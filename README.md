@@ -4,7 +4,7 @@
 
 **Status:** Pre-alpha (v0.0.x). APIs and on-disk formats may change without notice.
 
-kafkito is the spiritual successor to [`provectus/kafka-ui`](https://github.com/provectus/kafka-ui) — a free, open-source web UI for managing and observing Apache Kafka clusters. Built in Go with a modern React frontend, shipped as a single binary, licensed under Apache 2.0.
+kafkito is a free, open-source web UI for managing and observing Apache Kafka clusters — built in Go as a single binary, with a modern React frontend, Apache 2.0. It's an independent rewrite inspired by [`provectus/kafka-ui`](https://github.com/provectus/kafka-ui) (unmaintained since 2024); for a community-maintained continuation of the original Java codebase, see [`kafbat/kafka-ui`](https://github.com/kafbat/kafka-ui).
 
 ## Quickstart
 
@@ -93,5 +93,6 @@ Apache License 2.0 — see [LICENSE](./LICENSE) and [NOTICE](./NOTICE).
 
 ## Acknowledgements
 
-- [`provectus/kafka-ui`](https://github.com/provectus/kafka-ui) — Apache-2.0 reference for features (RBAC, masking, graceful degradation). We may port code from there with attribution.
+- [`provectus/kafka-ui`](https://github.com/provectus/kafka-ui) — original Apache-2.0 reference for features (RBAC, masking, graceful degradation). Unmaintained since 2024. We may port code from there with attribution.
+- [`kafbat/kafka-ui`](https://github.com/kafbat/kafka-ui) — community-maintained continuation of `provectus/kafka-ui` (Apache-2.0, Java/Spring). Different stack, shared goals. Worth a look if you want a maintained fork of the original codebase.
 - [`redpanda-data/console`](https://github.com/redpanda-data/console) — BSL-1.1 architectural inspiration only. **No source code copied.**

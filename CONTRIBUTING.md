@@ -22,6 +22,21 @@ GitHub Actions.
 - Frontend: Tailwind tokens from `@theme`, no default palette classes. See `docs/DESIGN_GUIDELINES.md`.
 - UI strings and code comments are English only. No emojis in UI chrome, logs, or commit messages.
 
+## Secret scanning
+
+Secrets must never enter the repo. Three layers protect against accidents:
+
+1. **Local pre-commit hook (Gitleaks).** Run once after cloning:
+   ```sh
+   brew install pre-commit   # or: pipx install pre-commit
+   pre-commit install
+   ```
+   `git commit` then aborts when Gitleaks finds a credential in the staged diff.
+2. **CI scan (TruffleHog).** `.github/workflows/secret-scan.yml` scans every push to `main` and every PR. Verified findings fail the job.
+3. **GitHub Push Protection.** Enabled in repo settings; blocks pushes containing recognised provider tokens server-side.
+
+If a secret leaks despite this, **rotate the credential at the provider first**, then clean the history (`git filter-repo`).
+
 ## License
 
 By submitting a contribution, you agree that your work is licensed under
