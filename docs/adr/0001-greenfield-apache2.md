@@ -5,7 +5,7 @@
 
 ## Context
 
-We set out to build a modern successor to [`provectus/kafka-ui`](https://github.com/provectus/kafka-ui), which has been stagnating since 2024. Two candidate starting points were considered:
+We set out to build a modern alternative in the lineage of [`provectus/kafka-ui`](https://github.com/provectus/kafka-ui), which has been stagnating since 2024. The community-maintained continuation of that codebase is [`kafbat/kafka-ui`](https://github.com/kafbat/kafka-ui) (Apache-2.0, Java/Spring). For a Go single-binary stack, two candidate starting points were considered:
 
 1. **Hard-fork of [`redpanda-data/console`](https://github.com/redpanda-data/console)** — a mature Go codebase covering ~80 % of the feature scope, with an active upstream.
 2. **Greenfield Go implementation** — clean-room, same architectural stack, Apache-2.0 from day one.
@@ -69,5 +69,6 @@ We will build kafkito as a **Greenfield Go implementation, licensed under Apache
 ## Alternatives considered
 
 - **Fork pre-BSL "Kowl" history (pre-2022 Apache-2.0).** Rejected: the pre-BSL codebase is ~4 years stale; nearly all valuable features were added under BSL.
+- **Fork [`kafbat/kafka-ui`](https://github.com/kafbat/kafka-ui) (Apache-2.0, community continuation of provectus/kafka-ui).** Rejected: Java/Spring stack conflicts with the goal of a Go single-binary distribution.
 - **Fork AKHQ (Apache-2.0, Java/Micronaut).** Rejected: we want a Go single-binary stack.
 - **Accept BSL and fork `redpanda-data/console`.** Rejected: conflicts with stated goal of OSI-approved, managed-service-friendly licensing.
