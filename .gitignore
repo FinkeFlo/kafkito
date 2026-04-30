@@ -29,6 +29,7 @@ Thumbs.db
 # Env / secrets
 .env
 .env.local
+.env.dev
 *.pem
 
 # Local cluster configs (real credentials) — never commit
