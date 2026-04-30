@@ -8,31 +8,53 @@ kafkito is the spiritual successor to [`provectus/kafka-ui`](https://github.com/
 
 ## Quickstart
 
-Run the prebuilt container against a local Kafka:
+### Try it locally — no auth setup
+
+The `local` image ships with auth disabled and a logged-in dev
+identity, so the UI works immediately. Use it to evaluate kafkito
+against a local Kafka. **Never deploy this variant.**
 
 ```sh
-docker run --rm -p 8080:8080 \
+docker run --rm -p 8080:37421 \
+  -e KAFKITO_KAFKA_BROKERS=host.docker.internal:9092 \
+  ghcr.io/finkeflo/kafkito:latest-local
+```
+
+Open http://localhost:8080 in your browser. Connect kafkito to a
+broker on your host (`host.docker.internal:9092`), or run a Kafka
+container alongside it on a shared docker network.
+
+### Production image (OIDC / JWT)
+
+```sh
+docker run --rm -p 8080:37421 \
+  -e KAFKITO_AUTH_MODE=mock \
   -e KAFKITO_KAFKA_BROKERS=host.docker.internal:9092 \
   ghcr.io/finkeflo/kafkito:latest
 ```
 
-Or build from source with Go 1.26+ and Bun 1.3+:
+The default image enforces auth. Use `KAFKITO_AUTH_MODE=mock` for
+JWT-validation testing, or wire in your own OIDC issuer for
+real-world deploys.
+
+### SAP BTP / XSUAA
+
+```sh
+docker run --rm -p 8080:37421 ghcr.io/finkeflo/kafkito:latest-btp
+```
+
+See [ADR-0004](./docs/adr/0004-xsuaa-build-tag.md) for the
+build-tag rationale.
+
+### Build from source
+
+Requires Go 1.26+ and Bun 1.3+:
 
 ```sh
 git clone https://github.com/FinkeFlo/kafkito && cd kafkito
 make build
 KAFKITO_KAFKA_BROKERS=localhost:9092 ./bin/kafkito
 ```
-
-Open http://localhost:8080 in your browser.
-
-For SAP BTP / XSUAA users, pull the build-tagged variant:
-
-```sh
-docker run --rm -p 8080:8080 ghcr.io/finkeflo/kafkito:latest-btp
-```
-
-See [ADR-0004](./docs/adr/0004-xsuaa-build-tag.md) for the build-tag rationale.
 
 ## Why kafkito?
 
