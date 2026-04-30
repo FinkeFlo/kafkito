@@ -1,0 +1,8 @@
+{
+  "generic": "Something went wrong.",
+  "network": "Cannot reach the server. Check the cluster connection.",
+  "unauthorized": "You are not authorized to perform this action.",
+  "notFound": "Not found.",
+  "timeout": "The request timed out. Please try again.",
+  "limitedPermissions": "Limited permissions on this cluster — some data may be hidden."
+}

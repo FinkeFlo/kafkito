@@ -1,0 +1,25 @@
+{
+  "title": "Overview",
+  "subtitle": "Kafka clusters at a glance.",
+  "empty": {
+    "title": "No clusters configured",
+    "body": "Configure clusters via clusters.yaml or KAFKITO_KAFKA_BROKERS to see them here."
+  },
+  "card": {
+    "topics_one": "{{count}} topic",
+    "topics_other": "{{count}} topics",
+    "groups_one": "{{count}} group",
+    "groups_other": "{{count}} groups",
+    "totalLag": "Total lag",
+    "lagUnknown": "n/a",
+    "browseTopics": "Browse topics",
+    "unreachable": "Unreachable",
+    "unreachableHint": "{{error}}",
+    "limitedHint": "Some metrics could not be loaded.",
+    "metricUnavailable": "—"
+  },
+  "actions": {
+    "newTopic": "+ New Topic",
+    "openSearch": "Open search"
+  }
+}

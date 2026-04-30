@@ -1,0 +1,24 @@
+{
+  "schema": "kafkito.private-clusters/v1",
+  "exported_at": "2026-04-28T13:00:00.000Z",
+  "clusters": [
+    {
+      "id": "20000000-0000-4000-8000-200000000001",
+      "name": "REPLACE_ME confluent cloud",
+      "brokers": ["pkc-REPLACEME.eu-west-1.aws.confluent.cloud:9092"],
+      "auth": {
+        "type": "plain",
+        "username": "REPLACE_ME_API_KEY",
+        "password": "REPLACE_ME_API_SECRET"
+      },
+      "tls": { "enabled": true },
+      "schema_registry": {
+        "url": "https://psrc-REPLACEME.eu-central-1.aws.confluent.cloud",
+        "username": "REPLACE_ME_SR_API_KEY",
+        "password": "REPLACE_ME_SR_API_SECRET"
+      },
+      "created_at": 1745846400000,
+      "updated_at": 1745846400000
+    }
+  ]
+}

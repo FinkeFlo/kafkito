@@ -1,0 +1,31 @@
+{
+  "title": "Schema Registry",
+  "subtitle": "Browse subjects and schema versions from Confluent/Apicurio-compatible registries.",
+  "notConfigured": "Cluster {{cluster}} has no schema_registry.url configured.",
+  "filter": {
+    "placeholder": "Filter subjects…"
+  },
+  "list": {
+    "count": "{{shown}} / {{total}} subjects",
+    "emptyShort": "No subjects."
+  },
+  "empty": {
+    "title": "No schemas registered",
+    "description": "Register a schema to enable serialization checks."
+  },
+  "selectPrompt": "Select a subject to view its schema versions.",
+  "delete": {
+    "title": "Soft-delete subject \"{{name}}\"?",
+    "description": "All versions of this subject will be soft-deleted in the Schema Registry. This can be restored administratively.",
+    "label": "Soft-delete",
+    "aria": "Soft-delete subject"
+  },
+  "detail": {
+    "loading": "Loading schema…",
+    "references": "References",
+    "schema": "Schema",
+    "compat": "compat",
+    "id": "id",
+    "type": "type"
+  }
+}

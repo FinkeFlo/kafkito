@@ -1,0 +1,35 @@
+{
+  "title": "SCRAM Users",
+  "subtitle": "Manage SASL/SCRAM credentials (KIP-554). One credential per user/mechanism.",
+  "empty": {
+    "title": "No SCRAM users",
+    "description": "Create a SCRAM user to enable SASL authentication.",
+    "noMatch": "No users match your filter."
+  },
+  "columns": {
+    "user": "User",
+    "mechanism": "Mechanism",
+    "iterations": "Iterations"
+  },
+  "actions": {
+    "new": "+ New User",
+    "rotate": "Rotate password"
+  },
+  "upsert": {
+    "createTitle": "Create / Update SCRAM User",
+    "rotateTitle": "Rotate password",
+    "password": "Password",
+    "passwordPlaceholder": "at least 1 character",
+    "iterations": "Iterations",
+    "iterationsHint": "(4096–16384, default 8192)",
+    "saving": "Saving…",
+    "rotate": "Rotate",
+    "successCreate": "SCRAM credential set: {{user}} / {{mechanism}} ({{iterations}} it.)"
+  },
+  "delete": {
+    "title": "Delete SCRAM credential?",
+    "description": "The user will no longer be able to authenticate with this mechanism. Other mechanisms remain.",
+    "destructiveLabel": "Delete credential",
+    "success": "Credential deleted: {{user}} / {{mechanism}}"
+  }
+}

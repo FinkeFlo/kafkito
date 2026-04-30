@@ -1,0 +1,38 @@
+{
+  "title": "ACLs",
+  "subtitle": "Manage Kafka ACL entries (principal, resource, operation, permission).",
+  "filter": {
+    "placeholder": "Filter principal / resource / operation…"
+  },
+  "empty": {
+    "title": "No ACLs configured",
+    "description": "Define an ACL to grant or restrict access to resources.",
+    "noMatch": "No ACL entries match your filter."
+  },
+  "columns": {
+    "principal": "Principal",
+    "host": "Host",
+    "resource": "Resource",
+    "pattern": "Pattern",
+    "operation": "Operation",
+    "permission": "Permission"
+  },
+  "actions": {
+    "new": "+ New ACL"
+  },
+  "create": {
+    "title": "Create ACL",
+    "resourceType": "Resource type",
+    "resourceName": "Resource name",
+    "creating": "Creating…",
+    "hints": {
+      "principal": "e.g. User:alice or User:CN=bob",
+      "host": "* (wildcard) or a specific IP",
+      "clusterResource": "for CLUSTER: \"kafka-cluster\""
+    }
+  },
+  "delete": {
+    "title": "Delete ACL?",
+    "destructiveLabel": "Delete ACL"
+  }
+}

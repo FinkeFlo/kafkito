@@ -1,0 +1,11 @@
+kafkito
+Copyright 2026 The kafkito Authors
+
+This product includes software developed at
+The kafkito Project (https://github.com/FinkeFlo/kafkito).
+
+This product is a clean-room, Greenfield implementation of a Kafka
+management UI. It is not derived from redpanda-data/console (Business
+Source License 1.1). Architectural and feature inspiration is drawn
+from provectus/kafka-ui (Apache License 2.0) and redpanda-data/console,
+without copying source code from the latter.

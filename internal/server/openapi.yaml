@@ -1,0 +1,699 @@
+openapi: 3.1.0
+info:
+  title: kafkito REST API
+  version: "1"
+  summary: Read/write access to Kafka clusters managed by kafkito.
+  description: |
+    Stable JSON surface that backs the kafkito web UI. Suitable for scripting
+    and development tooling.
+
+    Authentication: kafkito forwards the `X-User` header to the configured
+    RBAC policy. If RBAC is not configured the API is open. There is no
+    built-in login — delegate authentication to a reverse proxy.
+
+    Conventions:
+    - All list endpoints return `{ "<resource>": [...] }` objects, never bare
+      arrays, so new top-level fields can be added without breaking clients.
+    - Timestamps are Unix milliseconds (int64) unless noted otherwise.
+    - Error responses are `{ "error": "<short>", "detail": "<optional>" }`.
+servers:
+  - url: /
+tags:
+  - name: meta
+    description: Build info, readiness, identity.
+  - name: clusters
+    description: Cluster inventory and capabilities.
+  - name: topics
+    description: Topic listing, describe, create, delete, produce, consume.
+  - name: groups
+    description: Consumer groups, members, offsets, reset.
+  - name: schemas
+    description: Schema Registry subjects and versions.
+  - name: acls
+    description: Kafka ACLs.
+  - name: users
+    description: SCRAM users.
+paths:
+  /healthz:
+    get:
+      tags: [meta]
+      summary: Liveness probe.
+      responses:
+        "200":
+          description: Service is alive.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { status: { type: string, example: ok } }
+  /readyz:
+    get:
+      tags: [meta]
+      summary: Readiness probe. 503 if any configured cluster is unreachable.
+      responses:
+        "200": { description: All clusters reachable or none configured. }
+        "503": { description: At least one cluster is unreachable. }
+  /api/v1/info:
+    get:
+      tags: [meta]
+      summary: Build info.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name: { type: string }
+                  version: { type: string }
+  /api/v1/me:
+    get:
+      tags: [meta]
+      summary: Resolved caller identity and effective permissions.
+      responses:
+        "200": { description: OK }
+  /api/v1/clusters:
+    get:
+      tags: [clusters]
+      summary: List configured clusters with reachability + capabilities.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  clusters:
+                    type: array
+                    items: { $ref: "#/components/schemas/ClusterInfo" }
+  /api/v1/clusters/{cluster}/capabilities:
+    get:
+      tags: [clusters]
+      summary: Cached capabilities (permissions probed against the broker).
+      parameters: [ { $ref: "#/components/parameters/Cluster" } ]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Capabilities" }
+  /api/v1/clusters/{cluster}/capabilities/refresh:
+    post:
+      tags: [clusters]
+      summary: Re-probe capabilities (clears cache).
+      parameters: [ { $ref: "#/components/parameters/Cluster" } ]
+      responses:
+        "200": { description: OK }
+  /api/v1/clusters/{cluster}/topics:
+    get:
+      tags: [topics]
+      summary: List topics.
+      parameters: [ { $ref: "#/components/parameters/Cluster" } ]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  topics:
+                    type: array
+                    items: { $ref: "#/components/schemas/TopicInfo" }
+    post:
+      tags: [topics]
+      summary: Create a topic.
+      parameters: [ { $ref: "#/components/parameters/Cluster" } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTopicRequest" }
+      responses:
+        "201": { description: Created }
+        "409": { description: Already exists }
+  /api/v1/clusters/{cluster}/topics/{topic}:
+    get:
+      tags: [topics]
+      summary: Describe a single topic (partitions, configs, watermarks).
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { $ref: "#/components/parameters/Topic" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TopicDetail" }
+        "404": { description: Topic not found }
+    delete:
+      tags: [topics]
+      summary: Delete a topic.
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { $ref: "#/components/parameters/Topic" }
+      responses:
+        "204": { description: Deleted }
+  /api/v1/clusters/{cluster}/topics/{topic}/consumers:
+    get:
+      tags: [topics]
+      summary: Consumer groups that have committed offsets on this topic.
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { $ref: "#/components/parameters/Topic" }
+      responses:
+        "200": { description: OK }
+  /api/v1/clusters/{cluster}/topics/{topic}/records:
+    delete:
+      tags: [topics]
+      summary: Delete records up to an offset per partition (low-watermark bump).
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { $ref: "#/components/parameters/Topic" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                partitions:
+                  type: object
+                  additionalProperties: { type: integer, format: int64 }
+                  description: Map of partition → offset to delete up to.
+      responses:
+        "200": { description: OK }
+  /api/v1/clusters/{cluster}/topics/{topic}/messages:
+    get:
+      tags: [topics]
+      summary: Consume recent messages from a topic.
+      description: |
+        Reads at most `limit` messages (capped at 500 server-side). Ordering is
+        per-partition by offset ascending; the kafkito UI re-sorts on the
+        client. Values are decoded into `value` when printable; when binary,
+        `value_b64` is populated and `value_encoding=binary`. Schema-Registry
+        encoded records are decoded transparently when a Schema Registry is
+        configured for the cluster.
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { $ref: "#/components/parameters/Topic" }
+        - in: query
+          name: partition
+          schema: { type: integer, default: -1 }
+          description: "-1 = all partitions."
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+        - in: query
+          name: from
+          schema: { type: string, enum: [latest, oldest, offset], default: latest }
+        - in: query
+          name: offset
+          schema: { type: integer, format: int64 }
+          description: Required when `from=offset`.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items: { $ref: "#/components/schemas/Message" }
+    post:
+      tags: [topics]
+      summary: Produce a single record.
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { $ref: "#/components/parameters/Topic" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                partition: { type: integer }
+                key: { type: string }
+                value: { type: string }
+                key_encoding: { type: string, enum: [text, base64] }
+                value_encoding: { type: string, enum: [text, base64] }
+                headers:
+                  type: object
+                  additionalProperties: { type: string }
+      responses:
+        "200": { description: Produced }
+  /api/v1/clusters/{cluster}/topics/{topic}/sample:
+    get:
+      tags: [topics]
+      summary: Sample the last n decoded messages from a topic.
+      description: |
+        Returns up to `n` (default 5, max 25) most recent decoded messages.
+        Used by the search path-picker to build a structural sample of the
+        topic payload. Reuses the consume permission for RBAC.
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { $ref: "#/components/parameters/Topic" }
+        - in: query
+          name: n
+          schema: { type: integer, minimum: 1, maximum: 25, default: 5 }
+        - in: query
+          name: partition
+          schema: { type: integer, default: -1 }
+          description: "-1 = all partitions."
+      responses:
+        "200":
+          description: Sample fetched.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cluster:    { type: string }
+                  topic:      { type: string }
+                  messages:
+                    type: array
+                    items: { $ref: "#/components/schemas/Message" }
+                  sampled_at: { type: integer, format: int64 }
+        "400":
+          description: Bad request (invalid n or partition).
+        "404":
+          description: Unknown cluster.
+        "403":
+          description: Forbidden.
+  /api/v1/clusters/{cluster}/topics/{topic}/messages/search:
+    post:
+      tags: [topics]
+      summary: Bounded, budget-limited content search across partitions.
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { $ref: "#/components/parameters/Topic" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query: { type: string }
+                zones:
+                  type: array
+                  items: { type: string, enum: [value, key, headers] }
+                mode: { type: string, enum: [contains, regex, jsonpath] }
+                direction: { type: string, enum: [forward, backward] }
+                partitions:
+                  type: array
+                  items: { type: integer }
+                limit: { type: integer }
+                max_scan: { type: integer }
+                timeout_ms: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SearchResponse" }
+  /api/v1/clusters/{cluster}/groups:
+    get:
+      tags: [groups]
+      summary: List consumer groups.
+      parameters: [ { $ref: "#/components/parameters/Cluster" } ]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  groups:
+                    type: array
+                    items: { $ref: "#/components/schemas/GroupInfo" }
+  /api/v1/clusters/{cluster}/groups/{group}:
+    get:
+      tags: [groups]
+      summary: Describe a consumer group (members, offsets, lag).
+      description: |
+        Returns full membership and per-partition committed offsets.
+        `offsets[].assigned_to` is `<client_id>@<host>` of the current partition
+        owner, or empty if the group is rebalancing.
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { $ref: "#/components/parameters/Group" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GroupDetail" }
+    delete:
+      tags: [groups]
+      summary: Delete a consumer group. Must be empty.
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { $ref: "#/components/parameters/Group" }
+      responses:
+        "204": { description: Deleted }
+  /api/v1/clusters/{cluster}/groups/{group}/reset-offsets:
+    post:
+      tags: [groups]
+      summary: Reset committed offsets of a group.
+      description: |
+        Group must have no active members. Set `dry_run=true` to preview the
+        resulting offsets without committing.
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { $ref: "#/components/parameters/Group" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [topic, strategy]
+              properties:
+                topic: { type: string }
+                partitions:
+                  type: array
+                  items: { type: integer }
+                strategy:
+                  type: string
+                  enum: [earliest, latest, offset, timestamp, shift-by]
+                offset: { type: integer, format: int64 }
+                timestamp_ms: { type: integer, format: int64 }
+                shift: { type: integer, format: int64 }
+                dry_run: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResetOffsetsResponse" }
+  /api/v1/clusters/{cluster}/schemas/subjects:
+    get:
+      tags: [schemas]
+      summary: List Schema Registry subjects.
+      parameters: [ { $ref: "#/components/parameters/Cluster" } ]
+      responses: { "200": { description: OK } }
+  /api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions:
+    get:
+      tags: [schemas]
+      summary: List versions of a subject.
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { in: path, name: subject, required: true, schema: { type: string } }
+      responses: { "200": { description: OK } }
+    post:
+      tags: [schemas]
+      summary: Register a new version for a subject.
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { in: path, name: subject, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object } } }
+      responses: { "200": { description: OK } }
+  /api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions/{version}:
+    get:
+      tags: [schemas]
+      summary: Get a specific subject version (or `latest`).
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { in: path, name: subject, required: true, schema: { type: string } }
+        - { in: path, name: version, required: true, schema: { type: string }, description: "Integer or `latest`." }
+      responses: { "200": { description: OK } }
+  /api/v1/clusters/{cluster}/schemas/subjects/{subject}:
+    delete:
+      tags: [schemas]
+      summary: Soft-delete a subject.
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { in: path, name: subject, required: true, schema: { type: string } }
+      responses: { "204": { description: Deleted } }
+  /api/v1/clusters/{cluster}/acls:
+    get:
+      tags: [acls]
+      summary: List ACLs.
+      parameters: [ { $ref: "#/components/parameters/Cluster" } ]
+      responses: { "200": { description: OK } }
+    post:
+      tags: [acls]
+      summary: Create an ACL.
+      parameters: [ { $ref: "#/components/parameters/Cluster" } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ACL" } } }
+      responses: { "201": { description: Created } }
+    delete:
+      tags: [acls]
+      summary: Delete ACL(s) matching a filter.
+      parameters: [ { $ref: "#/components/parameters/Cluster" } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ACL" } } }
+      responses: { "200": { description: OK } }
+  /api/v1/clusters/{cluster}/users:
+    get:
+      tags: [users]
+      summary: List SCRAM users.
+      parameters: [ { $ref: "#/components/parameters/Cluster" } ]
+      responses: { "200": { description: OK } }
+    post:
+      tags: [users]
+      summary: Create or update a SCRAM user.
+      parameters: [ { $ref: "#/components/parameters/Cluster" } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user, mechanism, password]
+              properties:
+                user: { type: string }
+                mechanism: { type: string, enum: [SCRAM-SHA-256, SCRAM-SHA-512] }
+                password: { type: string, format: password }
+                iterations: { type: integer }
+      responses: { "200": { description: OK } }
+  /api/v1/clusters/{cluster}/users/{user}:
+    delete:
+      tags: [users]
+      summary: Delete a SCRAM user.
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { in: path, name: user, required: true, schema: { type: string } }
+      responses: { "204": { description: Deleted } }
+components:
+  parameters:
+    Cluster:
+      in: path
+      name: cluster
+      required: true
+      schema: { type: string }
+      description: Cluster name from the kafkito config.
+    Topic:
+      in: path
+      name: topic
+      required: true
+      schema: { type: string }
+    Group:
+      in: path
+      name: group
+      required: true
+      schema: { type: string }
+  schemas:
+    ClusterInfo:
+      type: object
+      properties:
+        name: { type: string }
+        reachable: { type: boolean }
+        error: { type: string }
+        auth_type: { type: string }
+        tls: { type: boolean }
+        schema_registry: { type: boolean }
+        capabilities: { $ref: "#/components/schemas/Capabilities" }
+    Capabilities:
+      type: object
+      properties:
+        describe_cluster: { type: boolean }
+        list_topics: { type: boolean }
+        describe_configs: { type: boolean }
+        list_groups: { type: boolean }
+        create_topic: { type: boolean }
+        delete_topic: { type: boolean }
+        alter_configs: { type: boolean }
+        errors:
+          type: object
+          additionalProperties: { type: string }
+        probed_at: { type: string, format: date-time }
+    TopicInfo:
+      type: object
+      properties:
+        name: { type: string }
+        partitions: { type: integer }
+        replication_factor: { type: integer }
+        is_internal: { type: boolean }
+    CreateTopicRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        partitions: { type: integer, default: -1 }
+        replication_factor: { type: integer, default: -1 }
+        configs:
+          type: object
+          additionalProperties: { type: string }
+    TopicDetail:
+      type: object
+      properties:
+        name: { type: string }
+        is_internal: { type: boolean }
+        partitions:
+          type: array
+          items: { $ref: "#/components/schemas/PartitionInfo" }
+        configs:
+          type: array
+          items: { $ref: "#/components/schemas/TopicConfigEntry" }
+    PartitionInfo:
+      type: object
+      properties:
+        id: { type: integer }
+        leader: { type: integer }
+        replicas: { type: array, items: { type: integer } }
+        isr: { type: array, items: { type: integer } }
+        low_watermark: { type: integer, format: int64 }
+        high_watermark: { type: integer, format: int64 }
+    TopicConfigEntry:
+      type: object
+      properties:
+        name: { type: string }
+        value: { type: string }
+        source: { type: string }
+        is_default: { type: boolean }
+        is_read_only: { type: boolean }
+        is_sensitive: { type: boolean }
+    Message:
+      type: object
+      properties:
+        partition: { type: integer }
+        offset: { type: integer, format: int64 }
+        timestamp_ms: { type: integer, format: int64 }
+        key: { type: string }
+        key_encoding: { type: string, enum: [text, binary, base64, empty, null] }
+        key_b64: { type: string }
+        value: { type: string }
+        value_encoding: { type: string, enum: [json, text, binary, base64, empty, null, avro, protobuf, json_sr] }
+        value_b64: { type: string }
+        headers:
+          type: object
+          additionalProperties: { type: string }
+        masked: { type: boolean }
+        value_sr: { $ref: "#/components/schemas/SRDecodedMeta" }
+        key_sr: { $ref: "#/components/schemas/SRDecodedMeta" }
+    SRDecodedMeta:
+      type: object
+      properties:
+        schema_id: { type: integer }
+        subject: { type: string }
+        version: { type: integer }
+        format: { type: string, enum: [avro, protobuf, json] }
+        error: { type: string }
+    SearchResponse:
+      type: object
+      properties:
+        messages:
+          type: array
+          items: { $ref: "#/components/schemas/Message" }
+        stats:
+          type: object
+          properties:
+            scanned: { type: integer }
+            matched: { type: integer }
+            budget_exhausted: { type: boolean }
+            direction: { type: string }
+            parse_errors: { type: integer }
+            next_cursors:
+              type: object
+              additionalProperties: { type: integer, format: int64 }
+            durations_ms:
+              type: object
+              additionalProperties: { type: integer, format: int64 }
+    GroupInfo:
+      type: object
+      properties:
+        group_id: { type: string }
+        state: { type: string, enum: [Stable, PreparingRebalance, CompletingRebalance, Empty, Dead, Unknown] }
+        protocol_type: { type: string }
+        protocol: { type: string, description: "e.g. range, roundrobin, cooperative-sticky." }
+        coordinator_id: { type: integer }
+        members: { type: integer }
+        topics: { type: integer }
+        lag: { type: integer, format: int64 }
+        lag_known: { type: boolean }
+        error: { type: string }
+    GroupDetail:
+      allOf:
+        - $ref: "#/components/schemas/GroupInfo"
+        - type: object
+          properties:
+            members:
+              type: array
+              items: { $ref: "#/components/schemas/GroupMember" }
+            offsets:
+              type: array
+              items: { $ref: "#/components/schemas/GroupOffset" }
+    GroupMember:
+      type: object
+      properties:
+        member_id: { type: string }
+        instance_id: { type: string, description: "Static-membership group.instance.id, if configured." }
+        client_id: { type: string }
+        client_host: { type: string }
+        assignments:
+          type: array
+          items:
+            type: object
+            properties:
+              topic: { type: string }
+              partitions: { type: array, items: { type: integer } }
+    GroupOffset:
+      type: object
+      properties:
+        topic: { type: string }
+        partition: { type: integer }
+        offset: { type: integer, format: int64 }
+        log_end: { type: integer, format: int64 }
+        lag: { type: integer, format: int64 }
+        metadata: { type: string }
+        assigned_to:
+          type: string
+          description: "Current owner as `<client_id>@<host>`, empty during rebalance."
+    ResetOffsetsResponse:
+      type: object
+      properties:
+        group: { type: string }
+        topic: { type: string }
+        dry_run: { type: boolean }
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              partition: { type: integer }
+              old_offset: { type: integer, format: int64 }
+              new_offset: { type: integer, format: int64 }
+              error: { type: string }
+    ACL:
+      type: object
+      properties:
+        principal: { type: string, example: "User:alice" }
+        host: { type: string, example: "*" }
+        resource_type: { type: string, enum: [TOPIC, GROUP, CLUSTER, TRANSACTIONAL_ID, DELEGATION_TOKEN] }
+        resource_name: { type: string }
+        pattern_type: { type: string, enum: [LITERAL, PREFIXED] }
+        operation: { type: string, enum: [READ, WRITE, CREATE, DELETE, ALTER, DESCRIBE, CLUSTER_ACTION, ALTER_CONFIGS, DESCRIBE_CONFIGS, IDEMPOTENT_WRITE, ALL] }
+        permission_type: { type: string, enum: [ALLOW, DENY] }

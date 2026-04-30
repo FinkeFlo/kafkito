@@ -1,0 +1,52 @@
+# Binaries
+/bin/
+/dist/
+/kafkito
+/kafkito.exe
+
+# Go
+*.test
+*.out
+coverage.*
+vendor/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+frontend/bun.lockb.backup
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Env / secrets
+.env
+.env.local
+*.pem
+
+# Local cluster configs (real credentials) — never commit
+/.local/
+deploy/local/
+*.local.yaml
+*.local.yml
+
+# Logs
+*.log
+*.key
+
+# Tool caches
+.golangci-cache/
+/tmp/
+
+# Personal Claude Code overrides (hooks, permissions). Team settings live
+# in .claude/settings.json (committed).
+.claude/settings.local.json
+NEXT_STEPS.md
+
+# Local git worktrees
+.worktrees/

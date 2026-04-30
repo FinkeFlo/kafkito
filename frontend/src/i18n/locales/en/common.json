@@ -1,0 +1,76 @@
+{
+  "actions": {
+    "newTopic": "+ New Topic",
+    "newGroup": "+ New Group",
+    "newSchema": "+ New Schema",
+    "newACL": "+ New ACL",
+    "newUser": "+ New User",
+    "create": "Create",
+    "save": "Save",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "close": "Close",
+    "edit": "Edit",
+    "refresh": "Refresh",
+    "search": "Search",
+    "open": "Open",
+    "copy": "Copy",
+    "back": "Back"
+  },
+  "copy": {
+    "idle": "Copy to clipboard",
+    "done": "Copied"
+  },
+  "states": {
+    "loading": "Loading…",
+    "ready": "Ready",
+    "unreachable": "Unreachable",
+    "limited": "Limited",
+    "empty": "Nothing here yet"
+  },
+  "filters": {
+    "showingOf": "Showing {{count}} of {{total}}",
+    "showingAll_one": "{{count}} item",
+    "showingAll_other": "{{count}} items",
+    "noResultsFor": "No results for \"{{query}}\""
+  },
+  "shortcuts": {
+    "openSearch": "⌘K to search"
+  },
+  "cluster": {
+    "label": "Cluster",
+    "switch": "Switch cluster",
+    "current": "Current cluster",
+    "none": "No clusters configured",
+    "noneHelp": "Set KAFKITO_KAFKA_BROKERS or configure clusters.yaml.",
+    "unknownTitle": "Unknown cluster",
+    "unknownBody": "The cluster \"{{name}}\" is not configured. Switching to \"{{fallback}}\".",
+    "unreachableTooltip": "Unreachable: {{error}}",
+    "capabilities": {
+      "sr": "SR",
+      "sasl": "SASL",
+      "tls": "TLS",
+      "limited": "Limited"
+    }
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "cycleHint": "click to cycle"
+  },
+  "timezone": {
+    "utc": "UTC",
+    "local": "Local",
+    "cycleHint": "click to cycle"
+  },
+  "nav": {
+    "home": "Home",
+    "topics": "Topics",
+    "groups": "Groups",
+    "schemas": "Schemas",
+    "acls": "ACLs",
+    "users": "Users"
+  }
+}
