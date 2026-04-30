@@ -1,4 +1,4 @@
-.PHONY: build build-go run run-dev test test-integration lint tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev proto proto-lint help
+.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev proto proto-lint help
 
 BIN := bin/kafkito
 PKG := ./...
@@ -87,3 +87,33 @@ proto:
 
 proto-lint:
 	buf lint
+
+# --- Dev iteration loop -------------------------------------------------
+# `worktree-init` writes a per-worktree .env.dev with a free port pair.
+# Idempotent: if .env.dev exists, it prints the contents and exits 0.
+worktree-init:
+	@if [ -f .env.dev ]; then \
+		echo ".env.dev already exists in this worktree:"; \
+		cat .env.dev; \
+		exit 0; \
+	fi; \
+	p=37421; \
+	while [ $$p -le 37499 ]; do \
+		if ! lsof -nP -iTCP:$$p -sTCP:LISTEN >/dev/null 2>&1 \
+		&& ! lsof -nP -iTCP:$$((p+1)) -sTCP:LISTEN >/dev/null 2>&1; then \
+			break; \
+		fi; \
+		p=$$((p+2)); \
+	done; \
+	if [ $$p -gt 37499 ]; then \
+		echo "no free port pair in 37421-37499" >&2; exit 1; \
+	fi; \
+	{ \
+		echo "# Per-worktree dev config — gitignored, regenerate with 'make worktree-init'."; \
+		echo "PORT=$$p"; \
+		echo "KAFKITO_BACKEND_PORT=$$p"; \
+		echo "KAFKITO_FRONTEND_PORT=$$(($$p+1))"; \
+		echo "KAFKITO_KAFKA_BROKERS=localhost:39092"; \
+	} > .env.dev; \
+	echo "wrote .env.dev:"; \
+	cat .env.dev
