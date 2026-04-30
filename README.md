@@ -56,6 +56,25 @@ make build
 KAFKITO_KAFKA_BROKERS=localhost:9092 ./bin/kafkito
 ```
 
+### Local development (hot-reload)
+
+Requires Go 1.26+, Bun 1.3+, and Docker.
+
+```sh
+make worktree-init    # writes .env.dev with a free port pair
+make dev              # Compose + backend (air) + frontend (Vite), one command
+```
+
+Open the Vite URL printed in the `[frontend]` stream
+(default `http://localhost:37422`). Backend changes under `cmd/`,
+`internal/`, or `pkg/` rebuild automatically; frontend changes hot-reload
+through Vite. Press Ctrl-C in the `make dev` terminal to stop both
+processes (the Compose stack stays up — tear it down with `make dev-down`).
+
+Multiple git worktrees can run `make dev` in parallel; each calls
+`make worktree-init` once to claim a free port pair, and they share the
+same Compose-backed Kafka and Schema Registry.
+
 ## Why kafkito?
 
 - **Single static binary** — no JVM, no side-car containers, ~50 MB RAM footprint.
