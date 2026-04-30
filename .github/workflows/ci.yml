@@ -21,9 +21,9 @@ jobs:
       - run: go build -tags "${{ matrix.tags }}" ./...
       - run: go test -tags "${{ matrix.tags }}" ./...
       - if: matrix.tags == ''
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v1.62
+          version: v2.11
 
   frontend:
     runs-on: ubuntu-24.04
