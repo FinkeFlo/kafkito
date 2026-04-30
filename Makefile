@@ -13,6 +13,9 @@ help:
 	@echo "  build-go           - build only the Go binary (skip frontend)"
 	@echo "  run                - build and run the binary"
 	@echo "  run-dev            - run with -tags devauth (auth disabled, dev only)"
+	@echo "  dev                - full local loop: Compose + backend (air) + frontend (Vite)"
+	@echo "  dev-down           - tear down the Compose dev stack"
+	@echo "  worktree-init      - write per-worktree .env.dev with a free port pair"
 	@echo "  test               - go test -race ./..."
 	@echo "  test-integration   - integration tests (requires Docker)"
 	@echo "  lint               - golangci-lint run"
@@ -147,3 +150,8 @@ dev:
 		--kill-timeout 5000 \
 		"go run github.com/air-verse/air@$(AIR_VERSION) -c .air.toml" \
 		"cd frontend && bun run dev"
+
+# Convenience alias of compose-down — same behavior, easier to discover
+# alongside `make dev`.
+dev-down:
+	docker compose --profile app --profile auth down --remove-orphans
