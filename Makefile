@@ -155,7 +155,8 @@ dev:
 		"go run github.com/air-verse/air@$(AIR_VERSION) -c .air.toml" \
 		"cd frontend && bun run dev"
 
-# Convenience alias of compose-down — same behavior, easier to discover
-# alongside `make dev`.
+# Tear down the dev Compose stack — scope mirrors `make dev`
+# (kafka + schema-registry, no profile filter). For the broader
+# teardown including --profile app/auth, use `make compose-down`.
 dev-down:
-	docker compose --profile app --profile auth down --remove-orphans
+	docker compose down --remove-orphans
