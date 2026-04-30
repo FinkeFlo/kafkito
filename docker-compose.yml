@@ -47,68 +47,6 @@ services:
       retries: 12
       start_period: 20s
 
-  kafka-secure:
-    image: apache/kafka:3.8.1
-    container_name: kafkito-kafka-secure
-    hostname: kafka-secure
-    ports:
-      - "39093:39093"
-    volumes:
-      - ./deploy/dev/kafka-secure-jaas.conf:/etc/kafka/jaas.conf:ro
-    environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-secure:9094
-      KAFKA_LISTENERS: SASL_PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9094,SASL_HOST://0.0.0.0:39093
-      KAFKA_ADVERTISED_LISTENERS: SASL_PLAINTEXT://kafka-secure:9092,SASL_HOST://localhost:39093
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_HOST:SASL_PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: SASL_PLAINTEXT
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
-      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
-      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/jaas.conf"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_LOG_RETENTION_HOURS: 24
-      # ACL authorizer: admin + ANONYMOUS (controller listener is PLAINTEXT)
-      # are super users; all other users need explicit ACLs.
-      KAFKA_AUTHORIZER_CLASS_NAME: "org.apache.kafka.metadata.authorizer.StandardAuthorizer"
-      KAFKA_SUPER_USERS: "User:admin;User:ANONYMOUS"
-      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
-      CLUSTER_ID: kafkito-secure-cluster-1
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - |
-          cat > /tmp/client.properties <<EOF
-          security.protocol=SASL_PLAINTEXT
-          sasl.mechanism=PLAIN
-          sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="admin-secret";
-          EOF
-          /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 --command-config /tmp/client.properties >/dev/null 2>&1
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 20s
-
-  # Idempotent one-shot bootstrap: grants the ACLs that User:kafkito needs to
-  # operate against kafka-secure. Without this, a fresh `docker compose up`
-  # leaves the secure broker with no ACLs for the `kafkito` principal and
-  # every admin call from the app fails with TOPIC_AUTHORIZATION_FAILED.
-  # The container exits cleanly after running (restart: "no").
-  kafka-secure-acls:
-    image: apache/kafka:3.8.1
-    container_name: kafkito-kafka-secure-acls
-    depends_on:
-      kafka-secure:
-        condition: service_healthy
-    volumes:
-      - ./deploy/dev/kafka-secure-acls.sh:/opt/bootstrap/acls.sh:ro
-    entrypoint: ["/bin/bash", "/opt/bootstrap/acls.sh"]
-    restart: "no"
-
   schema-registry:
     image: confluentinc/cp-schema-registry:7.6.2
     container_name: kafkito-schema-registry
