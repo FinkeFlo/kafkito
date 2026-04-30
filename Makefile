@@ -91,6 +91,9 @@ proto-lint:
 # --- Dev iteration loop -------------------------------------------------
 # `worktree-init` writes a per-worktree .env.dev with a free port pair.
 # Idempotent: if .env.dev exists, it prints the contents and exits 0.
+# The whole recipe runs as ONE shell (chained with `; \`), so the early
+# `exit 0` in the idempotent branch is load-bearing — without it, the
+# port scan below would still run and overwrite .env.dev.
 worktree-init:
 	@if [ -f .env.dev ]; then \
 		echo ".env.dev already exists in this worktree:"; \
@@ -98,21 +101,21 @@ worktree-init:
 		exit 0; \
 	fi; \
 	p=37421; \
-	while [ $$p -le 37499 ]; do \
+	while [ $$((p+1)) -le 37499 ]; do \
 		if ! lsof -nP -iTCP:$$p -sTCP:LISTEN >/dev/null 2>&1 \
 		&& ! lsof -nP -iTCP:$$((p+1)) -sTCP:LISTEN >/dev/null 2>&1; then \
 			break; \
 		fi; \
 		p=$$((p+2)); \
 	done; \
-	if [ $$p -gt 37499 ]; then \
+	if [ $$((p+1)) -gt 37499 ]; then \
 		echo "no free port pair in 37421-37499" >&2; exit 1; \
 	fi; \
 	{ \
-		echo "# Per-worktree dev config — gitignored, regenerate with 'make worktree-init'."; \
+		echo "# Per-worktree dev config - gitignored, regenerate with 'make worktree-init'."; \
 		echo "PORT=$$p"; \
 		echo "KAFKITO_BACKEND_PORT=$$p"; \
-		echo "KAFKITO_FRONTEND_PORT=$$(($$p+1))"; \
+		echo "KAFKITO_FRONTEND_PORT=$$((p+1))"; \
 		echo "KAFKITO_KAFKA_BROKERS=localhost:39092"; \
 	} > .env.dev; \
 	echo "wrote .env.dev:"; \
