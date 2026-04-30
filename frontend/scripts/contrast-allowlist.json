@@ -1,0 +1,38 @@
+[
+  {
+    "fg": "--color-accent",
+    "bg": "--color-accent",
+    "mode": "both",
+    "reason": "structurally unfixable same-colour focus ring. The global focus rule in index.css uses `outline-color: var(--color-focus)` (which aliases --color-accent); on a --color-accent surface the outline equals the fill (1.00:1). E1#1 is resolved at the primitive level: Phase 2's <Button variant=\"primary\"> overrides `focus-visible:outline-color` to `var(--color-focus-on-accent)` (the accent foreground — oklch(1 0 0) light, oklch(0.18 0.02 252) dark), which clears AA against the accent fill in both modes. The 2px outline-offset keeps the indicator visually separated from the button perimeter."
+  },
+  {
+    "fg": "--color-accent",
+    "bg": "--color-accent-hover",
+    "mode": "both",
+    "reason": "same-family focus ring. The global outline (--color-focus = --color-accent) lands on a hover variant of the same hue and cannot reach 3:1. Resolved by the same per-primitive override as the accent-on-accent case: Phase 2's <Button variant=\"primary\"> consumes --color-focus-on-accent on `:focus-visible` and keeps that outline-color through `:hover`."
+  },
+  {
+    "fg": "--color-accent",
+    "bg": "--color-danger",
+    "mode": "both",
+    "reason": "global focus ring (--color-focus = --color-accent outline) synthesised against a danger button background (ErrorState.tsx:25). Resolved at the primitive level: Phase 2's <Button variant=\"danger\"> overrides `focus-visible:outline-color` to `var(--color-focus-on-accent)` — the same near-black/white foreground primary buttons use — so the indicator clears AA against the danger fill in both modes."
+  },
+  {
+    "fg": "--color-accent",
+    "bg": "--color-text",
+    "mode": "dark",
+    "reason": "scanner false positive. CommandPalette.tsx:119 paints a translucent close-on-click backdrop with `bg-[var(--color-text)]/50`; the script synthesises a focus ring on this synthetic background even though the actual focus targets sit inside the dialog panel (--color-panel), where --color-accent outline clears 6.5:1. The backdrop element itself is non-interactive."
+  },
+  {
+    "fg": "--color-border",
+    "bg": "--color-panel",
+    "mode": "both",
+    "reason": "decorative hairline (1.31:1 light, 1.30:1 dark). WCAG 2.4.11 / 2.4.13 require 3:1 only for borders that carry information (focus, selection, error). --color-border is the default decorative divider; affordance borders use --color-border-hover (hover state, kept at the historical L=0.84 light / L=0.38 dark) or --color-border-strong (focused / selected, now lifted to ≥3:1 against --color-panel). When auditing future callsites: if a border is acting as a focus or selection affordance, switch to border-border-strong; if it's a hover affordance, switch to border-border-hover."
+  },
+  {
+    "fg": "--color-text",
+    "bg": "--color-accent",
+    "mode": "both",
+    "reason": "callsite at components/ErrorState.tsx:36 — the hand-rolled retry button uses `bg-accent … text-white` (white literal collides with the lighter dark accent and falls just short on light too). Follow-up fix: replace the hand-rolled button with <Button variant=\"primary\">, which consumes --color-accent-foreground / --color-text-on-accent automatically (light: 5.14:1, dark: 6.92:1). The scanner first-usage cursor may land elsewhere because it dedupes (fg, bg, sizeKind, kind) tuples; only the ErrorState retry button is a real conflict."
+  }
+]

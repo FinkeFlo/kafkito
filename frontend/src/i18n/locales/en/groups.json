@@ -1,0 +1,30 @@
+{
+  "title": "Consumer Groups",
+  "subtitle": "Offsets and membership for Kafka consumer groups in the active cluster.",
+  "empty": {
+    "title": "No consumer groups",
+    "description": "Consumer groups appear automatically once a client subscribes.",
+    "noMatch": "No groups match your filter."
+  },
+  "filter": {
+    "placeholder": "Filter groups…",
+    "lagOnly": "Lag > 0 only"
+  },
+  "columns": {
+    "groupId": "Group ID",
+    "state": "State",
+    "members": "Members",
+    "topics": "Topics",
+    "lag": "Lag",
+    "coordinator": "Coordinator"
+  },
+  "limited": {
+    "title": "No visible groups — possibly limited permissions",
+    "description": "Grant at least DESCRIBE on GROUP:* to see groups."
+  },
+  "delete": {
+    "confirmTitle": "Delete group \"{{name}}\"?",
+    "confirmDescription": "Members will lose committed offsets and replay according to their reset policy.",
+    "destructiveLabel": "Delete group"
+  }
+}

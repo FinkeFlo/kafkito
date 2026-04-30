@@ -1,0 +1,30 @@
+{
+  "placeholder": "Jump to page, cluster, or topic…",
+  "noResults": "No results.",
+  "footer": {
+    "navigate": "Navigate",
+    "open": "Open"
+  },
+  "category": {
+    "nav": "NAV",
+    "cluster": "CLUSTER",
+    "topic": "TOPIC"
+  },
+  "nav": {
+    "home": "Home",
+    "topics": "Topics",
+    "groups": "Groups",
+    "schemas": "Schemas",
+    "acls": "ACLs",
+    "users": "SCRAM Users"
+  },
+  "topic": {
+    "on": "on {{cluster}}"
+  },
+  "cluster": {
+    "unreachable": "unreachable"
+  },
+  "actions": {
+    "esc": "Esc"
+  }
+}

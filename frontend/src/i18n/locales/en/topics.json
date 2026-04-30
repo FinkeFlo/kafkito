@@ -1,0 +1,99 @@
+{
+  "tabs": {
+    "overview": "Overview",
+    "messages": "Messages",
+    "configs": "Configuration",
+    "produce": "Produce",
+    "consumers": "Consumers"
+  },
+  "backToTopics": "← Topics",
+  "detail": {
+    "subtitle": "Topic detail",
+    "noCluster": "No cluster selected. Go back to the topics list."
+  },
+  "overview": {
+    "partitions": "Partitions",
+    "replication": "Replication",
+    "messages": "Messages",
+    "kind": "Kind",
+    "internal": "internal",
+    "user": "user"
+  },
+  "partitionsTable": {
+    "title": "Partitions",
+    "columns": {
+      "partition": "#",
+      "leader": "Leader",
+      "replicas": "Replicas",
+      "isr": "ISR",
+      "start": "Start",
+      "end": "End",
+      "messages": "Messages"
+    }
+  },
+  "title": "Topics",
+  "subtitle": "Read-only view of Kafka topics in the active cluster.",
+  "filter": {
+    "placeholder": "Filter topics…",
+    "showInternal": "Show internal"
+  },
+  "empty": {
+    "title": "No topics yet",
+    "description": "Create the first Kafka topic for this cluster.",
+    "noMatch": "No topics match your filter."
+  },
+  "columns": {
+    "name": "Name",
+    "partitions": "Partitions",
+    "replicationFactor": "RF",
+    "type": "Type",
+    "consumers": "Consumers",
+    "messages": "Messages"
+  },
+  "type": {
+    "internal": "internal",
+    "user": "user"
+  },
+  "degraded": {
+    "title": "Limited permissions on this cluster",
+    "description": "The configured user lacks some Kafka ACLs. Grant at least DESCRIBE on TOPIC:* to see topics here."
+  },
+  "actions": {
+    "new": "+ New topic"
+  },
+  "create": {
+    "title": "Create topic on {{cluster}}",
+    "name": "Name",
+    "partitions": "Partitions",
+    "replicationFactor": "Replication factor",
+    "configs": "Configs (optional)",
+    "configsEmpty": "no overrides (broker defaults apply)",
+    "addConfig": "+ add",
+    "cancel": "Cancel",
+    "create": "Create",
+    "creating": "Creating…"
+  },
+  "delete": {
+    "confirmTitle": "Delete topic \"{{name}}\"?",
+    "confirmDescription": "This permanently removes the topic and all its messages. Type the topic name to confirm.",
+    "destructiveLabel": "Delete topic",
+    "errorTimeout": "Listing consumers for this topic took too long. Try again in a moment."
+  },
+  "consumers": {
+    "title": "Consumers",
+    "description": "Consumer groups currently reading from this topic.",
+    "columns": {
+      "groupId": "Group",
+      "state": "State",
+      "members": "Members",
+      "partitions": "Partitions",
+      "lag": "Lag"
+    },
+    "empty": {
+      "title": "No consumers",
+      "description": "No consumer group is currently reading from this topic."
+    },
+    "errorTimeout": "Listing consumers for this topic took too long. Try again in a moment.",
+    "errorGeneric": "Failed to load consumers: {{detail}}"
+  }
+}

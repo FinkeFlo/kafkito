@@ -1,0 +1,63 @@
+{
+  "schema": "kafkito.private-clusters/v1",
+  "exported_at": "2026-04-28T13:00:00.000Z",
+  "clusters": [
+    {
+      "id": "30000000-0000-4000-8000-300000000001",
+      "name": "team-x dev",
+      "brokers": ["dev-kafka.example.internal:9092"],
+      "auth": {
+        "type": "scram-sha-512",
+        "username": "team-x",
+        "password": "REPLACE_ME"
+      },
+      "tls": { "enabled": true },
+      "created_at": 1745846400000,
+      "updated_at": 1745846400000
+    },
+    {
+      "id": "30000000-0000-4000-8000-300000000002",
+      "name": "team-x staging",
+      "brokers": [
+        "staging-kafka-1.example.internal:9092",
+        "staging-kafka-2.example.internal:9092",
+        "staging-kafka-3.example.internal:9092"
+      ],
+      "auth": {
+        "type": "scram-sha-512",
+        "username": "team-x",
+        "password": "REPLACE_ME"
+      },
+      "tls": { "enabled": true },
+      "schema_registry": {
+        "url": "https://schema-staging.example.internal:8081",
+        "username": "team-x",
+        "password": "REPLACE_ME"
+      },
+      "created_at": 1745846400000,
+      "updated_at": 1745846400000
+    },
+    {
+      "id": "30000000-0000-4000-8000-300000000003",
+      "name": "team-x prod (read-only)",
+      "brokers": [
+        "prod-kafka-1.example.internal:9092",
+        "prod-kafka-2.example.internal:9092",
+        "prod-kafka-3.example.internal:9092"
+      ],
+      "auth": {
+        "type": "scram-sha-512",
+        "username": "team-x-readonly",
+        "password": "REPLACE_ME"
+      },
+      "tls": { "enabled": true, "insecure_skip_verify": false },
+      "schema_registry": {
+        "url": "https://schema-prod.example.internal:8081",
+        "username": "team-x-readonly",
+        "password": "REPLACE_ME"
+      },
+      "created_at": 1745846400000,
+      "updated_at": 1745846400000
+    }
+  ]
+}

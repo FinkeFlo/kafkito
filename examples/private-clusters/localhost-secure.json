@@ -1,0 +1,19 @@
+{
+  "schema": "kafkito.private-clusters/v1",
+  "exported_at": "2026-04-28T13:00:00.000Z",
+  "clusters": [
+    {
+      "id": "10000000-0000-4000-8000-100000000002",
+      "name": "local secure kafka",
+      "brokers": ["localhost:39093"],
+      "auth": {
+        "type": "plain",
+        "username": "kafkito",
+        "password": "kafkito-secret"
+      },
+      "tls": { "enabled": false },
+      "created_at": 1745846400000,
+      "updated_at": 1745846400000
+    }
+  ]
+}

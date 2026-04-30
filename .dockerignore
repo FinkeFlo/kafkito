@@ -1,0 +1,11 @@
+.git
+.github
+bin/
+*.md
+!README.md
+docs/
+frontend/node_modules/
+frontend/dist/assets/
+frontend/src/routeTree.gen.ts
+.DS_Store
+*.log

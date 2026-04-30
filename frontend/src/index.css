@@ -1,0 +1,188 @@
+@import "tailwindcss";
+
+/* Class-based dark mode — html.dark flips everything. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Surfaces */
+  --color-bg:             oklch(0.985 0.003 247);
+  --color-panel:          oklch(1     0     0  );
+  --color-subtle:         oklch(0.965 0.005 247);
+  --color-hover:          oklch(0.955 0.005 247);
+  --color-border:         oklch(0.91  0.008 247);
+  /* `--color-border-hover` keeps the historical L=0.84 for components
+   * that paint a hover-affordance border (secondary `<Button>`,
+   * `<IconButton>`, `<Pill>`, segmented controls). § 2.1 reserves
+   * `--color-border-strong` for focused / selected states only — that
+   * token is therefore lifted to ≥3:1 against `--color-panel`. Phase 3
+   * needs to migrate hover-affordance callsites from
+   * `border-border-strong` to `border-border-hover`. */
+  --color-border-hover:   oklch(0.84  0.01  247);
+  --color-border-strong:  oklch(0.62  0.012 247);
+
+  /* Text */
+  --color-text:           oklch(0.21  0.03  252);
+  --color-muted:          oklch(0.48  0.02  252);
+  /* Lifted from L=0.62 to L=0.52 so it clears 4.5:1 on both `bg-panel`
+   * and `bg-subtle`; kept above `--color-muted` (L=0.48) so the
+   * semantic split (subtle-text is *less* dark than muted, i.e. lower
+   * emphasis in light mode) is preserved. */
+  --color-subtle-text:    oklch(0.52  0.02  252);
+
+  /* Accent */
+  --color-accent:         oklch(0.54  0.18  255);
+  --color-accent-hover:   oklch(0.48  0.19  255);
+  --color-accent-subtle:  oklch(0.96  0.03  255);
+
+  /* Foreground that always lives on top of `--color-accent` /
+   * `--color-accent-hover`. Pure white passes 4.5:1 against both light-
+   * mode accent values; the dark-mode override below pins a near-black
+   * value for the lighter dark accent. Phase 2 primitives (`<Button>`)
+   * should consume this token instead of `--color-text-on-accent`. */
+  --color-accent-foreground: oklch(1 0 0);
+
+  /* Semantic — light values lifted from 0.72/0.62/0.58 so they clear
+   * 4.5:1 against `*-subtle` tinted surfaces (E1#2). Dark variants are
+   * untouched (already pass on dark `*-subtle`). NOTE for Phase 3:
+   * non-text uses (`bg-success` / `bg-warning` / `bg-danger` swatches
+   * in `StatusDot.tsx:14`, `health-dot.tsx`, `Gauge.tsx:25`) now sit
+   * on darker fills than before; if they read visually dim, switch
+   * those callsites to a brighter shade or, longer-term, introduce
+   * `--color-success-fill` / `--color-warning-fill` / `--color-danger-fill`
+   * intent-paired tokens. */
+  --color-success:        oklch(0.48  0.16  152);
+  --color-warning:        oklch(0.50  0.15  75);
+  --color-danger:         oklch(0.53  0.21  28);
+
+  /* Tints (cell highlights & badges) */
+  --color-tint-green-bg:  oklch(0.96  0.04  152);
+  --color-tint-green-fg:  oklch(0.42  0.12  152);
+  --color-tint-amber-bg:  oklch(0.96  0.05  75);
+  --color-tint-amber-fg:  oklch(0.42  0.12  75);
+  --color-tint-red-bg:    oklch(0.96  0.04  28);
+  --color-tint-red-fg:    oklch(0.42  0.18  28);
+
+  /* Typography */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /*
+   * Transitional aliases. Older components still reference these names
+   * via `var(--color-surface)` / `text-[var(--color-text-muted)]`.
+   * Remove after every file has been migrated to Direction A utilities.
+   */
+  --color-surface:          var(--color-bg);
+  --color-surface-raised:   var(--color-panel);
+  --color-surface-subtle:   var(--color-subtle);
+  --color-surface-hover:    var(--color-hover);
+  --color-text-muted:       var(--color-muted);
+  --color-text-subtle:      var(--color-subtle-text);
+  --color-text-on-accent:   var(--color-accent-foreground);
+  --color-danger-subtle:    var(--color-tint-red-bg);
+  --color-success-subtle:   var(--color-tint-green-bg);
+  --color-warning-subtle:   var(--color-tint-amber-bg);
+  --color-info-subtle:      var(--color-accent-subtle);
+  --color-info:             var(--color-accent);
+  --color-focus:            var(--color-accent);
+  --color-focus-on-accent:  var(--color-accent-foreground);
+  /* Light-mode overlay was `oklch(0.18 0.02 250 / 0.45)` (≈40% black).
+   * Tightened to `0.05 / 0.55` so the scrim reads as a clear modal
+   * dimmer rather than a barely-perceptible film — flagged for the PR
+   * description because the visual change is intentional. */
+  --color-overlay:          oklch(0.05 0.01 252 / 0.55);
+}
+
+html.dark {
+  --color-bg:             oklch(0.17  0.015 252);
+  --color-panel:          oklch(0.21  0.018 252);
+  --color-subtle:         oklch(0.235 0.018 252);
+  --color-hover:          oklch(0.26  0.02  252);
+  --color-border:         oklch(0.30  0.02  252);
+  /* Dark hover-affordance border kept near the historical L=0.38
+   * value; selected/focused affordance border lifted to ≥3:1 on
+   * `--color-panel`. */
+  --color-border-hover:   oklch(0.38  0.025 252);
+  --color-border-strong:  oklch(0.55  0.025 252);
+  --color-text:           oklch(0.95  0.01  247);
+  --color-muted:          oklch(0.70  0.02  252);
+  --color-subtle-text:    oklch(0.65  0.02  252);
+  --color-accent:         oklch(0.70  0.17  255);
+  --color-accent-hover:   oklch(0.75  0.17  255);
+  --color-accent-subtle:  oklch(0.30  0.08  255);
+  /* In dark mode the accent is intentionally light so it pops on the
+   * dark canvas (accent vs panel ≈ 6.5:1). The companion foreground
+   * therefore has to be dark, not white — `oklch(0.18 …)` clears
+   * 6.92:1 against `--color-accent` and 8.12:1 against
+   * `--color-accent-hover`. Phase 2 must consume `text-accent-foreground`
+   * (or the alias `text-text-on-accent`) on `bg-accent` surfaces; using
+   * `text-text` there fails AA (callsite bug, see allow-list). */
+  --color-accent-foreground: oklch(0.18 0.02 252);
+  --color-success:        oklch(0.72  0.16  152);
+  --color-warning:        oklch(0.78  0.15  75);
+  --color-danger:         oklch(0.70  0.18  28);
+  --color-tint-green-bg:  oklch(0.32  0.06  152);
+  --color-tint-green-fg:  oklch(0.85  0.14  152);
+  --color-tint-amber-bg:  oklch(0.32  0.06  75);
+  --color-tint-amber-fg:  oklch(0.85  0.13  75);
+  --color-tint-red-bg:    oklch(0.32  0.08  28);
+  --color-tint-red-fg:    oklch(0.82  0.15  28);
+  /* Dark scrim must be DARKER than dark `--color-panel` (L≈0.21) to be
+   * visible under modals — otherwise the scrim composites lighter than
+   * the panel beneath it and disappears (E1#6 / E3#10). */
+  --color-overlay:        oklch(0.04 0.01 252 / 0.65);
+  /* `--color-focus` and `--color-focus-on-accent` were `:root`-only
+   * before this change (E3#10). Re-declare for dark per § 2.4 of the
+   * design guidelines. Dark `--color-accent` at L=0.70 contrasts
+   * ~6.5:1 against `--color-panel`, ~7.5:1 against `--color-bg`, and
+   * ~5.7:1 against `--color-subtle`, so a single
+   * `--color-focus = --color-accent` ring is legible against every
+   * canvas surface; primary / danger buttons override the
+   * outline-color to `--color-focus-on-accent` (the dark accent
+   * foreground) so the indicator stays visible against the accent
+   * fill — Phase 2's `<Button variant="primary">` and
+   * `<Button variant="danger">` own that override. */
+  --color-focus:          var(--color-accent);
+  --color-focus-on-accent: var(--color-accent-foreground);
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-bg text-text antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Global focus indicator. Restored to `outline` (not `box-shadow`)
+ * because:
+ *   - `outline` is rendered outside the box and is NOT clipped by
+ *     `overflow: hidden` ancestors (tables, modals, tinted panels);
+ *     a `box-shadow` ring would be cropped at every such boundary
+ *     and silently drop below WCAG 2.4.13's visible-perimeter floor.
+ *   - `outline` does not compete with `box-shadow`; primitives that
+ *     stack `shadow-sm` / `shadow-xl` (cards, modals, toasts,
+ *     tooltips) keep their elevation on focus.
+ *
+ * E1#1 (the headline 1.0:1 dark-mode primary button focus ring) is
+ * resolved at the *primitive* level: Phase 2's
+ * `<Button variant="primary">` and `<Button variant="danger">` add an
+ * explicit `focus-visible:outline-color: var(--color-focus-on-accent)`
+ * so the indicator carves out of the accent / danger fill. The default
+ * `--color-focus = --color-accent` works against every canvas surface
+ * (`--color-bg`, `--color-panel`, `--color-subtle`, `--color-hover`)
+ * in both modes — see the contrast report for measured ratios.
+ *
+ * NOTE for Phase 5 (`doc-reconciler`): § 4.4 line 197 of
+ * `docs/DESIGN_GUIDELINES.md` says "Never use `outline` for visual
+ * treatment. Use `ring-*` for focus only." That rule cannot coexist
+ * with `overflow: hidden` ancestors (Tailwind `ring-*` is implemented
+ * via `box-shadow` and would be clipped). Phase 5 needs to update the
+ * guideline to permit `outline` for focus indicators. */
+:where(button, a, [role="button"], input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}

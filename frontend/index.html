@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>kafkito</title>
+    <script>
+      // Synchronous theme bootstrap to avoid FOUC.
+      // Mirror of frontend/src/lib/use-theme.ts (intentional duplication: must run before module bundle loads).
+      (function () {
+        try {
+          var pref = localStorage.getItem("kafkito.theme") || "system";
+          if (pref !== "light" && pref !== "dark") {
+            pref = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          }
+          document.documentElement.classList.toggle("dark", pref === "dark");
+        } catch (_) {
+          /* default light */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
