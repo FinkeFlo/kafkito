@@ -136,6 +136,10 @@ worktree-init:
 # Stop with Ctrl-C in the foreground terminal, or `kill -INT <concurrently-pid>`.
 # `kill -INT` on the make process does NOT propagate to children on macOS.
 dev:
+	@if [ ! -d frontend/node_modules ]; then \
+		echo "frontend/node_modules missing — running 'bun install' first"; \
+		cd frontend && bun install; \
+	fi
 	@if [ ! -f .env.dev ]; then \
 		echo "no .env.dev — run 'make worktree-init' first to pick free ports."; \
 		echo "falling back to defaults: PORT=37421 KAFKITO_FRONTEND_PORT=37422"; \
