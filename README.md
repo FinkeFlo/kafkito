@@ -75,6 +75,9 @@ Multiple git worktrees can run `make dev` in parallel; each calls
 `make worktree-init` once to claim a free port pair, and they share the
 same Compose-backed Kafka and Schema Registry.
 
+From an IDE, running `air` directly works too — `.air.toml` loads
+`.env.dev` itself, as long as you've run `make worktree-init` once.
+
 ## Why kafkito?
 
 - **Single static binary** — no JVM, no side-car containers, ~50 MB RAM footprint.
