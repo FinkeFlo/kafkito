@@ -12,7 +12,9 @@ vendor/
 
 # Frontend
 frontend/node_modules/
-frontend/dist/
+frontend/dist/*
+!frontend/dist/index.html
+!frontend/dist/README.md
 frontend/.vite/
 frontend/coverage/
 frontend/bun.lockb.backup

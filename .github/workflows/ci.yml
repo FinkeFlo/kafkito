@@ -49,6 +49,7 @@ jobs:
       - run: docker build --build-arg BUILD_TAGS="${{ matrix.build_tags }}" -t "kafkito:ci-${{ matrix.build_tags || 'default' }}" .
 
   dco:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
