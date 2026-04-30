@@ -13,8 +13,9 @@ jobs:
     strategy:
       matrix:
         variant:
-          - { name: default, tagSuffix: "",      tags: "" }
-          - { name: btp,     tagSuffix: "-btp",  tags: "btp" }
+          - { name: default, tagSuffix: "",        tags: "" }
+          - { name: btp,     tagSuffix: "-btp",    tags: "btp" }
+          - { name: local,   tagSuffix: "-local",  tags: "devauth" }
     steps:
       - uses: actions/checkout@v6
       - uses: docker/setup-qemu-action@v4
@@ -32,8 +33,10 @@ jobs:
           platforms: linux/amd64,linux/arm64
           build-args: |
             BUILD_TAGS=${{ matrix.variant.tags }}
+            VERSION=${{ github.ref_name }}
           tags: |
             ghcr.io/finkeflo/kafkito:${{ github.ref_name }}${{ matrix.variant.tagSuffix }}
+            ghcr.io/finkeflo/kafkito:latest${{ matrix.variant.tagSuffix }}
 
   binaries:
     runs-on: ubuntu-24.04
@@ -47,13 +50,19 @@ jobs:
         working-directory: frontend
         run: bun install --frozen-lockfile && bun run build
       - name: Build matrix
+        env:
+          VERSION: ${{ github.ref_name }}
         run: |
           mkdir dist
           for os in linux darwin windows; do
             for arch in amd64 arm64; do
               [ "$os" = "windows" ] && [ "$arch" = "arm64" ] && continue
               ext=""; [ "$os" = "windows" ] && ext=".exe"
-              GOOS=$os GOARCH=$arch go build -o "dist/kafkito-${os}-${arch}${ext}" ./cmd/kafkito
+              GOOS=$os GOARCH=$arch go build \
+                -trimpath \
+                -ldflags "-s -w -X main.version=${VERSION}" \
+                -o "dist/kafkito-${os}-${arch}${ext}" \
+                ./cmd/kafkito
             done
           done
           (cd dist && sha256sum * > SHA256SUMS)
