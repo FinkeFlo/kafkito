@@ -1,0 +1,25 @@
+# Live-reload config for kafkito backend (dev only).
+# Schema: https://github.com/air-verse/air (verified against v1.65.x docs, 2026-04-30).
+# Run via: `go run github.com/air-verse/air@v1.65.1` from the repo root.
+
+root = "."
+tmp_dir = "tmp"
+
+# Per-worktree dev env. .env.dev is gitignored; written by `make worktree-init`.
+# Air loads it before each build/run so air-from-IDE works without `make`.
+env_files = [".env.dev"]
+
+[build]
+  cmd = "go build -tags devauth -o ./tmp/kafkito ./cmd/kafkito"
+  entrypoint = ["./tmp/kafkito"]
+  include_dir = ["cmd", "internal", "pkg"]
+  include_ext = ["go"]
+  exclude_dir = ["frontend", "bin", "tmp", "dist", "node_modules", ".git", "deploy", "examples", "docs", ".worktrees"]
+  exclude_regex = [
+    "_test\\.go$",
+    ".*_mock\\.go$",
+    ".*\\.pb\\.go$",
+    ".*\\.connect\\.go$",
+  ]
+  exclude_unchanged = true
+  kill_delay = "500ms"
