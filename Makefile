@@ -135,7 +135,7 @@ dev:
 		echo "no .env.dev — run 'make worktree-init' first to pick free ports."; \
 		echo "falling back to defaults: PORT=37421 KAFKITO_FRONTEND_PORT=37422"; \
 	fi
-	docker compose up -d --wait
+	docker compose up -d --wait kafka schema-registry
 	@set -a; [ -f .env.dev ] && . ./.env.dev || true; set +a; \
 	bunx --bun concurrently \
 		--names backend,frontend \
