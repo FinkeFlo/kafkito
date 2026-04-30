@@ -1,6 +1,7 @@
 # Live-reload config for kafkito backend (dev only).
 # Schema: https://github.com/air-verse/air (verified against v1.65.x docs, 2026-04-30).
-# Run via: `go run github.com/air-verse/air@v1.65.1` from the repo root.
+# Run via: `make dev` (Makefile pins the air version via AIR_VERSION).
+# Air invocation under `make dev` is `go run github.com/air-verse/air@$(AIR_VERSION) -c .air.toml`.
 
 root = "."
 tmp_dir = "tmp"
