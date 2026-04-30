@@ -1,0 +1,4 @@
+# Default owner for all paths.
+# Pull requests will automatically request review from this owner.
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-security/customizing-your-repository/about-code-owners
+*       @FinkeFlo
