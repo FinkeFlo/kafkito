@@ -5,6 +5,10 @@ import tailwindcss from "@tailwindcss/vite";
 import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 import path from "node:path";
 
+const FRONTEND_PORT = Number(process.env.KAFKITO_FRONTEND_PORT ?? 37422);
+const BACKEND_PORT = Number(process.env.KAFKITO_BACKEND_PORT ?? 37421);
+const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
+
 export default defineConfig({
   plugins: [
     TanStackRouterVite({ target: "react", autoCodeSplitting: true }),
@@ -17,11 +21,11 @@ export default defineConfig({
     },
   },
   server: {
-    port: 37422,
+    port: FRONTEND_PORT,
     proxy: {
-      "/api":      "http://localhost:37421",
-      "/rpc":      "http://localhost:37421",
-      "/user-api": "http://localhost:37421",
+      "/api":      BACKEND_URL,
+      "/rpc":      BACKEND_URL,
+      "/user-api": BACKEND_URL,
     },
   },
   build: {
