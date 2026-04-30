@@ -4,6 +4,8 @@ BIN := bin/kafkito
 PKG := ./...
 VERSION ?= 0.0.0-dev
 IMAGE ?= ghcr.io/finkeflo/kafkito:dev
+# Pinned air version. Bump deliberately; keep .air.toml's reference in sync.
+AIR_VERSION ?= v1.65.1
 
 help:
 	@echo "Targets:"
@@ -120,3 +122,26 @@ worktree-init:
 	} > .env.dev; \
 	echo "wrote .env.dev:"; \
 	cat .env.dev
+
+# `make dev` — full local loop in one process tree:
+#   - Compose stack (Kafka + Schema Registry) up & healthy
+#   - Backend with air hot-reload
+#   - Frontend with Vite HMR
+# Sources .env.dev so both children see PORT, KAFKITO_BACKEND_PORT,
+# KAFKITO_FRONTEND_PORT, KAFKITO_KAFKA_BROKERS. Falls back to defaults
+# if .env.dev is missing.
+dev:
+	@if [ ! -f .env.dev ]; then \
+		echo "no .env.dev — run 'make worktree-init' first to pick free ports."; \
+		echo "falling back to defaults: PORT=37421 KAFKITO_FRONTEND_PORT=37422"; \
+	fi
+	docker compose up -d --wait
+	@set -a; [ -f .env.dev ] && . ./.env.dev || true; set +a; \
+	bunx --bun concurrently \
+		--names backend,frontend \
+		--prefix-colors blue,magenta \
+		--kill-others \
+		--kill-signal SIGTERM \
+		--kill-timeout 5000 \
+		"go run github.com/air-verse/air@$(AIR_VERSION) -c .air.toml" \
+		"cd frontend && bun run dev"
