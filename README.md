@@ -15,19 +15,19 @@ identity, so the UI works immediately. Use it to evaluate kafkito
 against a local Kafka. **Never deploy this variant.**
 
 ```sh
-docker run --rm -p 8080:37421 \
+docker run --rm -p 37421:37421 \
   -e KAFKITO_KAFKA_BROKERS=host.docker.internal:9092 \
   ghcr.io/finkeflo/kafkito:latest-local
 ```
 
-Open http://localhost:8080 in your browser. Connect kafkito to a
+Open http://localhost:37421 in your browser. Connect kafkito to a
 broker on your host (`host.docker.internal:9092`), or run a Kafka
 container alongside it on a shared docker network.
 
 ### Production image (OIDC / JWT)
 
 ```sh
-docker run --rm -p 8080:37421 \
+docker run --rm -p 37421:37421 \
   -e KAFKITO_AUTH_MODE=mock \
   -e KAFKITO_KAFKA_BROKERS=host.docker.internal:9092 \
   ghcr.io/finkeflo/kafkito:latest
@@ -40,7 +40,7 @@ real-world deploys.
 ### SAP BTP / XSUAA
 
 ```sh
-docker run --rm -p 8080:37421 ghcr.io/finkeflo/kafkito:latest-btp
+docker run --rm -p 37421:37421 ghcr.io/finkeflo/kafkito:latest-btp
 ```
 
 See [ADR-0004](./docs/adr/0004-xsuaa-build-tag.md) for the
