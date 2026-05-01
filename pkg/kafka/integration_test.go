@@ -130,15 +130,15 @@ func TestIntegration_ProduceConsume(t *testing.T) {
 		require.GreaterOrEqual(t, res.Offset, int64(0))
 	}
 
-	msgs, err := reg.ConsumeMessages(ctx, "it", topic, ConsumeOptions{
+	page, err := reg.ConsumeMessages(ctx, "it", topic, ConsumeOptions{
 		Partition: -1,
 		Limit:     n,
 		From:      FromStart,
 		Timeout:   8 * time.Second,
 	})
 	require.NoError(t, err)
-	require.Len(t, msgs, n)
-	for _, m := range msgs {
+	require.Len(t, page.Messages, n)
+	for _, m := range page.Messages {
 		require.Equal(t, "k", m.Key)
 		require.Equal(t, "v", m.Value)
 	}
