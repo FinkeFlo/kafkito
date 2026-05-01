@@ -50,10 +50,11 @@ function SchemaTab() {
           </>
         }
         action={
-          // TODO(task9): switch to /clusters/$cluster/schemas/$subject once
-          // the schemas routes are migrated. The legacy /schemas route still
-          // expects search-param cluster/subject, so we point at it.
-          <Link to="/schemas" search={{ cluster, subject, version: undefined } as never}>
+          <Link
+            to="/clusters/$cluster/schemas/$subject"
+            params={{ cluster, subject }}
+            search={{ subject: undefined, version: undefined }}
+          >
             <Button variant="primary" size="sm">
               Open in Schemas
             </Button>
@@ -82,11 +83,10 @@ function SchemaTab() {
             )}
           </div>
         </div>
-        {/* TODO(task9): switch to /clusters/$cluster/schemas/$subject once
-            the schemas routes are migrated. */}
         <Link
-          to="/schemas"
-          search={{ cluster, subject, version: undefined } as never}
+          to="/clusters/$cluster/schemas/$subject"
+          params={{ cluster, subject }}
+          search={{ subject: undefined, version: undefined }}
           className="rounded-md border border-border bg-panel px-2.5 py-1 text-xs text-text transition-colors hover:bg-hover"
         >
           Open full view
