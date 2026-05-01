@@ -61,7 +61,28 @@ type ConsumeOptions struct {
 const (
 	maxConsumeLimit     = 500
 	defaultConsumeLimit = 50
+
+	// balanceBuffer absorbs timestamp-interleaving wobble between partitions
+	// when merging "last N" results across multiple partitions. With it, the
+	// per-partition tail size is ceil(N/K) + buffer; without it, partitions
+	// whose newest record is slightly behind another partition's can be
+	// under-represented after the merge+truncate step.
+	balanceBuffer = 8
 )
+
+// fairShare returns the per-partition tail size for a balanced "last
+// limit across partitions" fetch. For single-partition (K=1) calls it
+// returns exactly limit (no buffer needed: one partition trivially
+// preserves order). For zero or negative partitions/limit it returns 0.
+func fairShare(limit, partitions int) int {
+	if partitions <= 0 || limit <= 0 {
+		return 0
+	}
+	if partitions == 1 {
+		return limit
+	}
+	return ((limit + partitions - 1) / partitions) + balanceBuffer
+}
 
 // ConsumeMessages pulls up to opts.Limit messages from the given topic on
 // the named cluster using a short-lived kgo.Client.
