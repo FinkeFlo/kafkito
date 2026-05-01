@@ -59,6 +59,14 @@ func Handler() (http.Handler, error) {
 		f, err := assets.Open(cleaned)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
+				// Missing files under /assets/ must NOT fall through to
+				// index.html — browsers strict-MIME-check hashed bundles and
+				// would reject the HTML response. Return a real 404 so the
+				// caller (and devtools) sees the failure clearly.
+				if strings.HasPrefix(cleaned, "assets/") {
+					http.NotFound(w, r)
+					return
+				}
 				serveIndex(w, r, assets)
 				return
 			}
