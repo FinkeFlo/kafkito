@@ -268,31 +268,9 @@ func (r *Registry) SearchMessages(ctx context.Context, cluster, topic string, op
 		}
 	}
 
-	lookupTS := func(ms int64) (map[int32]int64, error) {
-		lo, err := adm.ListOffsetsAfterMilli(admCtx, ms, topic)
-		if err != nil {
-			return nil, err
-		}
-		m := make(map[int32]int64, len(parts))
-		for _, p := range parts {
-			if po, ok := lo.Lookup(topic, p); ok {
-				m[p] = po.Offset
-			}
-		}
-		return m, nil
-	}
-	var fromOffsets, toOffsets map[int32]int64
-	if opts.FromTS > 0 {
-		fromOffsets, err = lookupTS(opts.FromTS)
-		if err != nil {
-			return nil, fmt.Errorf("list offsets after ts=%d for topic %q on cluster %q: %w", opts.FromTS, topic, cluster, err)
-		}
-	}
-	if opts.ToTS > 0 {
-		toOffsets, err = lookupTS(opts.ToTS)
-		if err != nil {
-			return nil, fmt.Errorf("list offsets after ts=%d for topic %q on cluster %q: %w", opts.ToTS, topic, cluster, err)
-		}
+	fromOffsets, toOffsets, err := resolveTimestampOffsets(admCtx, adm, topic, parts, opts.FromTS, opts.ToTS)
+	if err != nil {
+		return nil, fmt.Errorf("resolve time range for topic %q on cluster %q: %w", topic, cluster, err)
 	}
 
 	ranges := resolveSearchRange(opts, parts, startMap, endMap, fromOffsets, toOffsets)
