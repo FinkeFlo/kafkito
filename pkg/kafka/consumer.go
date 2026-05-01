@@ -208,10 +208,12 @@ func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, o
 		}
 	}
 
-	// FromTimestamp needs an admin call before the offset window math; resolve
-	// here so buildWindows can stay pure (offset-only).
+	// Time bounds need an admin call before the offset window math; resolve
+	// here so buildWindows can stay pure (offset-only). Bounds apply to
+	// FromTimestamp (the seek mechanism) and to FromEnd / FromStart (where
+	// they clamp the browse window).
 	var fromOff, toOff map[int32]int64
-	if opts.From == FromTimestamp {
+	if opts.FromTSMs > 0 || opts.ToTSMs > 0 {
 		var rerr error
 		fromOff, toOff, rerr = resolveTimestampOffsets(admCtx, adm, topic, parts, opts.FromTSMs, opts.ToTSMs)
 		if rerr != nil {
@@ -363,7 +365,7 @@ func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, o
 		merged = merged[:opts.Limit]
 	}
 
-	nextCursor, hasMore := buildNextCursor(direction, windows, merged, startMap, endMap)
+	nextCursor, hasMore := buildNextCursor(direction, windows, merged)
 
 	return &ConsumeResult{
 		Messages:   merged,
@@ -440,29 +442,45 @@ func buildWindows(
 		for _, p := range parts {
 			s := startMap[p]
 			e := endMap[p]
+			if o, ok := fromOff[p]; ok && o > s {
+				s = o
+			}
+			if o, ok := toOff[p]; ok && o < e {
+				e = o
+			}
 			if e > s {
 				windows[p] = pageWindow{begin: s, stop: e}
 			}
 		}
 	default: // FromEnd
-		nonEmpty := 0
-		for _, p := range parts {
+		// Clamp order: time bounds (filter window), then cursor upper bound
+		// (paginate within filter window). The result feeds fairShare so
+		// partitions whose entire range falls outside the filter window
+		// drop out of the denominator.
+		clamp := func(p int32) (int64, int64) {
 			s := startMap[p]
 			e := endMap[p]
+			if o, ok := fromOff[p]; ok && o > s {
+				s = o
+			}
+			if o, ok := toOff[p]; ok && o < e {
+				e = o
+			}
 			if ub, ok := opts.CursorUpperBounds[p]; ok && ub < e {
 				e = ub
 			}
+			return s, e
+		}
+		nonEmpty := 0
+		for _, p := range parts {
+			s, e := clamp(p)
 			if e > s {
 				nonEmpty++
 			}
 		}
 		share := fairShare(opts.Limit, nonEmpty)
 		for _, p := range parts {
-			s := startMap[p]
-			e := endMap[p]
-			if ub, ok := opts.CursorUpperBounds[p]; ok && ub < e {
-				e = ub
-			}
+			s, e := clamp(p)
 			if e <= s {
 				continue
 			}
@@ -493,11 +511,14 @@ func containsPartition(parts []int32, p int32) bool {
 
 // buildNextCursor returns the cursor pointing at the next page boundary,
 // or (nil, false) when no further records remain in the given direction.
+//
+// "More" is judged against the clamped window (w.begin / w.stop), not the
+// partition's raw start/end — otherwise a time-windowed query reports
+// "next page available" after fully draining its own filter window.
 func buildNextCursor(
 	direction CursorDirection,
 	windows map[int32]pageWindow,
 	page []Message,
-	startMap, endMap map[int32]int64,
 ) (*Cursor, bool) {
 	if len(page) == 0 {
 		return nil, false
@@ -523,7 +544,7 @@ func buildNextCursor(
 			if !ok {
 				lo = w.begin
 			}
-			if lo > startMap[p] {
+			if lo > w.begin {
 				hasMore = true
 			}
 			c.Partitions[p] = lo
@@ -542,7 +563,7 @@ func buildNextCursor(
 			if !ok {
 				next = w.begin
 			}
-			if next < w.stop && next < endMap[p] {
+			if next < w.stop {
 				hasMore = true
 			}
 			c.Partitions[p] = next

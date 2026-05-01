@@ -225,10 +225,18 @@ func (a *clusterAPI) describeTopic(w http.ResponseWriter, r *http.Request) {
 //	limit:             1..500              (default: 50)
 //	from:              end|start|offset|timestamp (default: end)
 //	offset:            int64 (used when from=offset, single partition)
-//	partition_offsets: "p:o,p:o" (used when from=offset, multi partition)
-//	from_ts_ms:        UNIX millis lower bound (auto-implies from=timestamp)
-//	to_ts_ms:          UNIX millis upper bound (exclusive)
-//	cursor:            opaque continuation token (overrides everything else)
+//	partition_offsets: "p:o,p:o" (used when from=offset, multi partition;
+//	                   capped at 1024 entries)
+//	from_ts_ms:        UNIX millis lower bound. With from=end / from=start
+//	                   it clamps the browse window. With from=timestamp it
+//	                   selects the seek offsets.
+//	to_ts_ms:          UNIX millis upper bound (exclusive). Same semantics
+//	                   as from_ts_ms across modes.
+//	cursor:            opaque continuation token. When present it forces
+//	                   the seek mode to match the cursor direction
+//	                   (backward → from=end, forward → from=offset). An
+//	                   explicit `from` that contradicts the cursor returns
+//	                   400.
 func (a *clusterAPI) consumeMessages(w http.ResponseWriter, r *http.Request) {
 	cluster := chi.URLParam(r, "cluster")
 	topic := chi.URLParam(r, "topic")

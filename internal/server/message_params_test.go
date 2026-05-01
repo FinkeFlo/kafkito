@@ -13,6 +13,15 @@ import (
 	kafkapkg "github.com/FinkeFlo/kafkito/pkg/kafka"
 )
 
+func mustEncodeCursor(t *testing.T, dir kafkapkg.CursorDirection, parts map[int32]int64) string {
+	t.Helper()
+	enc, err := kafkapkg.EncodeCursor(kafkapkg.Cursor{Direction: dir, Partitions: parts})
+	if err != nil {
+		t.Fatalf("EncodeCursor: %v", err)
+	}
+	return enc
+}
+
 func TestParseConsumeQuery(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -59,6 +68,98 @@ func TestParseConsumeQuery(t *testing.T) {
 		{name: "invalid limit (text)", raw: "limit=foo", wantErr: "invalid limit"},
 		{name: "invalid from", raw: "from=middle", wantErr: "invalid from"},
 		{name: "invalid offset value", raw: "from=offset&offset=xx", wantErr: "invalid offset"},
+		{
+			name: "from=end with time bounds clamps without changing mode",
+			raw:  "from=end&from_ts_ms=1000&to_ts_ms=2000",
+			check: func(t *testing.T, o kafkapkg.ConsumeOptions) {
+				if o.From != kafkapkg.FromEnd {
+					t.Fatalf("From = %v, want FromEnd", o.From)
+				}
+				if o.FromTSMs != 1000 || o.ToTSMs != 2000 {
+					t.Fatalf("ts bounds = (%d,%d)", o.FromTSMs, o.ToTSMs)
+				}
+			},
+		},
+		{
+			name: "from=timestamp",
+			raw:  "from=timestamp&from_ts_ms=1000",
+			check: func(t *testing.T, o kafkapkg.ConsumeOptions) {
+				if o.From != kafkapkg.FromTimestamp || o.FromTSMs != 1000 {
+					t.Fatalf("got %+v", o)
+				}
+			},
+		},
+		{name: "negative from_ts_ms", raw: "from_ts_ms=-1", wantErr: "invalid from_ts_ms"},
+		{name: "non-numeric from_ts_ms", raw: "from_ts_ms=abc", wantErr: "invalid from_ts_ms"},
+		{name: "negative to_ts_ms", raw: "to_ts_ms=-2", wantErr: "invalid to_ts_ms"},
+		{name: "to before from", raw: "from_ts_ms=2000&to_ts_ms=1000", wantErr: "to_ts_ms must be >= from_ts_ms"},
+		{
+			name: "from=offset with partition_offsets",
+			raw:  "from=offset&partition_offsets=0:42,1:99",
+			check: func(t *testing.T, o kafkapkg.ConsumeOptions) {
+				if o.From != kafkapkg.FromOffset {
+					t.Fatalf("From = %v", o.From)
+				}
+				if o.PartitionOffsets[0] != 42 || o.PartitionOffsets[1] != 99 {
+					t.Fatalf("partition_offsets = %+v", o.PartitionOffsets)
+				}
+			},
+		},
+		{
+			name:    "partition_offsets requires from=offset",
+			raw:     "partition_offsets=0:42",
+			wantErr: "partition_offsets requires from=offset",
+		},
+		{
+			name:    "partition_offsets bad pair",
+			raw:     "from=offset&partition_offsets=foo",
+			wantErr: "invalid partition_offsets",
+		},
+		{
+			name:    "partition_offsets duplicate partition",
+			raw:     "from=offset&partition_offsets=0:1,0:2",
+			wantErr: "duplicate partition",
+		},
+		{
+			name:    "partition_offsets negative offset",
+			raw:     "from=offset&partition_offsets=0:-1",
+			wantErr: "negative offset",
+		},
+		{
+			name: "backward cursor sets CursorUpperBounds",
+			raw:  "cursor=" + mustEncodeCursor(t, kafkapkg.CursorBackward, map[int32]int64{0: 100, 1: 200}),
+			check: func(t *testing.T, o kafkapkg.ConsumeOptions) {
+				if o.From != kafkapkg.FromEnd {
+					t.Fatalf("From = %v, want FromEnd", o.From)
+				}
+				if o.CursorUpperBounds[0] != 100 || o.CursorUpperBounds[1] != 200 {
+					t.Fatalf("upper bounds = %+v", o.CursorUpperBounds)
+				}
+			},
+		},
+		{
+			name: "forward cursor sets PartitionOffsets",
+			raw:  "cursor=" + mustEncodeCursor(t, kafkapkg.CursorForward, map[int32]int64{0: 50}),
+			check: func(t *testing.T, o kafkapkg.ConsumeOptions) {
+				if o.From != kafkapkg.FromOffset {
+					t.Fatalf("From = %v, want FromOffset", o.From)
+				}
+				if o.PartitionOffsets[0] != 50 {
+					t.Fatalf("partition_offsets = %+v", o.PartitionOffsets)
+				}
+			},
+		},
+		{
+			name:    "backward cursor conflicts with from=start",
+			raw:     "from=start&cursor=" + mustEncodeCursor(t, kafkapkg.CursorBackward, map[int32]int64{0: 1}),
+			wantErr: "cursor direction backward conflicts",
+		},
+		{
+			name:    "forward cursor conflicts with from=end",
+			raw:     "from=end&cursor=" + mustEncodeCursor(t, kafkapkg.CursorForward, map[int32]int64{0: 1}),
+			wantErr: "cursor direction forward conflicts",
+		},
+		{name: "garbage cursor", raw: "cursor=!!!", wantErr: "invalid cursor"},
 	}
 	for _, tc := range tests {
 		tc := tc
