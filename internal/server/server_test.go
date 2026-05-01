@@ -70,3 +70,88 @@ func TestSPAFallbackServesHTML(t *testing.T) {
 		t.Errorf("Content-Type = %q, want text/html", ct)
 	}
 }
+
+// TestSPAFallbackForDeepRoutes covers the exact production reload bug: the
+// browser hits a deep client-side path on a fresh GET (e.g. after ⌘R).
+// Every such path must render the SPA shell (HTML 200) so TanStack Router
+// can take over and resolve the route on the client.
+func TestSPAFallbackForDeepRoutes(t *testing.T) {
+	h := New(Options{Version: "x", Logger: slog.Default()})
+	cases := []string{
+		"/topics/foo/messages",
+		"/topics/FRA_aspire_eXtend_SalesPrices_PRD/messages",
+		"/clusters/PROD",
+		"/settings/clusters",
+		"/groups",
+	}
+	for _, p := range cases {
+		req := httptest.NewRequest(http.MethodGet, p, nil)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Errorf("%s: status = %d, want 200", p, rec.Code)
+		}
+		if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+			t.Errorf("%s: Content-Type = %q, want text/html", p, ct)
+		}
+	}
+}
+
+// TestSPAFallbackOnlyAppliesToGetAndHead — non-idempotent verbs against an
+// unknown path must NOT receive HTML; they should 404/405 cleanly so
+// programmatic clients (curl, scripts) get a sensible error rather than
+// the SPA shell.
+func TestSPAFallbackOnlyAppliesToGetAndHead(t *testing.T) {
+	h := New(Options{Version: "x", Logger: slog.Default()})
+	for _, m := range []string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
+		req := httptest.NewRequest(m, "/topics/foo/messages", nil)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code == http.StatusOK {
+			t.Errorf("%s /topics/foo/messages: status = 200, want non-OK", m)
+		}
+		if ct := rec.Header().Get("Content-Type"); strings.HasPrefix(ct, "text/html") {
+			t.Errorf("%s /topics/foo/messages: Content-Type = %q, want non-HTML", m, ct)
+		}
+	}
+}
+
+// TestBackendPrefixesNeverFallToSPA — known backend prefixes that don't match
+// a registered route must 404 with JSON, never the SPA shell. Otherwise CLI
+// tools see HTML on unknown API/RPC paths and misreport.
+func TestBackendPrefixesNeverFallToSPA(t *testing.T) {
+	h := New(Options{Version: "x", Logger: slog.Default()})
+	cases := []string{
+		"/api/nope",
+		"/api/v1/does/not/exist",
+		"/rpc/some.unknown.Service/Method",
+		"/user-api/unknown",
+	}
+	for _, p := range cases {
+		req := httptest.NewRequest(http.MethodGet, p, nil)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if ct := rec.Header().Get("Content-Type"); strings.HasPrefix(ct, "text/html") {
+			t.Errorf("%s: Content-Type = %q, want JSON (not SPA HTML)", p, ct)
+		}
+		if rec.Code == http.StatusOK {
+			t.Errorf("%s: status = 200, want 4xx", p)
+		}
+	}
+}
+
+// TestMissingAssetReturns404 — a request under /assets/ for a file that does
+// not exist must NOT be redirected to index.html (that breaks browser MIME
+// checks for hashed JS bundles); it must 404 cleanly.
+func TestMissingAssetReturns404(t *testing.T) {
+	h := New(Options{Version: "x", Logger: slog.Default()})
+	req := httptest.NewRequest(http.MethodGet, "/assets/this-asset-does-not-exist.js", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); strings.HasPrefix(ct, "text/html") {
+		t.Errorf("Content-Type = %q, want non-HTML", ct)
+	}
+}
