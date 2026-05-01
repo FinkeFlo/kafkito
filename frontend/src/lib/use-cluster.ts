@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
+import { useNavigate, useParams, useRouterState } from "@tanstack/react-router";
 import { fetchClusters, type ClusterInfo } from "./api";
 import {
   listPrivateClusters,
@@ -77,7 +77,10 @@ interface UseClusterResult {
 }
 
 export function useCluster(): UseClusterResult {
-  const search = useSearch({ strict: false }) as { cluster?: string };
+  // Cluster now lives in the URL path under /clusters/$cluster/...; read it
+  // from the loose-typed merged params so the hook works from any descendant
+  // route. URL-decode so consumers see the raw cluster name.
+  const params = useParams({ strict: false }) as { cluster?: string };
   const navigate = useNavigate();
   const location = useRouterState({ select: (s) => s.location });
 
@@ -116,7 +119,7 @@ export function useCluster(): UseClusterResult {
     [clusters],
   );
 
-  const fromUrl = search.cluster;
+  const fromUrl = params.cluster ? decodeURIComponent(params.cluster) : undefined;
   const stored = readStored();
 
   const cluster = useMemo<string | null>(() => {
