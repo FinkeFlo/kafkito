@@ -117,13 +117,8 @@ function TopicDetailLayout() {
         {TABS.map((tab) => (
           <Link
             key={tab.id}
-            // Sub-tab routes (messages/configs/consumers/schema/produce) are
-            // created in Task 6 of the URL Hierarchy Redesign — until then the
-            // generated route table doesn't list them, so we cast to satisfy
-            // TanStack's strict typed-router. Remove `as never` once Task 6
-            // lands.
-            to={tabPath(tab.id) as never}
-            params={{ cluster, topic } as never}
+            to={tabPath(tab.id)}
+            params={{ cluster, topic }}
             className="relative px-3 py-2 text-sm font-medium text-muted transition-colors hover:text-text"
             activeOptions={{ exact: tab.id === "overview" }}
             activeProps={{
