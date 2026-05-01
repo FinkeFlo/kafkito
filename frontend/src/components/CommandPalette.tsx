@@ -92,12 +92,17 @@ export function CommandPalette() {
   const items: Item[] = useMemo(() => {
     const base: Item[] = [
       { kind: "nav", label: tt("nav.home"), to: "/", icon: <Home className="h-3.5 w-3.5" /> },
-      { kind: "nav", label: tt("nav.topics"), to: "/topics", icon: <Boxes className="h-3.5 w-3.5" /> },
-      { kind: "nav", label: tt("nav.groups"), to: "/groups", icon: <Users className="h-3.5 w-3.5" /> },
-      { kind: "nav", label: tt("nav.schemas"), to: "/schemas", icon: <FileJson className="h-3.5 w-3.5" /> },
-      { kind: "nav", label: tt("nav.acls"), to: "/acls", icon: <Shield className="h-3.5 w-3.5" /> },
-      { kind: "nav", label: tt("nav.users"), to: "/users", icon: <Users className="h-3.5 w-3.5" /> },
     ];
+    if (activeCluster) {
+      const c = encodeURIComponent(activeCluster);
+      base.push(
+        { kind: "nav", label: tt("nav.topics"), to: `/clusters/${c}/topics`, icon: <Boxes className="h-3.5 w-3.5" /> },
+        { kind: "nav", label: tt("nav.groups"), to: `/clusters/${c}/groups`, icon: <Users className="h-3.5 w-3.5" /> },
+        { kind: "nav", label: tt("nav.schemas"), to: `/clusters/${c}/schemas`, icon: <FileJson className="h-3.5 w-3.5" /> },
+        { kind: "nav", label: tt("nav.acls"), to: `/clusters/${c}/acls`, icon: <Shield className="h-3.5 w-3.5" /> },
+      );
+    }
+    base.push({ kind: "nav", label: tt("nav.users"), to: "/users", icon: <Users className="h-3.5 w-3.5" /> });
     const clusters: Item[] = (clustersQ.data ?? []).map((c: ClusterInfo) => ({
       kind: "cluster" as const,
       label: c.name,
@@ -125,14 +130,19 @@ export function CommandPalette() {
   const pick = (it: Item) => {
     setOpen(false);
     if (it.kind === "nav") {
-      navigate({ to: it.to });
+      // it.to is a runtime-built path like `/clusters/<encoded>/topics`; the
+      // typed router accepts string targets at runtime, but the literal isn't
+      // in the route union, so cast.
+      navigate({ to: it.to as never });
     } else if (it.kind === "cluster") {
-      navigate({ to: "/topics", search: { cluster: it.cluster } as never });
+      navigate({
+        to: "/clusters/$cluster/topics",
+        params: { cluster: it.cluster },
+      });
     } else {
       navigate({
-        to: "/topics/$topic",
-        params: { topic: it.topic },
-        search: { cluster: it.cluster } as never,
+        to: "/clusters/$cluster/topics/$topic",
+        params: { cluster: it.cluster, topic: it.topic },
       });
     }
   };
