@@ -28,6 +28,49 @@ interface MessagesSearch {
   msgOffset: number;
 }
 
+const PRESET_DURATIONS_MS: Record<string, number> = {
+  "5m": 5 * 60_000,
+  "15m": 15 * 60_000,
+  "1h": 60 * 60_000,
+  "6h": 6 * 60 * 60_000,
+  "24h": 24 * 60 * 60_000,
+  "7d": 7 * 24 * 60 * 60_000,
+  "30d": 30 * 24 * 60 * 60_000,
+};
+
+function computeTimeRange(
+  mode: "off" | "preset" | "custom",
+  preset: string,
+  customFrom: string,
+  customTo: string,
+): { from_ts_ms: number | undefined; to_ts_ms: number | undefined } {
+  if (mode === "off") return { from_ts_ms: undefined, to_ts_ms: undefined };
+  if (mode === "preset") {
+    const now = Date.now();
+    if (preset === "today") {
+      const s = new Date();
+      s.setHours(0, 0, 0, 0);
+      return { from_ts_ms: s.getTime(), to_ts_ms: now };
+    }
+    if (preset === "yesterday") {
+      const s = new Date();
+      s.setHours(0, 0, 0, 0);
+      s.setDate(s.getDate() - 1);
+      const e = new Date(s);
+      e.setHours(23, 59, 59, 999);
+      return { from_ts_ms: s.getTime(), to_ts_ms: e.getTime() };
+    }
+    return {
+      from_ts_ms: now - (PRESET_DURATIONS_MS[preset] ?? 24 * 60 * 60_000),
+      to_ts_ms: now,
+    };
+  }
+  return {
+    from_ts_ms: customFrom ? new Date(customFrom).getTime() : undefined,
+    to_ts_ms: customTo ? new Date(customTo).getTime() : undefined,
+  };
+}
+
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic/messages")({
   validateSearch: (s: Record<string, unknown>): MessagesSearch => {
     const fromRaw = s.from;
@@ -90,6 +133,14 @@ function MessagesPanel({
 
   const [live, setLive] = useState<boolean>(false);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+
+  // Browse-level time-range filter (separate state from the search panel below)
+  const [browseRangeMode, setBrowseRangeMode] = useState<
+    "off" | "preset" | "custom"
+  >("off");
+  const [browsePreset, setBrowsePreset] = useState<string>("24h");
+  const [browseCustomFrom, setBrowseCustomFrom] = useState<string>("");
+  const [browseCustomTo, setBrowseCustomTo] = useState<string>("");
 
   // Search state
   const [searchOpen, setSearchOpen] = useState(false);
@@ -215,14 +266,27 @@ function MessagesPanel({
     }
   };
 
+  const browseRange = useMemo(
+    () =>
+      computeTimeRange(
+        browseRangeMode,
+        browsePreset,
+        browseCustomFrom,
+        browseCustomTo,
+      ),
+    [browseRangeMode, browsePreset, browseCustomFrom, browseCustomTo],
+  );
+
   const params = useMemo(
     () => ({
       partition,
       limit,
       from,
       offset: from === "offset" ? msgOffset : undefined,
+      from_ts_ms: browseRange.from_ts_ms,
+      to_ts_ms: browseRange.to_ts_ms,
     }),
-    [partition, limit, from, msgOffset],
+    [partition, limit, from, msgOffset, browseRange.from_ts_ms, browseRange.to_ts_ms],
   );
 
   const msgsQuery = useQuery({
@@ -232,39 +296,8 @@ function MessagesPanel({
     enabled: !searchResult,
   });
 
-  const resolvedRange = () => {
-    if (rangeMode === "off") return { from_ts_ms: undefined, to_ts_ms: undefined };
-    if (rangeMode === "preset") {
-      const now = Date.now();
-      const map: Record<string, number> = {
-        "5m": 5 * 60_000,
-        "15m": 15 * 60_000,
-        "1h": 60 * 60_000,
-        "6h": 6 * 60 * 60_000,
-        "24h": 24 * 60 * 60_000,
-        "7d": 7 * 24 * 60 * 60_000,
-        "30d": 30 * 24 * 60 * 60_000,
-      };
-      if (preset === "today") {
-        const s = new Date();
-        s.setHours(0, 0, 0, 0);
-        return { from_ts_ms: s.getTime(), to_ts_ms: now };
-      }
-      if (preset === "yesterday") {
-        const s = new Date();
-        s.setHours(0, 0, 0, 0);
-        s.setDate(s.getDate() - 1);
-        const e = new Date(s);
-        e.setHours(23, 59, 59, 999);
-        return { from_ts_ms: s.getTime(), to_ts_ms: e.getTime() };
-      }
-      return { from_ts_ms: now - (map[preset] ?? 24 * 60 * 60_000), to_ts_ms: now };
-    }
-    return {
-      from_ts_ms: customFrom ? new Date(customFrom).getTime() : undefined,
-      to_ts_ms: customTo ? new Date(customTo).getTime() : undefined,
-    };
-  };
+  const resolvedRange = () =>
+    computeTimeRange(rangeMode, preset, customFrom, customTo);
 
   const runSearch = async (continuation?: Record<string, number>) => {
     setSearching(true);
@@ -307,7 +340,9 @@ function MessagesPanel({
     setSearchError(null);
   };
 
-  const rawMessages = searchResult ? searchResult.messages : (msgsQuery.data ?? []);
+  const rawMessages = searchResult
+    ? searchResult.messages
+    : (msgsQuery.data?.messages ?? []);
   const displayMessages = useMemo(() => {
     if (sortOrder === "oldest") return rawMessages;
     // Stable sort: newest timestamp first; ties broken by (partition, offset) desc
@@ -388,6 +423,24 @@ function MessagesPanel({
           />
         </div>
         <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+          <label>Range</label>
+          <select
+            value={browseRangeMode}
+            onChange={(e) =>
+              setBrowseRangeMode(
+                e.target.value as "off" | "preset" | "custom",
+              )
+            }
+            className="rounded border border-[var(--color-border)] px-2 py-1 text-xs"
+            disabled={!!searchResult}
+            title="Filter messages by timestamp"
+          >
+            <option value="off">any time</option>
+            <option value="preset">preset</option>
+            <option value="custom">custom</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
           <label>Sort</label>
           <select
             value={sortOrder}
@@ -432,6 +485,53 @@ function MessagesPanel({
           {searching && " · searching…"}
         </span>
       </div>
+
+      {browseRangeMode !== "off" && !searchResult && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-2 text-xs">
+          {browseRangeMode === "preset" && (
+            <>
+              <span className="text-[var(--color-text-muted)]">From</span>
+              {(
+                ["5m", "15m", "1h", "6h", "24h", "7d", "30d", "today", "yesterday"] as const
+              ).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setBrowsePreset(p)}
+                  className={`rounded border px-2 py-0.5 ${
+                    browsePreset === p
+                      ? "border-accent bg-accent-subtle text-accent"
+                      : "border-[var(--color-border)] hover:border-[var(--color-border-strong)]"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </>
+          )}
+          {browseRangeMode === "custom" && (
+            <>
+              <label className="flex items-center gap-1.5 text-[var(--color-text-muted)]">
+                From
+                <input
+                  type="datetime-local"
+                  value={browseCustomFrom}
+                  onChange={(e) => setBrowseCustomFrom(e.target.value)}
+                  className="rounded border border-[var(--color-border)] px-2 py-1"
+                />
+              </label>
+              <label className="flex items-center gap-1.5 text-[var(--color-text-muted)]">
+                To
+                <input
+                  type="datetime-local"
+                  value={browseCustomTo}
+                  onChange={(e) => setBrowseCustomTo(e.target.value)}
+                  className="rounded border border-[var(--color-border)] px-2 py-1"
+                />
+              </label>
+            </>
+          )}
+        </div>
+      )}
 
       {searchOpen && (
         <div className="space-y-3 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3">
