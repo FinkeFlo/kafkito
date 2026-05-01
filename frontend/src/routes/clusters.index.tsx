@@ -291,11 +291,9 @@ function ClusterRow({ cluster }: { cluster: ClusterRowInfo }) {
   return (
     <DataTableRow>
       <td className="px-4 py-3">
-        {/* TODO(task4): /clusters/$cluster is not yet a typed route — Task 4 adds it.
-            Cast keeps the link target stable across the refactor. */}
         <Link
-          to={"/clusters/$cluster" as never}
-          params={{ cluster: cluster.name } as never}
+          to="/clusters/$cluster"
+          params={{ cluster: cluster.name }}
           className="block -my-3 -mx-4 px-4 py-3 text-left"
         >
           <div className="flex items-center gap-2">
