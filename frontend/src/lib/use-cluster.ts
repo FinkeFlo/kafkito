@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams, useRouterState } from "@tanstack/react-router";
 import { fetchClusters, type ClusterInfo } from "./api";
+import { computeSwitchTarget } from "./cluster-switch";
 import {
   listPrivateClusters,
   subscribePrivateClusters,
@@ -130,19 +131,6 @@ export function useCluster(): UseClusterResult {
 
   const isUnknownCluster = !!fromUrl && !!clusters && !known(fromUrl);
 
-  // Reflect resolved cluster into URL once data arrives so deep-links and
-  // shareable URLs keep working without forcing every route to set it manually.
-  useEffect(() => {
-    if (!clusters || !cluster) return;
-    if (fromUrl === cluster) return;
-    if (location.pathname === "/preview") return;
-    navigate({
-      to: location.pathname,
-      search: (prev: Record<string, unknown>) => ({ ...prev, cluster }),
-      replace: true,
-    });
-  }, [cluster, clusters, fromUrl, navigate, location.pathname]);
-
   // Persist any explicit URL value so reload restores it across tabs.
   useEffect(() => {
     if (cluster && cluster !== stored) writeStored(cluster);
@@ -151,24 +139,11 @@ export function useCluster(): UseClusterResult {
   const setCluster = useCallback(
     (name: string) => {
       writeStored(name);
-      // Detail-routes carry a path-param resource that may not exist on the
-      // target cluster; bounce back to the matching list page.
-      const path = location.pathname;
-      const isTopicDetail = /^\/topics\/[^/]+/.test(path);
-      const isGroupDetail = /^\/groups\/[^/]+/.test(path);
-      if (isTopicDetail) {
-        navigate({ to: "/topics", search: { cluster: name } });
-        return;
-      }
-      if (isGroupDetail) {
-        navigate({ to: "/groups", search: { cluster: name, group: undefined } });
-        return;
-      }
-      navigate({
-        to: path,
-        search: (prev: Record<string, unknown>) => ({ ...prev, cluster: name }),
-        replace: true,
-      });
+      // computeSwitchTarget returns a fully-formed `/clusters/<name>/<section>`
+      // pathname (URL-encoded, no query). The typed router accepts string
+      // targets at runtime — cast since the literal isn't in the route union.
+      const target = computeSwitchTarget(location.pathname, name);
+      navigate({ to: target as never });
     },
     [navigate, location.pathname],
   );
