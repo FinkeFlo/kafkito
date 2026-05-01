@@ -18,6 +18,7 @@ import { openCommandPalette } from "./CommandPalette";
 import { UserMenu } from "./UserMenu";
 import { useTheme } from "@/lib/theme";
 import { fetchInfo } from "@/lib/api";
+import { useCluster } from "@/lib/use-cluster";
 
 function Logo() {
   return (
@@ -87,6 +88,7 @@ function VersionBadge() {
 }
 
 export function Shell() {
+  const { cluster } = useCluster();
   return (
     <div className="flex min-h-full flex-col bg-bg text-text">
       <header className="border-b border-border bg-panel">
@@ -106,57 +108,73 @@ export function Shell() {
         <nav className="flex items-center gap-1 px-6 pb-0 pt-3">
           <Link
             to="/"
-            search={{ cluster: undefined }}
             activeOptions={{ exact: true }}
             className={navLinkBase}
           >
             <Home className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
             Overview
           </Link>
-          <Link
-            to="/topics"
-            search={{ cluster: undefined }}
-            className={navLinkBase}
-          >
-            <Boxes className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
-            Topics
-          </Link>
-          <Link
-            to="/groups"
-            search={{ cluster: undefined, group: undefined }}
-            className={navLinkBase}
-          >
-            <Users className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
-            Consumer groups
-          </Link>
-          <Link
-            to="/schemas"
-            search={{ cluster: undefined, subject: undefined, version: undefined }}
-            className={navLinkBase}
-          >
-            <FileJson className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
-            Schemas
-          </Link>
-          <Link
-            to="/acls"
-            search={{ cluster: undefined }}
-            className={clsx(navLinkBase, "mr-auto")}
-          >
-            <Shield className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
-            ACLs
-          </Link>
-          <div className="flex items-center gap-1 pb-1">
+          {cluster ? (
+            <>
+              <Link
+                to="/clusters/$cluster/topics"
+                params={{ cluster }}
+                className={navLinkBase}
+              >
+                <Boxes className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
+                Topics
+              </Link>
+              <Link
+                to="/clusters/$cluster/groups"
+                params={{ cluster }}
+                search={{ group: undefined }}
+                className={navLinkBase}
+              >
+                <Users className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
+                Consumer groups
+              </Link>
+              <Link
+                to="/clusters/$cluster/schemas"
+                params={{ cluster }}
+                search={{ subject: undefined, version: undefined }}
+                className={navLinkBase}
+              >
+                <FileJson className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
+                Schemas
+              </Link>
+              <Link
+                to="/clusters/$cluster/acls"
+                params={{ cluster }}
+                className={clsx(navLinkBase, "mr-auto")}
+              >
+                <Shield className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
+                ACLs
+              </Link>
+            </>
+          ) : (
             <Link
-              to="/brokers"
+              to="/clusters"
               search={{ cluster: undefined }}
-              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-hover hover:text-text [&.active]:bg-accent-subtle [&.active]:text-accent"
+              className={clsx(navLinkBase, "mr-auto")}
             >
-              <Server className="h-3.5 w-3.5" />
-              Brokers
+              <Boxes className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
+              Clusters
             </Link>
+          )}
+          <div className="flex items-center gap-1 pb-1">
+            {cluster ? (
+              <Link
+                to="/clusters/$cluster/brokers"
+                params={{ cluster }}
+                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-hover hover:text-text [&.active]:bg-accent-subtle [&.active]:text-accent"
+              >
+                <Server className="h-3.5 w-3.5" />
+                Brokers
+              </Link>
+            ) : null}
             <Link
               to="/settings"
-              search={{ cluster: undefined }}
+              search={{ cluster: cluster ?? undefined }}
               className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-hover hover:text-text [&.active]:bg-accent-subtle [&.active]:text-accent"
             >
               <SettingsIcon className="h-3.5 w-3.5" />
