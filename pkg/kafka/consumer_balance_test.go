@@ -19,7 +19,7 @@ func TestFairShare(t *testing.T) {
 	}{
 		{"limit 50 / 3 partitions", 50, 3, 17 + balanceBuffer}, // ceil(50/3)=17
 		{"limit 50 / 2 partitions", 50, 2, 25 + balanceBuffer},
-		{"limit 50 / 1 partition", 50, 1, 50},                     // single = exactly limit, no buffer
+		{"limit 50 / 1 partition", 50, 1, 50}, // single = exactly limit, no buffer
 		{"limit 1 / 3 partitions", 1, 3, 1 + balanceBuffer},
 		{"limit 500 / 3 partitions", 500, 3, 167 + balanceBuffer}, // ceil(500/3)=167
 		{"limit 100 / 100 partitions", 100, 100, 1 + balanceBuffer},
