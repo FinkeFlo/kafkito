@@ -296,6 +296,39 @@ function MessagesPanel({
     enabled: !searchResult,
   });
 
+  // Cursor pagination: the head page is fetched by the useQuery above; each
+  // "Load more" click appends the next backward page using the previous
+  // page's next_cursor. Reset whenever the head-page params change so the
+  // accumulated tail can never out-of-sync with the current filter.
+  const [tailMessages, setTailMessages] = useState<Message[]>([]);
+  const [tailCursor, setTailCursor] = useState<string | undefined>(undefined);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTailMessages([]);
+    setTailCursor(msgsQuery.data?.next_cursor);
+    setLoadMoreError(null);
+  }, [msgsQuery.data]);
+
+  const loadMore = async () => {
+    if (!tailCursor) return;
+    setLoadingMore(true);
+    setLoadMoreError(null);
+    try {
+      const next = await fetchMessages(cluster, topic, {
+        ...params,
+        cursor: tailCursor,
+      });
+      setTailMessages((prev) => [...prev, ...(next.messages ?? [])]);
+      setTailCursor(next.has_more ? next.next_cursor : undefined);
+    } catch (err) {
+      setLoadMoreError((err as Error).message);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const resolvedRange = () =>
     computeTimeRange(rangeMode, preset, customFrom, customTo);
 
@@ -342,7 +375,7 @@ function MessagesPanel({
 
   const rawMessages = searchResult
     ? searchResult.messages
-    : (msgsQuery.data?.messages ?? []);
+    : [...(msgsQuery.data?.messages ?? []), ...tailMessages];
   const displayMessages = useMemo(() => {
     if (sortOrder === "oldest") return rawMessages;
     // Stable sort: newest timestamp first; ties broken by (partition, offset) desc
@@ -881,6 +914,23 @@ function MessagesPanel({
           />
         ))}
       </div>
+
+      {!searchResult && tailCursor && !live && (
+        <div className="flex flex-col items-center gap-2 p-4">
+          <button
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="rounded-md border border-[var(--color-border)] bg-[var(--color-panel)] px-4 py-2 text-sm font-medium text-[var(--color-text)] transition-colors hover:border-[var(--color-border-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loadingMore ? "Loading…" : "Load more"}
+          </button>
+          {loadMoreError && (
+            <div className="text-xs text-[var(--color-danger)]">
+              {loadMoreError}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
