@@ -221,10 +221,14 @@ func (a *clusterAPI) describeTopic(w http.ResponseWriter, r *http.Request) {
 //
 // Query params:
 //
-//	partition: int32 or -1 for all (default: -1)
-//	limit:     1..500              (default: 50)
-//	from:      end|start|offset    (default: end)
-//	offset:    int64 (used when from=offset)
+//	partition:         int32 or -1 for all (default: -1)
+//	limit:             1..500              (default: 50)
+//	from:              end|start|offset|timestamp (default: end)
+//	offset:            int64 (used when from=offset, single partition)
+//	partition_offsets: "p:o,p:o" (used when from=offset, multi partition)
+//	from_ts_ms:        UNIX millis lower bound (auto-implies from=timestamp)
+//	to_ts_ms:          UNIX millis upper bound (exclusive)
+//	cursor:            opaque continuation token (overrides everything else)
 func (a *clusterAPI) consumeMessages(w http.ResponseWriter, r *http.Request) {
 	cluster := chi.URLParam(r, "cluster")
 	topic := chi.URLParam(r, "topic")
@@ -236,10 +240,10 @@ func (a *clusterAPI) consumeMessages(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
 
-	msgs, err := a.reg.ConsumeMessages(ctx, cluster, topic, opts)
+	res, err := a.reg.ConsumeMessages(ctx, cluster, topic, opts)
 	if err != nil {
 		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
@@ -248,11 +252,18 @@ func (a *clusterAPI) consumeMessages(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kafka: " + err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	resp := map[string]any{
 		"cluster":  cluster,
 		"topic":    topic,
-		"messages": msgs,
-	})
+		"messages": res.Messages,
+		"has_more": res.HasMore,
+	}
+	if res.NextCursor != nil {
+		if s, encErr := kafkapkg.EncodeCursor(*res.NextCursor); encErr == nil {
+			resp["next_cursor"] = s
+		}
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // sampleMessages returns the last n decoded messages for use as a structural
@@ -277,7 +288,7 @@ func (a *clusterAPI) sampleMessages(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	msgs, err := a.reg.ConsumeMessages(ctx, cluster, topic, opts)
+	res, err := a.reg.ConsumeMessages(ctx, cluster, topic, opts)
 	if err != nil {
 		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
@@ -289,7 +300,7 @@ func (a *clusterAPI) sampleMessages(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"cluster":    cluster,
 		"topic":      topic,
-		"messages":   msgs,
+		"messages":   res.Messages,
 		"sampled_at": time.Now().UnixMilli(),
 	})
 }

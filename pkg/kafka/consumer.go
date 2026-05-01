@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 	"unicode/utf8"
 
@@ -44,18 +45,43 @@ type ConsumeFrom string
 
 // Possible values for ConsumeFrom.
 const (
-	FromEnd    ConsumeFrom = "end"    // last N records (default)
-	FromStart  ConsumeFrom = "start"  // first N records
-	FromOffset ConsumeFrom = "offset" // starting at given offset
+	FromEnd       ConsumeFrom = "end"       // last N records (default)
+	FromStart     ConsumeFrom = "start"     // first N records
+	FromOffset    ConsumeFrom = "offset"    // starting at given offset(s)
+	FromTimestamp ConsumeFrom = "timestamp" // starting at first record at-or-after FromTSMs
 )
 
 // ConsumeOptions drives ConsumeMessages.
 type ConsumeOptions struct {
-	Partition int32       // -1 = all
-	Limit     int         // per call cap, hard-capped at 500
+	Partition int32       // -1 = all partitions
+	Limit     int         // per-page cap, hard-capped at 500
 	From      ConsumeFrom // default FromEnd
-	Offset    int64       // used when From==FromOffset
-	Timeout   time.Duration
+	Offset    int64       // used when From==FromOffset and PartitionOffsets is empty (single partition)
+
+	// PartitionOffsets is the explicit per-partition seek map. When non-empty,
+	// it overrides the single-partition Offset field. Used by from=offset for
+	// multi-partition seeks and by forward cursor pagination.
+	PartitionOffsets map[int32]int64
+
+	// CursorUpperBounds, when non-nil, replaces each partition's
+	// high-watermark with the given exclusive upper offset. Used by backward
+	// cursor pagination ("the next page is everything strictly older than
+	// these offsets per partition"). Only honored when From==FromEnd.
+	CursorUpperBounds map[int32]int64
+
+	// FromTSMs / ToTSMs are UNIX millis. Both zero means "no time filter".
+	// When set, From should be FromTimestamp.
+	FromTSMs int64
+	ToTSMs   int64
+
+	Timeout time.Duration
+}
+
+// ConsumeResult bundles a page of records with optional continuation.
+type ConsumeResult struct {
+	Messages   []Message
+	NextCursor *Cursor // nil when there are no more records in the current direction
+	HasMore    bool
 }
 
 const (
@@ -84,9 +110,27 @@ func fairShare(limit, partitions int) int {
 	return ((limit + partitions - 1) / partitions) + balanceBuffer
 }
 
-// ConsumeMessages pulls up to opts.Limit messages from the given topic on
-// the named cluster using a short-lived kgo.Client.
-func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, opts ConsumeOptions) ([]Message, error) {
+// pageWindow is the per-partition [begin, stop) offset range a single
+// page of ConsumeMessages will scan.
+type pageWindow struct {
+	begin int64 // inclusive
+	stop  int64 // exclusive
+}
+
+// ConsumeMessages pulls up to opts.Limit messages from the named topic
+// using a short-lived kgo.Client. For multi-partition (-1) calls with
+// from=end, each non-empty partition gets a fair share (ceil(limit/K)
+// + buffer) of records, then the merged result is sorted newest-first
+// by timestamp and truncated to limit. Single-partition calls and
+// forward calls (from=start, from=offset, from=timestamp) bypass the
+// fair-share math and consume up to limit records straight.
+//
+// The returned ConsumeResult.NextCursor, when non-nil, encodes the
+// per-partition boundary offsets for the next page in the same
+// direction. Callers may pass this value through DecodeCursor and into
+// ConsumeOptions.PartitionOffsets / CursorUpperBounds to fetch the
+// next page.
+func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, opts ConsumeOptions) (*ConsumeResult, error) {
 	cfg, ok := r.clusters[cluster]
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, cluster)
@@ -98,7 +142,11 @@ func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, o
 		opts.Limit = maxConsumeLimit
 	}
 	if opts.From == "" {
-		opts.From = FromEnd
+		if opts.FromTSMs > 0 || opts.ToTSMs > 0 {
+			opts.From = FromTimestamp
+		} else {
+			opts.From = FromEnd
+		}
 	}
 	if opts.Timeout <= 0 {
 		opts.Timeout = 5 * time.Second
@@ -120,11 +168,17 @@ func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, o
 		return nil, fmt.Errorf("topic %q not found on cluster %q", topic, cluster)
 	}
 
-	parts := make([]int32, 0, len(t.Partitions))
+	allParts := make([]int32, 0, len(t.Partitions))
+	for _, p := range t.Partitions {
+		allParts = append(allParts, p.Partition)
+	}
+	sort.Slice(allParts, func(i, j int) bool { return allParts[i] < allParts[j] })
+
+	parts := allParts
 	if opts.Partition >= 0 {
 		found := false
-		for _, p := range t.Partitions {
-			if p.Partition == opts.Partition {
+		for _, p := range allParts {
+			if p == opts.Partition {
 				found = true
 				break
 			}
@@ -132,11 +186,7 @@ func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, o
 		if !found {
 			return nil, fmt.Errorf("partition %d not found in topic %q on cluster %q", opts.Partition, topic, cluster)
 		}
-		parts = append(parts, opts.Partition)
-	} else {
-		for _, p := range t.Partitions {
-			parts = append(parts, p.Partition)
-		}
+		parts = []int32{opts.Partition}
 	}
 
 	starts, err := adm.ListStartOffsets(admCtx, topic)
@@ -147,63 +197,44 @@ func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, o
 	if err != nil {
 		return nil, fmt.Errorf("list end offsets for topic %q on cluster %q: %w", topic, cluster, err)
 	}
-
-	// Build per-partition start offsets and total expected message count.
-	partOffsets := make(map[int32]kgo.Offset, len(parts))
-	expected := 0
+	startMap := make(map[int32]int64, len(parts))
+	endMap := make(map[int32]int64, len(parts))
 	for _, p := range parts {
-		startOff := int64(0)
-		endOff := int64(0)
 		if so, ok := starts.Lookup(topic, p); ok {
-			startOff = so.Offset
+			startMap[p] = so.Offset
 		}
 		if eo, ok := ends.Lookup(topic, p); ok {
-			endOff = eo.Offset
+			endMap[p] = eo.Offset
 		}
-		avail := endOff - startOff
-		if avail <= 0 {
-			continue
-		}
-
-		var begin int64
-		switch opts.From {
-		case FromStart:
-			begin = startOff
-		case FromOffset:
-			begin = opts.Offset
-			if begin < startOff {
-				begin = startOff
-			}
-			if begin >= endOff {
-				continue
-			}
-		default: // FromEnd
-			// Take last opts.Limit records per partition (capped by availability).
-			tail := int64(opts.Limit)
-			if avail < tail {
-				tail = avail
-			}
-			begin = endOff - tail
-			if begin < startOff {
-				begin = startOff
-			}
-		}
-		want := endOff - begin
-		if want <= 0 {
-			continue
-		}
-		if want > int64(opts.Limit) {
-			want = int64(opts.Limit)
-		}
-		expected += int(want)
-		partOffsets[p] = kgo.NewOffset().At(begin)
 	}
 
-	if len(partOffsets) == 0 || expected == 0 {
-		return []Message{}, nil
+	// FromTimestamp needs an admin call before the offset window math; resolve
+	// here so buildWindows can stay pure (offset-only).
+	var fromOff, toOff map[int32]int64
+	if opts.From == FromTimestamp {
+		var rerr error
+		fromOff, toOff, rerr = resolveTimestampOffsets(admCtx, adm, topic, parts, opts.FromTSMs, opts.ToTSMs)
+		if rerr != nil {
+			return nil, fmt.Errorf("resolve time range for topic %q on cluster %q: %w", topic, cluster, rerr)
+		}
 	}
-	if expected > opts.Limit {
-		expected = opts.Limit
+
+	windows, err := buildWindows(parts, opts, startMap, endMap, fromOff, toOff)
+	if err != nil {
+		return nil, err
+	}
+	if len(windows) == 0 {
+		return &ConsumeResult{Messages: []Message{}}, nil
+	}
+
+	direction := CursorBackward
+	if opts.From == FromStart || opts.From == FromOffset || opts.From == FromTimestamp {
+		direction = CursorForward
+	}
+
+	partOffsets := make(map[int32]kgo.Offset, len(windows))
+	for p, w := range windows {
+		partOffsets[p] = kgo.NewOffset().At(w.begin)
 	}
 
 	consumeOpts := clientOpts(cfg, r.log.With("cluster", cluster, "role", "consume"))
@@ -211,39 +242,72 @@ func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, o
 		kgo.ConsumePartitions(map[string]map[int32]kgo.Offset{topic: partOffsets}),
 		kgo.FetchMaxWait(500*time.Millisecond),
 	)
-
 	cl, err := kgo.NewClient(consumeOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("create consume client for topic %q on cluster %q: %w", topic, cluster, err)
 	}
 	defer cl.Close()
 
-	out := make([]Message, 0, expected)
+	collected := make(map[int32][]Message, len(windows))
+	totalForward := 0
+
 	pollCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 
 	policy := r.MaskingPolicy(cluster)
 	dec := r.srDecoderFor(cluster)
-	for len(out) < opts.Limit {
+
+	enough := func() bool {
+		if direction == CursorForward {
+			return totalForward >= opts.Limit
+		}
+		// Backward: every active partition must have collected its window
+		// (window-size = stop - begin, which is bounded by the fair share).
+		for p, w := range windows {
+			got := int64(len(collected[p]))
+			want := w.stop - w.begin
+			if got < want {
+				return false
+			}
+		}
+		return true
+	}
+
+	emptyStreak := 0
+	for !enough() {
 		fetches := cl.PollFetches(pollCtx)
 		if errs := fetches.Errors(); len(errs) > 0 {
-			// Deadline is expected when we've drained partitions without reaching limit.
 			if errors.Is(pollCtx.Err(), context.DeadlineExceeded) {
 				break
 			}
+			fatal := false
+			var firstFatal error
 			for _, e := range errs {
 				if errors.Is(e.Err, context.Canceled) || errors.Is(e.Err, context.DeadlineExceeded) {
 					continue
 				}
-				return out, fmt.Errorf("fetch topic %q partition %d on cluster %q: %w", topic, e.Partition, cluster, e.Err)
+				if firstFatal == nil {
+					firstFatal = fmt.Errorf("fetch topic %q partition %d on cluster %q: %w", topic, e.Partition, cluster, e.Err)
+				}
+				fatal = true
+			}
+			if fatal {
+				return nil, firstFatal
 			}
 		}
-		empty := true
+		if pollCtx.Err() != nil {
+			break
+		}
+
+		empty := fetches.Empty()
 		fetches.EachRecord(func(rec *kgo.Record) {
-			if len(out) >= opts.Limit {
+			w, active := windows[rec.Partition]
+			if !active {
 				return
 			}
-			empty = false
+			if rec.Offset < w.begin || rec.Offset >= w.stop {
+				return
+			}
 			m := recordToMessage(rec)
 			m.applySRDecoder(ctx, dec, rec.Key, rec.Value)
 			if !policy.IsEmpty() && m.Value != "" {
@@ -252,17 +316,242 @@ func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, o
 					m.Masked = true
 				}
 			}
-			out = append(out, m)
+			collected[rec.Partition] = append(collected[rec.Partition], m)
+			if direction == CursorForward {
+				totalForward++
+			}
 		})
-		if empty && pollCtx.Err() != nil {
-			break
-		}
+
 		if empty {
-			break
+			emptyStreak++
+			// Two consecutive empty polls almost always means we've drained the
+			// brokers' assigned partitions. Bail.
+			if emptyStreak >= 2 {
+				break
+			}
+		} else {
+			emptyStreak = 0
 		}
 	}
 
-	return out, nil
+	merged := make([]Message, 0)
+	for _, msgs := range collected {
+		merged = append(merged, msgs...)
+	}
+	if direction == CursorBackward {
+		sort.Slice(merged, func(i, j int) bool {
+			if merged[i].Timestamp != merged[j].Timestamp {
+				return merged[i].Timestamp > merged[j].Timestamp
+			}
+			if merged[i].Partition != merged[j].Partition {
+				return merged[i].Partition < merged[j].Partition
+			}
+			return merged[i].Offset > merged[j].Offset
+		})
+	} else {
+		sort.Slice(merged, func(i, j int) bool {
+			if merged[i].Timestamp != merged[j].Timestamp {
+				return merged[i].Timestamp < merged[j].Timestamp
+			}
+			if merged[i].Partition != merged[j].Partition {
+				return merged[i].Partition < merged[j].Partition
+			}
+			return merged[i].Offset < merged[j].Offset
+		})
+	}
+	if len(merged) > opts.Limit {
+		merged = merged[:opts.Limit]
+	}
+
+	nextCursor, hasMore := buildNextCursor(direction, windows, merged, startMap, endMap)
+
+	return &ConsumeResult{
+		Messages:   merged,
+		NextCursor: nextCursor,
+		HasMore:    hasMore,
+	}, nil
+}
+
+// buildWindows resolves the [begin, stop) offset range to scan per partition,
+// based on the From/Offset/PartitionOffsets/CursorUpperBounds fields of opts.
+// For FromTimestamp the caller pre-resolves fromOff/toOff via
+// resolveTimestampOffsets and passes them through.
+func buildWindows(
+	parts []int32,
+	opts ConsumeOptions,
+	startMap, endMap map[int32]int64,
+	fromOff, toOff map[int32]int64,
+) (map[int32]pageWindow, error) {
+	windows := make(map[int32]pageWindow, len(parts))
+
+	switch opts.From {
+	case FromTimestamp:
+		for _, p := range parts {
+			b := startMap[p]
+			e := endMap[p]
+			if e <= b {
+				continue
+			}
+			if opts.FromTSMs > 0 {
+				if o, ok := fromOff[p]; ok && o > b {
+					b = o
+				}
+			}
+			if opts.ToTSMs > 0 {
+				if o, ok := toOff[p]; ok && o < e {
+					e = o
+				}
+			}
+			if e <= b {
+				continue
+			}
+			windows[p] = pageWindow{begin: b, stop: e}
+		}
+	case FromOffset:
+		switch {
+		case len(opts.PartitionOffsets) > 0:
+			for p, off := range opts.PartitionOffsets {
+				if !containsPartition(parts, p) {
+					continue
+				}
+				b := off
+				if s, ok := startMap[p]; ok && b < s {
+					b = s
+				}
+				e, ok := endMap[p]
+				if !ok || e <= b {
+					continue
+				}
+				windows[p] = pageWindow{begin: b, stop: e}
+			}
+		case len(parts) == 1:
+			p := parts[0]
+			b := opts.Offset
+			if s, ok := startMap[p]; ok && b < s {
+				b = s
+			}
+			if e, ok := endMap[p]; ok && e > b {
+				windows[p] = pageWindow{begin: b, stop: e}
+			}
+		default:
+			return nil, fmt.Errorf("from=offset with partition=-1 requires partition_offsets")
+		}
+	case FromStart:
+		for _, p := range parts {
+			s := startMap[p]
+			e := endMap[p]
+			if e > s {
+				windows[p] = pageWindow{begin: s, stop: e}
+			}
+		}
+	default: // FromEnd
+		nonEmpty := 0
+		for _, p := range parts {
+			s := startMap[p]
+			e := endMap[p]
+			if ub, ok := opts.CursorUpperBounds[p]; ok && ub < e {
+				e = ub
+			}
+			if e > s {
+				nonEmpty++
+			}
+		}
+		share := fairShare(opts.Limit, nonEmpty)
+		for _, p := range parts {
+			s := startMap[p]
+			e := endMap[p]
+			if ub, ok := opts.CursorUpperBounds[p]; ok && ub < e {
+				e = ub
+			}
+			if e <= s {
+				continue
+			}
+			tail := int64(share)
+			if avail := e - s; avail < tail {
+				tail = avail
+			}
+			b := e - tail
+			if b < s {
+				b = s
+			}
+			windows[p] = pageWindow{begin: b, stop: e}
+		}
+	}
+
+	return windows, nil
+}
+
+// containsPartition reports whether p appears in parts.
+func containsPartition(parts []int32, p int32) bool {
+	for _, x := range parts {
+		if x == p {
+			return true
+		}
+	}
+	return false
+}
+
+// buildNextCursor returns the cursor pointing at the next page boundary,
+// or (nil, false) when no further records remain in the given direction.
+func buildNextCursor(
+	direction CursorDirection,
+	windows map[int32]pageWindow,
+	page []Message,
+	startMap, endMap map[int32]int64,
+) (*Cursor, bool) {
+	if len(page) == 0 {
+		return nil, false
+	}
+	c := Cursor{
+		Direction:  direction,
+		Partitions: make(map[int32]int64, len(windows)),
+	}
+	hasMore := false
+	switch direction {
+	case CursorBackward:
+		// Lowest offset seen per partition on this page; the next page
+		// consumes records with offset strictly less than that boundary.
+		lowest := make(map[int32]int64, len(windows))
+		for _, m := range page {
+			cur, ok := lowest[m.Partition]
+			if !ok || m.Offset < cur {
+				lowest[m.Partition] = m.Offset
+			}
+		}
+		for p, w := range windows {
+			lo, ok := lowest[p]
+			if !ok {
+				lo = w.begin
+			}
+			if lo > startMap[p] {
+				hasMore = true
+			}
+			c.Partitions[p] = lo
+		}
+	default: // CursorForward
+		highest := make(map[int32]int64, len(windows))
+		for _, m := range page {
+			cur, ok := highest[m.Partition]
+			if !ok || m.Offset > cur {
+				highest[m.Partition] = m.Offset
+			}
+		}
+		for p, w := range windows {
+			hi, ok := highest[p]
+			next := hi + 1
+			if !ok {
+				next = w.begin
+			}
+			if next < w.stop && next < endMap[p] {
+				hasMore = true
+			}
+			c.Partitions[p] = next
+		}
+	}
+	if !hasMore {
+		return nil, false
+	}
+	return &c, true
 }
 
 func recordToMessage(rec *kgo.Record) Message {
