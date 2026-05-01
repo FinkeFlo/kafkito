@@ -110,6 +110,15 @@ export interface ConsumeParams {
   limit?: number;
   from?: "end" | "start" | "offset";
   offset?: number;
+  from_ts_ms?: number;
+  to_ts_ms?: number;
+  cursor?: string;
+}
+
+export interface MessagesPage {
+  messages: Message[];
+  has_more?: boolean;
+  next_cursor?: string;
 }
 
 async function getJSON<T>(path: string): Promise<T> {
@@ -207,17 +216,21 @@ export async function fetchMessages(
   cluster: string,
   topic: string,
   params: ConsumeParams = {},
-): Promise<Message[]> {
+): Promise<MessagesPage> {
   const qs = new URLSearchParams();
   if (params.partition !== undefined && params.partition >= 0)
     qs.set("partition", String(params.partition));
   if (params.limit !== undefined) qs.set("limit", String(params.limit));
   if (params.from) qs.set("from", params.from);
   if (params.offset !== undefined) qs.set("offset", String(params.offset));
+  if (params.from_ts_ms !== undefined) qs.set("from_ts_ms", String(params.from_ts_ms));
+  if (params.to_ts_ms !== undefined) qs.set("to_ts_ms", String(params.to_ts_ms));
+  if (params.cursor) qs.set("cursor", params.cursor);
   const q = qs.toString();
-  const r = await getJSONForCluster<{ messages: Message[] }>(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/messages${q ? "?" + q : ""}`),
+  return await getJSONForCluster<MessagesPage>(
+    cluster,
+    clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/messages${q ? "?" + q : ""}`),
   );
-  return r.messages;
 }
 
 export interface SampleResponse {

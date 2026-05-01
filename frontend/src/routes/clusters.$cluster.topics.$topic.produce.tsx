@@ -84,7 +84,7 @@ function ProduceSection({
     staleTime: 5_000,
   });
   const latestProbeAvailable =
-    !!latestProbeQuery.data && latestProbeQuery.data.length > 0;
+    !!latestProbeQuery.data && latestProbeQuery.data.messages.length > 0;
 
   const looksLikeJSON = (s: string): boolean => {
     const trimmed = s.trim();
@@ -111,7 +111,9 @@ function ProduceSection({
           partition: p.partition,
           from: "end",
           limit: 1,
-        }).catch(() => [] as Message[]),
+        })
+          .then((page) => page.messages)
+          .catch(() => [] as Message[]),
       );
       const results = await Promise.all(probes);
       const candidates = results.flat();
