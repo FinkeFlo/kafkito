@@ -91,8 +91,24 @@ func New(opts Options) http.Handler {
 		r.NotFound(apiNotFound)
 		return r
 	}
+	// SPA-fallback handler.
+	//
+	// Browser deep-link reload (e.g. ⌘R on /topics/foo/messages) lands here as
+	// a fresh GET. We must serve index.html so TanStack Router can take over
+	// on the client. But we MUST NOT:
+	//   - 200-fall through for backend route prefixes (/api, /rpc, /user-api,
+	//     /healthz, /readyz) when those didn't match — programmatic clients
+	//     deserve a JSON 404, not the SPA shell;
+	//   - serve HTML for non-GET/HEAD methods — POST/PUT/etc on an unknown
+	//     path must surface as 405/404 cleanly;
+	//   - serve HTML for missing /assets/* — browsers strict-MIME-check
+	//     hashed JS/CSS bundles and would refuse the response.
 	r.NotFound(func(w http.ResponseWriter, req *http.Request) {
-		if strings.HasPrefix(req.URL.Path, "/api/") {
+		if isBackendPrefix(req.URL.Path) {
+			apiNotFound(w, req)
+			return
+		}
+		if req.Method != http.MethodGet && req.Method != http.MethodHead {
 			apiNotFound(w, req)
 			return
 		}
@@ -100,6 +116,22 @@ func New(opts Options) http.Handler {
 	})
 
 	return r
+}
+
+// isBackendPrefix reports whether a request path belongs to a known backend
+// surface and should therefore never fall through to the SPA shell.
+func isBackendPrefix(p string) bool {
+	switch {
+	case strings.HasPrefix(p, "/api/"), p == "/api":
+		return true
+	case strings.HasPrefix(p, "/rpc/"), p == "/rpc":
+		return true
+	case strings.HasPrefix(p, "/user-api/"), p == "/user-api":
+		return true
+	case p == "/healthz", p == "/readyz":
+		return true
+	}
+	return false
 }
 
 func handleHealth(w http.ResponseWriter, _ *http.Request) {
