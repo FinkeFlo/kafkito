@@ -54,12 +54,10 @@ function ConsumersPanel({ cluster, topic }: { cluster: string; topic: string }) 
       header: t("consumers.columns.groupId"),
       sortValue: (r) => r.group_id,
       cell: (r) => (
-        // TODO(task9): switch to /clusters/$cluster/groups/$group once the
-        // groups routes are migrated. For now the legacy /groups route still
-        // uses search-param cluster, so we point at it.
         <Link
-          to="/groups"
-          search={{ cluster, group: r.group_id }}
+          to="/clusters/$cluster/groups"
+          params={{ cluster }}
+          search={{ group: r.group_id }}
           className="font-mono text-[13px] tabular-nums text-accent hover:underline"
         >
           {r.group_id}
