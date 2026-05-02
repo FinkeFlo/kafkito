@@ -42,10 +42,12 @@ Before writing any frontend code, do these five things:
 | Class merging | `clsx` + `tailwind-merge` | re-export as `cn()` in `src/lib/utils.ts` |
 | Dark mode | class-based (`html.dark`) | never media-query-only |
 
-**Do not add** shadcn, Radix, Headless UI, Mantine, Chakra, Material, CSS-in-JS,
+**Do not add** shadcn, Headless UI, Mantine, Chakra, Material, CSS-in-JS,
 styled-components, emotion, a state library (Redux/Zustand/Jotai), or a
 charting library. If you think you need one, stop and open a discussion
 first.
+
+**Radix UI headless primitives** (`@radix-ui/react-*` only, no shadcn) are allowed for behavioural complexity that is hard to get right by hand: focus trap, ARIA, collision-aware positioning. Each addition must be wrapped under `frontend/src/components/` with a canonical name and documented in § 6.1. We paint 100% of the visual layer ourselves; Radix provides no styling, only behaviour.
 
 ---
 
@@ -601,6 +603,7 @@ a review, treat it as drift and bring it in line.
 |---|---|---|
 | initial | Guidelines established alongside Direction A redesign | — |
 | 2026-04-26 | Direction-A delivery: WCAG-AA token sweep (focus-on-accent, accent-foreground, border-hover, dark overlay); new primitives (Toolbar, Modal, Input, Notice); kebab/PascalCase consolidation; Button variant rename destructive→danger; PageHeader eyebrow; Incidents-(24h) → Unreachable now semantic fix; outline-based focus indicator | (this PR — link added by author) |
+| 2026-05-02 | Phase 1 hardening: German strings stripped (English-only), `confirmPhrase` parity on Reset-Offsets and Delete-Records, ErrorState retry migrated to canonical `<Button>`, focus-indicator escapes removed (TimezoneToggle/SearchInput/CommandPalette), Radix headless-primitive carve-out in § 1 | (this PR — link added by author) |
 
 Add a row on every change. Small tweaks to tokens or primitives are
 fine; major shifts (new visual language, new nav model) require a design
