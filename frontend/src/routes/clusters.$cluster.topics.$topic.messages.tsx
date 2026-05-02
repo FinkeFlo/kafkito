@@ -585,7 +585,7 @@ function MessagesPanel({
           )}
           {undoToast && (
             <div className="flex items-center gap-3 rounded border border-border bg-panel p-2 text-xs">
-              <span>Path ersetzt durch Klick.</span>
+              <span>Path replaced by click.</span>
               <button
                 onClick={() => {
                   setPath(undoToast.previous.path);
@@ -855,7 +855,7 @@ function MessagesPanel({
                   disabled={searching}
                   className="ml-auto rounded border border-[var(--color-border)] px-2 py-1 hover:border-[var(--color-border-strong)]"
                 >
-                  Weiter suchen →
+                  Search more →
                 </button>
               )}
             </div>
