@@ -117,12 +117,12 @@ export function PathSense({
         <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-panel shadow-lg">
           {allRows.length === 0 ? (
             <div className="p-2 text-xs text-muted">
-              Sample ist kein JSON oder Topic ist leer — Pfad manuell eingeben.
+              Sample isn't JSON or topic is empty — enter path manually.
             </div>
           ) : (
             <ul className="max-h-72 overflow-auto py-1 text-xs">
               {filtered.length === 0 ? (
-                <li className="px-2 py-1 text-muted">Keine Treffer</li>
+                <li className="px-2 py-1 text-muted">No matches</li>
               ) : (
                 filtered.map((r) => (
                   <li key={r.path}>
