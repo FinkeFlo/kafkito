@@ -147,7 +147,7 @@ export function Shell() {
                 Schemas
               </Link>
               <Link
-                to="/clusters/$cluster/acls"
+                to="/clusters/$cluster/security/acls"
                 params={{ cluster }}
                 className={clsx(navLinkBase, "mr-auto")}
               >

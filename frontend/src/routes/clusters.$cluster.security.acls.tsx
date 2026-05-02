@@ -26,7 +26,7 @@ import { Input } from "@/components/Input";
 import { Notice } from "@/components/Notice";
 import { useFuzzy } from "@/lib/fuzzy";
 
-export const Route = createFileRoute("/clusters/$cluster/acls")({
+export const Route = createFileRoute("/clusters/$cluster/security/acls")({
   component: ACLsPage,
 });
 

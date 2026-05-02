@@ -18,9 +18,9 @@ describe("computeSwitchTarget", () => {
     expect(computeSwitchTarget("/clusters/IAK", "OTHER")).toBe("/clusters/OTHER");
   });
 
-  it("preserves /acls section", () => {
-    expect(computeSwitchTarget("/clusters/IAK/acls", "OTHER")).toBe(
-      "/clusters/OTHER/acls",
+  it("preserves /security section (acls + scram users live under it)", () => {
+    expect(computeSwitchTarget("/clusters/IAK/security/acls", "OTHER")).toBe(
+      "/clusters/OTHER/security",
     );
   });
 
