@@ -99,7 +99,7 @@ export function CommandPalette() {
         { kind: "nav", label: tt("nav.topics"), to: `/clusters/${c}/topics`, icon: <Boxes className="h-3.5 w-3.5" /> },
         { kind: "nav", label: tt("nav.groups"), to: `/clusters/${c}/groups`, icon: <Users className="h-3.5 w-3.5" /> },
         { kind: "nav", label: tt("nav.schemas"), to: `/clusters/${c}/schemas`, icon: <FileJson className="h-3.5 w-3.5" /> },
-        { kind: "nav", label: tt("nav.acls"), to: `/clusters/${c}/acls`, icon: <Shield className="h-3.5 w-3.5" /> },
+        { kind: "nav", label: tt("nav.acls"), to: `/clusters/${c}/security/acls`, icon: <Shield className="h-3.5 w-3.5" /> },
         { kind: "nav", label: tt("nav.users"), to: `/clusters/${c}/security/users`, icon: <Users className="h-3.5 w-3.5" /> },
       );
     }
