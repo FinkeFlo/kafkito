@@ -66,7 +66,7 @@ export function PathSense({
   value,
   onChange,
   onPick,
-  placeholder = "Tippen oder ↓ für Top-Felder",
+  placeholder = "Type or ↓ for top fields",
 }: PathSenseProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value);

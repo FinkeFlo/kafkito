@@ -37,10 +37,10 @@ export function ArrayScopePopover({
       className="rounded-md border border-border bg-panel shadow-md p-3 text-sm"
     >
       <div className="mb-2 text-muted">
-        <code className="font-mono">{arrayPath}</code> ist ein Array ({arrayLength} Einträge im Sample)
+        <code className="font-mono">{arrayPath}</code> is an array ({arrayLength} entries in sample)
       </div>
       <fieldset className="space-y-1.5">
-        <legend className="sr-only">Treffer in</legend>
+        <legend className="sr-only">Matches in</legend>
         <label className="flex items-start gap-2">
           <input
             type="radio"
@@ -49,7 +49,7 @@ export function ArrayScopePopover({
             onChange={() => setSel("index")}
           />
           <span>
-            <span className="font-medium">Diesem Index</span>{" "}
+            <span className="font-medium">This index</span>{" "}
             <span className="font-mono text-muted">{indexLeafPath}</span>
           </span>
         </label>
@@ -61,7 +61,7 @@ export function ArrayScopePopover({
             onChange={() => setSel("star")}
           />
           <span>
-            <span className="font-medium">Allen Einträgen</span>{" "}
+            <span className="font-medium">All entries</span>{" "}
             <span className="font-mono text-muted">{starLeafPath}</span>
           </span>
         </label>
@@ -77,7 +77,7 @@ export function ArrayScopePopover({
           onClick={() => onApply(sel)}
           className="rounded bg-accent px-3 py-1 font-semibold text-[var(--color-text-on-accent)] hover:bg-accent-hover"
         >
-          Übernehmen
+          Apply
         </button>
       </div>
     </div>

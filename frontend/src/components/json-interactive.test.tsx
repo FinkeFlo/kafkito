@@ -62,6 +62,6 @@ describe("JsonInteractive", () => {
   it("falls back to <pre> for messages over 1 MB", () => {
     const giant = "x".repeat(1_100_000);
     render(<JsonInteractive value={{ blob: giant }} onPick={() => {}} />);
-    expect(screen.getByText(/zu groß für interaktiven Modus/i)).toBeInTheDocument();
+    expect(screen.getByText(/Message too large for interactive mode/i)).toBeInTheDocument();
   });
 });
