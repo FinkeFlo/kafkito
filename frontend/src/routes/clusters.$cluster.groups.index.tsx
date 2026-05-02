@@ -721,7 +721,7 @@ function ResetOffsetsModal({
           <Button
             variant="primary"
             size="sm"
-            disabled={commitMut.isPending}
+            disabled={commitMut.isPending || selectedParts.length === 0}
             onClick={() => setCommitOpen(true)}
           >
             {commitMut.isPending ? "Committing…" : "Commit reset"}
@@ -731,7 +731,8 @@ function ResetOffsetsModal({
             onOpenChange={setCommitOpen}
             variant="primary"
             title="Commit new offsets?"
-            description={`This will overwrite committed offsets for group "${detail.group_id}" on topic "${topic}".`}
+            description={`This will overwrite committed offsets for group "${detail.group_id}" on topic "${topic}". Partitions: ${selectedParts.join(",")} (${selectedParts.length} of ${topicParts.length}).`}
+            confirmPhrase={detail.group_id}
             confirmLabel="Commit reset"
             onConfirm={() => {
               setErr(null);
@@ -864,11 +865,15 @@ function ResetOffsetsModal({
               </label>
             ))}
           </div>
-          <div className="mt-1 text-xs text-muted">
-            {selectedParts.length === 0
-              ? "none selected → will apply to ALL partitions of the topic"
-              : `${selectedParts.length} of ${topicParts.length} selected`}
-          </div>
+          {selectedParts.length === 0 ? (
+            <div className="mt-2">
+              <Notice intent="warning">Pick at least one partition.</Notice>
+            </div>
+          ) : (
+            <div className="mt-1 text-xs text-muted">
+              {`${selectedParts.length} of ${topicParts.length} selected`}
+            </div>
+          )}
         </div>
 
         {(dryResult || result) && (
