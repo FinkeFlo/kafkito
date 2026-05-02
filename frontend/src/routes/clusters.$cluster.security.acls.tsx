@@ -9,7 +9,6 @@ import {
   type ACLEntry,
   type ACLSpec,
 } from "@/lib/api";
-import { useCluster } from "@/lib/use-cluster";
 import { Tag } from "@/components/Tag";
 import { KpiCard } from "@/components/KpiCard";
 import { DataTable, DataTableHead, DataTableRow, DataTableTh } from "@/components/DataTable";
@@ -18,7 +17,6 @@ import { ErrorState } from "@/components/ErrorState";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { SearchInput } from "@/components/search-input";
 import { Highlight } from "@/components/highlight";
-import { PageHeader } from "@/components/page-header";
 import { Toolbar } from "@/components/Toolbar";
 import { Button } from "@/components/button";
 import { Modal } from "@/components/Modal";
@@ -48,30 +46,8 @@ const OPERATIONS = [
 const PERMISSIONS = ["ALLOW", "DENY"];
 
 function ACLsPage() {
-  const { cluster } = useCluster();
-  return (
-    <div className="space-y-5 p-6">
-      <PageHeader
-        eyebrow={
-          <>
-            <span className="font-mono normal-case tracking-normal">{cluster ?? "—"}</span>{" "}
-            <span aria-hidden>›</span> Access control
-          </>
-        }
-        title="ACLs"
-        subtitle="Principals, allow/deny rules, and resource scopes enforced by the broker."
-      />
-      {cluster ? (
-        <ACLsBody cluster={cluster} />
-      ) : (
-        <EmptyState
-          icon={Shield}
-          title="No cluster selected"
-          description="Pick a cluster from the header to manage its ACLs."
-        />
-      )}
-    </div>
-  );
+  const { cluster } = Route.useParams();
+  return <ACLsBody cluster={cluster} />;
 }
 
 function ACLsBody({ cluster }: { cluster: string }) {
