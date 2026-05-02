@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, RotateCcw } from "lucide-react";
 import { clsx } from "clsx";
+import { Button } from "@/components/button";
 
 export function ErrorState({
   title,
@@ -30,13 +31,16 @@ export function ErrorState({
         <p className="mt-1 max-w-md text-xs text-tint-red-fg/80">{detail}</p>
       )}
       {onRetry && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="mt-5 inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-hover"
-        >
-          ↻ {retryLabel}
-        </button>
+        <div className="mt-5">
+          <Button
+            variant="primary"
+            size="sm"
+            leadingIcon={<RotateCcw className="h-4 w-4" />}
+            onClick={onRetry}
+          >
+            {retryLabel}
+          </Button>
+        </div>
       )}
     </div>
   );

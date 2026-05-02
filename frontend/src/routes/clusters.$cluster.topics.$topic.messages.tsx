@@ -20,6 +20,7 @@ import { buildJsonPath, type Token } from "@/lib/path-builder";
 import { PathSense } from "@/components/path-sense";
 import { ArrayScopePopover } from "@/components/array-scope-popover";
 import { JsonInteractive } from "@/components/json-interactive";
+import { Button } from "@/components/button";
 
 interface MessagesSearch {
   partition: number;
@@ -1276,14 +1277,15 @@ function RangePicker({
                 className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[var(--color-text)]"
               />
             </label>
-            <button
-              type="button"
+            <Button
+              variant="primary"
+              size="sm"
+              className="mt-1"
               onClick={applyCustom}
               disabled={!draftFrom && !draftTo}
-              className="mt-1 rounded border border-accent bg-accent px-2 py-1 text-xs font-semibold text-[var(--color-on-accent)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Apply
-            </button>
+            </Button>
             {active && (
               <button
                 type="button"
