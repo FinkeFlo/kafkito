@@ -322,6 +322,7 @@ function DeleteRecordsModal({
     Object.fromEntries(partitions.map((p) => [p.partition, String(p.end_offset)])),
   );
   const [err, setErr] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [result, setResult] = useState<
     | { partition: number; low_watermark: number; error?: string }[]
     | null
@@ -345,6 +346,13 @@ function DeleteRecordsModal({
   });
 
   const anySelected = Object.values(sel).some(Boolean);
+  const selectedPartitions = partitions
+    .filter((p) => sel[p.partition])
+    .map((p) => p.partition);
+  const confirmDescription =
+    mode === "all"
+      ? `This truncates partitions ${selectedPartitions.join(",")} (${selectedPartitions.length} of ${partitions.length}) to their end offset on topic "${topic}". Cannot be undone.`
+      : `This deletes records before the chosen offset on partitions ${selectedPartitions.join(",")} (${selectedPartitions.length} of ${partitions.length}) on topic "${topic}". Cannot be undone.`;
 
   return (
     <Modal
@@ -371,14 +379,24 @@ function DeleteRecordsModal({
             variant="danger"
             size="sm"
             disabled={!anySelected || mut.isPending}
-            onClick={() => {
+            onClick={() => setConfirmOpen(true)}
+          >
+            {mut.isPending ? "Running…" : "Delete records"}
+          </Button>
+          <ConfirmDialog
+            open={confirmOpen}
+            onOpenChange={setConfirmOpen}
+            title={`Delete records from "${topic}"?`}
+            description={confirmDescription}
+            confirmPhrase={topic}
+            confirmLabel="Delete records"
+            variant="danger"
+            onConfirm={() => {
               setErr(null);
               setResult(null);
               mut.mutate();
             }}
-          >
-            {mut.isPending ? "Running…" : "Delete records"}
-          </Button>
+          />
         </>
       }
     >
