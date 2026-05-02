@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { FileJson, Trash2 } from "lucide-react";
@@ -42,9 +42,17 @@ function SchemasPage() {
       <Header cluster={cluster} hasSR={!!active?.schema_registry} />
 
       {active && !active.schema_registry && (
-        <Notice intent="warning" title="Schema Registry is not configured">
+        <Notice intent="info" title="Schemas not configured">
           Cluster <span className="font-mono">{active.name}</span> has no
-          schema registry URL. Add one in Settings to browse subjects.
+          Schema Registry URL. Add one in{" "}
+          <Link
+            to="/settings/clusters"
+            search={{ cluster: undefined }}
+            className="underline hover:text-text"
+          >
+            Manage clusters
+          </Link>{" "}
+          to browse subjects.
         </Notice>
       )}
 
