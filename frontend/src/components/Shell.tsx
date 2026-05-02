@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Boxes,
   FileJson,
-  Home,
   Moon,
   Search,
   Server,
@@ -11,7 +10,6 @@ import {
   Sun,
   Users,
 } from "lucide-react";
-import { clsx } from "clsx";
 import { ClusterPill } from "./ClusterPill";
 import { openCommandPalette } from "./CommandPalette";
 import { Tooltip } from "./tooltip";
@@ -119,14 +117,6 @@ export function Shell() {
           </div>
         </div>
         <nav className="flex items-center gap-1 px-6 pb-0 pt-3">
-          <Link
-            to="/"
-            activeOptions={{ exact: true }}
-            className={navLinkBase}
-          >
-            <Home className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
-            Overview
-          </Link>
           {cluster ? (
             <>
               <Link
@@ -171,36 +161,32 @@ export function Shell() {
                 </Link>
               </Tooltip>
               <Link
-                to="/clusters/$cluster/security/acls"
+                to="/clusters/$cluster/security"
                 params={{ cluster }}
-                className={clsx(navLinkBase, "mr-auto")}
+                className={navLinkBase}
               >
                 <Shield className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
-                ACLs
+                Security
+              </Link>
+              <Link
+                to="/clusters/$cluster/brokers"
+                params={{ cluster }}
+                className={navLinkBase}
+              >
+                <Server className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
+                Brokers
               </Link>
             </>
           ) : (
             <Link
               to="/clusters"
               search={{ cluster: undefined }}
-              className={clsx(navLinkBase, "mr-auto")}
+              className={navLinkBase}
             >
               <Boxes className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
               Clusters
             </Link>
           )}
-          <div className="flex items-center gap-1 pb-1">
-            {cluster ? (
-              <Link
-                to="/clusters/$cluster/brokers"
-                params={{ cluster }}
-                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-hover hover:text-text [&.active]:bg-accent-subtle [&.active]:text-accent"
-              >
-                <Server className="h-3.5 w-3.5" />
-                Brokers
-              </Link>
-            ) : null}
-          </div>
         </nav>
       </header>
       <main className="flex-1">
