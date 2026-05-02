@@ -71,7 +71,7 @@ export function ArrayScopePopover({
           onClick={onCancel}
           className="rounded border border-border px-2 py-1 hover:border-border-strong"
         >
-          Abbrechen
+          Cancel
         </button>
         <button
           onClick={() => onApply(sel)}

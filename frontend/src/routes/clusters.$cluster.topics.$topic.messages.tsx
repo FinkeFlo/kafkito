@@ -703,25 +703,25 @@ function MessagesPanel({
               <code className="font-mono">headers</code>,{" "}
               <code className="font-mono">partition</code>,{" "}
               <code className="font-mono">offset</code>,{" "}
-              <code className="font-mono">timestampMs</code>. Beispiel:{" "}
+              <code className="font-mono">timestampMs</code>. Example:{" "}
               <code className="font-mono">
                 parsed &amp;&amp; parsed.currency === "EUR" &amp;&amp;
                 parsed.amount &gt; 500
               </code>
-              . Limit 100 ms pro Nachricht.
+              . Limit 100 ms per message.
             </div>
           )}
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <label className="font-medium">Zeitraum</label>
+            <label className="font-medium">Range</label>
             <select
               value={rangeMode}
               onChange={(e) => setRangeMode(e.target.value as typeof rangeMode)}
               className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1"
             >
-              <option value="off">aus</option>
+              <option value="off">off</option>
               <option value="preset">Preset</option>
-              <option value="custom">Benutzerdefiniert</option>
+              <option value="custom">Custom</option>
             </select>
             {rangeMode === "preset" && (
               <div className="flex flex-wrap items-center gap-1">
@@ -736,7 +736,7 @@ function MessagesPanel({
                           : "border-[var(--color-border)] bg-[var(--color-surface-raised)] hover:border-[var(--color-border-strong)]"
                       }`}
                     >
-                      {p === "today" ? "Heute" : p === "yesterday" ? "Gestern" : `Letzte ${p}`}
+                      {p === "today" ? "Today" : p === "yesterday" ? "Yesterday" : `Last ${p}`}
                     </button>
                   ),
                 )}
@@ -876,12 +876,12 @@ function MessagesPanel({
 
       {showCoachmark && firstJsonIdx >= 0 && (
         <div className="m-3 flex items-center gap-2 rounded border border-accent/40 bg-accent-subtle p-2 text-xs text-accent">
-          <span>Tipp: Klicke auf einen Wert in einer JSON-Nachricht, um danach zu filtern.</span>
+          <span>Tip: click any value in a JSON message to filter by it.</span>
           <button
             onClick={dismissCoachmark}
             className="ml-auto rounded border border-border px-2 py-0.5 hover:border-border-strong"
           >
-            Verstanden
+            Got it
           </button>
         </div>
       )}

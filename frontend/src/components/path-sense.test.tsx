@@ -111,7 +111,7 @@ describe("PathSense", () => {
       />,
     );
     fireEvent.focus(screen.getByRole("combobox"));
-    expect(screen.getByText(/Pfad manuell eingeben/i)).toBeInTheDocument();
+    expect(screen.getByText(/enter path manually/i)).toBeInTheDocument();
   });
 
   it("closes on Escape", () => {
