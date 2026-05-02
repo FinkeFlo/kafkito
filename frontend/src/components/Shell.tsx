@@ -14,6 +14,7 @@ import {
 import { clsx } from "clsx";
 import { ClusterPill } from "./ClusterPill";
 import { openCommandPalette } from "./CommandPalette";
+import { Tooltip } from "./tooltip";
 import { UserMenu } from "./UserMenu";
 import { useTheme } from "@/lib/theme";
 import { fetchInfo } from "@/lib/api";
@@ -87,7 +88,15 @@ function VersionBadge() {
 }
 
 export function Shell() {
-  const { cluster } = useCluster();
+  const { cluster, clusters } = useCluster();
+  const activeInfo = cluster
+    ? clusters?.find((c) => c.name === cluster)
+    : undefined;
+  // hasSR is `true` when we know the cluster has a Schema Registry, `false`
+  // when we know it doesn't, `undefined` while clusters are loading. Treat
+  // unknown as "assume yes" so the tab doesn't briefly suffix `(—)` on cold
+  // load and then drop the suffix once metadata arrives.
+  const hasSR = activeInfo ? activeInfo.schema_registry : undefined;
   return (
     <div className="flex min-h-full flex-col bg-bg text-text">
       <header className="border-b border-border bg-panel">
@@ -137,15 +146,30 @@ export function Shell() {
                 <Users className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
                 Consumer groups
               </Link>
-              <Link
-                to="/clusters/$cluster/schemas"
-                params={{ cluster }}
-                search={{ subject: undefined, version: undefined }}
-                className={navLinkBase}
+              <Tooltip
+                content={
+                  hasSR === false
+                    ? "Configure Schema Registry to enable"
+                    : ""
+                }
+                side="bottom"
               >
-                <FileJson className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
-                Schemas
-              </Link>
+                <Link
+                  to="/clusters/$cluster/schemas"
+                  params={{ cluster }}
+                  search={{ subject: undefined, version: undefined }}
+                  aria-disabled={hasSR === false ? "true" : undefined}
+                  className={navLinkBase}
+                >
+                  <FileJson className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
+                  Schemas
+                  {hasSR === false ? (
+                    <span className="ml-1 text-muted" aria-hidden>
+                      (—)
+                    </span>
+                  ) : null}
+                </Link>
+              </Tooltip>
               <Link
                 to="/clusters/$cluster/security/acls"
                 params={{ cluster }}
