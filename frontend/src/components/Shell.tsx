@@ -93,10 +93,15 @@ export function Shell() {
     <div className="flex min-h-full flex-col bg-bg text-text">
       <header className="border-b border-border bg-panel">
         <div className="flex items-center justify-between gap-4 px-6 pt-3">
-          <div className="flex items-center gap-2.5">
+          <Link
+            to="/clusters"
+            search={{ cluster: undefined }}
+            aria-label="Fleet overview"
+            className="flex items-center gap-2.5 rounded-md transition-opacity hover:opacity-90"
+          >
             <Logo />
             <VersionBadge />
-          </div>
+          </Link>
           <div className="flex items-center gap-2">
             <ClusterPill />
             <SearchButton />
