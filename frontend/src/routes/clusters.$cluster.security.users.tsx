@@ -12,7 +12,6 @@ import {
 import { DataTable, type DataTableColumn } from "@/components/DataTable";
 import { Badge } from "@/components/badge";
 import { EmptyState } from "@/components/EmptyState";
-import { PageHeader } from "@/components/page-header";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/button";
 import { Input } from "@/components/Input";
@@ -29,22 +28,7 @@ type Row = { user: string; mechanism: string; iterations: number };
 
 function UsersPage() {
   const { cluster } = Route.useParams();
-  const { t } = useTranslation(["users", "common"]);
-  return (
-    <div className="space-y-5 p-6">
-      <PageHeader
-        eyebrow={
-          <>
-            <span className="font-mono normal-case tracking-normal">{cluster}</span>{" "}
-            <span aria-hidden>›</span> SCRAM users
-          </>
-        }
-        title={t("users:title")}
-        subtitle={t("users:subtitle")}
-      />
-      <UsersBody cluster={cluster} />
-    </div>
-  );
+  return <UsersBody cluster={cluster} />;
 }
 
 function UsersBody({ cluster }: { cluster: string }) {
