@@ -44,9 +44,7 @@ function SearchButton() {
       title="Open command palette"
     >
       <Search className="h-3.5 w-3.5 text-subtle-text" />
-      <span className="text-muted">
-        Find <span className="font-mono text-text/80">topic, group, broker</span>…
-      </span>
+      <span className="text-muted">Find anything…</span>
       <kbd className="ml-1 rounded border border-border bg-subtle px-1 font-mono text-[10px] text-muted">
         ⌘K
       </kbd>

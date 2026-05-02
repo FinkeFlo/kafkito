@@ -1,5 +1,5 @@
 {
-  "placeholder": "Jump to page, cluster, or topic…",
+  "placeholder": "Find anything: topic, group, broker, subject, cluster…",
   "noResults": "No results.",
   "footer": {
     "navigate": "Navigate",
@@ -8,7 +8,10 @@
   "category": {
     "nav": "NAV",
     "cluster": "CLUSTER",
-    "topic": "TOPIC"
+    "topic": "TOPIC",
+    "group": "GROUP",
+    "broker": "BROKER",
+    "subject": "SUBJECT"
   },
   "nav": {
     "home": "Home",
@@ -23,6 +26,12 @@
   },
   "cluster": {
     "unreachable": "unreachable"
+  },
+  "broker": {
+    "host": "{{host}}:{{port}}"
+  },
+  "subject": {
+    "versions": "v{{latest}} · {{count}} versions"
   },
   "actions": {
     "esc": "Esc"

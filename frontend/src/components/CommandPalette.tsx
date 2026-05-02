@@ -3,13 +3,37 @@ import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
+  fetchBrokers,
   fetchClusters,
+  fetchGroups,
   fetchTopics,
+  listSubjects,
+  type BrokerInfo,
   type ClusterInfo,
+  type GroupInfo,
+  type Subject,
   type TopicInfo,
 } from "../lib/api";
 import { useCluster } from "../lib/use-cluster";
-import { Boxes, FileJson, Home, Search, Shield, Users } from "lucide-react";
+import { useFuzzy } from "../lib/fuzzy";
+import {
+  Boxes,
+  FileJson,
+  Home,
+  Search,
+  Server,
+  Shield,
+  UserCog,
+  Users,
+} from "lucide-react";
+
+type ItemKind =
+  | "nav"
+  | "cluster"
+  | "topic"
+  | "group"
+  | "broker"
+  | "subject";
 
 type Item =
   | { kind: "nav"; label: string; to: string; icon: React.ReactNode }
@@ -24,6 +48,29 @@ type Item =
       label: string;
       cluster: string;
       topic: string;
+    }
+  | {
+      kind: "group";
+      label: string;
+      cluster: string;
+      group: string;
+      state: string;
+    }
+  | {
+      kind: "broker";
+      label: string;
+      cluster: string;
+      brokerId: number;
+      host: string;
+      port: number;
+    }
+  | {
+      kind: "subject";
+      label: string;
+      cluster: string;
+      subject: string;
+      latest: number;
+      versions: number;
     };
 
 // Module-level pub-sub used by `<Shell>`'s search button to open the
@@ -77,7 +124,12 @@ export function CommandPalette() {
     }
   }, [open]);
 
-  const { cluster: activeCluster } = useCluster();
+  const { cluster: activeCluster, clusters } = useCluster();
+  const activeInfo = activeCluster
+    ? clusters?.find((c) => c.name === activeCluster)
+    : undefined;
+  const hasSR = activeInfo ? activeInfo.schema_registry : undefined;
+
   const clustersQ = useQuery({
     queryKey: ["clusters"],
     queryFn: fetchClusters,
@@ -88,8 +140,25 @@ export function CommandPalette() {
     queryFn: () => fetchTopics(activeCluster!),
     enabled: open && !!activeCluster,
   });
+  const groupsQ = useQuery({
+    queryKey: ["groups", activeCluster],
+    queryFn: () => fetchGroups(activeCluster!),
+    enabled: open && !!activeCluster,
+  });
+  const brokersQ = useQuery({
+    queryKey: ["brokers", activeCluster],
+    queryFn: () => fetchBrokers(activeCluster!),
+    enabled: open && !!activeCluster,
+  });
+  const subjectsQ = useQuery({
+    queryKey: ["schemas", activeCluster],
+    queryFn: () => listSubjects(activeCluster!),
+    // Only probe the registry when we know the cluster has one; avoids a
+    // guaranteed-404 flood for SR-less clusters like QAS.
+    enabled: open && !!activeCluster && hasSR === true,
+  });
 
-  const items: Item[] = useMemo(() => {
+  const allItems: Item[] = useMemo(() => {
     const base: Item[] = [
       { kind: "nav", label: tt("nav.home"), to: "/", icon: <Home className="h-3.5 w-3.5" /> },
     ];
@@ -100,26 +169,94 @@ export function CommandPalette() {
         { kind: "nav", label: tt("nav.groups"), to: `/clusters/${c}/groups`, icon: <Users className="h-3.5 w-3.5" /> },
         { kind: "nav", label: tt("nav.schemas"), to: `/clusters/${c}/schemas`, icon: <FileJson className="h-3.5 w-3.5" /> },
         { kind: "nav", label: tt("nav.acls"), to: `/clusters/${c}/security/acls`, icon: <Shield className="h-3.5 w-3.5" /> },
-        { kind: "nav", label: tt("nav.users"), to: `/clusters/${c}/security/users`, icon: <Users className="h-3.5 w-3.5" /> },
+        { kind: "nav", label: tt("nav.users"), to: `/clusters/${c}/security/users`, icon: <UserCog className="h-3.5 w-3.5" /> },
       );
     }
-    const clusters: Item[] = (clustersQ.data ?? []).map((c: ClusterInfo) => ({
+    const clusterItems: Item[] = (clustersQ.data ?? []).map((c: ClusterInfo) => ({
       kind: "cluster" as const,
       label: c.name,
       cluster: c.name,
       reachable: c.reachable,
     }));
-    const topics: Item[] = (topicsQ.data ?? []).map((t: TopicInfo) => ({
-      kind: "topic" as const,
-      label: t.name,
-      cluster: activeCluster!,
-      topic: t.name,
-    }));
-    const all = [...base, ...clusters, ...topics];
-    const ql = q.trim().toLowerCase();
-    if (!ql) return all.slice(0, 20);
-    return all.filter((it) => it.label.toLowerCase().includes(ql)).slice(0, 30);
-  }, [q, clustersQ.data, topicsQ.data, activeCluster]);
+    const topicItems: Item[] = activeCluster
+      ? (topicsQ.data ?? []).map((t: TopicInfo) => ({
+          kind: "topic" as const,
+          label: t.name,
+          cluster: activeCluster,
+          topic: t.name,
+        }))
+      : [];
+    const groupItems: Item[] = activeCluster
+      ? (groupsQ.data ?? []).map((g: GroupInfo) => ({
+          kind: "group" as const,
+          label: g.group_id,
+          cluster: activeCluster,
+          group: g.group_id,
+          state: g.state,
+        }))
+      : [];
+    const brokerItems: Item[] = activeCluster
+      ? (brokersQ.data ?? []).map((b: BrokerInfo) => ({
+          kind: "broker" as const,
+          label: `Broker ${b.node_id} · ${b.host}`,
+          cluster: activeCluster,
+          brokerId: b.node_id,
+          host: b.host,
+          port: b.port,
+        }))
+      : [];
+    const subjectItems: Item[] = activeCluster
+      ? (subjectsQ.data ?? []).map((s: Subject) => ({
+          kind: "subject" as const,
+          label: s.name,
+          cluster: activeCluster,
+          subject: s.name,
+          latest: s.versions[s.versions.length - 1] ?? 1,
+          versions: s.versions.length,
+        }))
+      : [];
+    return [
+      ...base,
+      ...clusterItems,
+      ...topicItems,
+      ...groupItems,
+      ...brokerItems,
+      ...subjectItems,
+    ];
+  }, [
+    activeCluster,
+    clustersQ.data,
+    topicsQ.data,
+    groupsQ.data,
+    brokersQ.data,
+    subjectsQ.data,
+    tt,
+  ]);
+
+  // Multi-token AND search via the project's canonical fuzzy helper (Fuse,
+  // configured for Kafka identifiers in lib/fuzzy.ts).
+  const fuzzy = useFuzzy(allItems, {
+    keys: ["label"],
+    query: q,
+  });
+
+  const items: Item[] = useMemo(() => {
+    const ql = q.trim();
+    if (!ql) return allItems.slice(0, 20);
+    return fuzzy.results.slice(0, 50);
+  }, [q, allItems, fuzzy.results]);
+
+  // Render-order: keep buckets visually adjacent when there is a query.
+  // When idle, the items array is already grouped by source bucket order.
+  const renderItems: Item[] = useMemo(() => {
+    if (!q.trim()) return items;
+    const order: ItemKind[] = ["nav", "cluster", "topic", "group", "broker", "subject"];
+    const grouped: Item[] = [];
+    for (const kind of order) {
+      for (const it of items) if (it.kind === kind) grouped.push(it);
+    }
+    return grouped;
+  }, [items, q]);
 
   useEffect(() => {
     setSel(0);
@@ -139,10 +276,25 @@ export function CommandPalette() {
         to: "/clusters/$cluster/topics",
         params: { cluster: it.cluster },
       });
-    } else {
+    } else if (it.kind === "topic") {
       navigate({
         to: "/clusters/$cluster/topics/$topic",
         params: { cluster: it.cluster, topic: it.topic },
+      });
+    } else if (it.kind === "group") {
+      navigate({
+        to: "/clusters/$cluster/groups/$group",
+        params: { cluster: it.cluster, group: it.group },
+      });
+    } else if (it.kind === "broker") {
+      navigate({
+        to: "/clusters/$cluster/brokers/$id",
+        params: { cluster: it.cluster, id: String(it.brokerId) },
+      });
+    } else {
+      navigate({
+        to: "/clusters/$cluster/schemas/$subject",
+        params: { cluster: it.cluster, subject: it.subject },
       });
     }
   };
@@ -165,13 +317,13 @@ export function CommandPalette() {
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
-                setSel((s) => Math.min(s + 1, items.length - 1));
+                setSel((s) => Math.min(s + 1, renderItems.length - 1));
               } else if (e.key === "ArrowUp") {
                 e.preventDefault();
                 setSel((s) => Math.max(s - 1, 0));
               } else if (e.key === "Enter") {
                 e.preventDefault();
-                const it = items[sel];
+                const it = renderItems[sel];
                 if (it) pick(it);
               }
             }}
@@ -183,10 +335,10 @@ export function CommandPalette() {
           </kbd>
         </div>
         <div className="max-h-[60vh] overflow-y-auto py-1">
-          {items.length === 0 && (
+          {renderItems.length === 0 && (
             <div className="p-6 text-center text-sm text-[var(--color-text-muted)]">{tt("noResults")}</div>
           )}
-          {items.map((it, i) => (
+          {renderItems.map((it, i) => (
             <button
               key={`${it.kind}-${it.label}-${i}`}
               onMouseEnter={() => setSel(i)}
@@ -200,12 +352,28 @@ export function CommandPalette() {
                 {tt(`category.${it.kind}`)}
               </span>
               {it.kind === "nav" && it.icon}
+              {it.kind === "group" && <Users className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />}
+              {it.kind === "broker" && <Server className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />}
+              {it.kind === "subject" && <FileJson className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />}
               <span className="font-mono">{it.label}</span>
               {it.kind === "cluster" && !it.reachable && (
                 <span className="ml-auto text-[10px] text-[var(--color-danger)]">{tt("cluster.unreachable")}</span>
               )}
               {it.kind === "topic" && (
                 <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">{tt("topic.on", { cluster: it.cluster })}</span>
+              )}
+              {it.kind === "group" && (
+                <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">{it.state}</span>
+              )}
+              {it.kind === "broker" && (
+                <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">
+                  {tt("broker.host", { host: it.host, port: it.port })}
+                </span>
+              )}
+              {it.kind === "subject" && (
+                <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">
+                  {tt("subject.versions", { latest: it.latest, count: it.versions })}
+                </span>
               )}
             </button>
           ))}
