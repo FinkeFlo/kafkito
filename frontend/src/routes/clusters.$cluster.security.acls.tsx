@@ -89,6 +89,18 @@ function ACLsBody({ cluster }: { cluster: string }) {
     return { principals, allow, deny };
   }, [rows]);
 
+  const errorMessage = (q.error as Error | undefined)?.message;
+  // Distinguish "permission missing" (degraded capability) from real fetch
+  // failures. Brokers reject DESCRIBE on the cluster-level ACL listing with
+  // CLUSTER_AUTHORIZATION_FAILED / NOT_AUTHORIZED / "not authorized" in the
+  // message body. Anything else (timeout, 5xx, network) keeps the red
+  // ErrorState path so the user is prompted to retry.
+  const isPermissionDenied =
+    !!errorMessage &&
+    /authoriz|not\s+authorized|permission|forbidden|describe/i.test(errorMessage);
+  const limited = q.isError && isPermissionDenied;
+  const aclsCapDisabledId = "acls-capability-disabled-reason";
+
   return (
     <>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -98,6 +110,26 @@ function ACLsBody({ cluster }: { cluster: string }) {
         {/* TODO(backend): ACL usage / last_seen_at per rule to drive "Unused (90d)" */}
         <KpiCard label="Unused (90d)" value="—" delta="pending usage data" />
       </div>
+
+      {limited && (
+        <Notice
+          intent="warning"
+          title="Limited capability"
+        >
+          <span id={aclsCapDisabledId} className="block">
+            The configured Kafka user lacks{" "}
+            <code className="font-mono">DESCRIBE</code> on{" "}
+            <code className="font-mono">CLUSTER:*</code>, so ACL rules cannot
+            be listed on this cluster. Granting it will enable this view.
+            {errorMessage ? (
+              <span className="mt-1 block text-xs text-muted">
+                Broker response:{" "}
+                <span className="font-mono">{errorMessage}</span>
+              </span>
+            ) : null}
+          </span>
+        </Notice>
+      )}
 
       <Toolbar
         search={
@@ -117,7 +149,13 @@ function ACLsBody({ cluster }: { cluster: string }) {
           </>
         }
         actions={
-          <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => setShowCreate(true)}
+            disabled={limited}
+            aria-describedby={limited ? aclsCapDisabledId : undefined}
+          >
             + New rule
           </Button>
         }
@@ -136,10 +174,10 @@ function ACLsBody({ cluster }: { cluster: string }) {
         </Notice>
       )}
 
-      {q.isError && (
+      {q.isError && !limited && (
         <ErrorState
           title="Failed to load ACLs"
-          detail={(q.error as Error | undefined)?.message}
+          detail={errorMessage}
           onRetry={() => q.refetch()}
         />
       )}
