@@ -2,18 +2,18 @@ import type { HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
-  /** Reduce padding from p-6 → p-4 for compact list cards. */
-  compact?: boolean;
+  /** Bumps padding from p-4 → p-5 for the overview/hero card on a page. */
+  hero?: boolean;
   /** Removes the default padding. Use for tables that should reach the card edge. */
   flush?: boolean;
 }
 
-export function Card({ className, compact, flush, children, ...rest }: CardProps) {
+export function Card({ className, hero, flush, children, ...rest }: CardProps) {
   return (
     <div
       className={cn(
-        "rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm",
-        !flush && (compact ? "p-4" : "p-6"),
+        "rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)]",
+        !flush && (hero ? "p-5" : "p-4"),
         className,
       )}
       {...rest}
