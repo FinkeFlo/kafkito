@@ -12,7 +12,7 @@ GitHub Actions.
 ## Workflow
 
 1. Fork, branch, code.
-2. `make test && make lint` (Go); `cd frontend && bun run lint && bun run build && bun run check:palette` (frontend).
+2. `make test && make lint` (Go); `cd frontend && bun run lint && bun run build && bun run check:palette && bun run check:strings && bun run check:tokens && bun run test` (frontend).
 3. Open a PR with a clear description and a Test plan.
 4. Sign off your commits (`-s`).
 

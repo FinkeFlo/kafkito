@@ -13,6 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:palette": "bash scripts/check-palette.sh",
+    "check:strings": "bash scripts/check-strings.sh",
+    "check:tokens": "bash scripts/check-tokens.sh",
     "check:contrast": "node scripts/check-contrast.mjs"
   },
   "dependencies": {
