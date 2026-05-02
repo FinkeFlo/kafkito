@@ -18,8 +18,20 @@ describe("computeSwitchTarget", () => {
     expect(computeSwitchTarget("/clusters/IAK", "OTHER")).toBe("/clusters/OTHER");
   });
 
-  it("preserves /security section (acls + scram users live under it)", () => {
+  it("preserves the security sub-tab when switching from /security/acls", () => {
     expect(computeSwitchTarget("/clusters/IAK/security/acls", "OTHER")).toBe(
+      "/clusters/OTHER/security/acls",
+    );
+  });
+
+  it("preserves the security sub-tab and drops the deep id from /security/users/Y", () => {
+    expect(
+      computeSwitchTarget("/clusters/IAK/security/users/alice", "OTHER"),
+    ).toBe("/clusters/OTHER/security/users");
+  });
+
+  it("returns /security index when on the security layout root", () => {
+    expect(computeSwitchTarget("/clusters/IAK/security", "OTHER")).toBe(
       "/clusters/OTHER/security",
     );
   });
