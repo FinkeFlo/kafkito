@@ -35,7 +35,7 @@ export function JsonInteractive({ value, onPick }: JsonInteractiveProps) {
     return (
       <div>
         <div className="mb-2 rounded border border-border bg-tint-amber-bg p-2 text-xs text-muted">
-          Nachricht zu groß für interaktiven Modus — Pfad manuell eingeben.
+          Message too large for interactive mode — enter path manually.
         </div>
         <pre className="overflow-auto rounded border border-border bg-panel p-2 text-xs">
           {pretty(value)}
