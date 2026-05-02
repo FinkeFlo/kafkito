@@ -28,20 +28,20 @@ describe("ArrayScopePopover", () => {
 
   it("defaults to ANY (star)", () => {
     setup();
-    const star = screen.getByLabelText(/Allen/i) as HTMLInputElement;
+    const star = screen.getByLabelText(/All entries/i) as HTMLInputElement;
     expect(star.checked).toBe(true);
   });
 
   it("calls onApply with 'star' when ANY is selected and Apply is clicked", () => {
     const { onApply } = setup();
-    fireEvent.click(screen.getByRole("button", { name: /Übernehmen/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Apply/i }));
     expect(onApply).toHaveBeenCalledWith("star");
   });
 
   it("calls onApply with 'index' after switching to THIS index", () => {
     const { onApply } = setup();
-    fireEvent.click(screen.getByLabelText(/Diesem Index/i));
-    fireEvent.click(screen.getByRole("button", { name: /Übernehmen/i }));
+    fireEvent.click(screen.getByLabelText(/This index/i));
+    fireEvent.click(screen.getByRole("button", { name: /Apply/i }));
     expect(onApply).toHaveBeenCalledWith("index");
   });
 
@@ -59,6 +59,6 @@ describe("ArrayScopePopover", () => {
 
   it("shows the array length in the header", () => {
     setup({ arrayLength: 17 });
-    expect(screen.getByText(/17 Einträge/i)).toBeInTheDocument();
+    expect(screen.getByText(/17 entries/i)).toBeInTheDocument();
   });
 });
