@@ -595,7 +595,7 @@ function MessagesPanel({
                 }}
                 className="rounded border border-border px-2 py-0.5 hover:border-border-strong"
               >
-                Rückgängig
+                Undo
               </button>
             </div>
           )}
@@ -811,7 +811,7 @@ function MessagesPanel({
                 onClick={clearSearch}
                 className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1 hover:border-[var(--color-border-strong)]"
               >
-                Ergebnis löschen
+                Clear result
               </button>
             )}
           </div>
@@ -827,16 +827,16 @@ function MessagesPanel({
                 {searchResult.stats.matched} matches
               </span>
               <span className="text-[var(--color-text-muted)]">
-                · {searchResult.stats.scanned} gescannt
+                · {searchResult.stats.scanned} scanned
               </span>
               {searchResult.stats.parse_errors > 0 && (
                 <span className="text-[var(--color-warning)]">
-                  · {searchResult.stats.parse_errors} Parse-Fehler übersprungen
+                  · {searchResult.stats.parse_errors} parse errors skipped
                 </span>
               )}
               {searchResult.stats.budget_exhausted && (
                 <span className="rounded bg-[var(--color-warning-subtle)] px-1.5 py-0.5 text-[var(--color-warning)]">
-                  Budget erschöpft
+                  Budget exhausted
                 </span>
               )}
               {searchResult.stats.durations_ms?.total !== undefined && (
@@ -1014,7 +1014,7 @@ function MessageRow({
         {m.value_sr && <SRBadge meta={m.value_sr} />}
         {m.masked && (
           <span
-            title="Wert wurde durch eine data_masking-Regel verändert"
+            title="Value modified by a data_masking rule"
             className="rounded bg-[var(--color-warning-subtle)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-warning)]"
           >
             masked
