@@ -7,7 +7,6 @@ import {
   Moon,
   Search,
   Server,
-  Settings as SettingsIcon,
   Shield,
   Sun,
   Users,
@@ -177,14 +176,6 @@ export function Shell() {
                 Brokers
               </Link>
             ) : null}
-            <Link
-              to="/settings"
-              search={{ cluster: cluster ?? undefined }}
-              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-hover hover:text-text [&.active]:bg-accent-subtle [&.active]:text-accent"
-            >
-              <SettingsIcon className="h-3.5 w-3.5" />
-              Settings
-            </Link>
           </div>
         </nav>
       </header>
