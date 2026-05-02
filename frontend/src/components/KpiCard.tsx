@@ -59,7 +59,7 @@ export function KpiCard({
         {label}
       </div>
       <div className="mt-2 flex items-baseline gap-2">
-        <div className="text-2xl font-semibold font-mono tabular-nums">{value}</div>
+        <div className="text-2xl font-semibold tabular-nums">{value}</div>
         {unit !== undefined && unit !== null && (
           <div className="text-xs text-subtle-text">{unit}</div>
         )}
