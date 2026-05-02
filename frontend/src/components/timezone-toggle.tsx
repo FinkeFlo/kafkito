@@ -26,7 +26,7 @@ export function TimezoneToggle() {
       onClick={next}
       title={`${label} (${t("timezone.cycleHint")})`}
       aria-label={label}
-      className="flex h-8 items-center gap-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-2 text-xs font-medium text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)]"
+      className="flex h-8 items-center gap-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-2 text-xs font-medium text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
     >
       <Icon className="h-4 w-4" />
       <span className="uppercase tracking-wide">{mode}</span>

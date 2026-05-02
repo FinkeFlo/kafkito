@@ -62,7 +62,6 @@ export function SearchInput({
     <div
       className={cn(
         "flex h-9 min-w-[260px] flex-1 items-center gap-2 rounded-md border border-border bg-panel px-3",
-        "focus-within:border-border-strong",
         className,
       )}
     >
@@ -75,7 +74,7 @@ export function SearchInput({
         placeholder={placeholder}
         aria-label={ariaLabel}
         autoFocus={autoFocus}
-        className="flex-1 bg-transparent text-sm text-text outline-none placeholder:text-subtle-text"
+        className="flex-1 bg-transparent text-sm text-text placeholder:text-subtle-text"
       />
       {showCount && (
         <span className="shrink-0 text-[11px] tabular-nums text-muted">

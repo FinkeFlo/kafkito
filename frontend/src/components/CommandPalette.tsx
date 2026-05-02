@@ -176,7 +176,7 @@ export function CommandPalette() {
               }
             }}
             placeholder={tt("placeholder")}
-            className="flex-1 bg-transparent text-sm outline-none"
+            className="flex-1 bg-transparent text-sm"
           />
           <kbd className="rounded border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--color-text-muted)]">
             {tt("actions.esc")}
