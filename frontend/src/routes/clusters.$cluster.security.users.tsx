@@ -9,7 +9,6 @@ import {
   upsertSCRAMUser,
   type SCRAMUser,
 } from "@/lib/api";
-import { useCluster } from "@/lib/use-cluster";
 import { DataTable, type DataTableColumn } from "@/components/DataTable";
 import { Badge } from "@/components/badge";
 import { EmptyState } from "@/components/EmptyState";
@@ -20,10 +19,7 @@ import { Input } from "@/components/Input";
 import { Modal } from "@/components/Modal";
 import { Notice } from "@/components/Notice";
 
-export const Route = createFileRoute("/users")({
-  validateSearch: (s: Record<string, unknown>) => ({
-    cluster: typeof s.cluster === "string" ? s.cluster : undefined,
-  }),
+export const Route = createFileRoute("/clusters/$cluster/security/users")({
   component: UsersPage,
 });
 
@@ -32,21 +28,21 @@ const MECHANISMS = ["SCRAM-SHA-256", "SCRAM-SHA-512"];
 type Row = { user: string; mechanism: string; iterations: number };
 
 function UsersPage() {
-  const { cluster } = useCluster();
+  const { cluster } = Route.useParams();
   const { t } = useTranslation(["users", "common"]);
   return (
     <div className="space-y-5 p-6">
       <PageHeader
         eyebrow={
           <>
-            <span className="font-mono normal-case tracking-normal">{cluster ?? "—"}</span>{" "}
+            <span className="font-mono normal-case tracking-normal">{cluster}</span>{" "}
             <span aria-hidden>›</span> SCRAM users
           </>
         }
         title={t("users:title")}
         subtitle={t("users:subtitle")}
       />
-      {cluster && <UsersBody cluster={cluster} />}
+      <UsersBody cluster={cluster} />
     </div>
   );
 }
