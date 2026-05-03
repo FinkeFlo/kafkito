@@ -34,6 +34,7 @@
     "tailwind-merge": "^2.5.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/vite": "^4.0.0",
     "@tanstack/router-cli": "^1.166.33",
     "@tanstack/router-plugin": "^1.87.0",
