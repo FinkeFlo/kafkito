@@ -9,45 +9,72 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestAuthConfigLogValueMasksPassword(t *testing.T) {
+// logToJSONAttrs renders one slog attribute (key=value) through a JSON handler
+// and returns the captured output. The returned string is the full log line so
+// callers can assert on the masking behaviour applied to nested fields.
+func logToJSONAttrs(t *testing.T, key string, value any) string {
+	t.Helper()
+
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
-	a := AuthConfig{Type: "plain", Username: "alice", Password: "s3cret"}
-	logger.LogAttrs(context.Background(), slog.LevelInfo, "test", slog.Any("auth", a))
-	out := buf.String()
-	if strings.Contains(out, "s3cret") {
-		t.Fatalf("password leaked in log output: %s", out)
-	}
-	if !strings.Contains(out, `"password":"***"`) {
-		t.Fatalf("expected masked password, got: %s", out)
-	}
+	logger.LogAttrs(context.Background(), slog.LevelInfo, "test", slog.Any(key, value))
+
+	return buf.String()
 }
 
-func TestSchemaRegistryConfigLogValueMasksPassword(t *testing.T) {
-	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
-	s := SchemaRegistryConfig{URL: "https://sr.example", Username: "u", Password: "pw"}
-	logger.LogAttrs(context.Background(), slog.LevelInfo, "test", slog.Any("sr", s))
-	if strings.Contains(buf.String(), "pw\"") {
-		t.Fatalf("password leaked: %s", buf.String())
-	}
-}
+func TestLogValue_MasksSecretsInJSONOutput(t *testing.T) {
+	t.Parallel()
 
-func TestClusterConfigLogValueHidesNested(t *testing.T) {
-	var buf bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buf, nil))
-	c := ClusterConfig{
-		Name:           "prod",
-		Brokers:        []string{"b1:9092"},
-		Auth:           AuthConfig{Type: "plain", Username: "u", Password: "leaky-password"},
-		SchemaRegistry: SchemaRegistryConfig{Password: "another-leaky"},
+	cases := []struct {
+		name        string
+		key         string
+		value       any
+		wantAbsent  []string
+		wantPresent []string
+	}{
+		{
+			name:        "auth_config_masks_password",
+			key:         "auth",
+			value:       AuthConfig{Type: "plain", Username: "alice", Password: "s3cret"},
+			wantAbsent:  []string{"s3cret"},
+			wantPresent: []string{`"password":"***"`},
+		},
+		{
+			name:       "schema_registry_config_masks_password",
+			key:        "sr",
+			value:      SchemaRegistryConfig{URL: "https://sr.example", Username: "u", Password: "pw"},
+			wantAbsent: []string{`"pw"`},
+		},
+		{
+			name: "cluster_config_hides_nested_passwords",
+			key:  "cluster",
+			value: ClusterConfig{
+				Name:           "prod",
+				Brokers:        []string{"b1:9092"},
+				Auth:           AuthConfig{Type: "plain", Username: "u", Password: "leaky-password"},
+				SchemaRegistry: SchemaRegistryConfig{Password: "another-leaky"},
+			},
+			wantAbsent: []string{"leaky"},
+		},
 	}
-	logger.LogAttrs(context.Background(), slog.LevelInfo, "test", slog.Any("cluster", c))
-	if strings.Contains(buf.String(), "leaky") {
-		t.Fatalf("nested password leaked: %s", buf.String())
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := logToJSONAttrs(t, tc.key, tc.value)
+
+			for _, secret := range tc.wantAbsent {
+				assert.NotContains(t, got, secret, "secret leaked in log output: %s", got)
+			}
+			for _, masked := range tc.wantPresent {
+				assert.Contains(t, got, masked, "expected masked value in log output: %s", got)
+			}
+		})
 	}
 }
