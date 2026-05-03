@@ -11,24 +11,24 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/FinkeFlo/kafkito/internal/auth"
 )
 
 func TestBuildValidator_OffMode_Devauth(t *testing.T) {
+	t.Parallel()
+
 	v, cleanup, err := auth.BuildValidator(auth.ModeConfig{Mode: "off"})
-	if err != nil {
-		t.Fatalf("off mode under devauth: %v", err)
-	}
-	defer cleanup()
-	if v == nil {
-		t.Fatalf("nil validator")
-	}
+	require.NoError(t, err, "BuildValidator(off) under -tags devauth")
+	t.Cleanup(cleanup)
+	require.NotNil(t, v, "validator must not be nil under off mode")
+
 	// In off mode the validator must accept any (or empty) token and stamp a synthetic principal.
 	p, err := v.Validate(context.Background(), "ignored")
-	if err != nil {
-		t.Fatalf("Validate under off: %v", err)
-	}
-	if p == nil || p.Subject == "" {
-		t.Errorf("synthetic principal missing or empty: %+v", p)
-	}
+
+	require.NoError(t, err, "Validate under off mode must not error")
+	require.NotNil(t, p, "synthetic principal must not be nil")
+	assert.NotEmpty(t, p.Subject, "synthetic principal must have a non-empty Subject")
 }

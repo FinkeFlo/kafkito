@@ -4,10 +4,15 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/FinkeFlo/kafkito/internal/auth"
 )
 
-func TestPrincipalContextRoundtrip(t *testing.T) {
+func TestPrincipal_RoundTripsThroughContext(t *testing.T) {
+	t.Parallel()
+
 	p := &auth.Principal{
 		Subject: "u-123",
 		Email:   "user@example.com",
@@ -16,22 +21,18 @@ func TestPrincipalContextRoundtrip(t *testing.T) {
 	ctx := auth.WithPrincipal(context.Background(), p)
 
 	got, ok := auth.PrincipalFromContext(ctx)
-	if !ok {
-		t.Fatalf("PrincipalFromContext: ok = false, want true")
-	}
-	if got.Subject != "u-123" {
-		t.Errorf("Subject = %q, want %q", got.Subject, "u-123")
-	}
-	if !got.HasScope("Display") {
-		t.Errorf("HasScope(Display) = false, want true")
-	}
-	if got.HasScope("Admin") {
-		t.Errorf("HasScope(Admin) = true, want false")
-	}
+
+	require.True(t, ok, "PrincipalFromContext must report ok=true after WithPrincipal")
+	require.NotNil(t, got)
+	assert.Equal(t, "u-123", got.Subject)
+	assert.True(t, got.HasScope("Display"), "HasScope(Display) must be true")
+	assert.False(t, got.HasScope("Admin"), "HasScope(Admin) must be false")
 }
 
-func TestPrincipalFromContext_Empty(t *testing.T) {
-	if _, ok := auth.PrincipalFromContext(context.Background()); ok {
-		t.Errorf("PrincipalFromContext on empty ctx: ok = true, want false")
-	}
+func TestPrincipal_FromContextReportsAbsenceWhenEmpty(t *testing.T) {
+	t.Parallel()
+
+	_, ok := auth.PrincipalFromContext(context.Background())
+
+	assert.False(t, ok, "PrincipalFromContext on empty ctx must report ok=false")
 }
