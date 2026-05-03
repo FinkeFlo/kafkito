@@ -4,154 +4,214 @@
 package server
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestHealthz(t *testing.T) {
-	h := New(Options{Version: "test", Logger: slog.Default()})
+// Both /healthz and /readyz return JSON with `"status":"ok"` when no kafka
+// clusters are configured. /readyz additionally emits a `"note"` describing
+// the empty-registry state — the per-path assertion captures that distinction.
+func TestHealthz_ReturnsOK_PerPath(t *testing.T) {
+	t.Parallel()
 
-	for _, path := range []string{"/healthz", "/readyz"} {
-		req := httptest.NewRequest(http.MethodGet, path, nil)
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, req)
+	cases := []struct {
+		name        string
+		path        string
+		wantNoteSub string
+	}{
+		{name: "healthz", path: "/healthz", wantNoteSub: ""},
+		{name: "readyz", path: "/readyz", wantNoteSub: "no kafka clusters configured"},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		if rec.Code != http.StatusOK {
-			t.Errorf("%s: status = %d, want 200", path, rec.Code)
-		}
-		if !strings.Contains(rec.Body.String(), "ok") && !strings.Contains(rec.Body.String(), "ready") {
-			t.Errorf("%s: body = %q", path, rec.Body.String())
-		}
+			h := New(Options{Version: "test", Logger: slog.Default()})
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			rec := httptest.NewRecorder()
+
+			h.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusOK, rec.Code, "body=%s", rec.Body.String())
+			var body struct {
+				Status string `json:"status"`
+				Note   string `json:"note"`
+			}
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body), "body=%s", rec.Body.String())
+
+			assert.Equal(t, "ok", body.Status, "%s status field", tc.path)
+			if tc.wantNoteSub != "" {
+				assert.Contains(t, body.Note, tc.wantNoteSub,
+					"%s note field must describe empty-registry state", tc.path)
+			}
+		})
 	}
 }
 
-func TestInfoReturnsVersion(t *testing.T) {
+func TestInfo_ReturnsConfiguredVersion_AsJSON(t *testing.T) {
+	t.Parallel()
+
 	h := New(Options{Version: "1.2.3", Logger: slog.Default()})
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/info", nil)
 	rec := httptest.NewRecorder()
+
 	h.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", rec.Code)
+	require.Equal(t, http.StatusOK, rec.Code, "body=%s", rec.Body.String())
+	var body struct {
+		Name    string `json:"name"`
+		Version string `json:"version"`
 	}
-	if !strings.Contains(rec.Body.String(), `"version":"1.2.3"`) {
-		t.Errorf("body missing version: %s", rec.Body.String())
-	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body), "body=%s", rec.Body.String())
+
+	assert.Equal(t, "1.2.3", body.Version)
+	assert.Equal(t, "kafkito", body.Name)
 }
 
-func TestAPINotFoundIsJSON(t *testing.T) {
+func TestAPINotFound_ReturnsJSONContentType(t *testing.T) {
+	t.Parallel()
+
 	h := New(Options{Version: "x", Logger: slog.Default()})
 	req := httptest.NewRequest(http.MethodGet, "/api/nope", nil)
 	rec := httptest.NewRecorder()
+
 	h.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want 404", rec.Code)
-	}
-	if rec.Header().Get("Content-Type") != "application/json" {
-		t.Errorf("Content-Type = %q", rec.Header().Get("Content-Type"))
-	}
+	require.Equal(t, http.StatusNotFound, rec.Code)
+	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
 }
 
-func TestSPAFallbackServesHTML(t *testing.T) {
+func TestSPAFallback_ServesHTML_ForUnknownClientRoute(t *testing.T) {
+	t.Parallel()
+
 	h := New(Options{Version: "x", Logger: slog.Default()})
 	req := httptest.NewRequest(http.MethodGet, "/some/client/route", nil)
 	rec := httptest.NewRecorder()
+
 	h.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200 (SPA fallback)", rec.Code)
+	require.Equal(t, http.StatusOK, rec.Code, "SPA fallback must serve 200")
+	assert.True(t, strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html"),
+		"Content-Type = %q, want text/html prefix", rec.Header().Get("Content-Type"))
+}
+
+// Per-path subtests are intentional: when the embed.FS sibling-build race
+// bites in CI, the failure ID names the specific path that 500'd, not a
+// collapsed "TestSPAFallbackForDeepRoutes failed" without context.
+func TestSPAFallback_ServesHTML_ForDeepClientRoutes(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		path string
+	}{
+		{name: "topics_foo_messages", path: "/topics/foo/messages"},
+		{name: "topics_long_uppercase_name_messages", path: "/topics/FRA_aspire_eXtend_SalesPrices_PRD/messages"},
+		{name: "clusters_PROD", path: "/clusters/PROD"},
+		{name: "settings_clusters", path: "/settings/clusters"},
+		{name: "groups", path: "/groups"},
 	}
-	ct := rec.Header().Get("Content-Type")
-	if !strings.HasPrefix(ct, "text/html") {
-		t.Errorf("Content-Type = %q, want text/html", ct)
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := New(Options{Version: "x", Logger: slog.Default()})
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			rec := httptest.NewRecorder()
+
+			h.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusOK, rec.Code,
+				"%s: SPA fallback must serve 200, body=%s", tc.path, rec.Body.String())
+			assert.True(t, strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html"),
+				"%s: Content-Type = %q, want text/html prefix", tc.path, rec.Header().Get("Content-Type"))
+		})
 	}
 }
 
-// TestSPAFallbackForDeepRoutes covers the exact production reload bug: the
-// browser hits a deep client-side path on a fresh GET (e.g. after ⌘R).
-// Every such path must render the SPA shell (HTML 200) so TanStack Router
-// can take over and resolve the route on the client.
-func TestSPAFallbackForDeepRoutes(t *testing.T) {
-	h := New(Options{Version: "x", Logger: slog.Default()})
-	cases := []string{
-		"/topics/foo/messages",
-		"/topics/FRA_aspire_eXtend_SalesPrices_PRD/messages",
-		"/clusters/PROD",
-		"/settings/clusters",
-		"/groups",
+func TestSPAFallback_RejectsNonIdempotentVerbs(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		method string
+	}{
+		{name: "POST", method: http.MethodPost},
+		{name: "PUT", method: http.MethodPut},
+		{name: "PATCH", method: http.MethodPatch},
+		{name: "DELETE", method: http.MethodDelete},
 	}
-	for _, p := range cases {
-		req := httptest.NewRequest(http.MethodGet, p, nil)
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
-			t.Errorf("%s: status = %d, want 200", p, rec.Code)
-		}
-		if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
-			t.Errorf("%s: Content-Type = %q, want text/html", p, ct)
-		}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := New(Options{Version: "x", Logger: slog.Default()})
+			req := httptest.NewRequest(tc.method, "/topics/foo/messages", nil)
+			rec := httptest.NewRecorder()
+
+			h.ServeHTTP(rec, req)
+
+			assert.NotEqual(t, http.StatusOK, rec.Code,
+				"%s /topics/foo/messages must not return 200", tc.method)
+			assert.False(t, strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html"),
+				"%s /topics/foo/messages: Content-Type = %q, must not be HTML",
+				tc.method, rec.Header().Get("Content-Type"))
+		})
 	}
 }
 
-// TestSPAFallbackOnlyAppliesToGetAndHead — non-idempotent verbs against an
-// unknown path must NOT receive HTML; they should 404/405 cleanly so
-// programmatic clients (curl, scripts) get a sensible error rather than
-// the SPA shell.
-func TestSPAFallbackOnlyAppliesToGetAndHead(t *testing.T) {
-	h := New(Options{Version: "x", Logger: slog.Default()})
-	for _, m := range []string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
-		req := httptest.NewRequest(m, "/topics/foo/messages", nil)
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, req)
-		if rec.Code == http.StatusOK {
-			t.Errorf("%s /topics/foo/messages: status = 200, want non-OK", m)
-		}
-		if ct := rec.Header().Get("Content-Type"); strings.HasPrefix(ct, "text/html") {
-			t.Errorf("%s /topics/foo/messages: Content-Type = %q, want non-HTML", m, ct)
-		}
+func TestBackendPrefixes_NeverFallThroughToSPAShell(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		path string
+	}{
+		{name: "api_nope", path: "/api/nope"},
+		{name: "api_v1_does_not_exist", path: "/api/v1/does/not/exist"},
+		{name: "rpc_unknown_service", path: "/rpc/some.unknown.Service/Method"},
+		{name: "user_api_unknown", path: "/user-api/unknown"},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := New(Options{Version: "x", Logger: slog.Default()})
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			rec := httptest.NewRecorder()
+
+			h.ServeHTTP(rec, req)
+
+			assert.False(t, strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html"),
+				"%s: Content-Type = %q, want JSON (not SPA HTML)",
+				tc.path, rec.Header().Get("Content-Type"))
+			assert.NotEqual(t, http.StatusOK, rec.Code,
+				"%s: backend prefix must not return 200", tc.path)
+		})
 	}
 }
 
-// TestBackendPrefixesNeverFallToSPA — known backend prefixes that don't match
-// a registered route must 404 with JSON, never the SPA shell. Otherwise CLI
-// tools see HTML on unknown API/RPC paths and misreport.
-func TestBackendPrefixesNeverFallToSPA(t *testing.T) {
-	h := New(Options{Version: "x", Logger: slog.Default()})
-	cases := []string{
-		"/api/nope",
-		"/api/v1/does/not/exist",
-		"/rpc/some.unknown.Service/Method",
-		"/user-api/unknown",
-	}
-	for _, p := range cases {
-		req := httptest.NewRequest(http.MethodGet, p, nil)
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, req)
-		if ct := rec.Header().Get("Content-Type"); strings.HasPrefix(ct, "text/html") {
-			t.Errorf("%s: Content-Type = %q, want JSON (not SPA HTML)", p, ct)
-		}
-		if rec.Code == http.StatusOK {
-			t.Errorf("%s: status = 200, want 4xx", p)
-		}
-	}
-}
+func TestMissingAsset_Returns404_NotSPAShell(t *testing.T) {
+	t.Parallel()
 
-// TestMissingAssetReturns404 — a request under /assets/ for a file that does
-// not exist must NOT be redirected to index.html (that breaks browser MIME
-// checks for hashed JS bundles); it must 404 cleanly.
-func TestMissingAssetReturns404(t *testing.T) {
 	h := New(Options{Version: "x", Logger: slog.Default()})
 	req := httptest.NewRequest(http.MethodGet, "/assets/this-asset-does-not-exist.js", nil)
 	rec := httptest.NewRecorder()
+
 	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusNotFound {
-		t.Errorf("status = %d, want 404", rec.Code)
-	}
-	if ct := rec.Header().Get("Content-Type"); strings.HasPrefix(ct, "text/html") {
-		t.Errorf("Content-Type = %q, want non-HTML", ct)
-	}
+
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+	assert.False(t, strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html"),
+		"Content-Type = %q, want non-HTML", rec.Header().Get("Content-Type"))
 }
