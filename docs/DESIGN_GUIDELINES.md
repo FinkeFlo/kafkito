@@ -554,9 +554,19 @@ Copy this into the PR description and tick each box.
 - [ ] npm run lint passes
 - [ ] npm run build passes
 - [ ] npm run check:palette passes
+- [ ] npm run check:strings passes
+- [ ] npm run check:tokens passes
+- [ ] npm run check:routes passes
+- [ ] npm run check:dates passes
+- [ ] npm run test passes
 - [ ] routeTree.gen.ts regenerated and committed
 - [ ] Every TODO(backend): comment is also listed in the PR body
 ```
+
+The full hard-gate string is in `CLAUDE.md`. `make e2e` is **opt-in**
+(too slow for the per-commit gate) — run it before merging any PR
+that touches a destructive flow (Reset-Offsets, Delete-Records, ACL
+mutations, SCRAM rotate). Setup + scope: `frontend/e2e/README.md`.
 
 ---
 
