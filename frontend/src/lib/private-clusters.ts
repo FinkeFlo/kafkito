@@ -151,6 +151,7 @@ export function exportBundle(ids?: ReadonlySet<string>): ExportBundle {
   const clusters = ids ? all.filter((c) => ids.has(c.id)) : all;
   return {
     schema: "kafkito.private-clusters/v1",
+    // allow-raw-date: serialization into a portable JSON export, not UI display
     exported_at: new Date().toISOString(),
     clusters,
   };
