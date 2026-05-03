@@ -60,6 +60,30 @@ echo "$$ pid=$$ started=$(date -u +%FT%TZ)" > "$LOCKDIR/owner" 2>/dev/null || tr
 # completed hook runs. Belt-and-suspenders: trap on every exit signal we can.
 trap 'rm -rf "$LOCKDIR" 2>/dev/null || true' EXIT INT TERM HUP
 
+# Self-heal stale .git/index.lock from crashed pre-commit hooks. Same idea as
+# the mkdir-lock self-heal above, but for git's own per-repo index lock.
+# Pre-commit hooks (gitleaks, etc.) use git stash/apply on the index; if the
+# hook process is SIGKILLed (timeout, OOM, lock-acquire abandon), git leaves
+# the lock behind and every subsequent `git add` / `git commit` from any
+# teammate fails with "Unable to create '.git/index.lock': File exists".
+#
+# We only clear the lock when:
+#   1. it has been on disk longer than 30 seconds (younger lock = active
+#      operation, do not touch);
+#   2. AND no live process matches the standard git/pre-commit/gitleaks
+#      patterns. Conservative; better to leave a real lock alone than to
+#      stomp a real operation.
+git_index_lock="$repo_root/.git/index.lock"
+if [ -f "$git_index_lock" ]; then
+  lock_age_s=$(($(date +%s) - $(stat -f %m "$git_index_lock" 2>/dev/null || stat -c %Y "$git_index_lock" 2>/dev/null || echo 0)))
+  if [ "$lock_age_s" -gt 30 ] && \
+     ! pgrep -f '(^|/)git ' >/dev/null 2>&1 && \
+     ! pgrep -f 'pre-commit|gitleaks' >/dev/null 2>&1; then
+    echo "agent-team-gate: clearing stale .git/index.lock (age ${lock_age_s}s, no owning git/pre-commit process)" >&2
+    rm -f "$git_index_lock" 2>/dev/null || true
+  fi
+fi
+
 # Determine the diff base. Prefer HEAD~1 if it exists; fall back to
 # merge-base with origin/main; fall back to working-tree changes.
 if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
