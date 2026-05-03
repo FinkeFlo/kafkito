@@ -7,33 +7,36 @@ test.describe("Reset Offsets walk (Q-001 fixture)", () => {
   test("opens, requires partition, requires confirm phrase, aborts cleanly", async ({ page }) => {
     await page.goto(`/clusters/${encodeURIComponent(CLUSTER)}/groups`);
 
-    const groupRow = page.getByRole("row", { name: new RegExp(GROUP) });
-    await expect(groupRow).toBeVisible();
+    const groupTrigger = page.getByRole("button", { name: new RegExp(GROUP) });
+    await expect(groupTrigger).toBeVisible();
+    await groupTrigger.click();
 
-    await groupRow.getByRole("button", { name: /reset offsets/i }).click();
+    const resetTrigger = page.getByRole("button", { name: /^reset offsets/i });
+    await expect(resetTrigger).toBeVisible();
+    await resetTrigger.click();
 
-    const dialog = page.getByRole("dialog", { name: /reset offsets/i });
-    await expect(dialog).toBeVisible();
+    const modal = page.getByRole("dialog", { name: /reset offsets/i });
+    await expect(modal).toBeVisible();
 
-    const commit = dialog.getByRole("button", { name: /^commit$|^reset$/i });
-    await expect(commit).toBeDisabled();
-    await expect(dialog).toContainText(/pick at least one partition/i);
+    const commitButton = modal.getByRole("button", { name: /commit reset/i });
+    await expect(commitButton).toBeDisabled();
+    await expect(modal).toContainText(/pick at least one partition/i);
 
-    await dialog.getByRole("checkbox", { name: /partition 0/i }).check();
-    await expect(commit).toBeEnabled();
+    await modal.locator("label").filter({ hasText: /^p0$/ }).click();
+    await expect(commitButton).toBeEnabled();
 
-    await commit.click();
+    await commitButton.click();
 
-    const confirm = page.getByRole("dialog", { name: /confirm/i });
+    const confirm = page.getByRole("dialog", { name: /commit new offsets/i });
     await expect(confirm).toBeVisible();
-    const confirmButton = confirm.getByRole("button", { name: /confirm|reset/i });
-    await expect(confirmButton).toBeDisabled();
+    const confirmCommit = confirm.getByRole("button", { name: /commit reset/i });
+    await expect(confirmCommit).toBeDisabled();
 
     const phraseInput = confirm.getByRole("textbox");
     await phraseInput.fill(GROUP.slice(0, 5));
-    await expect(confirmButton).toBeDisabled();
+    await expect(confirmCommit).toBeDisabled();
     await phraseInput.fill(GROUP);
-    await expect(confirmButton).toBeEnabled();
+    await expect(confirmCommit).toBeEnabled();
 
     await page.keyboard.press("Escape");
     await expect(confirm).toBeHidden();

@@ -9,14 +9,21 @@ test.describe("Delete Records walk (Q-001 fixture)", () => {
       `/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}`,
     );
 
-    const trigger = page.getByRole("button", { name: /delete records/i });
+    const trigger = page.getByRole("button", { name: /^delete records/i });
     await expect(trigger).toBeVisible();
     await trigger.click();
 
-    const confirm = page.getByRole("dialog", { name: /confirm|delete records/i });
+    const outerModal = page.getByRole("dialog", { name: new RegExp(`delete records from\\s+${TOPIC}`, "i") });
+    await expect(outerModal).toBeVisible();
+
+    const innerTrigger = outerModal.getByRole("button", { name: /^delete records$/i });
+    await expect(innerTrigger).toBeEnabled();
+    await innerTrigger.click();
+
+    const confirm = page.getByRole("dialog", { name: /delete records from "/i });
     await expect(confirm).toBeVisible();
 
-    const confirmButton = confirm.getByRole("button", { name: /confirm|delete/i });
+    const confirmButton = confirm.getByRole("button", { name: /^delete records$/i });
     await expect(confirmButton).toBeDisabled();
 
     const phraseInput = confirm.getByRole("textbox");

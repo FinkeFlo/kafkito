@@ -18,6 +18,9 @@ frontend/dist/*
 frontend/.vite/
 frontend/coverage/
 frontend/bun.lockb.backup
+frontend/playwright-report/
+frontend/test-results/
+frontend/.tanstack/
 
 # IDE / OS
 .idea/
