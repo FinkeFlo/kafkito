@@ -14,20 +14,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/FinkeFlo/kafkito/internal/auth"
 	"github.com/FinkeFlo/kafkito/internal/auth/xsuaa"
 )
 
 func newValidator(t *testing.T) (*auth.MockOIDC, auth.Validator, xsuaa.Credentials) {
 	t.Helper()
+
 	mock, err := auth.NewMockOIDC(
 		auth.WithScopePrefix("kafkito!t12345"),
 		auth.WithZoneID("test-zone"),
 	)
-	if err != nil {
-		t.Fatalf("mock: %v", err)
-	}
+	require.NoError(t, err, "NewMockOIDC")
 	t.Cleanup(mock.Close)
+
 	creds := xsuaa.Credentials{
 		ClientID:       "sb-kafkito!t12345",
 		URL:            mock.Server.URL,
@@ -36,162 +39,208 @@ func newValidator(t *testing.T) (*auth.MockOIDC, auth.Validator, xsuaa.Credentia
 		IdentityZoneID: "test-zone",
 	}
 	v, err := xsuaa.NewValidator(creds)
-	if err != nil {
-		t.Fatalf("NewValidator: %v", err)
-	}
+	require.NoError(t, err, "NewValidator")
+
 	return mock, v, creds
 }
 
-func TestValidator_HappyPath(t *testing.T) {
+func TestValidator_HappyPath_AcceptsCanonicalToken(t *testing.T) {
+	t.Parallel()
+
 	mock, v, creds := newValidator(t)
 	tok, err := mock.Issue("u-1", creds.ClientID, creds.URL, []string{"Display"}, nil)
-	if err != nil {
-		t.Fatalf("issue: %v", err)
-	}
+	require.NoError(t, err, "Issue")
+
 	p, err := v.Validate(context.Background(), tok)
-	if err != nil {
-		t.Fatalf("Validate: %v", err)
-	}
-	if p.Subject != "u-1" {
-		t.Errorf("Subject = %q", p.Subject)
-	}
-	if !p.HasScope("Display") {
-		t.Errorf("expected Display scope, got %v", p.Scopes)
-	}
+
+	require.NoError(t, err, "Validate")
+	require.NotNil(t, p)
+	assert.Equal(t, "u-1", p.Subject)
+	assert.True(t, p.HasScope("Display"), "HasScope(Display); scopes=%v", p.Scopes)
 }
 
-func TestValidator_RejectsWrongIssuer(t *testing.T) {
-	mock, v, creds := newValidator(t)
-	tok, _ := mock.Issue("u", creds.ClientID, "https://evil.example", []string{"Display"}, nil)
-	if _, err := v.Validate(context.Background(), tok); err == nil || !strings.Contains(err.Error(), "iss") {
-		t.Errorf("want issuer error, got %v", err)
-	}
-}
+func TestValidator_HappyPath_AcceptsAudienceViaXSAppName(t *testing.T) {
+	t.Parallel()
 
-func TestValidator_RejectsWrongAudience(t *testing.T) {
-	mock, v, creds := newValidator(t)
-	tok, _ := mock.Issue("u", "sb-other!t12345", creds.URL, []string{"Display"}, nil)
-	if _, err := v.Validate(context.Background(), tok); err == nil {
-		t.Errorf("want audience error")
-	}
-}
-
-func TestValidator_RejectsBadJKUHost(t *testing.T) {
-	mock, _, creds := newValidator(t)
-	creds.UAADomain = "different.example.com"
-	v, _ := xsuaa.NewValidator(creds)
-	tok, _ := mock.Issue("u", creds.ClientID, creds.URL, []string{"Display"}, nil)
-	if _, err := v.Validate(context.Background(), tok); err == nil || !strings.Contains(err.Error(), "jku") {
-		t.Errorf("want jku error, got %v", err)
-	}
-}
-
-func TestValidator_RejectsMissingJKU(t *testing.T) {
-	mock, v, creds := newValidator(t)
-	raw, err := mock.IssueWithoutJKU("u-1", creds.ClientID, creds.URL, []string{"Display"})
-	if err != nil {
-		t.Fatalf("issue: %v", err)
-	}
-	if _, err := v.Validate(context.Background(), raw); err == nil || !strings.Contains(err.Error(), "jku") {
-		t.Errorf("want jku error, got %v", err)
-	}
-}
-
-func TestValidator_RejectsTamperedSignature(t *testing.T) {
-	mock, v, creds := newValidator(t)
-	tok, err := mock.Issue("u", creds.ClientID, creds.URL, []string{"Display"}, nil)
-	if err != nil {
-		t.Fatalf("issue: %v", err)
-	}
-	// JWS compact form is "<header>.<payload>.<signature>". Mutate one byte
-	// in the decoded signature so the signature is guaranteed different.
-	parts := strings.Split(tok, ".")
-	if len(parts) != 3 {
-		t.Fatalf("expected 3 JWS parts, got %d", len(parts))
-	}
-	sig, err := base64.RawURLEncoding.DecodeString(parts[2])
-	if err != nil {
-		t.Fatalf("decode signature: %v", err)
-	}
-	if len(sig) < 8 {
-		t.Fatalf("signature suspiciously short: %d bytes", len(sig))
-	}
-	sig[len(sig)/2] ^= 0xFF // flip every bit of one middle byte
-	parts[2] = base64.RawURLEncoding.EncodeToString(sig)
-	tampered := strings.Join(parts, ".")
-
-	if _, err := v.Validate(context.Background(), tampered); err == nil {
-		t.Errorf("want signature error, got nil")
-	}
-}
-
-func TestValidator_RejectsExpiredToken(t *testing.T) {
-	mock, v, creds := newValidator(t)
-	past := time.Now().Add(-5 * time.Minute).Unix()
-	tok, err := mock.Issue("u", creds.ClientID, creds.URL, []string{"Display"}, map[string]any{
-		"exp": past,
-		"iat": time.Now().Add(-10 * time.Minute).Unix(),
-	})
-	if err != nil {
-		t.Fatalf("issue: %v", err)
-	}
-	if _, err := v.Validate(context.Background(), tok); err == nil {
-		t.Errorf("want expiration error")
-	}
-}
-
-func TestValidator_RejectsWrongZID(t *testing.T) {
-	mock, v, creds := newValidator(t)
-	_ = creds
-	tok, _ := mock.Issue("u", creds.ClientID, creds.URL, []string{"Display"}, map[string]any{
-		"zid": "different-zone",
-	})
-	if _, err := v.Validate(context.Background(), tok); err == nil || !strings.Contains(err.Error(), "zid") {
-		t.Errorf("want zid error, got %v", err)
-	}
-}
-
-func TestValidator_AcceptsAudienceViaXSAppName(t *testing.T) {
 	mock, v, creds := newValidator(t)
 	// Issue with aud = xsappname (no sb- prefix), simulating an XSUAA flow that targets the app directly.
-	tok, _ := mock.Issue("u", creds.ClientID, creds.URL, []string{"Display"}, map[string]any{
+	tok, err := mock.Issue("u", creds.ClientID, creds.URL, []string{"Display"}, map[string]any{
 		"aud": []string{creds.XSAppName},
 	})
+	require.NoError(t, err, "Issue")
+
 	p, err := v.Validate(context.Background(), tok)
-	if err != nil {
-		t.Fatalf("Validate: %v", err)
-	}
-	if p.Subject != "u" {
-		t.Errorf("Subject = %q", p.Subject)
-	}
+
+	require.NoError(t, err, "Validate")
+	require.NotNil(t, p)
+	assert.Equal(t, "u", p.Subject)
 }
 
-func TestValidator_RejectsHostnameSubstringMatch(t *testing.T) {
-	mock, _, creds := newValidator(t)
-	// UAADomain set to something whose suffix-match with the mock host would be wrong.
-	creds.UAADomain = "ost" // mock.Host() == "127.0.0.1" — does not end with ".ost" and is not "ost"
-	v, _ := xsuaa.NewValidator(creds)
-	tok, _ := mock.Issue("u", creds.ClientID, creds.URL, []string{"Display"}, nil)
-	if _, err := v.Validate(context.Background(), tok); err == nil || !strings.Contains(err.Error(), "jku") {
-		t.Errorf("want jku error, got %v", err)
+func TestValidator_RejectsInvalidToken(t *testing.T) {
+	t.Parallel()
+
+	// mutateCreds: optional callback to alter the Credentials before building the
+	// validator. Used by rows that need a non-default validator (e.g. wrong UAADomain).
+	// issueToken: produces the JWT (or post-Issue tampered string) under test for the row.
+	type tokenIssuer func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string
+
+	cases := []struct {
+		name             string
+		mutateCreds      func(*xsuaa.Credentials)
+		issueToken       tokenIssuer
+		wantErrSubstring string
+	}{
+		{
+			name: "wrong_issuer",
+			issueToken: func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string {
+				t.Helper()
+				tok, err := mock.Issue("u", creds.ClientID, "https://evil.example", []string{"Display"}, nil)
+				require.NoError(t, err, "Issue")
+				return tok
+			},
+			wantErrSubstring: "iss",
+		},
+		{
+			// Upstream library wording for audience errors isn't part of our public
+			// contract, so we only require that an error is returned.
+			name: "wrong_audience",
+			issueToken: func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string {
+				t.Helper()
+				tok, err := mock.Issue("u", "sb-other!t12345", creds.URL, []string{"Display"}, nil)
+				require.NoError(t, err, "Issue")
+				return tok
+			},
+		},
+		{
+			name: "bad_jku_host",
+			mutateCreds: func(c *xsuaa.Credentials) {
+				c.UAADomain = "different.example.com"
+			},
+			issueToken: func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string {
+				t.Helper()
+				// creds passed here already carries the original UAADomain; the
+				// mutated copy is used only for validator construction.
+				tok, err := mock.Issue("u", creds.ClientID, creds.URL, []string{"Display"}, nil)
+				require.NoError(t, err, "Issue")
+				return tok
+			},
+			wantErrSubstring: "jku",
+		},
+		{
+			name: "missing_jku",
+			issueToken: func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string {
+				t.Helper()
+				raw, err := mock.IssueWithoutJKU("u-1", creds.ClientID, creds.URL, []string{"Display"})
+				require.NoError(t, err, "IssueWithoutJKU")
+				return raw
+			},
+			wantErrSubstring: "jku",
+		},
+		{
+			// Signature error wording isn't substring-stable across upstream versions.
+			name: "tampered_signature",
+			issueToken: func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string {
+				t.Helper()
+				tok, err := mock.Issue("u", creds.ClientID, creds.URL, []string{"Display"}, nil)
+				require.NoError(t, err, "Issue")
+
+				// JWS compact form is "<header>.<payload>.<signature>". Mutate one
+				// byte in the decoded signature so the signature is guaranteed
+				// different from any valid one.
+				parts := strings.Split(tok, ".")
+				require.Len(t, parts, 3, "expected 3 JWS parts")
+				sig, err := base64.RawURLEncoding.DecodeString(parts[2])
+				require.NoError(t, err, "decode signature")
+				require.GreaterOrEqual(t, len(sig), 8, "signature suspiciously short")
+				sig[len(sig)/2] ^= 0xFF // flip every bit of one middle byte
+				parts[2] = base64.RawURLEncoding.EncodeToString(sig)
+				return strings.Join(parts, ".")
+			},
+		},
+		{
+			name: "expired_token",
+			issueToken: func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string {
+				t.Helper()
+				past := time.Now().Add(-5 * time.Minute).Unix()
+				tok, err := mock.Issue("u", creds.ClientID, creds.URL, []string{"Display"}, map[string]any{
+					"exp": past,
+					"iat": time.Now().Add(-10 * time.Minute).Unix(),
+				})
+				require.NoError(t, err, "Issue")
+				return tok
+			},
+		},
+		{
+			name: "wrong_zid",
+			issueToken: func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string {
+				t.Helper()
+				tok, err := mock.Issue("u", creds.ClientID, creds.URL, []string{"Display"}, map[string]any{
+					"zid": "different-zone",
+				})
+				require.NoError(t, err, "Issue")
+				return tok
+			},
+			wantErrSubstring: "zid",
+		},
+		{
+			// UAADomain="ost" must not match mock.Host() == "127.0.0.1" by suffix.
+			name: "hostname_substring_match",
+			mutateCreds: func(c *xsuaa.Credentials) {
+				c.UAADomain = "ost"
+			},
+			issueToken: func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string {
+				t.Helper()
+				tok, err := mock.Issue("u", creds.ClientID, creds.URL, []string{"Display"}, nil)
+				require.NoError(t, err, "Issue")
+				return tok
+			},
+			wantErrSubstring: "jku",
+		},
+		{
+			// iss = creds.URL + ".evil.com" — strings.HasPrefix would match without the / boundary check.
+			name: "issuer_suffix_attack",
+			issueToken: func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string {
+				t.Helper()
+				evilIss := creds.URL + ".evil.com"
+				tok, err := mock.Issue("u", creds.ClientID, evilIss, []string{"Display"}, nil)
+				require.NoError(t, err, "Issue")
+				return tok
+			},
+			wantErrSubstring: "iss",
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mock, v, creds := newValidator(t)
+			if tc.mutateCreds != nil {
+				mutated := creds
+				tc.mutateCreds(&mutated)
+				var err error
+				v, err = xsuaa.NewValidator(mutated)
+				require.NoError(t, err, "NewValidator(mutated)")
+			}
+			tok := tc.issueToken(t, mock, creds)
+
+			_, err := v.Validate(context.Background(), tok)
+
+			require.Error(t, err, "Validate must reject")
+			if tc.wantErrSubstring != "" {
+				assert.ErrorContains(t, err, tc.wantErrSubstring)
+			}
+		})
 	}
 }
 
 func TestNewValidator_RejectsUAADomainWithPort(t *testing.T) {
+	t.Parallel()
+
 	_, err := xsuaa.NewValidator(xsuaa.Credentials{
 		ClientID: "x", URL: "https://x.example", UAADomain: "x.example:8080", XSAppName: "x",
 	})
-	if err == nil || !strings.Contains(err.Error(), "UAADomain") {
-		t.Errorf("want UAADomain validation error, got %v", err)
-	}
-}
 
-func TestValidator_RejectsIssuerSuffixAttack(t *testing.T) {
-	mock, v, creds := newValidator(t)
-	// Issue with iss = creds.URL + ".evil.com" — strings.HasPrefix would match without the / boundary.
-	evilIss := creds.URL + ".evil.com"
-	tok, _ := mock.Issue("u", creds.ClientID, evilIss, []string{"Display"}, nil)
-	if _, err := v.Validate(context.Background(), tok); err == nil || !strings.Contains(err.Error(), "iss") {
-		t.Errorf("want iss error, got %v", err)
-	}
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "UAADomain")
 }
