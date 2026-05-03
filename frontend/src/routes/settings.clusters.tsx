@@ -169,6 +169,7 @@ function ClusterSettingsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
+    // allow-raw-date: filename stamp, not UI display
     a.download = `kafkito-private-clusters-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a);
     a.click();

@@ -16,6 +16,7 @@ import { Button } from "@/components/button";
 import { IconButton } from "@/components/icon-button";
 import { Card } from "@/components/card";
 import { Input } from "@/components/Input";
+import { Timestamp } from "@/components/timestamp";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic/produce")({
   component: ProduceTab,
@@ -367,7 +368,7 @@ function ProduceSection({
         {result && (
           <div className="rounded-md border border-success/30 bg-success-subtle p-2 text-xs text-success">
             Produced · partition {result.partition} · offset {result.offset} ·{" "}
-            {new Date(result.timestamp_ms).toLocaleString()}
+            <Timestamp value={result.timestamp_ms} className="text-xs text-success" />
           </div>
         )}
 
