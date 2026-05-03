@@ -16,6 +16,7 @@
     "check:strings": "bash scripts/check-strings.sh",
     "check:tokens": "bash scripts/check-tokens.sh",
     "check:routes": "bash scripts/check-route-orphans.sh",
+    "check:dates": "bash scripts/check-date-format.sh",
     "check:contrast": "node scripts/check-contrast.mjs"
   },
   "dependencies": {
