@@ -1,12 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { JsonInteractive } from "./json-interactive";
-
-// production: see SIZE_LIMIT_BYTES in json-interactive.tsx
-const sizeLimitBytes = 1_000_000;
-// production: see ARRAY_COLLAPSE_THRESHOLD in json-interactive.tsx
-const arrayCollapseThreshold = 100;
+import {
+  ARRAY_COLLAPSE_THRESHOLD,
+  JsonInteractive,
+  SIZE_LIMIT_BYTES,
+} from "./json-interactive";
 
 describe("JsonInteractive", () => {
   it("renders scalar values clickably and reports trail + literal on click", async () => {
@@ -60,8 +59,8 @@ describe("JsonInteractive", () => {
     );
   });
 
-  it(`collapses arrays with more than ${arrayCollapseThreshold} items by default`, () => {
-    const arrayLength = arrayCollapseThreshold + 150;
+  it(`collapses arrays with more than ${ARRAY_COLLAPSE_THRESHOLD} items by default`, () => {
+    const arrayLength = ARRAY_COLLAPSE_THRESHOLD + 150;
     const arr = Array.from({ length: arrayLength }, (_, i) => i);
     render(<JsonInteractive value={{ items: arr }} onPick={() => {}} />);
 
@@ -72,7 +71,7 @@ describe("JsonInteractive", () => {
   });
 
   it("expands a collapsed array on click", async () => {
-    const arrayLength = arrayCollapseThreshold + 150;
+    const arrayLength = ARRAY_COLLAPSE_THRESHOLD + 150;
     const arr = Array.from({ length: arrayLength }, (_, i) => i);
     const user = userEvent.setup();
     render(<JsonInteractive value={{ items: arr }} onPick={() => {}} />);
@@ -85,7 +84,7 @@ describe("JsonInteractive", () => {
   });
 
   it("falls back to <pre> for messages over the size limit", () => {
-    const overLimit = sizeLimitBytes + 100_000;
+    const overLimit = SIZE_LIMIT_BYTES + 100_000;
     const giant = "x".repeat(overLimit);
     render(<JsonInteractive value={{ blob: giant }} onPick={() => {}} />);
 
