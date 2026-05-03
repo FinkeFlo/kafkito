@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildPathTree, type PathInfo, type PathType } from "./path-tree";
-
-// production: see MAX_SAMPLE_VALUES in path-tree.ts
-const sampleValuesCap = 5;
-// production: see MAX_DEPTH in path-tree.ts
-const maxDepth = 20;
+import {
+  buildPathTree,
+  MAX_DEPTH,
+  MAX_SAMPLE_VALUES,
+  type PathInfo,
+  type PathType,
+} from "./path-tree";
 
 describe("buildPathTree", () => {
   it("returns an empty tree for no samples", () => {
@@ -43,24 +44,24 @@ describe("buildPathTree", () => {
     expect(tree.get("$.b")?.distinctCount).toBe(2);
   });
 
-  it(`caps sampleValues at ${sampleValuesCap} distinct entries`, () => {
-    const samples = Array.from({ length: sampleValuesCap + 2 }, (_, i) => ({ k: i + 1 }));
+  it(`caps sampleValues at ${MAX_SAMPLE_VALUES} distinct entries`, () => {
+    const samples = Array.from({ length: MAX_SAMPLE_VALUES + 2 }, (_, i) => ({ k: i + 1 }));
 
     const tree = buildPathTree(samples);
 
     expect(tree.get("$.k")?.distinctCount).toBe(samples.length);
-    expect(tree.get("$.k")?.sampleValues).toHaveLength(sampleValuesCap);
+    expect(tree.get("$.k")?.sampleValues).toHaveLength(MAX_SAMPLE_VALUES);
   });
 
-  it(`caps depth at ${maxDepth} levels`, () => {
+  it(`caps depth at ${MAX_DEPTH} levels`, () => {
     let cur: Record<string, unknown> = { leaf: 1 };
-    for (let i = 0; i < maxDepth + 10; i++) cur = { x: cur };
+    for (let i = 0; i < MAX_DEPTH + 10; i++) cur = { x: cur };
 
     const tree = buildPathTree([cur]);
 
     const longest = [...tree.keys()].reduce((a, b) => (a.length > b.length ? a : b));
     const depth = (longest.match(/\.x/g) || []).length;
-    expect(depth).toBeLessThanOrEqual(maxDepth);
+    expect(depth).toBeLessThanOrEqual(MAX_DEPTH);
   });
 
   it.each<[string, PathType]>([
