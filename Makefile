@@ -1,4 +1,4 @@
-.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev proto proto-lint help
+.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev proto proto-lint e2e e2e-up e2e-test e2e-down help
 
 BIN := bin/kafkito
 PKG := ./...
@@ -27,6 +27,7 @@ help:
 	@echo "  frontend-dev       - bun run dev in frontend/"
 	@echo "  docker-build       - docker build -t $(IMAGE)"
 	@echo "  compose-up/down    - docker compose lifecycle"
+	@echo "  e2e                - opt-in Playwright walks against a local fixture stack"
 
 frontend-install:
 	cd frontend && bun install
@@ -85,6 +86,33 @@ compose-down:
 
 clean:
 	rm -rf bin frontend/dist/assets
+
+# --- e2e harness (Q-001 / PLAN.md § 3.14) -------------------------------
+# `make e2e` brings up the local Compose stack including the kafkito
+# container (which serves the embedded frontend), seeds deterministic
+# fixtures into the broker, runs Playwright walks, and tears down. Opt-in
+# only — NOT part of the canonical hard gate.
+#
+# Requires Docker, Bun, and a one-time `bunx playwright install chromium`
+# under frontend/. See frontend/e2e/README.md for the full guide.
+#
+# The user's `make dev` stack must be stopped first (port 37421 conflict).
+
+e2e: e2e-up e2e-test e2e-down
+
+e2e-up:
+	@if lsof -nP -iTCP:37421 -sTCP:LISTEN >/dev/null 2>&1; then \
+		echo "port 37421 is in use — stop your dev stack ('make dev-down' + kill the dev process) before running e2e."; \
+		exit 1; \
+	fi
+	docker compose --profile app up -d --build --wait kafka schema-registry kafkito
+	bash frontend/e2e/fixtures/seed.sh
+
+e2e-test:
+	cd frontend && bunx playwright test
+
+e2e-down:
+	docker compose --profile app down --remove-orphans
 
 
 proto:
