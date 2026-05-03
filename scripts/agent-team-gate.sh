@@ -135,7 +135,13 @@ if [ "$needs_e2e" -eq 1 ]; then
   # This is the canonical hermetic flow from commit cebaf1f. Calling
   # `bun run e2e` directly was wrong on two counts: no such npm script exists,
   # and Playwright needs the kafkito-e2e binary running, not just Kafka.
-  run_gate "e2e: make e2e (hermetic)" bash -c 'make e2e'
+  #
+  # `make e2e-clean` is run first as a defense-in-depth: it kills any
+  # leftover kafkito-e2e LISTEN socket on $(E2E_PORT) and removes stale
+  # PID/log state. This protects against external (non-hook) `make e2e`
+  # invocations that died without running e2e-down, and against teammate
+  # workstreams that bypass the gate-hook lock.
+  run_gate "e2e: make e2e-clean e2e (hermetic)" bash -c 'make e2e-clean e2e'
 fi
 
 if [ "${#failures[@]}" -gt 0 ]; then
