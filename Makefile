@@ -117,15 +117,20 @@ e2e-up:
 	@echo "e2e: starting kafkito-e2e on port $(E2E_PORT)"
 	@KAFKITO_KAFKA_BROKERS=localhost:39092 PORT=$(E2E_PORT) KAFKITO_AUTH_MODE=off \
 		./bin/kafkito-e2e > $(E2E_LOG) 2>&1 & echo $$! > $(E2E_PID)
-	@for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do \
-		if curl -fsS http://localhost:$(E2E_PORT)/ >/dev/null 2>&1; then \
-			echo "e2e: kafkito ready on $(E2E_PORT)"; \
-			break; \
+	@ok=0; for i in $$(seq 1 20); do \
+		if curl -fsS http://localhost:$(E2E_PORT)/healthz >/dev/null 2>&1; then \
+			ok=$$((ok + 1)); \
+			if [ "$$ok" -ge 2 ]; then \
+				echo "e2e: kafkito ready on $(E2E_PORT) (2 consecutive /healthz)"; \
+				break; \
+			fi; \
+		else \
+			ok=0; \
 		fi; \
 		sleep 1; \
 	done
-	@if ! curl -fsS http://localhost:$(E2E_PORT)/ >/dev/null 2>&1; then \
-		echo "e2e: kafkito did not become ready in 15s — check $(E2E_LOG)"; \
+	@if ! curl -fsS http://localhost:$(E2E_PORT)/healthz >/dev/null 2>&1; then \
+		echo "e2e: kafkito did not become ready in 20s — check $(E2E_LOG)"; \
 		cat $(E2E_LOG); \
 		exit 1; \
 	fi
