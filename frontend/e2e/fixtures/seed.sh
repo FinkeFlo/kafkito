@@ -19,6 +19,10 @@ run_in_kafka() {
   docker exec "${CONTAINER}" "$@"
 }
 
+run_in_kafka_stdin() {
+  docker exec -i "${CONTAINER}" "$@"
+}
+
 wait_for_broker() {
   local tries=30
   while ! run_in_kafka /opt/kafka/bin/kafka-broker-api-versions.sh \
@@ -51,7 +55,7 @@ produce_lines() {
   for i in $(seq 1 "${n}"); do
     payload+="seed-message-${i}"$'\n'
   done
-  printf '%s' "${payload}" | run_in_kafka /opt/kafka/bin/kafka-console-producer.sh \
+  printf '%s' "${payload}" | run_in_kafka_stdin /opt/kafka/bin/kafka-console-producer.sh \
     --bootstrap-server "${BROKER_INTERNAL}" --topic "${topic}" >/dev/null 2>&1
 }
 

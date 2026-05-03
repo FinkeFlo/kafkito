@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const BASE_URL = process.env.KAFKITO_E2E_BASE_URL ?? "http://localhost:37421";
+const BASE_URL = process.env.KAFKITO_E2E_BASE_URL ?? "http://localhost:47421";
 
 export default defineConfig({
   testDir: "./e2e",

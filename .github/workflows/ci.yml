@@ -37,6 +37,11 @@ jobs:
       - run: bun run lint
       - run: bun run build
       - run: bun run check:palette
+      - run: bun run check:strings
+      - run: bun run check:tokens
+      - run: bun run check:routes
+      - run: bun run check:dates
+      - run: bun run test
 
   docker-build:
     runs-on: ubuntu-24.04

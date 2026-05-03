@@ -88,31 +88,58 @@ clean:
 	rm -rf bin frontend/dist/assets
 
 # --- e2e harness (Q-001 / PLAN.md § 3.14) -------------------------------
-# `make e2e` brings up the local Compose stack including the kafkito
-# container (which serves the embedded frontend), seeds deterministic
-# fixtures into the broker, runs Playwright walks, and tears down. Opt-in
-# only — NOT part of the canonical hard gate.
+# `make e2e` runs Playwright walks against a hermetic local stack:
+# Kafka via docker compose (existing kafkito-kafka container) +
+# kafkito as a Go subprocess on a non-default port (E2E_PORT, default
+# 47421) so it does NOT conflict with a running `make dev` stack.
+# Frontend is served from the kafkito-embedded assets — no Vite needed.
 #
-# Requires Docker, Bun, and a one-time `bunx playwright install chromium`
-# under frontend/. See frontend/e2e/README.md for the full guide.
+# Opt-in: NOT part of the canonical hard gate. CI runs the same flow
+# in .github/workflows/e2e.yml; behaviour parity matters.
 #
-# The user's `make dev` stack must be stopped first (port 37421 conflict).
+# Requires Docker, Bun, Go, and a one-time `bunx playwright install
+# chromium` under frontend/. See frontend/e2e/README.md.
+
+E2E_PORT ?= 47421
+E2E_PID := /tmp/kafkito-e2e.pid
+E2E_LOG := /tmp/kafkito-e2e.log
 
 e2e: e2e-up e2e-test e2e-down
 
 e2e-up:
-	@if lsof -nP -iTCP:37421 -sTCP:LISTEN >/dev/null 2>&1; then \
-		echo "port 37421 is in use — stop your dev stack ('make dev-down' + kill the dev process) before running e2e."; \
+	@if lsof -nP -iTCP:$(E2E_PORT) -sTCP:LISTEN >/dev/null 2>&1; then \
+		echo "e2e: port $(E2E_PORT) is in use — kill the listener and retry"; \
 		exit 1; \
 	fi
-	docker compose --profile app up -d --build --wait kafka schema-registry kafkito
+	docker compose up -d --wait kafka
+	cd frontend && bun run build
+	go build -tags devauth -ldflags "-X main.version=e2e-dev" -o bin/kafkito-e2e ./cmd/kafkito
+	@echo "e2e: starting kafkito-e2e on port $(E2E_PORT)"
+	@KAFKITO_KAFKA_BROKERS=localhost:39092 PORT=$(E2E_PORT) KAFKITO_AUTH_MODE=off \
+		./bin/kafkito-e2e > $(E2E_LOG) 2>&1 & echo $$! > $(E2E_PID)
+	@for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do \
+		if curl -fsS http://localhost:$(E2E_PORT)/ >/dev/null 2>&1; then \
+			echo "e2e: kafkito ready on $(E2E_PORT)"; \
+			break; \
+		fi; \
+		sleep 1; \
+	done
+	@if ! curl -fsS http://localhost:$(E2E_PORT)/ >/dev/null 2>&1; then \
+		echo "e2e: kafkito did not become ready in 15s — check $(E2E_LOG)"; \
+		cat $(E2E_LOG); \
+		exit 1; \
+	fi
 	bash frontend/e2e/fixtures/seed.sh
 
 e2e-test:
-	cd frontend && bunx playwright test
+	cd frontend && KAFKITO_E2E_BASE_URL=http://localhost:$(E2E_PORT) bunx playwright test
 
 e2e-down:
-	docker compose --profile app down --remove-orphans
+	@if [ -f $(E2E_PID) ]; then \
+		kill $$(cat $(E2E_PID)) 2>/dev/null || true; \
+		rm -f $(E2E_PID); \
+		echo "e2e: kafkito-e2e stopped"; \
+	fi
 
 
 proto:
