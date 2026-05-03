@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { PathSense } from "./path-sense";
-import type { PathTree } from "@/lib/path-tree";
+import type { PathInfo, PathTree } from "@/lib/path-tree";
 
-function makeTree(entries: Array<[string, Partial<PathTree extends Map<string, infer V> ? V : never>]>): PathTree {
+function makeTree(entries: Array<[string, Partial<PathInfo>]>): PathTree {
   const t: PathTree = new Map();
   for (const [k, v] of entries) {
     t.set(k, {
@@ -18,8 +19,9 @@ function makeTree(entries: Array<[string, Partial<PathTree extends Map<string, i
 }
 
 describe("PathSense", () => {
-  it("opens on focus and shows top entries", () => {
+  it("opens on focus and shows top entries", async () => {
     const onPick = vi.fn();
+    const user = userEvent.setup();
     render(
       <PathSense
         tree={makeTree([
@@ -31,13 +33,16 @@ describe("PathSense", () => {
         onPick={onPick}
       />,
     );
-    fireEvent.focus(screen.getByRole("combobox"));
+
+    await user.click(screen.getByRole("combobox"));
+
     expect(screen.getByText("$.orderId")).toBeInTheDocument();
     expect(screen.getByText("$.amount")).toBeInTheDocument();
   });
 
-  it("filters as the user types", () => {
+  it("filters as the user types", async () => {
     const onChange = vi.fn();
+    const user = userEvent.setup();
     render(
       <PathSense
         tree={makeTree([
@@ -49,15 +54,18 @@ describe("PathSense", () => {
         onPick={() => {}}
       />,
     );
+
     const input = screen.getByRole("combobox");
-    fireEvent.focus(input);
-    fireEvent.change(input, { target: { value: "cust" } });
+    await user.click(input);
+    await user.type(input, "cust");
+
     expect(screen.getByText("$.customerName")).toBeInTheDocument();
     expect(screen.queryByText("$.orderId")).not.toBeInTheDocument();
   });
 
-  it("calls onPick when an entry is clicked", () => {
+  it("calls onPick when an entry is clicked", async () => {
     const onPick = vi.fn();
+    const user = userEvent.setup();
     render(
       <PathSense
         tree={makeTree([["$.orderId", { type: "string" }]])}
@@ -66,13 +74,16 @@ describe("PathSense", () => {
         onPick={onPick}
       />,
     );
-    fireEvent.focus(screen.getByRole("combobox"));
-    fireEvent.click(screen.getByText("$.orderId"));
+
+    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getByText("$.orderId"));
+
     expect(onPick).toHaveBeenCalledWith("$.orderId", expect.anything());
   });
 
-  it("toggles last array segment with Tab after a star path is selected", () => {
+  it("toggles last array segment with Tab after a star path is selected", async () => {
     const onChange = vi.fn();
+    const user = userEvent.setup();
     render(
       <PathSense
         tree={makeTree([])}
@@ -81,14 +92,17 @@ describe("PathSense", () => {
         onPick={() => {}}
       />,
     );
+
     const input = screen.getByRole("combobox");
-    fireEvent.focus(input);
-    fireEvent.keyDown(input, { key: "Tab" });
+    await user.click(input);
+    await user.tab();
+
     expect(onChange).toHaveBeenCalledWith("$.prices[0].customerNumber");
   });
 
-  it("toggles back to star with another Tab", () => {
+  it("toggles back to star with another Tab", async () => {
     const onChange = vi.fn();
+    const user = userEvent.setup();
     render(
       <PathSense
         tree={makeTree([])}
@@ -97,11 +111,16 @@ describe("PathSense", () => {
         onPick={() => {}}
       />,
     );
-    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Tab" });
+
+    const input = screen.getByRole("combobox");
+    await user.click(input);
+    await user.tab();
+
     expect(onChange).toHaveBeenCalledWith("$.prices[*].customerNumber");
   });
 
-  it("shows an empty-state hint when the tree is empty", () => {
+  it("shows an empty-state hint when the tree is empty", async () => {
+    const user = userEvent.setup();
     render(
       <PathSense
         tree={makeTree([])}
@@ -110,11 +129,14 @@ describe("PathSense", () => {
         onPick={() => {}}
       />,
     );
-    fireEvent.focus(screen.getByRole("combobox"));
+
+    await user.click(screen.getByRole("combobox"));
+
     expect(screen.getByText(/enter path manually/i)).toBeInTheDocument();
   });
 
-  it("closes on Escape", () => {
+  it("closes on Escape", async () => {
+    const user = userEvent.setup();
     render(
       <PathSense
         tree={makeTree([["$.x", { type: "string" }]])}
@@ -123,9 +145,12 @@ describe("PathSense", () => {
         onPick={() => {}}
       />,
     );
-    fireEvent.focus(screen.getByRole("combobox"));
+    const input = screen.getByRole("combobox");
+    await user.click(input);
     expect(screen.getByText("$.x")).toBeInTheDocument();
-    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Escape" });
+
+    await user.keyboard("{Escape}");
+
     expect(screen.queryByText("$.x")).not.toBeInTheDocument();
   });
 });
