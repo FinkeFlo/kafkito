@@ -15,8 +15,8 @@ export interface PathInfo {
 
 export type PathTree = Map<string, PathInfo>;
 
-const MAX_DEPTH = 20;
-const MAX_SAMPLE_VALUES = 5;
+export const MAX_DEPTH = 20;
+export const MAX_SAMPLE_VALUES = 5;
 
 function detectType(v: unknown): PathType {
   if (v === null) return "null";
