@@ -43,16 +43,12 @@ describe("buildJsonPath", () => {
     expect(buildJsonPath(trail)).toBe("$.a[*].b[2].c");
   });
 
-  it("uses bracket notation for keys with special characters", () => {
-    expect(
-      buildJsonPath([{ kind: "key", name: "has space" }]),
-    ).toBe("$['has space']");
-    expect(
-      buildJsonPath([{ kind: "key", name: "weird-key" }]),
-    ).toBe("$['weird-key']");
-    expect(
-      buildJsonPath([{ kind: "key", name: "with.dot" }]),
-    ).toBe("$['with.dot']");
+  it.each<[string, string]>([
+    ["has space", "$['has space']"],
+    ["weird-key", "$['weird-key']"],
+    ["with.dot", "$['with.dot']"],
+  ])("uses bracket notation for key %p (special characters)", (name, expected) => {
+    expect(buildJsonPath([{ kind: "key", name }])).toBe(expected);
   });
 
   it("escapes single quotes in bracket-notation keys", () => {
