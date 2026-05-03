@@ -1,4 +1,4 @@
-.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev proto proto-lint e2e e2e-up e2e-test e2e-down help
+.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev proto proto-lint e2e e2e-up e2e-test e2e-down e2e-clean help
 
 BIN := bin/kafkito
 PKG := ./...
@@ -140,6 +140,12 @@ e2e-down:
 		rm -f $(E2E_PID); \
 		echo "e2e: kafkito-e2e stopped"; \
 	fi
+
+e2e-clean:
+	@pids=$$(lsof -nP -iTCP:$(E2E_PORT) -sTCP:LISTEN -t 2>/dev/null); \
+	if [ -n "$$pids" ]; then kill -9 $$pids 2>/dev/null || true; fi
+	@rm -f $(E2E_PID) $(E2E_LOG)
+	@echo "e2e: cleaned port $(E2E_PORT) and stale state"
 
 
 proto:
