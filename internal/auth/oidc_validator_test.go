@@ -7,127 +7,155 @@ package auth_test
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/FinkeFlo/kafkito/internal/auth"
 )
+
+// alg=none JWT with sub=attacker — must be rejected by Validate. Public-test
+// payload, no real secret material. Gitleaks flags the high-entropy literal.
+// header: {"alg":"none","typ":"JWT"} -> base64url
+// payload: {"sub":"attacker","aud":"test-audience"} -> base64url
+const algNoneToken = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0." + // gitleaks:allow
+	"eyJzdWIiOiJhdHRhY2tlciIsImF1ZCI6InRlc3QtYXVkaWVuY2UifQ." // gitleaks:allow
 
 // newOIDCValidator returns a generic mock issuer (no scope prefix, no zid)
 // wired up to a freshly constructed OIDCValidator. The audience is fixed to
 // "test-audience" so callers can mint matching/mismatching tokens.
 func newOIDCValidator(t *testing.T) (*auth.MockOIDC, auth.Validator, string) {
 	t.Helper()
+
 	mock, err := auth.NewMockOIDC()
-	if err != nil {
-		t.Fatalf("mock: %v", err)
-	}
+	require.NoError(t, err, "NewMockOIDC")
 	t.Cleanup(mock.Close)
+
 	const audience = "test-audience"
 	v, err := auth.NewOIDCValidator(auth.OIDCConfig{
 		IssuerURL:    mock.Server.URL,
 		Audience:     audience,
 		JWKSEndpoint: mock.JKU(),
 	})
-	if err != nil {
-		t.Fatalf("NewOIDCValidator: %v", err)
-	}
+	require.NoError(t, err, "NewOIDCValidator")
+
 	return mock, v, audience
 }
 
-func TestOIDCValidator_HappyPath_ScopeString(t *testing.T) {
+func TestOIDCValidator_HappyPath_AcceptsScopeStringClaim(t *testing.T) {
+	t.Parallel()
+
 	mock, v, aud := newOIDCValidator(t)
 	tok, err := mock.Issue("user-123", aud, mock.Server.URL, []string{"read", "write"}, nil)
-	if err != nil {
-		t.Fatalf("issue: %v", err)
-	}
+	require.NoError(t, err, "Issue")
+
 	p, err := v.Validate(context.Background(), tok)
-	if err != nil {
-		t.Fatalf("Validate: %v", err)
-	}
-	if p.Subject != "user-123" {
-		t.Errorf("Subject = %q, want %q", p.Subject, "user-123")
-	}
-	if !p.HasScope("read") || !p.HasScope("write") {
-		t.Errorf("expected read+write scopes, got %v", p.Scopes)
-	}
+
+	require.NoError(t, err, "Validate")
+	assert.Equal(t, "user-123", p.Subject)
+	assert.True(t, p.HasScope("read"), "HasScope(read); got scopes=%v", p.Scopes)
+	assert.True(t, p.HasScope("write"), "HasScope(write); got scopes=%v", p.Scopes)
 }
 
-func TestOIDCValidator_HappyPath_ScopesArray(t *testing.T) {
+func TestOIDCValidator_HappyPath_AcceptsScopesArrayClaim(t *testing.T) {
+	t.Parallel()
+
 	mock, v, aud := newOIDCValidator(t)
 	// Issue without scope claim, then layer "scopes" array via extra. We also
 	// blank out the default "scope" claim so only "scopes" carries the data.
 	tok, err := mock.Issue("user-arr", aud, mock.Server.URL, nil, map[string]any{
 		"scopes": []string{"admin", "viewer"},
 	})
-	if err != nil {
-		t.Fatalf("issue: %v", err)
-	}
+	require.NoError(t, err, "Issue")
+
 	p, err := v.Validate(context.Background(), tok)
-	if err != nil {
-		t.Fatalf("Validate: %v", err)
-	}
-	if !p.HasScope("admin") || !p.HasScope("viewer") {
-		t.Errorf("expected admin+viewer scopes, got %v", p.Scopes)
-	}
+
+	require.NoError(t, err, "Validate")
+	assert.True(t, p.HasScope("admin"), "HasScope(admin); got scopes=%v", p.Scopes)
+	assert.True(t, p.HasScope("viewer"), "HasScope(viewer); got scopes=%v", p.Scopes)
 }
 
-func TestOIDCValidator_RejectsWrongAudience(t *testing.T) {
-	mock, v, _ := newOIDCValidator(t)
-	tok, err := mock.Issue("u", "other-audience", mock.Server.URL, []string{"read"}, nil)
-	if err != nil {
-		t.Fatalf("issue: %v", err)
-	}
-	if _, err := v.Validate(context.Background(), tok); err == nil || !strings.Contains(err.Error(), "aud") {
-		t.Errorf("want audience error, got %v", err)
-	}
-}
+func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
+	t.Parallel()
 
-func TestOIDCValidator_RejectsWrongIssuer(t *testing.T) {
-	mock, v, aud := newOIDCValidator(t)
-	tok, err := mock.Issue("u", aud, "https://evil.example", []string{"read"}, nil)
-	if err != nil {
-		t.Fatalf("issue: %v", err)
-	}
-	if _, err := v.Validate(context.Background(), tok); err == nil || !strings.Contains(err.Error(), "iss") {
-		t.Errorf("want issuer error, got %v", err)
-	}
-}
+	// tokenForRow builds the token for a row. Returning nil means the row
+	// validates a literal raw string (rawToken) instead of a freshly issued
+	// JWT — used for malformed and alg=none cases.
+	type tokenIssuer func(t *testing.T, mock *auth.MockOIDC, aud string) string
 
-func TestOIDCValidator_RejectsExpiredToken(t *testing.T) {
-	mock, v, aud := newOIDCValidator(t)
-	past := time.Now().Add(-10 * time.Minute).Unix()
-	tok, err := mock.Issue("u", aud, mock.Server.URL, []string{"read"}, map[string]any{
-		"exp": past,
-		"iat": time.Now().Add(-20 * time.Minute).Unix(),
-	})
-	if err != nil {
-		t.Fatalf("issue: %v", err)
+	cases := []struct {
+		name             string
+		issue            tokenIssuer
+		rawToken         string
+		wantErrSubstring string
+	}{
+		{
+			name: "wrong_audience",
+			issue: func(t *testing.T, mock *auth.MockOIDC, _ string) string {
+				t.Helper()
+				tok, err := mock.Issue("u", "other-audience", mock.Server.URL, []string{"read"}, nil)
+				require.NoError(t, err, "Issue")
+				return tok
+			},
+			wantErrSubstring: "aud",
+		},
+		{
+			name: "wrong_issuer",
+			issue: func(t *testing.T, mock *auth.MockOIDC, aud string) string {
+				t.Helper()
+				tok, err := mock.Issue("u", aud, "https://evil.example", []string{"read"}, nil)
+				require.NoError(t, err, "Issue")
+				return tok
+			},
+			wantErrSubstring: "iss",
+		},
+		{
+			// Substring not asserted: the upstream library's wording for
+			// expiry isn't part of our public contract. Just require an error.
+			name: "expired_token",
+			issue: func(t *testing.T, mock *auth.MockOIDC, aud string) string {
+				t.Helper()
+				past := time.Now().Add(-10 * time.Minute).Unix()
+				tok, err := mock.Issue("u", aud, mock.Server.URL, []string{"read"}, map[string]any{
+					"exp": past,
+					"iat": time.Now().Add(-20 * time.Minute).Unix(),
+				})
+				require.NoError(t, err, "Issue")
+				return tok
+			},
+		},
+		{
+			name:     "malformed_token_garbage",
+			rawToken: "not.a.jwt",
+		},
+		{
+			name:     "malformed_token_empty",
+			rawToken: "",
+		},
+		{
+			name:     "alg_none_unsigned",
+			rawToken: algNoneToken,
+		},
 	}
-	if _, err := v.Validate(context.Background(), tok); err == nil {
-		t.Errorf("want expiration error, got nil")
-	}
-}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-func TestOIDCValidator_RejectsMalformedToken(t *testing.T) {
-	_, v, _ := newOIDCValidator(t)
-	if _, err := v.Validate(context.Background(), "not.a.jwt"); err == nil {
-		t.Errorf("want parse error for malformed token, got nil")
-	}
-	if _, err := v.Validate(context.Background(), ""); err == nil {
-		t.Errorf("want error for empty token, got nil")
-	}
-}
+			mock, v, aud := newOIDCValidator(t)
+			tok := tc.rawToken
+			if tc.issue != nil {
+				tok = tc.issue(t, mock, aud)
+			}
 
-func TestOIDCValidator_RejectsUnsignedToken(t *testing.T) {
-	_, v, _ := newOIDCValidator(t)
-	// alg=none JWT with sub=attacker — must be rejected.
-	// header: {"alg":"none","typ":"JWT"} -> base64url
-	// payload: {"sub":"attacker","aud":"test-audience"} -> base64url
-	const unsigned = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0." +
-		"eyJzdWIiOiJhdHRhY2tlciIsImF1ZCI6InRlc3QtYXVkaWVuY2UifQ."
-	if _, err := v.Validate(context.Background(), unsigned); err == nil {
-		t.Errorf("want error for alg=none token, got nil")
+			_, err := v.Validate(context.Background(), tok)
+
+			require.Error(t, err, "Validate must reject this token")
+			if tc.wantErrSubstring != "" {
+				assert.ErrorContains(t, err, tc.wantErrSubstring)
+			}
+		})
 	}
 }
