@@ -12,129 +12,164 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/FinkeFlo/kafkito/pkg/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/pkg/kafka"
-	"github.com/go-chi/chi/v5"
 )
 
 func encodeHeader(t *testing.T, cfg config.ClusterConfig) string {
 	t.Helper()
+
 	b, err := json.Marshal(cfg)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
+	require.NoError(t, err, "marshal cluster config")
 	return base64.StdEncoding.EncodeToString(b)
 }
 
-func TestDecodePrivateClusterHeader(t *testing.T) {
+func TestDecodePrivateClusterHeader_AcceptsValidConfig(t *testing.T) {
+	t.Parallel()
+
 	good := config.ClusterConfig{
 		Name:    "mine",
 		Brokers: []string{"localhost:9092"},
 		Auth:    config.AuthConfig{Type: "none"},
 	}
-	got, err := decodePrivateClusterHeader(encodeHeader(t, good))
-	if err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if len(got.Brokers) != 1 || got.Brokers[0] != "localhost:9092" {
-		t.Fatalf("brokers = %v", got.Brokers)
-	}
 
-	cases := map[string]string{
-		"not-base64":   "!!!",
-		"bad-json":     base64.StdEncoding.EncodeToString([]byte("{not json")),
-		"no-brokers":   base64.StdEncoding.EncodeToString([]byte(`{"name":"x"}`)),
-		"empty-broker": base64.StdEncoding.EncodeToString([]byte(`{"name":"x","brokers":[""]}`)),
-		"bad-auth":     base64.StdEncoding.EncodeToString([]byte(`{"name":"x","brokers":["a:1"],"auth":{"type":"plain"}}`)),
+	got, err := decodePrivateClusterHeader(encodeHeader(t, good))
+
+	require.NoError(t, err)
+	require.Len(t, got.Brokers, 1)
+	assert.Equal(t, "localhost:9092", got.Brokers[0])
+}
+
+func TestDecodePrivateClusterHeader_RejectsInvalidEncoding(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		raw  string
+	}{
+		{
+			name: "not_base64",
+			raw:  "!!!",
+		},
+		{
+			name: "bad_json",
+			raw:  base64.StdEncoding.EncodeToString([]byte("{not json")),
+		},
+		{
+			name: "no_brokers",
+			raw:  base64.StdEncoding.EncodeToString([]byte(`{"name":"x"}`)),
+		},
+		{
+			name: "empty_broker",
+			raw:  base64.StdEncoding.EncodeToString([]byte(`{"name":"x","brokers":[""]}`)),
+		},
+		{
+			name: "bad_auth",
+			raw:  base64.StdEncoding.EncodeToString([]byte(`{"name":"x","brokers":["a:1"],"auth":{"type":"plain"}}`)),
+		},
 	}
-	for label, raw := range cases {
-		if _, err := decodePrivateClusterHeader(raw); err == nil {
-			t.Errorf("%s: expected error", label)
-		}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := decodePrivateClusterHeader(tc.raw)
+
+			assert.Error(t, err, "decodePrivateClusterHeader(%q) must reject", tc.name)
+		})
 	}
 }
 
-func TestPrivateClusterMiddlewareStoresContext(t *testing.T) {
+func TestPrivateClusterMiddleware_StoresDecodedConfigInContext_WhenHeaderValid(t *testing.T) {
+	t.Parallel()
+
 	cfg := config.ClusterConfig{Name: "x", Brokers: []string{"a:1"}}
 	var seen bool
 	next := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		got, ok := privateClusterFromContext(r.Context())
-		if !ok {
-			t.Errorf("ctx did not carry config")
-			return
-		}
-		if got.Brokers[0] != "a:1" {
-			t.Errorf("brokers = %v", got.Brokers)
-		}
+		require.True(t, ok, "ctx must carry decoded config")
+		require.Len(t, got.Brokers, 1)
+		assert.Equal(t, "a:1", got.Brokers[0])
 		seen = true
 	})
 	h := privateClusterMiddleware(next)
 	req := httptest.NewRequest(http.MethodGet, "/x", nil)
 	req.Header.Set(PrivateClusterHeader, encodeHeader(t, cfg))
+
 	h.ServeHTTP(httptest.NewRecorder(), req)
-	if !seen {
-		t.Fatal("handler not called")
-	}
+
+	assert.True(t, seen, "next handler must run on valid header")
 }
 
-func TestPrivateClusterMiddlewareRejectsBadHeader(t *testing.T) {
-	called := false
-	next := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) { called = true })
-	h := privateClusterMiddleware(next)
+func TestPrivateClusterMiddleware_Returns400_WhenHeaderNotBase64(t *testing.T) {
+	t.Parallel()
 
+	next := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		t.Error("next handler must not run on malformed header")
+	})
+	h := privateClusterMiddleware(next)
 	req := httptest.NewRequest(http.MethodGet, "/x", nil)
 	req.Header.Set(PrivateClusterHeader, "!!!not-base64!!!")
 	rec := httptest.NewRecorder()
+
 	h.ServeHTTP(rec, req)
-	if called {
-		t.Fatal("handler should not run on malformed header")
-	}
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("status = %d, want 400", rec.Code)
-	}
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
-func TestRegistryUseAdhocReusesFingerprint(t *testing.T) {
+func TestRegistryUseAdhoc(t *testing.T) {
+	t.Parallel()
+
+	// Sub-tests share `reg` and `n1` across calls — they MUST run sequentially.
+	// Do NOT add t.Parallel() to the inner t.Run blocks: the second and third
+	// rows compare their result against `n1` returned by the first call.
 	reg := kafkapkg.NewRegistry(nil, slog.Default())
 	cfg := config.ClusterConfig{
 		Name:    "ignored",
 		Brokers: []string{"b:1", "a:0"},
 		Auth:    config.AuthConfig{Type: "none"},
 	}
+
 	n1, err := reg.UseAdhoc(cfg)
-	if err != nil {
-		t.Fatalf("use1: %v", err)
-	}
-	if !strings.HasPrefix(n1, kafkapkg.AdhocPrefix) {
-		t.Fatalf("name = %q, want adhoc prefix", n1)
-	}
+	require.NoError(t, err, "first UseAdhoc")
 
-	cfg.Name = "different-display-name"
-	n2, err := reg.UseAdhoc(cfg)
-	if err != nil {
-		t.Fatalf("use2: %v", err)
-	}
-	if n1 != n2 {
-		t.Errorf("same config produced different names: %q vs %q", n1, n2)
-	}
+	t.Run("returns_adhoc_prefixed_name", func(t *testing.T) {
+		assert.True(t, strings.HasPrefix(n1, kafkapkg.AdhocPrefix),
+			"name = %q, want adhoc prefix %q", n1, kafkapkg.AdhocPrefix)
+	})
 
-	cfg.Brokers = []string{"other:9092"}
-	n3, err := reg.UseAdhoc(cfg)
-	if err != nil {
-		t.Fatalf("use3: %v", err)
-	}
-	if n3 == n1 {
-		t.Error("different brokers should yield different fingerprint")
-	}
+	t.Run("same_fingerprint_when_only_display_name_changes", func(t *testing.T) {
+		cfg2 := cfg
+		cfg2.Name = "different-display-name"
+
+		n2, err := reg.UseAdhoc(cfg2)
+
+		require.NoError(t, err, "second UseAdhoc")
+		assert.Equal(t, n1, n2, "display-name change must not affect fingerprint")
+	})
+
+	t.Run("different_fingerprint_when_brokers_change", func(t *testing.T) {
+		cfg3 := cfg
+		cfg3.Brokers = []string{"other:9092"}
+
+		n3, err := reg.UseAdhoc(cfg3)
+
+		require.NoError(t, err, "third UseAdhoc")
+		assert.NotEqual(t, n1, n3, "broker change must yield different fingerprint")
+	})
 }
 
-func TestResolvePrivateClusterParamRewritesViaRouter(t *testing.T) {
+func TestResolvePrivateClusterParam_RewritesSentinelToFingerprint_WhenRouted(t *testing.T) {
+	t.Parallel()
+
 	reg := kafkapkg.NewRegistry(nil, slog.Default())
 	cfg := config.ClusterConfig{Brokers: []string{"x:1"}}
 	expected, err := reg.UseAdhoc(cfg)
-	if err != nil {
-		t.Fatalf("adhoc: %v", err)
-	}
+	require.NoError(t, err, "seed adhoc registration")
 
 	var captured string
 	r := chi.NewRouter()
@@ -147,19 +182,19 @@ func TestResolvePrivateClusterParamRewritesViaRouter(t *testing.T) {
 			})
 		})
 	})
-
 	req := httptest.NewRequest(http.MethodGet,
 		"/api/v1/clusters/"+config.PrivateClusterSentinel+"/topics", nil)
 	req.Header.Set(PrivateClusterHeader, encodeHeader(t, cfg))
 	rec := httptest.NewRecorder()
+
 	r.ServeHTTP(rec, req)
 
-	if captured != expected {
-		t.Errorf("param after rewrite = %q, want %q", captured, expected)
-	}
+	assert.Equal(t, expected, captured, "sentinel must be rewritten to adhoc fingerprint")
 }
 
-func TestResolvePrivateClusterParamRejectsWithoutHeader(t *testing.T) {
+func TestResolvePrivateClusterParam_Returns400_WhenHeaderMissing(t *testing.T) {
+	t.Parallel()
+
 	reg := kafkapkg.NewRegistry(nil, slog.Default())
 	r := chi.NewRouter()
 	r.Route("/api/v1", func(v1 chi.Router) {
@@ -167,25 +202,47 @@ func TestResolvePrivateClusterParamRejectsWithoutHeader(t *testing.T) {
 			g.Use(privateClusterMiddleware)
 			g.Use(resolvePrivateClusterParam(reg))
 			g.Get("/clusters/{cluster}/topics", func(_ http.ResponseWriter, _ *http.Request) {
-				t.Fatal("handler should not run without header")
+				t.Error("handler must not run without header")
 			})
 		})
 	})
-
 	req := httptest.NewRequest(http.MethodGet,
 		"/api/v1/clusters/"+config.PrivateClusterSentinel+"/topics", nil)
 	rec := httptest.NewRecorder()
+
 	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("status = %d, want 400", rec.Code)
-	}
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
 func TestConfigValidateRejectsReservedNames(t *testing.T) {
-	for _, name := range []string{config.PrivateClusterSentinel, config.AdhocClusterPrefix + "abc"} {
-		c := config.Config{Clusters: []config.ClusterConfig{{Name: name, Brokers: []string{"a:1"}}}}
-		if err := c.Validate(); err == nil {
-			t.Errorf("%s: expected reject, got nil", name)
-		}
+	t.Parallel()
+
+	cases := []struct {
+		name        string
+		clusterName string
+	}{
+		{
+			name:        "private_cluster_sentinel",
+			clusterName: config.PrivateClusterSentinel,
+		},
+		{
+			name:        "adhoc_prefixed_name",
+			clusterName: config.AdhocClusterPrefix + "abc",
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := config.Config{Clusters: []config.ClusterConfig{
+				{Name: tc.clusterName, Brokers: []string{"a:1"}},
+			}}
+
+			err := c.Validate()
+
+			assert.Error(t, err, "Validate must reject reserved cluster name %q", tc.clusterName)
+		})
 	}
 }
