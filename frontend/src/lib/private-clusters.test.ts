@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   deletePrivateCluster,
   encodePrivateClusterHeader,
@@ -29,6 +29,11 @@ describe("private-clusters", () => {
     window.localStorage.clear();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
   it("exposes the URL sentinel constant", () => {
     expect(PRIVATE_CLUSTER_SENTINEL).toBe("__private__");
   });
@@ -41,14 +46,22 @@ describe("private-clusters", () => {
     expect(listPrivateClusters()).toHaveLength(1);
   });
 
-  it("upsert updates in place, preserving id and created_at", async () => {
+  it("upsert updates in place, preserving id and created_at", () => {
+    // Smallest deterministic delta the production code's `Date.now()` can observe.
+    const tickMs = 1;
+    const t0 = new Date(2026, 0, 1, 12).getTime();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(t0));
+
     const created = upsertPrivateCluster(sample("a"));
-    // Ensure a measurable tick before updating.
-    await new Promise((r) => setTimeout(r, 2));
+
+    vi.setSystemTime(new Date(t0 + tickMs));
     const updated = upsertPrivateCluster({ ...sample("a"), id: created.id, brokers: ["h:1"] });
+
     expect(updated.id).toBe(created.id);
     expect(updated.created_at).toBe(created.created_at);
-    expect(updated.updated_at).toBeGreaterThanOrEqual(created.updated_at);
+    expect(updated.updated_at).toBe(t0 + tickMs);
+    expect(updated.updated_at).toBeGreaterThan(created.updated_at);
     expect(updated.brokers).toEqual(["h:1"]);
     expect(listPrivateClusters()).toHaveLength(1);
   });
