@@ -6,44 +6,64 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/FinkeFlo/kafkito/internal/auth"
 )
 
-func TestRequireScope_Allows(t *testing.T) {
-	h := auth.RequireScope("Display")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	req := httptest.NewRequest("GET", "/x", nil).WithContext(
-		auth.WithPrincipal(context.Background(), &auth.Principal{Scopes: []string{"Display"}}),
-	)
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Errorf("status = %d", rec.Code)
-	}
-}
+func TestRequireScope_EnforcesPolicy(t *testing.T) {
+	t.Parallel()
 
-func TestRequireScope_Denies(t *testing.T) {
-	h := auth.RequireScope("Admin")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		t.Fatalf("handler called without scope")
-	}))
-	req := httptest.NewRequest("GET", "/x", nil).WithContext(
-		auth.WithPrincipal(context.Background(), &auth.Principal{Scopes: []string{"Display"}}),
-	)
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusForbidden {
-		t.Errorf("status = %d, want 403", rec.Code)
+	cases := []struct {
+		name              string
+		requiredScope     string
+		principal         *auth.Principal
+		wantStatus        int
+		wantHandlerCalled bool
+	}{
+		{
+			name:              "allows_when_principal_has_required_scope",
+			requiredScope:     "Display",
+			principal:         &auth.Principal{Scopes: []string{"Display"}},
+			wantStatus:        http.StatusOK,
+			wantHandlerCalled: true,
+		},
+		{
+			name:              "denies_when_principal_lacks_required_scope",
+			requiredScope:     "Admin",
+			principal:         &auth.Principal{Scopes: []string{"Display"}},
+			wantStatus:        http.StatusForbidden,
+			wantHandlerCalled: false,
+		},
+		{
+			name:              "denies_when_request_has_no_principal",
+			requiredScope:     "Display",
+			principal:         nil,
+			wantStatus:        http.StatusUnauthorized,
+			wantHandlerCalled: false,
+		},
 	}
-}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-func TestRequireScope_NoPrincipal(t *testing.T) {
-	h := auth.RequireScope("Display")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		t.Fatalf("handler called without principal")
-	}))
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest("GET", "/x", nil))
-	if rec.Code != http.StatusUnauthorized {
-		t.Errorf("status = %d, want 401", rec.Code)
+			called := false
+			h := auth.RequireScope(tc.requiredScope)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				called = true
+				w.WriteHeader(http.StatusOK)
+			}))
+			req := httptest.NewRequest(http.MethodGet, "/x", nil)
+			if tc.principal != nil {
+				req = req.WithContext(auth.WithPrincipal(context.Background(), tc.principal))
+			}
+			rec := httptest.NewRecorder()
+
+			h.ServeHTTP(rec, req)
+
+			assert.Equal(t, tc.wantStatus, rec.Code)
+			assert.Equal(t, tc.wantHandlerCalled, called,
+				"handler invocation expectation; required=%q principal=%+v", tc.requiredScope, tc.principal)
+		})
 	}
 }
