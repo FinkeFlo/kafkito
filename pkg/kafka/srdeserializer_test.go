@@ -9,19 +9,21 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
-	"github.com/FinkeFlo/kafkito/pkg/config"
 	"github.com/hamba/avro/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/FinkeFlo/kafkito/pkg/config"
 )
 
-// TestSRDecoder_AvroRoundtrip wires SRDecoder against an httptest-backed
-// fake schema registry, encodes a record with hamba/avro using the Confluent
-// wire format ([0x00][be uint32 id][payload]) and asserts the decoder
-// produces JSON + meaningful metadata.
-func TestSRDecoder_AvroRoundtrip(t *testing.T) {
+// TestSRDecoder_AvroRoundtrip_DecodesPayloadAndExposesMetadata wires
+// SRDecoder against an httptest-backed fake schema registry, encodes a
+// record with hamba/avro using the Confluent wire format
+// ([0x00][be uint32 id][payload]) and asserts both the rendered JSON and
+// the metadata derived from the registry response.
+func TestSRDecoder_AvroRoundtrip_DecodesPayloadAndExposesMetadata(t *testing.T) {
 	t.Parallel()
 
 	const schemaJSON = `{
@@ -32,10 +34,10 @@ func TestSRDecoder_AvroRoundtrip(t *testing.T) {
 			{"name":"name","type":"string"}
 		]
 	}`
+	const schemaID = 42
+
 	schema, err := avro.Parse(schemaJSON)
 	require.NoError(t, err)
-
-	const schemaID = 42
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/schemas/ids/42", func(w http.ResponseWriter, _ *http.Request) {
@@ -48,7 +50,7 @@ func TestSRDecoder_AvroRoundtrip(t *testing.T) {
 		})
 	})
 	srv := httptest.NewServer(mux)
-	defer srv.Close()
+	t.Cleanup(srv.Close)
 
 	sr := newSchemaRegistryClient(config.SchemaRegistryConfig{URL: srv.URL})
 	dec := NewSRDecoder(sr)
@@ -56,42 +58,68 @@ func TestSRDecoder_AvroRoundtrip(t *testing.T) {
 
 	payload, err := avro.Marshal(schema, map[string]any{"id": int64(7), "name": "alice"})
 	require.NoError(t, err)
-
 	framed := make([]byte, 5+len(payload))
 	framed[0] = 0x00
 	binary.BigEndian.PutUint32(framed[1:5], schemaID)
 	copy(framed[5:], payload)
-
 	require.True(t, IsSRFramed(framed))
 
 	rendered, meta, ok, err := dec.Decode(context.Background(), framed)
+
 	require.NoError(t, err)
-	require.True(t, ok, "decode should succeed")
-	require.Equal(t, "avro", meta.Format)
-	require.Equal(t, schemaID, meta.SchemaID)
-	require.Equal(t, "users-value", meta.Subject)
-	require.Equal(t, 3, meta.Version)
-	require.True(t, strings.Contains(rendered, `"name":"alice"`), "rendered=%s", rendered)
-	require.True(t, strings.Contains(rendered, `"id":7`), "rendered=%s", rendered)
+	require.True(t, ok, "decode must succeed for valid Avro framed payload")
+
+	t.Run("renders_payload_as_json", func(t *testing.T) {
+		assert.Contains(t, rendered, `"name":"alice"`, "rendered=%s", rendered)
+		assert.Contains(t, rendered, `"id":7`, "rendered=%s", rendered)
+	})
+
+	t.Run("exposes_schema_metadata", func(t *testing.T) {
+		assert.Equal(t, "avro", meta.Format)
+		assert.Equal(t, schemaID, meta.SchemaID)
+		assert.Equal(t, "users-value", meta.Subject)
+		assert.Equal(t, 3, meta.Version)
+	})
 }
 
-func TestSRDecoder_NotFramed(t *testing.T) {
+func TestSRDecoder_NotFramed_ReturnsFalseAndZeroMeta(t *testing.T) {
 	t.Parallel()
 
 	sr := newSchemaRegistryClient(config.SchemaRegistryConfig{URL: "http://example.invalid"})
 	dec := NewSRDecoder(sr)
 
 	_, meta, ok, err := dec.Decode(context.Background(), []byte("plain text"))
+
 	require.NoError(t, err)
-	require.False(t, ok)
-	require.Equal(t, SRDecodedMeta{}, meta)
+	assert.False(t, ok, "plain text must not decode as framed")
+	assert.Equal(t, SRDecodedMeta{}, meta)
 }
 
-func TestSRDecoder_NilSafe(t *testing.T) {
+func TestNewSRDecoder_ReturnsNil_OnNilClient(t *testing.T) {
 	t.Parallel()
 
-	require.Nil(t, NewSRDecoder(nil))
-	require.False(t, IsSRFramed(nil))
-	require.False(t, IsSRFramed([]byte{0x00, 0x00, 0x00}))
-	require.True(t, IsSRFramed([]byte{0x00, 0x00, 0x00, 0x00, 0x01}))
+	dec := NewSRDecoder(nil)
+
+	assert.Nil(t, dec, "NewSRDecoder(nil) must return nil so callers fall through")
+}
+
+func TestIsSRFramed_RecognisesByteLayout(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		raw  []byte
+		want bool
+	}{
+		{name: "rejects_nil", raw: nil, want: false},
+		{name: "rejects_short_buffer", raw: []byte{0x00, 0x00, 0x00}, want: false},
+		{name: "accepts_minimal_framed_header", raw: []byte{0x00, 0x00, 0x00, 0x00, 0x01}, want: true},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, IsSRFramed(tc.raw))
+		})
+	}
 }

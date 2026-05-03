@@ -7,6 +7,9 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/FinkeFlo/kafkito/pkg/config"
 )
 
@@ -43,97 +46,159 @@ func testPolicy() *Policy {
 	})
 }
 
-func TestAllowWildcardResourceAndAction(t *testing.T) {
+func TestAllow_GrantsWildcardAdminAcrossResources(t *testing.T) {
+	t.Parallel()
+
 	p := testPolicy()
-	if !p.Allow("alice", "c1", "topic", "anything", "delete") {
-		t.Errorf("alice should be allowed delete on any topic")
+
+	cases := []struct {
+		name     string
+		resource string
+		name_    string
+		action   string
+	}{
+		{name: "delete_any_topic", resource: "topic", name_: "anything", action: "delete"},
+		{name: "admin_user_resource", resource: "user", name_: "x", action: "admin"},
 	}
-	if !p.Allow("alice", "c1", "user", "x", "admin") {
-		t.Errorf("alice should be allowed admin on user")
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.True(t, p.Allow("alice", "c1", tc.resource, tc.name_, tc.action),
+				"alice (admin) must be allowed %s on %s/%s", tc.action, tc.resource, tc.name_)
+		})
 	}
 }
 
-func TestAllowPrefixGlob(t *testing.T) {
+func TestAllow_PrefixGlob_HonoursOrdersPrefix(t *testing.T) {
+	t.Parallel()
+
 	p := testPolicy()
-	if !p.Allow("bob", "c1", "topic", "orders-eu", "produce") {
-		t.Errorf("bob should be allowed produce on orders-eu")
-	}
-	if p.Allow("bob", "c1", "topic", "other", "produce") {
-		t.Errorf("bob should NOT be allowed produce on 'other'")
-	}
+
+	t.Run("matches_orders_prefix", func(t *testing.T) {
+		t.Parallel()
+		assert.True(t, p.Allow("bob", "c1", "topic", "orders-eu", "produce"),
+			"bob (producer) must be allowed produce on orders-* topics")
+	})
+
+	t.Run("rejects_non_matching_topic", func(t *testing.T) {
+		t.Parallel()
+		assert.False(t, p.Allow("bob", "c1", "topic", "other", "produce"),
+			"bob must NOT be allowed produce on a topic outside orders-* glob")
+	})
 }
 
-func TestDenyNoMatchingRole(t *testing.T) {
+func TestAllow_DeniesActionWithoutMatchingRole(t *testing.T) {
+	t.Parallel()
+
 	p := testPolicy()
-	if p.Allow("bob", "c1", "topic", "anything", "delete") {
-		t.Errorf("bob should not be allowed delete")
-	}
-	if p.Allow("charlie", "c1", "topic", "x", "view") {
-		t.Errorf("unknown user without default_role should have no permissions")
-	}
+
+	t.Run("bob_cannot_delete_topic", func(t *testing.T) {
+		t.Parallel()
+		assert.False(t, p.Allow("bob", "c1", "topic", "anything", "delete"),
+			"bob (viewer+producer) has no delete permission")
+	})
+
+	t.Run("unknown_user_without_default_role_has_no_perms", func(t *testing.T) {
+		t.Parallel()
+		assert.False(t, p.Allow("charlie", "c1", "topic", "x", "view"),
+			"unknown user without default_role must be denied")
+	})
 }
 
-func TestDisabledAlwaysAllow(t *testing.T) {
+func TestAllow_DisabledPolicy_AlwaysAllows(t *testing.T) {
+	t.Parallel()
+
 	p := Compile(config.RBACConfig{Enabled: false})
-	if !p.Allow("", "c1", "topic", "x", "delete") {
-		t.Errorf("disabled RBAC must allow everything")
-	}
+
+	assert.True(t, p.Allow("", "c1", "topic", "x", "delete"),
+		"disabled RBAC must allow every action regardless of subject")
 }
 
-func TestResolveRolesAnonymousAndDefault(t *testing.T) {
-	p := testPolicy()
-	if got := p.ResolveRoles(""); len(got) != 1 || got[0] != "viewer" {
-		t.Errorf("anonymous should resolve to [viewer], got %v", got)
-	}
-	if got := p.ResolveRoles("alice"); len(got) != 1 || got[0] != "admin" {
-		t.Errorf("alice should resolve to [admin], got %v", got)
-	}
-	if got := p.ResolveRoles("charlie"); len(got) != 0 {
-		t.Errorf("charlie has no role + no default, got %v", got)
-	}
+func TestResolveRoles(t *testing.T) {
+	t.Parallel()
 
-	p2 := Compile(config.RBACConfig{Enabled: true, DefaultRole: "viewer"})
-	if got := p2.ResolveRoles("charlie"); len(got) != 1 || got[0] != "viewer" {
-		t.Errorf("default_role should apply, got %v", got)
-	}
+	p := testPolicy()
+
+	t.Run("anonymous_resolves_to_anonymous_role", func(t *testing.T) {
+		t.Parallel()
+		assert.Equal(t, []string{"viewer"}, p.ResolveRoles(""),
+			"anonymous user must resolve to configured anonymous_role")
+	})
+
+	t.Run("named_subject_resolves_to_assigned_roles", func(t *testing.T) {
+		t.Parallel()
+		assert.Equal(t, []string{"admin"}, p.ResolveRoles("alice"))
+	})
+
+	t.Run("unknown_subject_without_default_role_resolves_to_empty", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, p.ResolveRoles("charlie"),
+			"unknown subject without default_role must resolve to no roles")
+	})
+
+	t.Run("unknown_subject_falls_back_to_default_role_when_set", func(t *testing.T) {
+		t.Parallel()
+		p2 := Compile(config.RBACConfig{Enabled: true, DefaultRole: "viewer"})
+		assert.Equal(t, []string{"viewer"}, p2.ResolveRoles("charlie"))
+	})
 }
 
 func TestMaterializePermissions(t *testing.T) {
-	p := testPolicy()
-	perms := p.MaterializePermissions("alice")
-	if v, ok := perms["*"]; !ok || len(v) != 1 || v[0] != "*" {
-		t.Errorf("alice should have *:*, got %v", perms)
-	}
+	t.Parallel()
 
-	perms = p.MaterializePermissions("bob")
-	topic := perms["topic"]
-	sort.Strings(topic)
-	want := map[string]bool{"view": true, "consume": true, "produce": true}
-	for _, a := range topic {
-		if !want[a] {
-			t.Errorf("unexpected action %q for bob on topic", a)
-		}
-	}
+	p := testPolicy()
+
+	t.Run("admin_subject_has_wildcard_resource_and_action", func(t *testing.T) {
+		t.Parallel()
+
+		perms := p.MaterializePermissions("alice")
+
+		actions, ok := perms["*"]
+		require.True(t, ok, "alice must materialise wildcard resource entry, got %v", perms)
+		assert.Equal(t, []string{"*"}, actions)
+	})
+
+	t.Run("multi_role_subject_unions_per_resource_actions", func(t *testing.T) {
+		t.Parallel()
+
+		perms := p.MaterializePermissions("bob")
+
+		topic := perms["topic"]
+		sort.Strings(topic)
+		want := []string{"consume", "produce", "view"}
+		assert.Equal(t, want, topic, "bob's topic actions must union viewer+producer")
+	})
 }
 
 func TestAllowedResourceNames(t *testing.T) {
+	t.Parallel()
+
 	p := testPolicy()
-	names, all := p.AllowedResourceNames("alice", "c1", "topic", "view")
-	if !all {
-		t.Errorf("alice should have all topics for view, got %v all=%v", names, all)
-	}
-	names, all = p.AllowedResourceNames("bob", "c1", "topic", "produce")
-	if all {
-		t.Errorf("bob should NOT have all topics for produce")
-	}
-	if len(names) != 1 || names[0] != "orders*" {
-		t.Errorf("bob produce globs = %v, want [orders*]", names)
-	}
+
+	t.Run("admin_subject_has_unconstrained_access", func(t *testing.T) {
+		t.Parallel()
+
+		_, all := p.AllowedResourceNames("alice", "c1", "topic", "view")
+
+		assert.True(t, all, "alice (admin) must report unconstrained access (all=true)")
+	})
+
+	t.Run("constrained_subject_returns_glob_list", func(t *testing.T) {
+		t.Parallel()
+
+		names, all := p.AllowedResourceNames("bob", "c1", "topic", "produce")
+
+		assert.False(t, all, "bob is constrained to orders-* and must not report all=true")
+		assert.Equal(t, []string{"orders*"}, names,
+			"bob's produce globs must enumerate orders*")
+	})
 }
 
-func TestHeaderDefault(t *testing.T) {
+func TestHeader_DefaultsToConfiguredHeaderConstant(t *testing.T) {
+	t.Parallel()
+
 	p := Compile(config.RBACConfig{Enabled: true})
-	if p.Header() != config.DefaultIdentityHeader {
-		t.Errorf("header default = %q", p.Header())
-	}
+
+	assert.Equal(t, config.DefaultIdentityHeader, p.Header())
 }
