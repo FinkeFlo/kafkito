@@ -5,6 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/FinkeFlo/kafkito/internal/auth"
 )
 
@@ -12,75 +15,105 @@ import (
 // fixture. The returned audience is the clientID expected by Issue().
 func newMiddlewareValidator(t *testing.T) (mock *auth.MockOIDC, v auth.Validator, audience string) {
 	t.Helper()
+
 	m, err := auth.NewMockOIDC()
-	if err != nil {
-		t.Fatalf("mock: %v", err)
-	}
+	require.NoError(t, err, "NewMockOIDC")
 	t.Cleanup(m.Close)
+
 	const aud = "kafkito-test"
 	val, err := auth.NewOIDCValidator(auth.OIDCConfig{
 		IssuerURL:    m.Server.URL,
 		Audience:     aud,
 		JWKSEndpoint: m.JKU(),
 	})
-	if err != nil {
-		t.Fatalf("NewOIDCValidator: %v", err)
-	}
+	require.NoError(t, err, "NewOIDCValidator")
+
 	return m, val, aud
 }
 
-func TestMiddleware_Allows(t *testing.T) {
-	mock, v, aud := newMiddlewareValidator(t)
-	tok, _ := mock.Issue("u-1", aud, mock.Server.URL, []string{"Display"}, nil)
+func TestMiddleware_AllowsAuthorizedRequest_InvokesHandler(t *testing.T) {
+	t.Parallel()
 
-	mw := auth.Middleware(v)
+	mock, v, aud := newMiddlewareValidator(t)
+	tok, err := mock.Issue("u-1", aud, mock.Server.URL, []string{"Display"}, nil)
+	require.NoError(t, err, "Issue")
+
 	called := false
-	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mw := auth.Middleware(v)
+	h := mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		called = true
-		p, ok := auth.PrincipalFromContext(r.Context())
-		if !ok || p.Subject != "u-1" {
-			t.Errorf("principal missing or wrong: %+v", p)
-		}
 		w.WriteHeader(http.StatusOK)
 	}))
-
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/x", nil)
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
+
 	h.ServeHTTP(rec, req)
 
-	if !called {
-		t.Errorf("handler not called")
-	}
-	if rec.Code != http.StatusOK {
-		t.Errorf("status = %d", rec.Code)
-	}
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.True(t, called, "handler must be invoked when token is valid")
 }
 
-func TestMiddleware_RejectsMissingHeader(t *testing.T) {
-	_, v, _ := newMiddlewareValidator(t)
+func TestMiddleware_PutsPrincipalIntoRequestContext(t *testing.T) {
+	t.Parallel()
+
+	mock, v, aud := newMiddlewareValidator(t)
+	tok, err := mock.Issue("u-1", aud, mock.Server.URL, []string{"Display"}, nil)
+	require.NoError(t, err, "Issue")
+
+	var (
+		gotPrincipal *auth.Principal
+		gotOK        bool
+	)
 	mw := auth.Middleware(v)
 	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Fatalf("handler called for missing token")
+		gotPrincipal, gotOK = auth.PrincipalFromContext(r.Context())
+		w.WriteHeader(http.StatusOK)
 	}))
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest("GET", "/x", nil))
-	if rec.Code != http.StatusUnauthorized {
-		t.Errorf("status = %d, want 401", rec.Code)
-	}
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+
+	h.ServeHTTP(rec, req)
+
+	require.True(t, gotOK, "principal must be present in request context")
+	require.NotNil(t, gotPrincipal)
+	assert.Equal(t, "u-1", gotPrincipal.Subject)
 }
 
-func TestMiddleware_RejectsBadToken(t *testing.T) {
+func TestMiddleware_RejectsRequest_WhenAuthorizationHeaderMissing(t *testing.T) {
+	t.Parallel()
+
 	_, v, _ := newMiddlewareValidator(t)
+	called := false
 	mw := auth.Middleware(v)
-	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Fatalf("handler called for bad token")
+	h := mw(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		called = true
 	}))
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/x", nil)
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
+
+	h.ServeHTTP(rec, req)
+
+	assert.False(t, called, "handler must not run when Authorization header is missing")
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+func TestMiddleware_RejectsRequest_WhenBearerTokenMalformed(t *testing.T) {
+	t.Parallel()
+
+	_, v, _ := newMiddlewareValidator(t)
+	called := false
+	mw := auth.Middleware(v)
+	h := mw(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		called = true
+	}))
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
 	req.Header.Set("Authorization", "Bearer not-a-jwt")
+
 	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusUnauthorized {
-		t.Errorf("status = %d, want 401", rec.Code)
-	}
+
+	assert.False(t, called, "handler must not run when bearer token is malformed")
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
