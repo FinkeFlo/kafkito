@@ -8,8 +8,10 @@
 package auth_test
 
 import (
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/FinkeFlo/kafkito/internal/auth"
 
@@ -24,8 +26,10 @@ import (
 // VCAP_SERVICES, BuildValidator must surface a VCAP-shaped error rather than
 // the generic "unknown mode" error returned by the default registry.
 func TestBuildValidator_XSUAAMode_RequiresVCAP(t *testing.T) {
+	t.Parallel()
+
 	_, _, err := auth.BuildValidator(auth.ModeConfig{Mode: "xsuaa", VCAPServices: ""})
-	if err == nil || !strings.Contains(err.Error(), "VCAP") {
-		t.Errorf("want VCAP error, got %v", err)
-	}
+
+	require.Error(t, err, "BuildValidator(xsuaa) without VCAP must reject")
+	assert.ErrorContains(t, err, "VCAP")
 }
