@@ -3,7 +3,7 @@ import { ChevronDown, LogOut, Monitor, Moon, Sun } from "lucide-react";
 import { clsx } from "clsx";
 import { useAuth } from "@/auth/hooks";
 import { useTheme, type ThemePreference } from "@/lib/theme";
-import { useTimeZone, type TimeZoneMode } from "@/lib/use-timezone";
+import { useTimeZone, getDetectedTimeZone, type TimeZoneMode } from "@/lib/use-timezone";
 
 const TAIL_BUFFER_KEY = "kafkito.tailBuffer";
 const TAIL_BUFFER_DEFAULT = "10000";
@@ -204,15 +204,18 @@ function ThemeRow() {
 }
 
 const TIMEZONE_OPTIONS: { value: TimeZoneMode; label: string }[] = [
-  { value: "utc", label: "UTC" },
   { value: "local", label: "Local" },
+  { value: "utc", label: "UTC" },
 ];
 
 function TimezoneRow() {
   const [mode, setMode] = useTimeZone();
+  const detected = getDetectedTimeZone();
+  const hint = mode === "local" ? detected : `browser: ${detected}`;
   return (
     <SettingRow
       label="Timezone"
+      hint={hint}
       control={
         <div role="radiogroup" aria-label="Timezone" className="inline-flex rounded-md border border-border bg-bg p-0.5 text-[11px] font-semibold uppercase tracking-wide">
           {TIMEZONE_OPTIONS.map((opt) => {

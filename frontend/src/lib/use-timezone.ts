@@ -6,9 +6,9 @@ const EVENT = "kafkito:timezone-change";
 export type TimeZoneMode = "utc" | "local";
 
 function read(): TimeZoneMode {
-  if (typeof window === "undefined") return "utc";
+  if (typeof window === "undefined") return "local";
   const raw = window.localStorage.getItem(STORAGE_KEY);
-  return raw === "local" ? "local" : "utc";
+  return raw === "utc" ? "utc" : "local";
 }
 
 export function getTimeZone(): TimeZoneMode {
@@ -18,6 +18,20 @@ export function getTimeZone(): TimeZoneMode {
 export function setTimeZone(mode: TimeZoneMode): void {
   window.localStorage.setItem(STORAGE_KEY, mode);
   window.dispatchEvent(new CustomEvent(EVENT, { detail: mode }));
+}
+
+/**
+ * Resolve the user's browser/OS IANA zone (e.g. "Europe/Berlin"). Used in
+ * UI labels so users can see what "Local" actually maps to. Falls back to
+ * "UTC" if Intl is unavailable or returns an empty string.
+ */
+export function getDetectedTimeZone(): string {
+  if (typeof window === "undefined") return "UTC";
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
 }
 
 /**
