@@ -21,6 +21,7 @@ import { PathSense } from "@/components/path-sense";
 import { ArrayScopePopover } from "@/components/array-scope-popover";
 import { JsonInteractive } from "@/components/json-interactive";
 import { Button } from "@/components/button";
+import { Timestamp } from "@/components/timestamp";
 
 interface MessagesSearch {
   partition: number;
@@ -964,7 +965,6 @@ function MessageRow({
 }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const ts = new Date(m.timestamp_ms).toISOString().replace("T", " ").slice(0, 19);
   const preview =
     m.value_encoding === "null"
       ? "(null)"
@@ -1020,7 +1020,7 @@ function MessageRow({
             masked
           </span>
         )}
-        <span className="text-[10px] text-[var(--color-text-subtle)]">{ts}</span>
+        <Timestamp value={m.timestamp_ms} className="text-[10px] text-[var(--color-text-subtle)]" />
         {m.key && (
           <span className="font-mono text-[var(--color-text-muted)]">
             <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-subtle)]">key</span>{" "}
