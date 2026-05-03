@@ -12,6 +12,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/FinkeFlo/kafkito/internal/auth"
 	"github.com/FinkeFlo/kafkito/internal/server"
 	"github.com/FinkeFlo/kafkito/pkg/config"
@@ -23,7 +26,9 @@ func (s stubValidator) Validate(context.Context, string) (*auth.Principal, error
 	return s.p, nil
 }
 
-func TestHandleMe_WithJWT(t *testing.T) {
+func TestHandleMe_WithJWT_PopulatesPrincipalFieldsInResponse(t *testing.T) {
+	t.Parallel()
+
 	v := stubValidator{p: &auth.Principal{
 		Subject:  "u-1",
 		UserName: "testuser",
@@ -32,50 +37,52 @@ func TestHandleMe_WithJWT(t *testing.T) {
 		Tenant:   "test-zone",
 	}}
 	h := server.New(server.Options{Version: "test", Config: config.Config{}, Auth: v})
-
-	req := httptest.NewRequest("GET", "/api/v1/me", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
 	req.Header.Set("Authorization", "Bearer ignored-by-stub")
 	rec := httptest.NewRecorder()
+
 	h.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
-	}
+	require.Equal(t, http.StatusOK, rec.Code, "body=%s", rec.Body.String())
 	var body map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if body["user"] != "testuser" {
-		t.Errorf("user = %v, want testuser", body["user"])
-	}
-	if body["jwt"] != true {
-		t.Errorf("jwt flag = %v, want true", body["jwt"])
-	}
-	if body["tenant"] != "test-zone" {
-		t.Errorf("tenant = %v", body["tenant"])
-	}
-	scopes, _ := body["scopes"].([]any)
-	if len(scopes) != 1 || scopes[0] != "Display" {
-		t.Errorf("scopes = %v", body["scopes"])
-	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body), "body=%s", rec.Body.String())
+
+	t.Run("echoes_user_name", func(t *testing.T) {
+		t.Parallel()
+		assert.Equal(t, "testuser", body["user"])
+	})
+
+	t.Run("marks_jwt_true", func(t *testing.T) {
+		t.Parallel()
+		assert.Equal(t, true, body["jwt"])
+	})
+
+	t.Run("echoes_tenant_from_principal", func(t *testing.T) {
+		t.Parallel()
+		assert.Equal(t, "test-zone", body["tenant"])
+	})
+
+	t.Run("echoes_scopes_array", func(t *testing.T) {
+		t.Parallel()
+		scopes, ok := body["scopes"].([]any)
+		require.True(t, ok, "scopes is not a JSON array: %T", body["scopes"])
+		require.Len(t, scopes, 1)
+		assert.Equal(t, "Display", scopes[0])
+	})
 }
 
-func TestHandleMe_WithoutJWT(t *testing.T) {
-	// No Auth wired -> Principal is absent -> falls through to header trust path
-	h := server.New(server.Options{Version: "test", Config: config.Config{}})
+func TestHandleMe_WithoutJWT_FallsThroughToHeaderTrust(t *testing.T) {
+	t.Parallel()
 
-	req := httptest.NewRequest("GET", "/api/v1/me", nil)
+	// No Auth wired -> Principal is absent -> falls through to header trust path.
+	h := server.New(server.Options{Version: "test", Config: config.Config{}})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
 	rec := httptest.NewRecorder()
+
 	h.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
-	}
+	require.Equal(t, http.StatusOK, rec.Code, "body=%s", rec.Body.String())
 	var body map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if body["jwt"] != false {
-		t.Errorf("jwt flag = %v, want false", body["jwt"])
-	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body), "body=%s", rec.Body.String())
+	assert.Equal(t, false, body["jwt"])
 }
