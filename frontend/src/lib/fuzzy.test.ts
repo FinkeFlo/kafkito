@@ -5,6 +5,12 @@ interface Item {
   name: string;
 }
 
+// Realistic Kafka identifiers chosen to exercise the matcher's edge cases:
+// - several entries containing "qas" (substring match);
+// - several entries containing both "sales" and "qas" (multi-token AND);
+// - one DEV entry that contains "sales" only (must NOT match "sales qas");
+// - one short dotted name (`sales.qas.v1`) used by the rangesFor test;
+// - one entry (`orders-prod-v1`) that should NOT match either token.
 const topics: Item[] = [
   { name: "FRA_acme_eXtend_BillingDocuments_QAS" },
   { name: "FRA_acme_eXtend_CustomerMaster_QAS" },
@@ -30,12 +36,14 @@ describe("fuzzyFilter", () => {
   });
 
   it("requires a literal substring match per token (no subsequence fuzziness)", () => {
-    const names = run(topics, "qas").results.map((r) => r.name);
-    for (const n of names) expect(n.toLowerCase()).toContain("qas");
     const expected = topics
       .filter((t) => t.name.toLowerCase().includes("qas"))
       .map((t) => t.name)
       .sort();
+
+    const names = run(topics, "qas").results.map((r) => r.name);
+
+    expect(names.length).toBeGreaterThan(0);
     expect(names.slice().sort()).toEqual(expected);
   });
 
@@ -46,13 +54,20 @@ describe("fuzzyFilter", () => {
   });
 
   it("treats multi-token queries as AND, order-independent", () => {
+    const expected = topics
+      .filter((t) => {
+        const lower = t.name.toLowerCase();
+        return lower.includes("sales") && lower.includes("qas");
+      })
+      .map((t) => t.name)
+      .sort();
+
     const a = run(topics, "sales qas").results.map((r) => r.name).sort();
     const b = run(topics, "qas sales").results.map((r) => r.name).sort();
-    expect(a).toEqual(b);
-    for (const n of a) {
-      expect(n.toLowerCase()).toContain("sales");
-      expect(n.toLowerCase()).toContain("qas");
-    }
+
+    expect(a.length).toBeGreaterThan(0);
+    expect(a).toEqual(expected);
+    expect(b).toEqual(expected);
   });
 
   it("returns zero matches for typos (no character-level fuzziness)", () => {
@@ -60,11 +75,16 @@ describe("fuzzyFilter", () => {
   });
 
   it("rangesFor returns Fuse indices for the matched key only", () => {
-    const res = run(topics, "qas");
-    const hit = res.results.find((r) => r.name === "sales.qas.v1")!;
+    const target = "sales.qas.v1";
+    const needle = "qas";
+    const start = target.indexOf(needle);
+    const end = start + needle.length - 1;
+
+    const res = run(topics, needle);
+    const hit = res.results.find((r) => r.name === target)!;
     const ranges = res.rangesFor(hit, "name");
-    // 'qas' lives at positions 6..8 in "sales.qas.v1".
-    expect(ranges.some(([s, e]) => s === 6 && e === 8)).toBe(true);
+
+    expect(ranges.some(([s, e]) => s === start && e === end)).toBe(true);
     expect(res.rangesFor(hit, "other")).toEqual([]);
   });
 
