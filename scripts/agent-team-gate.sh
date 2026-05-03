@@ -20,6 +20,46 @@ set -uo pipefail
 repo_root="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 cd "$repo_root" || { echo "agent-team-gate: cannot cd to $repo_root" >&2; exit 2; }
 
+# Serialize concurrent hook invocations across teammates. Without this, two
+# overlapping gates race on shared resources:
+#   - golangci-lint's on-disk cache lock fails fast with "parallel
+#     golangci-lint is running";
+#   - `bun run build` (invoked by `make e2e-up`) rewrites frontend/dist/
+#     while a sibling `go test` is compiling the embed.FS, so internal/server's
+#     SPA-fallback tests transiently 500 because index.html is briefly
+#     missing from the embedded snapshot.
+# Both are eliminated by running gate invocations one at a time. Portable
+# mkdir-lock (atomic on POSIX) with a trap-released lockdir.
+LOCKDIR="${TMPDIR:-/tmp}/kafkito-agent-team-gate.lock"
+LOCK_TIMEOUT_SECONDS=900
+lock_elapsed=0
+while ! mkdir "$LOCKDIR" 2>/dev/null; do
+  # Self-heal stale locks: if the owner PID is no longer running, clear
+  # and retry. This protects against bash invocations whose trap failed
+  # (e.g., SIGKILL or older script versions whose trap used rmdir without
+  # first removing the owner file).
+  if [ -f "$LOCKDIR/owner" ]; then
+    owner_pid="$(awk '{print $1}' "$LOCKDIR/owner" 2>/dev/null || true)"
+    if [ -n "$owner_pid" ] && ! kill -0 "$owner_pid" 2>/dev/null; then
+      echo "agent-team-gate: clearing stale lock from dead pid $owner_pid" >&2
+      rm -f "$LOCKDIR/owner" 2>/dev/null
+      rmdir "$LOCKDIR" 2>/dev/null
+      continue
+    fi
+  fi
+  if [ "$lock_elapsed" -ge "$LOCK_TIMEOUT_SECONDS" ]; then
+    echo "agent-team-gate: lock timeout after ${LOCK_TIMEOUT_SECONDS}s — another gate may be stuck. Inspect $LOCKDIR/owner and remove the directory if stale." >&2
+    exit 2
+  fi
+  sleep 3
+  lock_elapsed=$((lock_elapsed+3))
+done
+echo "$$ pid=$$ started=$(date -u +%FT%TZ)" > "$LOCKDIR/owner" 2>/dev/null || true
+# rm -rf is required (not rmdir): the lockdir contains the owner file, and
+# rmdir refuses non-empty dirs — that bug let stale locks survive across
+# completed hook runs. Belt-and-suspenders: trap on every exit signal we can.
+trap 'rm -rf "$LOCKDIR" 2>/dev/null || true' EXIT INT TERM HUP
+
 # Determine the diff base. Prefer HEAD~1 if it exists; fall back to
 # merge-base with origin/main; fall back to working-tree changes.
 if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
@@ -90,8 +130,12 @@ if [ "$needs_frontend_unit" -eq 1 ]; then
 fi
 
 if [ "$needs_e2e" -eq 1 ]; then
-  run_gate "stack: docker compose"   bash -c 'docker compose up -d --wait'
-  run_gate "e2e: playwright"         bash -c 'cd frontend && bun run e2e'
+  # `make e2e` runs e2e-up (docker compose up kafka, frontend build, kafkito-e2e
+  # binary on KAFKITO_E2E_BASE_URL, seed) → e2e-test (playwright) → e2e-down.
+  # This is the canonical hermetic flow from commit cebaf1f. Calling
+  # `bun run e2e` directly was wrong on two counts: no such npm script exists,
+  # and Playwright needs the kafkito-e2e binary running, not just Kafka.
+  run_gate "e2e: make e2e (hermetic)" bash -c 'make e2e'
 fi
 
 if [ "${#failures[@]}" -gt 0 ]; then

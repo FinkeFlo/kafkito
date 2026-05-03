@@ -22,7 +22,7 @@ test.describe("Reset Offsets walk (Q-001 fixture)", () => {
     await expect(commitButton).toBeDisabled();
     await expect(modal).toContainText(/pick at least one partition/i);
 
-    await modal.locator("label").filter({ hasText: /^p0$/ }).click();
+    await modal.getByText(/^p0$/).click();
     await expect(commitButton).toBeEnabled();
 
     await commitButton.click();
