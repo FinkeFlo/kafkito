@@ -15,6 +15,7 @@
     "check:palette": "bash scripts/check-palette.sh",
     "check:strings": "bash scripts/check-strings.sh",
     "check:tokens": "bash scripts/check-tokens.sh",
+    "check:routes": "bash scripts/check-route-orphans.sh",
     "check:contrast": "node scripts/check-contrast.mjs"
   },
   "dependencies": {
