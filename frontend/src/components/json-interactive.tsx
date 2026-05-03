@@ -10,8 +10,8 @@ export interface JsonInteractiveProps {
   ) => void;
 }
 
-const SIZE_LIMIT_BYTES = 1_000_000;
-const ARRAY_COLLAPSE_THRESHOLD = 100;
+export const SIZE_LIMIT_BYTES = 1_000_000;
+export const ARRAY_COLLAPSE_THRESHOLD = 100;
 
 function approximateSize(v: unknown): number {
   try {
