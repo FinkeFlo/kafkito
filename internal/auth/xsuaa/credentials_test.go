@@ -10,6 +10,9 @@ package xsuaa_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/FinkeFlo/kafkito/internal/auth/xsuaa"
 )
 
@@ -29,27 +32,36 @@ const fixtureVCAP = `{
   }]
 }`
 
-func TestParseCredentialsFromVCAP(t *testing.T) {
+func TestParseCredentialsFromVCAP_ExtractsAllFields(t *testing.T) {
+	t.Parallel()
+
 	c, err := xsuaa.ParseCredentialsFromVCAP(fixtureVCAP)
-	if err != nil {
-		t.Fatalf("ParseCredentialsFromVCAP: %v", err)
+	require.NoError(t, err, "ParseCredentialsFromVCAP must accept the canonical fixture")
+
+	cases := []struct {
+		field string
+		got   string
+		want  string
+	}{
+		{"ClientID", c.ClientID, "sb-kafkito!t12345"},
+		{"UAADomain", c.UAADomain, "authentication.eu10.hana.ondemand.com"},
+		{"XSAppName", c.XSAppName, "kafkito!t12345"},
+		{"LocalScopePrefix", c.LocalScopePrefix(), "kafkito!t12345."},
 	}
-	if c.ClientID != "sb-kafkito!t12345" {
-		t.Errorf("ClientID = %q", c.ClientID)
-	}
-	if c.UAADomain != "authentication.eu10.hana.ondemand.com" {
-		t.Errorf("UAADomain = %q", c.UAADomain)
-	}
-	if c.XSAppName != "kafkito!t12345" {
-		t.Errorf("XSAppName = %q", c.XSAppName)
-	}
-	if c.LocalScopePrefix() != "kafkito!t12345." {
-		t.Errorf("LocalScopePrefix = %q", c.LocalScopePrefix())
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.field, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tc.want, tc.got)
+		})
 	}
 }
 
-func TestParseCredentialsFromVCAP_NoXSUAABinding(t *testing.T) {
-	if _, err := xsuaa.ParseCredentialsFromVCAP(`{"xsuaa": []}`); err == nil {
-		t.Errorf("expected error for empty xsuaa array")
-	}
+func TestParseCredentialsFromVCAP_RejectsEmptyXSUAAArray(t *testing.T) {
+	t.Parallel()
+
+	_, err := xsuaa.ParseCredentialsFromVCAP(`{"xsuaa": []}`)
+
+	require.Error(t, err, "empty xsuaa binding array must be rejected")
 }
