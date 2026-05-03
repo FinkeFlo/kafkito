@@ -1,12 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { JsonInteractive } from "./json-interactive";
 
+// production: see SIZE_LIMIT_BYTES in json-interactive.tsx
+const sizeLimitBytes = 1_000_000;
+// production: see ARRAY_COLLAPSE_THRESHOLD in json-interactive.tsx
+const arrayCollapseThreshold = 100;
+
 describe("JsonInteractive", () => {
-  it("renders scalar values clickably and reports trail + literal on click", () => {
+  it("renders scalar values clickably and reports trail + literal on click", async () => {
     const onPick = vi.fn();
+    const user = userEvent.setup();
     render(<JsonInteractive value={{ orderId: "A1" }} onPick={onPick} />);
-    fireEvent.click(screen.getByText('"A1"'));
+
+    await user.click(screen.getByText('"A1"'));
+
     expect(onPick).toHaveBeenCalledWith(
       [{ kind: "key", name: "orderId" }],
       "A1",
@@ -14,10 +23,13 @@ describe("JsonInteractive", () => {
     );
   });
 
-  it("clicking a key reports trail with undefined leaf", () => {
+  it("clicking a key reports trail with undefined leaf", async () => {
     const onPick = vi.fn();
+    const user = userEvent.setup();
     render(<JsonInteractive value={{ orderId: "A1" }} onPick={onPick} />);
-    fireEvent.click(screen.getByText(/orderId/));
+
+    await user.click(screen.getByText(/orderId/));
+
     expect(onPick).toHaveBeenCalledWith(
       [{ kind: "key", name: "orderId" }],
       undefined,
@@ -25,15 +37,18 @@ describe("JsonInteractive", () => {
     );
   });
 
-  it("clicking inside an array fires a trail with index token and array length", () => {
+  it("clicking inside an array fires a trail with index token and array length", async () => {
     const onPick = vi.fn();
+    const user = userEvent.setup();
     render(
       <JsonInteractive
         value={{ prices: [{ x: 1 }, { x: 2 }] }}
         onPick={onPick}
       />,
     );
-    fireEvent.click(screen.getByText("1"));
+
+    await user.click(screen.getByText("1"));
+
     expect(onPick).toHaveBeenCalledWith(
       [
         { kind: "key", name: "prices" },
@@ -45,23 +60,35 @@ describe("JsonInteractive", () => {
     );
   });
 
-  it("collapses arrays with more than 100 items by default", () => {
-    const arr = Array.from({ length: 250 }, (_, i) => i);
+  it(`collapses arrays with more than ${arrayCollapseThreshold} items by default`, () => {
+    const arrayLength = arrayCollapseThreshold + 150;
+    const arr = Array.from({ length: arrayLength }, (_, i) => i);
     render(<JsonInteractive value={{ items: arr }} onPick={() => {}} />);
-    expect(screen.getByRole("button", { name: /Show all 250/i })).toBeInTheDocument();
-    expect(screen.queryByText("249")).not.toBeInTheDocument();
+
+    expect(
+      screen.getByRole("button", { name: new RegExp(`Show all ${arrayLength}`, "i") }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(String(arrayLength - 1))).not.toBeInTheDocument();
   });
 
-  it("expands a collapsed array on click", () => {
-    const arr = Array.from({ length: 250 }, (_, i) => i);
+  it("expands a collapsed array on click", async () => {
+    const arrayLength = arrayCollapseThreshold + 150;
+    const arr = Array.from({ length: arrayLength }, (_, i) => i);
+    const user = userEvent.setup();
     render(<JsonInteractive value={{ items: arr }} onPick={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: /Show all 250/i }));
-    expect(screen.getByText("249")).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: new RegExp(`Show all ${arrayLength}`, "i") }),
+    );
+
+    expect(screen.getByText(String(arrayLength - 1))).toBeInTheDocument();
   });
 
-  it("falls back to <pre> for messages over 1 MB", () => {
-    const giant = "x".repeat(1_100_000);
+  it("falls back to <pre> for messages over the size limit", () => {
+    const overLimit = sizeLimitBytes + 100_000;
+    const giant = "x".repeat(overLimit);
     render(<JsonInteractive value={{ blob: giant }} onPick={() => {}} />);
+
     expect(screen.getByText(/Message too large for interactive mode/i)).toBeInTheDocument();
   });
 });
