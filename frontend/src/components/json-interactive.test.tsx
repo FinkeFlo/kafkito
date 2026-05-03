@@ -70,6 +70,17 @@ describe("JsonInteractive", () => {
     expect(screen.queryByText(String(arrayLength - 1))).not.toBeInTheDocument();
   });
 
+  it.each<[string, number]>([
+    ["at threshold", ARRAY_COLLAPSE_THRESHOLD],
+    ["below threshold", ARRAY_COLLAPSE_THRESHOLD - 1],
+  ])("does not collapse arrays %s (no Show all button)", (_label, arrayLength) => {
+    const arr = Array.from({ length: arrayLength }, (_, i) => i);
+    render(<JsonInteractive value={{ items: arr }} onPick={() => {}} />);
+
+    expect(screen.queryByRole("button", { name: /Show all/i })).not.toBeInTheDocument();
+    expect(screen.getByText(String(arrayLength - 1))).toBeInTheDocument();
+  });
+
   it("expands a collapsed array on click", async () => {
     const arrayLength = ARRAY_COLLAPSE_THRESHOLD + 150;
     const arr = Array.from({ length: arrayLength }, (_, i) => i);
