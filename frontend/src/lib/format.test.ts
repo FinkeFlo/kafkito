@@ -1,84 +1,119 @@
 import { describe, expect, it } from "vitest";
 import { formatBytes, formatCount, formatDuration, formatRate } from "./format";
 
+const oneSecondMs = 1_000;
+const oneMinuteMs = 60_000;
+const oneHourMs = 3_600_000;
+const oneDayMs = 86_400_000;
+
+const oneKiB = 1_024;
+const oneMiB = 1_024 * 1_024;
+const oneGiB = 1_024 * 1_024 * 1_024;
+
+const oneThousand = 1_000;
+const oneMillion = 1_000_000;
+const oneBillion = 1_000_000_000;
+
 describe("formatDuration", () => {
-  it("returns — for nullish / non-finite", () => {
-    expect(formatDuration(null)).toBe("—");
-    expect(formatDuration(undefined)).toBe("—");
-    expect(formatDuration(NaN)).toBe("—");
+  it.each<[unknown, string]>([
+    [null, "—"],
+    [undefined, "—"],
+    [NaN, "—"],
+  ])("returns — for nullish / non-finite (%p)", (input, expected) => {
+    expect(formatDuration(input as number | null | undefined)).toBe(expected);
   });
 
-  it("returns ∞ for negative values (Kafka 'infinite retention' convention)", () => {
-    expect(formatDuration(-1)).toBe("∞");
-    expect(formatDuration(-1000)).toBe("∞");
+  it.each<[number, string]>([
+    [-1, "∞"],
+    [-1_000, "∞"],
+  ])("returns ∞ for negative %i ms (Kafka 'infinite retention' convention)", (input, expected) => {
+    expect(formatDuration(input)).toBe(expected);
   });
 
-  it("renders sub-second durations in ms", () => {
-    expect(formatDuration(0)).toBe("0");
-    expect(formatDuration(1)).toBe("1 ms");
-    expect(formatDuration(250)).toBe("250 ms");
-    expect(formatDuration(999)).toBe("999 ms");
+  it.each<[number, string]>([
+    [0, "0"],
+    [1, "1 ms"],
+    [250, "250 ms"],
+    [999, "999 ms"],
+  ])("renders sub-second duration %i ms", (input, expected) => {
+    expect(formatDuration(input)).toBe(expected);
   });
 
-  it("scales through s, m, h, d, mo, y", () => {
-    expect(formatDuration(1_500)).toBe("2 s");
-    expect(formatDuration(60_000)).toBe("1 m");
-    expect(formatDuration(3_600_000)).toBe("1.0 h"); // 1 hour
-    expect(formatDuration(86_400_000)).toBe("1.0 d"); // 1 day
-    expect(formatDuration(7 * 86_400_000)).toBe("7.0 d");
-    expect(formatDuration(60 * 86_400_000)).toBe("2 mo");
-    expect(formatDuration(365 * 86_400_000)).toBe("1.0 y");
+  it.each<[number, string]>([
+    [1.5 * oneSecondMs, "2 s"],
+    [oneMinuteMs, "1 m"],
+    [oneHourMs, "1.0 h"],
+    [oneDayMs, "1.0 d"],
+    [7 * oneDayMs, "7.0 d"],
+    [60 * oneDayMs, "2 mo"],
+    [365 * oneDayMs, "1.0 y"],
+  ])("scales %i ms through s, m, h, d, mo, y", (input, expected) => {
+    expect(formatDuration(input)).toBe(expected);
   });
 });
 
 describe("formatRate", () => {
-  it("handles nullish / negative / non-finite", () => {
-    expect(formatRate(null)).toBe("—");
-    expect(formatRate(undefined)).toBe("—");
-    expect(formatRate(-1)).toBe("—");
-    expect(formatRate(NaN)).toBe("—");
+  it.each<[unknown, string]>([
+    [null, "—"],
+    [undefined, "—"],
+    [-1, "—"],
+    [NaN, "—"],
+  ])("handles nullish / negative / non-finite (%p)", (input, expected) => {
+    expect(formatRate(input as number | null | undefined)).toBe(expected);
   });
 
-  it("shows 0/s for tiny values", () => {
-    expect(formatRate(0)).toBe("0/s");
-    expect(formatRate(0.01)).toBe("0/s");
+  it.each<[number, string]>([
+    [0, "0/s"],
+    [0.01, "0/s"],
+  ])("shows 0/s for tiny value %f", (input, expected) => {
+    expect(formatRate(input)).toBe(expected);
   });
 
-  it("picks the right unit and precision", () => {
-    expect(formatRate(0.5)).toBe("0.50/s");
-    expect(formatRate(3.4)).toBe("3.4/s");
-    expect(formatRate(42)).toBe("42/s");
-    expect(formatRate(999)).toBe("999/s");
-    expect(formatRate(1_500)).toBe("1.5k/s");
-    expect(formatRate(2_500_000)).toBe("2.50M/s");
+  it.each<[number, string]>([
+    [0.5, "0.50/s"],
+    [3.4, "3.4/s"],
+    [42, "42/s"],
+    [999, "999/s"],
+    [1.5 * oneThousand, "1.5k/s"],
+    [2.5 * oneMillion, "2.50M/s"],
+  ])("picks the right unit and precision for %f /s", (input, expected) => {
+    expect(formatRate(input)).toBe(expected);
   });
 });
 
 describe("formatBytes", () => {
-  it("handles nullish", () => {
-    expect(formatBytes(null)).toBe("—");
-    expect(formatBytes(undefined)).toBe("—");
+  it.each<[unknown, string]>([
+    [null, "—"],
+    [undefined, "—"],
+  ])("handles nullish (%p)", (input, expected) => {
+    expect(formatBytes(input as number | null | undefined)).toBe(expected);
   });
 
-  it("scales IEC units correctly", () => {
-    expect(formatBytes(0)).toBe("0 B");
-    expect(formatBytes(512)).toBe("512 B");
-    expect(formatBytes(1024)).toBe("1.00 KiB");
-    expect(formatBytes(1_048_576)).toBe("1.00 MiB");
-    expect(formatBytes(1_073_741_824)).toBe("1.00 GiB");
+  it.each<[number, string]>([
+    [0, "0 B"],
+    [512, "512 B"],
+    [oneKiB, "1.00 KiB"],
+    [oneMiB, "1.00 MiB"],
+    [oneGiB, "1.00 GiB"],
+  ])("scales IEC unit boundary %i B", (input, expected) => {
+    expect(formatBytes(input)).toBe(expected);
   });
 });
 
 describe("formatCount", () => {
-  it("handles nullish", () => {
-    expect(formatCount(null)).toBe("—");
-    expect(formatCount(undefined)).toBe("—");
+  it.each<[unknown, string]>([
+    [null, "—"],
+    [undefined, "—"],
+  ])("handles nullish (%p)", (input, expected) => {
+    expect(formatCount(input as number | null | undefined)).toBe(expected);
   });
 
-  it("scales k/M/B at the right thresholds", () => {
-    expect(formatCount(42)).toBe("42");
-    expect(formatCount(1_500)).toBe("1.5k");
-    expect(formatCount(2_500_000)).toBe("2.50M");
-    expect(formatCount(3_200_000_000)).toBe("3.20B");
+  it.each<[number, string]>([
+    [42, "42"],
+    [1.5 * oneThousand, "1.5k"],
+    [2.5 * oneMillion, "2.50M"],
+    [3.2 * oneBillion, "3.20B"],
+  ])("scales k/M/B threshold %i", (input, expected) => {
+    expect(formatCount(input)).toBe(expected);
   });
 });
