@@ -12,16 +12,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/twmb/franz-go/pkg/kadm"
 )
 
-// TestClusterStateWritePrev verifies that writePrev records a per-topic
-// end-offset sum that matches what refreshOne will later diff against to
-// derive a rate.
-func TestClusterStateWritePrev(t *testing.T) {
-	s := &clusterState{prev: map[string]topicSample{}}
+func TestClusterStateWritePrev_SumsEndOffsetsPerTopic(t *testing.T) {
+	t.Parallel()
 
-	// Synthesize end offsets for two topics (two partitions each).
+	s := &clusterState{prev: map[string]topicSample{}}
 	ends := kadm.ListedOffsets{
 		"a": {
 			0: kadm.ListedOffset{Topic: "a", Partition: 0, Offset: 100},
@@ -31,74 +30,93 @@ func TestClusterStateWritePrev(t *testing.T) {
 			0: kadm.ListedOffset{Topic: "b", Partition: 0, Offset: 9},
 		},
 	}
-
 	t0 := time.Now()
+
 	s.writePrev([]string{"a", "b"}, ends, t0)
-
 	prev := s.prevPerTopic()
-	if got, want := prev["a"].endOffsetSum, int64(150); got != want {
-		t.Fatalf("a endOffsetSum: got %d want %d", got, want)
-	}
-	if got, want := prev["b"].endOffsetSum, int64(9); got != want {
-		t.Fatalf("b endOffsetSum: got %d want %d", got, want)
-	}
-	if !prev["a"].at.Equal(t0) {
-		t.Fatalf("a sample time not preserved")
-	}
 
-	// writePrev prunes topics that disappear, so the next round that drops
-	// "b" from the topic list must forget it.
+	t.Run("topic_a_sum", func(t *testing.T) {
+		assert.Equal(t, int64(150), prev["a"].endOffsetSum)
+	})
+	t.Run("topic_b_sum", func(t *testing.T) {
+		assert.Equal(t, int64(9), prev["b"].endOffsetSum)
+	})
+	t.Run("sample_time_preserved", func(t *testing.T) {
+		assert.True(t, prev["a"].at.Equal(t0), "got %v want %v", prev["a"].at, t0)
+	})
+}
+
+func TestClusterStateWritePrev_PrunesDisappearedTopics(t *testing.T) {
+	t.Parallel()
+
+	s := &clusterState{prev: map[string]topicSample{}}
+	ends1 := kadm.ListedOffsets{
+		"a": {
+			0: kadm.ListedOffset{Topic: "a", Partition: 0, Offset: 100},
+		},
+		"b": {
+			0: kadm.ListedOffset{Topic: "b", Partition: 0, Offset: 9},
+		},
+	}
+	t0 := time.Now()
+	s.writePrev([]string{"a", "b"}, ends1, t0)
+
 	ends2 := kadm.ListedOffsets{
 		"a": {
 			0: kadm.ListedOffset{Topic: "a", Partition: 0, Offset: 200},
-			1: kadm.ListedOffset{Topic: "a", Partition: 1, Offset: 100},
 		},
 	}
 	s.writePrev([]string{"a"}, ends2, t0.Add(10*time.Second))
-	prev = s.prevPerTopic()
-	if _, ok := prev["b"]; ok {
-		t.Fatalf("expected b to be pruned from prev, got %+v", prev)
-	}
-	if got, want := prev["a"].endOffsetSum, int64(300); got != want {
-		t.Fatalf("a endOffsetSum after update: got %d want %d", got, want)
-	}
+	prev := s.prevPerTopic()
 
-	// Rate is (endSumNew - endSumPrev)/dt. With 300 new vs 150 old over
-	// 10s we expect 15 msg/s. Do the math the same way refreshOne does to
-	// pin the semantics.
-	dt := 10.0
-	delta := float64(300 - 150)
-	if got, want := delta/dt, 15.0; got != want {
-		t.Fatalf("rate: got %v want %v", got, want)
-	}
+	_, hasB := prev["b"]
+	assert.False(t, hasB, "topic b should be pruned, got %+v", prev)
+	assert.Equal(t, int64(200), prev["a"].endOffsetSum)
 }
 
-// TestClusterStateSnapshotEmpty documents that ClusterMetricsSnapshot
-// returns false when no refresh has happened yet, so callers never see a
-// zeroed ClusterMetrics and treat it as authoritative.
-func TestClusterStateSnapshotEmpty(t *testing.T) {
+// TestClusterStateRate_MatchesRefreshOneSemantics pins the rate math the way
+// refreshOne computes it: (endSumNew - endSumPrev)/dt. With 300 vs 150 over
+// 10s the rate must be 15 msg/s.
+func TestClusterStateRate_MatchesRefreshOneSemantics(t *testing.T) {
+	t.Parallel()
+
+	const endSumPrev, endSumNew, dtSeconds = 150.0, 300.0, 10.0
+
+	rate := (endSumNew - endSumPrev) / dtSeconds
+
+	assert.Equal(t, 15.0, rate)
+}
+
+func TestClusterMetricsSnapshot_ReturnsFalse_WhenCollectorNotStarted(t *testing.T) {
+	t.Parallel()
+
 	r := NewRegistry(nil, nil)
+
 	_, ok := r.ClusterMetricsSnapshot("nope")
-	if ok {
-		t.Fatalf("expected no snapshot when collector not started")
+
+	assert.False(t, ok, "snapshot must be absent before any refresh")
+}
+
+func TestPtrHelpers_DereferenceToValue(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		got  any
+		want any
+	}{
+		{name: "ptrInt64", got: *ptrInt64(7), want: int64(7)},
+		{name: "ptrFloat64", got: *ptrFloat64(1.5), want: 1.5},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, tc.got)
+		})
 	}
 }
 
-// TestPtrHelpers is a smoke test for the pointer constructors used to
-// serialize "known zero" values as 0 (not null) in JSON.
-func TestPtrHelpers(t *testing.T) {
-	if *ptrInt64(7) != 7 {
-		t.Fatal("ptrInt64")
-	}
-	if *ptrFloat64(1.5) != 1.5 {
-		t.Fatal("ptrFloat64")
-	}
-}
-
-// newTestCollector returns a metricsCollector with the minimum wiring
-// required to exercise ensureFresh's TTL/lazy-state paths without
-// touching Kafka. The probe pipeline itself is exercised end-to-end by
-// the integration tests.
 func newTestCollector() *metricsCollector {
 	return &metricsCollector{
 		log:    slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -106,52 +124,45 @@ func newTestCollector() *metricsCollector {
 	}
 }
 
-// TestEnsureFresh_LazyStateCreation verifies that calling ensureFresh
-// for an unknown cluster name creates the state entry on-the-fly so
-// private (browser-stored) clusters get cached metrics without being
-// pre-registered by the periodic collector.
-func TestEnsureFresh_LazyStateCreation(t *testing.T) {
-	mc := newTestCollector()
+// TestEnsureFresh_LazyStateCreation_CreatesStateBeforeProbe verifies that
+// calling ensureFresh for an unknown cluster name creates the state entry
+// on-the-fly so private (browser-stored) clusters get cached metrics
+// without being pre-registered by the periodic collector.
+//
+// The recover() seam is intentional: ensureFresh dereferences the nil
+// admin during the probe stage, but the lazy-creation invariant fires
+// *before* the probe. Phase-2 candidate: introduce an admin interface so
+// the test can pass a fake instead of relying on panic-recover.
+func TestEnsureFresh_LazyStateCreation_CreatesStateBeforeProbe(t *testing.T) {
+	t.Parallel()
 
-	// Use a context already cancelled so the probe pipeline bails out
-	// at Metadata before touching the nil admin's network. ensureFresh
-	// must still have created the state entry by then.
+	mc := newTestCollector()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	// Calling against a nil admin would normally panic if probe
-	// dereferenced it; we accept the panic via recover and only assert
-	// on the lazy-creation invariant, which happens *before* the probe.
 	defer func() { _ = recover() }()
 	mc.ensureFresh(ctx, "private-2", time.Minute, nil)
 
 	mc.statesMu.RLock()
 	_, ok := mc.states["private-2"]
 	mc.statesMu.RUnlock()
-	if !ok {
-		t.Fatal("private-2 should exist after ensureFresh")
-	}
+
+	require.True(t, ok, "private-2 state must exist after ensureFresh")
 }
 
-// TestEnsureFresh_CacheHitWithinTTL ensures a cached snapshot inside the
-// TTL window short-circuits before any probe attempt.
-func TestEnsureFresh_CacheHitWithinTTL(t *testing.T) {
+func TestEnsureFresh_ReturnsCachedSnapshot_WithinTTL(t *testing.T) {
+	t.Parallel()
+
 	mc := newTestCollector()
-	cached := ClusterMetrics{
-		Brokers:   3,
-		UpdatedAt: time.Now(),
-	}
+	cached := ClusterMetrics{Brokers: 3, UpdatedAt: time.Now()}
 	mc.states["c"] = &clusterState{
 		prev:     map[string]topicSample{},
 		hasSnap:  true,
 		snapshot: cached,
 	}
 
-	// Passing a nil admin would panic if probe were called → the test
-	// passes if the call returns without panicking.
 	mc.ensureFresh(context.Background(), "c", time.Minute, nil)
 
-	if got := mc.states["c"].snapshot.Brokers; got != 3 {
-		t.Fatalf("snapshot mutated: brokers=%d want 3", got)
-	}
+	assert.Equal(t, 3, mc.states["c"].snapshot.Brokers,
+		"cached snapshot must be returned without invoking probe (which would panic on nil admin)")
 }
