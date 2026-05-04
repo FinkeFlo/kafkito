@@ -117,11 +117,11 @@ e2e-up:
 	@echo "e2e: starting kafkito-e2e on port $(E2E_PORT)"
 	@KAFKITO_KAFKA_BROKERS=localhost:39092 PORT=$(E2E_PORT) KAFKITO_AUTH_MODE=off \
 		./bin/kafkito-e2e > $(E2E_LOG) 2>&1 & echo $$! > $(E2E_PID)
-	@ok=0; for i in $$(seq 1 20); do \
-		if curl -fsS http://localhost:$(E2E_PORT)/healthz >/dev/null 2>&1; then \
+	@ok=0; for i in $$(seq 1 30); do \
+		if curl -fsS http://localhost:$(E2E_PORT)/api/v1/me >/dev/null 2>&1; then \
 			ok=$$((ok + 1)); \
-			if [ "$$ok" -ge 2 ]; then \
-				echo "e2e: kafkito ready on $(E2E_PORT) (2 consecutive /healthz)"; \
+			if [ "$$ok" -ge 3 ]; then \
+				echo "e2e: kafkito ready on $(E2E_PORT) (3 consecutive /api/v1/me)"; \
 				break; \
 			fi; \
 		else \
@@ -129,11 +129,15 @@ e2e-up:
 		fi; \
 		sleep 1; \
 	done
-	@if ! curl -fsS http://localhost:$(E2E_PORT)/healthz >/dev/null 2>&1; then \
-		echo "e2e: kafkito did not become ready in 20s — check $(E2E_LOG)"; \
+	@if ! curl -fsS http://localhost:$(E2E_PORT)/api/v1/me >/dev/null 2>&1; then \
+		echo "e2e: kafkito did not become ready in 30s — check $(E2E_LOG)"; \
 		cat $(E2E_LOG); \
 		exit 1; \
 	fi
+	@curl -fsS -o /dev/null \
+		-H 'X-Kafkito-Cluster: {"id":"warmup","name":"warmup","brokers":["localhost:1"],"auth":{"type":"none"},"tls":{"enabled":false},"created_at":0,"updated_at":0}' \
+		http://localhost:$(E2E_PORT)/api/v1/clusters/__private__/topics 2>/dev/null || true
+	@echo "e2e: warmup adhoc-cluster probe issued (pre-triggers dial-and-fail goroutines)"
 	bash frontend/e2e/fixtures/seed.sh
 
 e2e-test:
