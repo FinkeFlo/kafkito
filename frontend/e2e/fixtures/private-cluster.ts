@@ -28,7 +28,23 @@ export const test = base.extend<Fixtures>({
       [STORAGE_KEY, SECOND_CLUSTER_NAME],
     );
     await use(page);
-    await page.evaluate((key) => window.localStorage.removeItem(key), STORAGE_KEY);
+    // Defensive: if the test failed before page.goto reached the app origin
+    // (e.g., ERR_CONNECTION_REFUSED on first navigation), the page is on
+    // chrome-error:// or about:blank where Chromium denies localStorage
+    // access. Swallow the SecurityError so the underlying test failure is
+    // what surfaces, not noise from teardown. The browser context is torn
+    // down anyway, so leaking the seeded entry has no cross-test impact.
+    await page
+      .evaluate((key) => {
+        try {
+          window.localStorage.removeItem(key);
+        } catch {
+          // page not on app origin — nothing to clean
+        }
+      }, STORAGE_KEY)
+      .catch(() => {
+        // page.evaluate itself failed (e.g., page closed) — nothing to clean
+      });
   },
   pageWithSRCluster: async ({ browser }, use) => {
     const context = await browser.newContext();
