@@ -24,10 +24,10 @@ func TestHostBelongsToDomain(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name    string
-		rawURL  string
-		domain  string
-		want    bool
+		name   string
+		rawURL string
+		domain string
+		want   bool
 	}{
 		{name: "equal_host", rawURL: "https://example.com/jwks", domain: "example.com", want: true},
 		{name: "one_label_below", rawURL: "https://auth.example.com/keys", domain: "example.com", want: true},
