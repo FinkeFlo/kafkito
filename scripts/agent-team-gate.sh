@@ -94,11 +94,22 @@ else
   base="HEAD"
 fi
 
+# Scope the change set to the current teammate's authored work — i.e., the
+# diff between the chosen base and the current commit, plus anything they have
+# explicitly staged. We deliberately exclude unstaged working-tree changes
+# (`git diff --name-only` with no argument) because TaskCompleted fires per
+# teammate, and other teammates routinely have orthogonal in-flight diffs in
+# the working tree. Including those was the source of the cross-domain gate
+# leakage that blocked Tasks #45 and #49 on unrelated e2e infra failures.
+#
+# Workflow assumption: teammates follow commit-then-complete (`git add <named
+# files>` → `git commit` → `TaskUpdate completed`). If a teammate marks a task
+# completed without committing, the gate will report "no changes detected" —
+# that's the right signal: gate the committed work, not the working tree.
 changed="$(
   {
     git diff --name-only "$base" HEAD 2>/dev/null
     git diff --name-only --cached 2>/dev/null
-    git diff --name-only 2>/dev/null
   } | sort -u
 )"
 
