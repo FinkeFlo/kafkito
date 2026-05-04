@@ -149,6 +149,7 @@ e2e-down:
 e2e-clean:
 	@pids=$$(lsof -nP -iTCP:$(E2E_PORT) -sTCP:LISTEN -t 2>/dev/null); \
 	if [ -n "$$pids" ]; then kill -9 $$pids 2>/dev/null || true; fi
+	@rm -rf frontend/test-results/.playwright-artifacts-*
 	@rm -f $(E2E_PID) $(E2E_LOG)
 	@echo "e2e: cleaned port $(E2E_PORT) and stale state"
 
