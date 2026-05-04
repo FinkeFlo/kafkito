@@ -17,6 +17,22 @@
 
 set -uo pipefail
 
+# Capture the TaskCompleted JSON payload from stdin once, before anything
+# else consumes it. Used to scope the diff to the teammate's specific commit
+# (see "Determine the diff base" below).
+hook_payload="$(cat 2>/dev/null || true)"
+
+task_id=""
+if [ -n "$hook_payload" ]; then
+  if command -v jq >/dev/null 2>&1; then
+    task_id="$(printf '%s' "$hook_payload" | jq -r '.task_id // empty' 2>/dev/null || true)"
+  else
+    # No-jq fallback: extract task_id field, tolerating string-quoted or
+    # numeric JSON values. POSIX-portable enough for macOS + Linux.
+    task_id="$(printf '%s' "$hook_payload" | grep -oE '"task_id"[[:space:]]*:[[:space:]]*("[^"]*"|[0-9]+)' | head -n1 | sed -E 's/.*"task_id"[[:space:]]*:[[:space:]]*"?([^"]*)"?$/\1/')"
+  fi
+fi
+
 repo_root="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 cd "$repo_root" || { echo "agent-team-gate: cannot cd to $repo_root" >&2; exit 2; }
 
@@ -84,34 +100,64 @@ if [ -f "$git_index_lock" ]; then
   fi
 fi
 
-# Determine the diff base. Prefer HEAD~1 if it exists; fall back to
-# merge-base with origin/main; fall back to working-tree changes.
-if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
-  base="HEAD~1"
-elif git rev-parse --verify origin/main >/dev/null 2>&1; then
-  base="$(git merge-base HEAD origin/main 2>/dev/null || echo HEAD)"
-else
-  base="HEAD"
+# Determine the diff base. Three modes, in order of preference:
+#
+# 1. Task-id-aware (Mode 1 of Task #52): if the hook payload supplied a
+#    task_id AND there is a commit citing "Task #<id>" in its message, scope
+#    the diff to exactly that commit's parent..itself. Immune to the
+#    sibling-commit race that bit Tasks #41+#42 (e2e-tdd's TaskCompleted
+#    fired AFTER backend-tdd-2's #47 commit landed at HEAD, so the gate
+#    scoped to backend's diff and false-positive-failed on a gofmt issue
+#    that wasn't e2e's work).
+# 2. HEAD~1 fallback: when no task_id is available or no matching commit
+#    exists (e.g., teammate marked complete without committing), use the
+#    previous-commit fallback. Same as the pre-#52 behavior.
+# 3. merge-base fallback: when HEAD~1 doesn't exist (initial commit),
+#    diff against the merge-base with origin/main.
+ref_commit=""
+if [ -n "$task_id" ]; then
+  # Word-boundary the suffix so #5 doesn't match #56. -E enables ERE.
+  ref_commit="$(git log -E --grep="Task #${task_id}([^0-9]|$)" --format=%H -n 1 2>/dev/null || true)"
 fi
 
-# Scope the change set to the current teammate's authored work — i.e., the
-# diff between the chosen base and the current commit, plus anything they have
-# explicitly staged. We deliberately exclude unstaged working-tree changes
-# (`git diff --name-only` with no argument) because TaskCompleted fires per
-# teammate, and other teammates routinely have orthogonal in-flight diffs in
-# the working tree. Including those was the source of the cross-domain gate
-# leakage that blocked Tasks #45 and #49 on unrelated e2e infra failures.
-#
-# Workflow assumption: teammates follow commit-then-complete (`git add <named
-# files>` → `git commit` → `TaskUpdate completed`). If a teammate marks a task
-# completed without committing, the gate will report "no changes detected" —
-# that's the right signal: gate the committed work, not the working tree.
-changed="$(
-  {
-    git diff --name-only "$base" HEAD 2>/dev/null
-    git diff --name-only --cached 2>/dev/null
-  } | sort -u
-)"
+if [ -n "$ref_commit" ]; then
+  # Task-id-aware: scope to teammate's specific commit only. We deliberately
+  # exclude --cached (staged) here because in this mode any staged work is
+  # necessarily NOT this teammate's authored scope (their authored scope is
+  # exactly ref_commit). Including staged would re-introduce sibling leakage.
+  echo "agent-team-gate: scoped to commit ${ref_commit:0:8} via Task #${task_id}"
+  changed="$(git diff --name-only "${ref_commit}^" "$ref_commit" 2>/dev/null | sort -u)"
+else
+  # Fallback: HEAD~1..HEAD + staged. Same as the pre-#52 (post-#46)
+  # behavior. Comment block preserved for the unstaged-exclusion rationale.
+  if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+    base="HEAD~1"
+  elif git rev-parse --verify origin/main >/dev/null 2>&1; then
+    base="$(git merge-base HEAD origin/main 2>/dev/null || echo HEAD)"
+  else
+    base="HEAD"
+  fi
+  # Scope the change set to the current teammate's authored work — i.e., the
+  # diff between the chosen base and the current commit, plus anything they
+  # have explicitly staged. We deliberately exclude unstaged working-tree
+  # changes (`git diff --name-only` with no argument) because TaskCompleted
+  # fires per teammate, and other teammates routinely have orthogonal in-
+  # flight diffs in the working tree. Including those was the source of the
+  # cross-domain gate leakage that blocked Tasks #45 and #49 on unrelated
+  # e2e infra failures (#46).
+  #
+  # Workflow assumption: teammates follow commit-then-complete (`git add
+  # <named files>` → `git commit` → `TaskUpdate completed`). If a teammate
+  # marks a task completed without committing, the gate will report "no
+  # changes detected" — that's the right signal: gate the committed work,
+  # not the working tree.
+  changed="$(
+    {
+      git diff --name-only "$base" HEAD 2>/dev/null
+      git diff --name-only --cached 2>/dev/null
+    } | sort -u
+  )"
+fi
 
 if [ -z "$changed" ]; then
   echo "agent-team-gate: no changes detected; nothing to verify."
