@@ -77,6 +77,58 @@ func TestOIDCValidator_HappyPath_AcceptsScopesArrayClaim(t *testing.T) {
 	assert.True(t, p.HasScope("viewer"), "HasScope(viewer); got scopes=%v", p.Scopes)
 }
 
+func TestNewOIDCValidator_RejectsMissingConfigFields(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name          string
+		cfg           auth.OIDCConfig
+		wantErrSubstr string
+	}{
+		{
+			name:          "missing_issuer_url",
+			cfg:           auth.OIDCConfig{Audience: "a", JWKSEndpoint: "https://x/jwks"},
+			wantErrSubstr: "IssuerURL required",
+		},
+		{
+			name:          "missing_audience",
+			cfg:           auth.OIDCConfig{IssuerURL: "https://x", JWKSEndpoint: "https://x/jwks"},
+			wantErrSubstr: "Audience required",
+		},
+		{
+			name:          "missing_jwks_endpoint",
+			cfg:           auth.OIDCConfig{IssuerURL: "https://x", Audience: "a"},
+			wantErrSubstr: "JWKSEndpoint required",
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := auth.NewOIDCValidator(tc.cfg)
+
+			require.Error(t, err, "NewOIDCValidator must reject %s", tc.name)
+			assert.ErrorContains(t, err, tc.wantErrSubstr,
+				"error must name the missing field so operators can fix the misconfiguration")
+		})
+	}
+}
+
+func TestOIDCValidator_AcceptsMultiTenantIssuerPrefix(t *testing.T) {
+	t.Parallel()
+
+	mock, v, aud := newOIDCValidator(t)
+	tenantIss := mock.Server.URL + "/tenant-42"
+	tok, err := mock.Issue("user-mt", aud, tenantIss, []string{"read"}, nil)
+	require.NoError(t, err, "Issue")
+
+	p, err := v.Validate(context.Background(), tok)
+
+	require.NoError(t, err, "Validate must accept iss that sits under the configured IssuerURL")
+	assert.Equal(t, "user-mt", p.Subject)
+}
+
 func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
 	t.Parallel()
 
@@ -110,6 +162,21 @@ func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
 				return tok
 			},
 			wantErrSubstring: "iss",
+		},
+		{
+			// Distinct from wrong_audience: the aud claim is empty, not
+			// merely mismatched. Locks oidc_validator.go:97 (len(auds)==0)
+			// separately from oidc_validator.go:99-100 (AudienceContains
+			// false).
+			name: "aud_claim_missing",
+			issue: func(t *testing.T, mock *auth.MockOIDC, _ string) string {
+				t.Helper()
+				tok, err := mock.Issue("u", "ignored", mock.Server.URL,
+					[]string{"read"}, map[string]any{"aud": []string{}})
+				require.NoError(t, err, "Issue")
+				return tok
+			},
+			wantErrSubstring: "aud claim missing",
 		},
 		{
 			// Substring not asserted: the upstream library's wording for
