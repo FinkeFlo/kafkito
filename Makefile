@@ -141,7 +141,7 @@ e2e-up:
 	bash frontend/e2e/fixtures/seed.sh
 
 e2e-test:
-	cd frontend && KAFKITO_E2E_BASE_URL=http://localhost:$(E2E_PORT) bunx playwright test
+	cd frontend && mkdir -p test-results && KAFKITO_E2E_BASE_URL=http://localhost:$(E2E_PORT) bunx playwright test
 
 e2e-down:
 	@if [ -f $(E2E_PID) ]; then \
