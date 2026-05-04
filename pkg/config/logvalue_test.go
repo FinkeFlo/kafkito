@@ -78,3 +78,40 @@ func TestLogValue_MasksSecretsInJSONOutput(t *testing.T) {
 		})
 	}
 }
+
+// TestConfigLogValue_EmitsStructuralStartupSummary locks the six structural
+// fields the root Config.LogValue emits for diagnostic logs. Distinct counts
+// (1, 2, 3) plus a non-empty server address and role name discriminate
+// against slot-swap mutations: putting the wrong len() under the wrong
+// attribute would surface as a substring miss.
+//
+// Unlike the other LogValue contracts, this one is NOT a credential-leak
+// guard — Config.LogValue does not emit any credential-bearing fields
+// directly. Nested ClusterConfig rendering goes through its own LogValue,
+// already locked above.
+func TestConfigLogValue_EmitsStructuralStartupSummary(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		Server: ServerConfig{Addr: ":37421"},
+		Clusters: []ClusterConfig{
+			{Name: "c1", Brokers: []string{"b:1"}},
+			{Name: "c2", Brokers: []string{"b:2"}},
+		},
+		RBAC: RBACConfig{
+			Enabled:     true,
+			DefaultRole: "viewer",
+			Roles:       []RoleConfig{{Name: "admin"}, {Name: "viewer"}, {Name: "ops"}},
+			Subjects:    []SubjectConfig{{User: "alice"}},
+		},
+	}
+
+	got := logToJSONAttrs(t, "config", cfg)
+
+	assert.Contains(t, got, `"server_addr":":37421"`, "got=%s", got)
+	assert.Contains(t, got, `"clusters":2`, "got=%s", got)
+	assert.Contains(t, got, `"rbac_enabled":true`, "got=%s", got)
+	assert.Contains(t, got, `"rbac_default_role":"viewer"`, "got=%s", got)
+	assert.Contains(t, got, `"rbac_roles":3`, "got=%s", got)
+	assert.Contains(t, got, `"rbac_subjects":1`, "got=%s", got)
+}
