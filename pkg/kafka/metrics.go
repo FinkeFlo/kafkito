@@ -62,6 +62,21 @@ type ClusterMetrics struct {
 	PerTopic map[string]TopicMetrics
 }
 
+// adminProber is the narrow slice of *kadm.Client that the metrics probe
+// pipeline depends on. Narrowing the dependency from the full kadm.Client
+// surface to only the seven methods probe() actually issues documents
+// the contract at the network boundary; *kadm.Client satisfies it
+// implicitly so production wiring is unchanged.
+type adminProber interface {
+	Metadata(ctx context.Context, topics ...string) (kadm.Metadata, error)
+	ListStartOffsets(ctx context.Context, topics ...string) (kadm.ListedOffsets, error)
+	ListEndOffsets(ctx context.Context, topics ...string) (kadm.ListedOffsets, error)
+	DescribeAllLogDirs(ctx context.Context, s kadm.TopicsSet) (kadm.DescribedAllLogDirs, error)
+	DescribeTopicConfigs(ctx context.Context, topics ...string) (kadm.ResourceConfigs, error)
+	ListGroups(ctx context.Context, filterStates ...string) (kadm.ListedGroups, error)
+	FetchManyOffsets(ctx context.Context, groups ...string) kadm.FetchOffsetsResponses
+}
+
 // ---- collector internals ---------------------------------------------
 
 type topicSample struct {
@@ -217,7 +232,7 @@ func (mc *metricsCollector) refreshOne(cluster string) {
 // calls — only the helpers prevPerTopic / writePrev briefly do.
 func (mc *metricsCollector) probe(
 	ctx context.Context,
-	adm *kadm.Client,
+	adm adminProber,
 	state *clusterState,
 ) (ClusterMetrics, bool) {
 	// Metadata is the cheap, authoritative source for broker + topic lists.
@@ -471,7 +486,7 @@ func (mc *metricsCollector) ensureFresh(
 	ctx context.Context,
 	cluster string,
 	ttl time.Duration,
-	adm *kadm.Client,
+	adm adminProber,
 ) {
 	mc.statesMu.RLock()
 	state, ok := mc.states[cluster]
