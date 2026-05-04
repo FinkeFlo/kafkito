@@ -202,3 +202,67 @@ func TestHeader_DefaultsToConfiguredHeaderConstant(t *testing.T) {
 
 	assert.Equal(t, config.DefaultIdentityHeader, p.Header())
 }
+
+// TestMatchName pins the exported glob-match contract used by HTTP
+// handlers (filterTopicsByRBAC, filterGroupsByRBAC) to filter list
+// results. The CVE class is "an attacker name matches a more
+// restrictive glob"; the empty-target row pins the intentional
+// list-operation wildcard documented on matchResName.
+func TestMatchName(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		pattern string
+		target  string
+		want    bool
+	}{
+		{name: "wildcard_pattern_matches_anything", pattern: "*", target: "topic-anything", want: true},
+		{name: "prefix_glob_hit", pattern: "topic-*", target: "topic-orders", want: true},
+		{name: "prefix_glob_miss_different_prefix", pattern: "topic-*", target: "metric-orders", want: false},
+		{name: "prefix_glob_empty_body_after_prefix_allowed", pattern: "topic-*", target: "topic-", want: true},
+		{name: "exact_equality_hit", pattern: "exact", target: "exact", want: true},
+		{name: "exact_equality_miss", pattern: "exact", target: "different", want: false},
+		{name: "empty_target_intentional_wildcard_for_list_ops", pattern: "topic-*", target: "", want: true},
+		{name: "empty_pattern_does_not_wildcard", pattern: "", target: "anything", want: false},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := MatchName(tc.pattern, tc.target)
+
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+// TestEnabled_ReflectsCompiledPolicyConfig pins the accessor contract
+// callers depend on to short-circuit the RBAC pipeline. A regression
+// that hard-coded true would silently mass-allow; a regression that
+// hard-coded false would mass-deny.
+func TestEnabled_ReflectsCompiledPolicyConfig(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name          string
+		configEnabled bool
+		want          bool
+	}{
+		{name: "enabled_true_reflects_true", configEnabled: true, want: true},
+		{name: "enabled_false_reflects_false", configEnabled: false, want: false},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			p := Compile(config.RBACConfig{Enabled: tc.configEnabled})
+
+			assert.Equal(t, tc.want, p.Enabled())
+		})
+	}
+}
