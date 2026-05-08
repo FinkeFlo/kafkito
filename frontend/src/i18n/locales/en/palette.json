@@ -1,5 +1,5 @@
 {
-  "placeholder": "Find anything: topic, group, broker, subject, cluster…",
+  "placeholder": "Find anything: topic, group, broker, subject, user, cluster…",
   "noResults": "No results.",
   "footer": {
     "navigate": "Navigate",
@@ -11,7 +11,8 @@
     "topic": "TOPIC",
     "group": "GROUP",
     "broker": "BROKER",
-    "subject": "SUBJECT"
+    "subject": "SUBJECT",
+    "user": "USER"
   },
   "nav": {
     "home": "Home",
@@ -32,6 +33,9 @@
   },
   "subject": {
     "versions": "v{{latest}} · {{count}} versions"
+  },
+  "user": {
+    "fallback": "no mechanism"
   },
   "actions": {
     "esc": "Esc"
