@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, Settings } from "lucide-react";
+import { Check, ChevronDown, Search, Settings } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { clsx } from "clsx";
 import { useCluster, type ClusterListItem } from "@/lib/use-cluster";
+import { useFuzzy } from "@/lib/fuzzy";
 import { StatusDot } from "./StatusDot";
 
 function brokersHint(c: ClusterListItem | null): string {
@@ -16,8 +17,10 @@ export function ClusterPill({ className }: { className?: string }) {
   const { cluster, clusters, setCluster, isLoading } = useCluster();
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
+  const [query, setQuery] = useState("");
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const itemsRef = useRef<Array<HTMLButtonElement | null>>([]);
   const popoverId = useId();
 
@@ -25,6 +28,12 @@ export function ClusterPill({ className }: { className?: string }) {
     if (!clusters) return [];
     return [...clusters].sort((a, b) => a.name.localeCompare(b.name));
   }, [clusters]);
+
+  const fuzzy = useFuzzy(sorted, { keys: ["name"], query });
+  const visible = useMemo(() => {
+    if (!query.trim()) return sorted;
+    return fuzzy.results;
+  }, [sorted, query, fuzzy.results]);
 
   const activeInfo = useMemo(
     () => sorted.find((c) => c.name === cluster) ?? null,
@@ -64,11 +73,12 @@ export function ClusterPill({ className }: { className?: string }) {
 
   useLayoutEffect(() => {
     if (!open) return;
+    setQuery("");
     const idx = sorted.findIndex((c) => c.name === cluster);
     const start = idx >= 0 ? idx : 0;
     setActiveIdx(start);
     requestAnimationFrame(() => {
-      itemsRef.current[start]?.focus();
+      searchRef.current?.focus();
     });
   }, [open, sorted, cluster]);
 
@@ -103,16 +113,20 @@ export function ClusterPill({ className }: { className?: string }) {
     );
   }
 
+  useEffect(() => {
+    setActiveIdx(0);
+  }, [query]);
+
   const onListKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (sorted.length === 0) return;
+    if (visible.length === 0) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      const next = (activeIdx + 1) % sorted.length;
+      const next = (activeIdx + 1) % visible.length;
       setActiveIdx(next);
       itemsRef.current[next]?.focus();
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      const next = (activeIdx - 1 + sorted.length) % sorted.length;
+      const next = (activeIdx - 1 + visible.length) % visible.length;
       setActiveIdx(next);
       itemsRef.current[next]?.focus();
     } else if (e.key === "Home") {
@@ -121,9 +135,22 @@ export function ClusterPill({ className }: { className?: string }) {
       itemsRef.current[0]?.focus();
     } else if (e.key === "End") {
       e.preventDefault();
-      const last = sorted.length - 1;
+      const last = visible.length - 1;
       setActiveIdx(last);
       itemsRef.current[last]?.focus();
+    }
+  };
+
+  const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (visible.length === 0) return;
+      setActiveIdx(0);
+      itemsRef.current[0]?.focus();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const target = visible[activeIdx] ?? visible[0];
+      if (target) choose(target.name);
     }
   };
 
@@ -170,36 +197,53 @@ export function ClusterPill({ className }: { className?: string }) {
           <div className="px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted">
             Switch cluster
           </div>
-          <ul className="space-y-0.5">
-            {sorted.map((c, i) => {
-              const active = c.name === cluster;
-              return (
-                <li key={`${c.source}:${c.name}`}>
-                  <button
-                    ref={(el) => {
-                      itemsRef.current[i] = el;
-                    }}
-                    type="button"
-                    role="option"
-                    aria-selected={active}
-                    onClick={() => choose(c.name)}
-                    className={clsx(
-                      "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors",
-                      "hover:bg-hover",
-                      active && "bg-accent-subtle",
-                    )}
-                  >
-                    <StatusDot reachable={c.reachable} />
-                    <span className="min-w-0 flex-1 truncate font-mono text-[12px] font-medium text-text">
-                      {c.name}
-                    </span>
-                    <span className="text-[10px] text-muted">{brokersHint(c)}</span>
-                    {active && <Check className="h-3.5 w-3.5 text-accent" aria-hidden />}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="mb-1 flex items-center gap-2 rounded-md border border-border bg-subtle px-2 py-1.5">
+            <Search className="h-3.5 w-3.5 text-muted" aria-hidden />
+            <input
+              ref={searchRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={onSearchKeyDown}
+              placeholder="Filter clusters…"
+              aria-label="Filter clusters"
+              className="w-full bg-transparent text-[12px] text-text outline-none placeholder:text-muted"
+            />
+          </div>
+          {visible.length === 0 ? (
+            <div className="px-2 py-3 text-center text-[11px] text-muted">No clusters match.</div>
+          ) : (
+            <ul className="space-y-0.5">
+              {visible.map((c, i) => {
+                const active = c.name === cluster;
+                return (
+                  <li key={`${c.source}:${c.name}`}>
+                    <button
+                      ref={(el) => {
+                        itemsRef.current[i] = el;
+                      }}
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      onClick={() => choose(c.name)}
+                      className={clsx(
+                        "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors",
+                        "hover:bg-hover",
+                        active && "bg-accent-subtle",
+                      )}
+                    >
+                      <StatusDot reachable={c.reachable} />
+                      <span className="min-w-0 flex-1 truncate font-mono text-[12px] font-medium text-text">
+                        {c.name}
+                      </span>
+                      <span className="text-[10px] text-muted">{brokersHint(c)}</span>
+                      {active && <Check className="h-3.5 w-3.5 text-accent" aria-hidden />}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
           <div className="mt-1.5 border-t border-border pt-1.5">
             <Link
               to="/settings/clusters"

@@ -4,13 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
   fetchBrokers,
-  fetchClusters,
   fetchGroups,
   fetchTopics,
+  listSCRAMUsers,
   listSubjects,
   type BrokerInfo,
-  type ClusterInfo,
   type GroupInfo,
+  type SCRAMUser,
   type Subject,
   type TopicInfo,
 } from "../lib/api";
@@ -33,7 +33,8 @@ type ItemKind =
   | "topic"
   | "group"
   | "broker"
-  | "subject";
+  | "subject"
+  | "user";
 
 type Item =
   | { kind: "nav"; label: string; to: string; icon: React.ReactNode }
@@ -71,6 +72,13 @@ type Item =
       subject: string;
       latest: number;
       versions: number;
+    }
+  | {
+      kind: "user";
+      label: string;
+      cluster: string;
+      user: string;
+      mechanisms: string;
     };
 
 // Module-level pub-sub used by `<Shell>`'s search button to open the
@@ -130,11 +138,6 @@ export function CommandPalette() {
     : undefined;
   const hasSR = activeInfo ? activeInfo.schema_registry : undefined;
 
-  const clustersQ = useQuery({
-    queryKey: ["clusters"],
-    queryFn: fetchClusters,
-    enabled: open,
-  });
   const topicsQ = useQuery({
     queryKey: ["topics", activeCluster],
     queryFn: () => fetchTopics(activeCluster!),
@@ -157,6 +160,14 @@ export function CommandPalette() {
     // guaranteed-404 flood for SR-less clusters like QAS.
     enabled: open && !!activeCluster && hasSR === true,
   });
+  const usersQ = useQuery({
+    queryKey: ["scram-users", activeCluster],
+    queryFn: () => listSCRAMUsers(activeCluster!),
+    enabled: open && !!activeCluster,
+    // Best-effort: clusters without SCRAM (or with insufficient ACLs) return
+    // an error; keep the palette quiet instead of retrying.
+    retry: false,
+  });
 
   const allItems: Item[] = useMemo(() => {
     const base: Item[] = [
@@ -172,7 +183,7 @@ export function CommandPalette() {
         { kind: "nav", label: tt("nav.users"), to: `/clusters/${c}/security/users`, icon: <UserCog className="h-3.5 w-3.5" /> },
       );
     }
-    const clusterItems: Item[] = (clustersQ.data ?? []).map((c: ClusterInfo) => ({
+    const clusterItems: Item[] = (clusters ?? []).map((c) => ({
       kind: "cluster" as const,
       label: c.name,
       cluster: c.name,
@@ -215,6 +226,15 @@ export function CommandPalette() {
           versions: s.versions.length,
         }))
       : [];
+    const userItems: Item[] = activeCluster
+      ? (usersQ.data ?? []).map((u: SCRAMUser) => ({
+          kind: "user" as const,
+          label: u.user,
+          cluster: activeCluster,
+          user: u.user,
+          mechanisms: u.credentials.map((c) => c.mechanism).join(", "),
+        }))
+      : [];
     return [
       ...base,
       ...clusterItems,
@@ -222,14 +242,16 @@ export function CommandPalette() {
       ...groupItems,
       ...brokerItems,
       ...subjectItems,
+      ...userItems,
     ];
   }, [
     activeCluster,
-    clustersQ.data,
+    clusters,
     topicsQ.data,
     groupsQ.data,
     brokersQ.data,
     subjectsQ.data,
+    usersQ.data,
     tt,
   ]);
 
@@ -250,7 +272,7 @@ export function CommandPalette() {
   // When idle, the items array is already grouped by source bucket order.
   const renderItems: Item[] = useMemo(() => {
     if (!q.trim()) return items;
-    const order: ItemKind[] = ["nav", "cluster", "topic", "group", "broker", "subject"];
+    const order: ItemKind[] = ["nav", "cluster", "topic", "group", "broker", "subject", "user"];
     const grouped: Item[] = [];
     for (const kind of order) {
       for (const it of items) if (it.kind === kind) grouped.push(it);
@@ -291,10 +313,17 @@ export function CommandPalette() {
         to: "/clusters/$cluster/brokers/$id",
         params: { cluster: it.cluster, id: String(it.brokerId) },
       });
-    } else {
+    } else if (it.kind === "subject") {
       navigate({
         to: "/clusters/$cluster/schemas/$subject",
         params: { cluster: it.cluster, subject: it.subject },
+      });
+    } else {
+      // SCRAM users have no per-user route; jump to the listing page where
+      // search/highlight already exists.
+      navigate({
+        to: "/clusters/$cluster/security/users",
+        params: { cluster: it.cluster },
       });
     }
   };
@@ -355,6 +384,7 @@ export function CommandPalette() {
               {it.kind === "group" && <Users className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />}
               {it.kind === "broker" && <Server className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />}
               {it.kind === "subject" && <FileJson className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />}
+              {it.kind === "user" && <UserCog className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />}
               <span className="font-mono">{it.label}</span>
               {it.kind === "cluster" && !it.reachable && (
                 <span className="ml-auto text-[10px] text-[var(--color-danger)]">{tt("cluster.unreachable")}</span>
@@ -373,6 +403,11 @@ export function CommandPalette() {
               {it.kind === "subject" && (
                 <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">
                   {tt("subject.versions", { latest: it.latest, count: it.versions })}
+                </span>
+              )}
+              {it.kind === "user" && (
+                <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">
+                  {it.mechanisms || tt("user.fallback")}
                 </span>
               )}
             </button>
