@@ -10,6 +10,9 @@ const writeMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 // apiFetch is a fetch wrapper for SPA<->approuter<->backend traffic:
 // - always sends cookies (approuter session)
+// - always sends x-requested-with: XMLHttpRequest so @sap/approuter answers
+//   expired sessions with a clean 401 instead of a 200 + login HTML page
+//   (which would otherwise blow up at res.json() as `Unexpected token '<'`)
 // - injects x-csrf-token on writes
 // - on 401: clears CSRF cache, navigates the top window to / so the
 //   approuter can run the OAuth code flow against XSUAA, throws
@@ -18,6 +21,7 @@ const writeMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 export async function apiFetch(input: RequestInfo, init: RequestInit = {}): Promise<Response> {
   const method = (init.method ?? 'GET').toUpperCase();
   const headers = new Headers(init.headers);
+  headers.set('x-requested-with', 'XMLHttpRequest');
   if (writeMethods.has(method)) {
     try {
       headers.set('x-csrf-token', await getCsrfToken());

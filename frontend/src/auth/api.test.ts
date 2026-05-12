@@ -57,6 +57,32 @@ describe("apiFetch — method handling and CSRF header injection", () => {
     expect(mockedGetCsrfToken).not.toHaveBeenCalled();
   });
 
+  it.each([["GET"], ["POST"], ["PUT"], ["PATCH"], ["DELETE"], ["HEAD"]])(
+    "always sets x-requested-with: XMLHttpRequest (method=%s) so @sap/approuter answers expired sessions with 401 instead of 200 + login HTML",
+    async (method) => {
+      mockedGetCsrfToken.mockResolvedValue("tok");
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        makeResponse(200),
+      );
+
+      await apiFetch("/x", { method });
+
+      const headers = getFetchHeaders();
+      expect(headers.get("x-requested-with")).toBe("XMLHttpRequest");
+    },
+  );
+
+  it("preserves a caller-provided x-requested-with override is not a concern; the helper always sets XMLHttpRequest to keep approuter behavior predictable", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      makeResponse(200),
+    );
+
+    await apiFetch("/x", { headers: { "x-requested-with": "Something" } });
+
+    const headers = getFetchHeaders();
+    expect(headers.get("x-requested-with")).toBe("XMLHttpRequest");
+  });
+
   it.each([["GET"], ["HEAD"], ["get"], ["head"]])(
     "read method %s does not inject x-csrf-token (negative control)",
     async (method) => {
