@@ -12,7 +12,7 @@ import { Badge, type BadgeVariant } from "@/components/badge";
 import { LagBadge } from "@/components/lag-badge";
 import { EmptyState } from "@/components/EmptyState";
 import { Notice } from "@/components/Notice";
-import { formatNumber } from "@/lib/format";
+import { useFormatters } from "@/lib/use-formatters";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic/consumers")({
   component: ConsumersTab,
@@ -25,6 +25,7 @@ function ConsumersTab() {
 
 function ConsumersPanel({ cluster, topic }: { cluster: string; topic: string }) {
   const { t } = useTranslation("topics");
+  const fmt = useFormatters();
   const query = useQuery({
     queryKey: ["topic-consumers", cluster, topic],
     queryFn: () => fetchTopicConsumers(cluster, topic),
@@ -76,7 +77,7 @@ function ConsumersPanel({ cluster, topic }: { cluster: string; topic: string }) 
       sortValue: (r) => r.members,
       align: "right",
       className: "tabular-nums",
-      cell: (r) => formatNumber(r.members),
+      cell: (r) => fmt.number(r.members),
     },
     {
       id: "partitions",
@@ -84,7 +85,7 @@ function ConsumersPanel({ cluster, topic }: { cluster: string; topic: string }) 
       sortValue: (r) => r.partitions_assigned.length,
       align: "right",
       className: "tabular-nums",
-      cell: (r) => formatNumber(r.partitions_assigned.length),
+      cell: (r) => fmt.number(r.partitions_assigned.length),
     },
     {
       id: "lag",

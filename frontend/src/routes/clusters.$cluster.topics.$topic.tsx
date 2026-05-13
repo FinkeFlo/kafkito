@@ -20,7 +20,7 @@ import { Button } from "@/components/button";
 import { Modal } from "@/components/Modal";
 import { Notice } from "@/components/Notice";
 import { Input } from "@/components/Input";
-import { formatBytes, formatCount } from "@/lib/format";
+import { useFormatters } from "@/lib/use-formatters";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic")({
   component: TopicDetailLayout,
@@ -172,7 +172,8 @@ function KpiStrip({
   detail: TopicDetail | undefined;
   consumers: Array<{ lag: number; lag_known: boolean }> | undefined;
 }) {
-  const msgs = detail ? formatCount(detail.messages) : "—";
+  const fmt = useFormatters();
+  const msgs = detail ? fmt.count(detail.messages) : "—";
   const totalLag = consumers
     ? consumers.reduce((s, c) => s + (c.lag_known ? c.lag : 0), 0)
     : undefined;
@@ -184,7 +185,7 @@ function KpiStrip({
       <KpiCard label="Messages" value={msgs} />
       <KpiCard
         label="Lag (all groups)"
-        value={totalLag === undefined ? "—" : lagKnown ? formatCount(totalLag) : "—"}
+        value={totalLag === undefined ? "—" : lagKnown ? fmt.count(totalLag) : "—"}
         delta={totalLag === 0 ? "healthy" : undefined}
         deltaIntent={totalLag === 0 ? "good" : "neutral"}
       />
@@ -192,7 +193,7 @@ function KpiStrip({
         label="Avg msg size"
         value={
           detail && detail.size_bytes != null && detail.messages > 0
-            ? formatBytes(Math.round(detail.size_bytes / Number(detail.messages)))
+            ? fmt.bytes(Math.round(detail.size_bytes / Number(detail.messages)))
             : "—"
         }
         unit="per message"
@@ -314,6 +315,7 @@ function DeleteRecordsModal({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  const fmt = useFormatters();
   const [sel, setSel] = useState<Record<number, boolean>>(() =>
     Object.fromEntries(partitions.map((p) => [p.partition, true])),
   );
@@ -370,7 +372,7 @@ function DeleteRecordsModal({
       actions={
         <>
           <span className="mr-auto text-xs text-muted">
-            {formatBytes(0)} to be freed · estimate
+            {fmt.bytes(0)} to be freed · estimate
           </span>
           <Button variant="ghost" size="sm" onClick={onClose}>
             Close

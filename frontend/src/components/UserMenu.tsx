@@ -2,8 +2,14 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, LogOut, Monitor, Moon, Sun } from "lucide-react";
 import { clsx } from "clsx";
 import { useAuth } from "@/auth/hooks";
+import { formatNumber } from "@/lib/format";
 import { useTheme, type ThemePreference } from "@/lib/theme";
 import { useTimeZone, getDetectedTimeZone, type TimeZoneMode } from "@/lib/use-timezone";
+import {
+  getDetectedLocale,
+  useNumberFormat,
+  type NumberFormatPreference,
+} from "@/lib/use-number-format";
 
 const TAIL_BUFFER_KEY = "kafkito.tailBuffer";
 const TAIL_BUFFER_DEFAULT = "10000";
@@ -136,6 +142,7 @@ export function UserMenu() {
 
           <ThemeRow />
           <TimezoneRow />
+          <NumberFormatRow />
           <TailBufferRow />
           <ConfirmDestructiveRow />
 
@@ -227,6 +234,50 @@ function TimezoneRow() {
                 role="radio"
                 aria-checked={active}
                 onClick={() => setMode(opt.value)}
+                className={clsx(
+                  "inline-flex h-6 items-center justify-center rounded px-2 transition-colors",
+                  active
+                    ? "bg-panel text-text"
+                    : "text-muted hover:text-text",
+                )}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      }
+    />
+  );
+}
+
+const NUMBER_FORMAT_OPTIONS: { value: NumberFormatPreference; label: string }[] = [
+  { value: "auto", label: "Auto" },
+  { value: "de", label: "DE" },
+  { value: "en", label: "EN" },
+];
+
+const NUMBER_FORMAT_SAMPLE = 1_965_590;
+
+function NumberFormatRow() {
+  const { preference, effectiveLocale, setPreference } = useNumberFormat();
+  const preview = formatNumber(NUMBER_FORMAT_SAMPLE, effectiveLocale);
+  const hint = preference === "auto" ? `browser: ${getDetectedLocale()} · ${preview}` : preview;
+  return (
+    <SettingRow
+      label="Numbers"
+      hint={hint}
+      control={
+        <div role="radiogroup" aria-label="Number format" className="inline-flex rounded-md border border-border bg-bg p-0.5 text-[11px] font-semibold uppercase tracking-wide">
+          {NUMBER_FORMAT_OPTIONS.map((opt) => {
+            const active = preference === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => setPreference(opt.value)}
                 className={clsx(
                   "inline-flex h-6 items-center justify-center rounded px-2 transition-colors",
                   active

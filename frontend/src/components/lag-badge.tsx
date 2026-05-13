@@ -1,5 +1,6 @@
 import { Badge, type BadgeVariant } from "./badge";
-import { formatNumber, lagVariant } from "@/lib/format";
+import { lagVariant } from "@/lib/format";
+import { useFormatters } from "@/lib/use-formatters";
 
 export interface LagBadgeProps {
   /** Lag value (sum or per-partition). null/undefined → "—" rendered as neutral. */
@@ -33,6 +34,7 @@ const labelByVariant: Record<BadgeVariant, string> = {
  * Threshold logic (§3) lives here — never compare lag values directly in feature code.
  */
 export function LagBadge({ value, className, showZero = true }: LagBadgeProps) {
+  const fmt = useFormatters();
   if (value === null || value === undefined) {
     return (
       <Badge variant="neutral" className={className}>
@@ -51,7 +53,7 @@ export function LagBadge({ value, className, showZero = true }: LagBadgeProps) {
       <span aria-hidden="true" className="font-mono text-[10px] leading-none">
         {glyphByVariant[variant]}
       </span>
-      <span>{formatNumber(n)}</span>
+      <span>{fmt.number(n)}</span>
     </Badge>
   );
 }

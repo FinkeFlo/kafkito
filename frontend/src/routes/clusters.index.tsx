@@ -20,7 +20,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/button";
-import { formatCount, formatNumber, formatRate, formatRelative } from "@/lib/format";
+import { formatRelative } from "@/lib/format";
+import { useFormatters } from "@/lib/use-formatters";
 
 type ClusterRowInfo = ClusterInfo & { is_private?: boolean };
 
@@ -184,23 +185,24 @@ function Header({
 }
 
 function Kpis({ clusters }: { clusters: ClusterRowInfo[] }) {
+  const fmt = useFormatters();
   const unreachable = clusters.filter((c) => !c.reachable);
   const totals = aggregateTotals(clusters);
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <KpiCard
         label="Total throughput"
-        value={totals.rate !== null ? formatRate(totals.rate) : "—"}
+        value={totals.rate !== null ? fmt.rate(totals.rate) : "—"}
         unit="msg/s"
       />
       <KpiCard
         label="Total lag"
-        value={totals.lag !== null ? formatCount(totals.lag) : "—"}
+        value={totals.lag !== null ? fmt.count(totals.lag) : "—"}
         unit="messages"
       />
       <KpiCard
         label="Topics"
-        value={totals.topics !== null ? formatNumber(totals.topics) : "—"}
+        value={totals.topics !== null ? fmt.number(totals.topics) : "—"}
         unit="across clusters"
       />
       {/* TODO(backend): /clusters/health/incidents?window=24h needed for a real Incidents-24h metric */}
@@ -287,6 +289,7 @@ function ClustersTable({ clusters }: { clusters: ClusterRowInfo[] }) {
 }
 
 function ClusterRow({ cluster }: { cluster: ClusterRowInfo }) {
+  const fmt = useFormatters();
   const limited = isLimited(cluster);
   return (
     <DataTableRow>
@@ -326,11 +329,11 @@ function ClusterRow({ cluster }: { cluster: ClusterRowInfo }) {
           TODO(backend): /clusters groups count
           TODO(backend): /clusters total_rate_per_sec aggregate
           TODO(backend): /clusters total_lag aggregate */}
-      <MetricTd value={cluster.brokers} format={formatNumber} />
-      <MetricTd value={cluster.topics} format={formatNumber} />
-      <MetricTd value={cluster.groups} format={formatNumber} />
-      <MetricTd value={cluster.total_rate_per_sec} format={formatRate} />
-      <MetricTd value={cluster.total_lag} format={formatCount} />
+      <MetricTd value={cluster.brokers} format={fmt.number} />
+      <MetricTd value={cluster.topics} format={fmt.number} />
+      <MetricTd value={cluster.groups} format={fmt.number} />
+      <MetricTd value={cluster.total_rate_per_sec} format={fmt.rate} />
+      <MetricTd value={cluster.total_lag} format={fmt.count} />
     </DataTableRow>
   );
 }

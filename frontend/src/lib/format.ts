@@ -1,41 +1,86 @@
 /**
  * Project-wide formatting helpers. Single source of truth — never re-implement
- * locally. ISO 8601 timestamps, IEC bytes, en-US numbers (i18n-ready later).
+ * locally. ISO 8601 timestamps, IEC bytes, locale-aware numbers via Intl.
+ *
+ * Number-formatting functions accept an optional `locale` argument (BCP-47,
+ * e.g. "de-DE"). Omit it to keep the historical en-US output. React UI should
+ * pull the active locale through `useFormatters()` so the user-menu toggle
+ * (Auto · DE · EN) is honored everywhere.
  *
  * See: .github/instructions/frontend-styleguide.instructions.md §4.
  */
 
-const numberFormatter = new Intl.NumberFormat("en-US");
+const DEFAULT_LOCALE = "en-US";
 
-/** Format an integer count with thin thousands separators. */
-export function formatNumber(n: number | bigint): string {
-  if (typeof n === "bigint") return numberFormatter.format(n);
+const groupedCache = new Map<string, Intl.NumberFormat>();
+const compactCache = new Map<string, Intl.NumberFormat>();
+
+function grouped(locale: string): Intl.NumberFormat {
+  let nf = groupedCache.get(locale);
+  if (!nf) {
+    nf = new Intl.NumberFormat(locale);
+    groupedCache.set(locale, nf);
+  }
+  return nf;
+}
+
+function compact(locale: string): Intl.NumberFormat {
+  let nf = compactCache.get(locale);
+  if (!nf) {
+    nf = new Intl.NumberFormat(locale, {
+      notation: "compact",
+      compactDisplay: "short",
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
+    });
+    compactCache.set(locale, nf);
+  }
+  return nf;
+}
+
+function fixed(locale: string, digits: number): Intl.NumberFormat {
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
+/** Format an integer count with locale-appropriate thousands separators. */
+export function formatNumber(
+  n: number | bigint,
+  locale: string = DEFAULT_LOCALE,
+): string {
+  if (typeof n === "bigint") return grouped(locale).format(n);
   if (!Number.isFinite(n)) return "—";
-  return numberFormatter.format(n);
+  return grouped(locale).format(n);
 }
 
 /**
- * Format a count with k/M/B compaction for dense data-grid cells.
- * `formatCount(8_420_000)` → "8.42M"; `formatCount(110_000)` → "110.0k".
+ * Format a count with locale-aware compact notation for dense data-grid cells.
+ * In en-US: `formatCount(8_420_000)` → "8.42M".
+ * In de-DE: `formatCount(8_420_000)` → "8,42 Mio.".
  * Falls back to a grouped decimal for values below 1000.
  */
-export function formatCount(n: number | bigint | null | undefined): string {
+export function formatCount(
+  n: number | bigint | null | undefined,
+  locale: string = DEFAULT_LOCALE,
+): string {
   if (n === null || n === undefined) return "—";
   const num = typeof n === "bigint" ? Number(n) : n;
   if (!Number.isFinite(num)) return "—";
-  const abs = Math.abs(num);
-  if (abs < 1_000) return numberFormatter.format(num);
-  if (abs < 1_000_000) return `${(num / 1_000).toFixed(1)}k`;
-  if (abs < 1_000_000_000) return `${(num / 1_000_000).toFixed(2)}M`;
-  return `${(num / 1_000_000_000).toFixed(2)}B`;
+  if (Math.abs(num) < 1_000) return grouped(locale).format(num);
+  return compact(locale).format(num);
 }
 
 /** Render a consumer-group lag value as a plain string. `null`/`undefined`/NaN → "—". */
-export function formatLag(lag: number | bigint | null | undefined): string {
+export function formatLag(
+  lag: number | bigint | null | undefined,
+  locale: string = DEFAULT_LOCALE,
+): string {
   if (lag === null || lag === undefined) return "—";
   const n = typeof lag === "bigint" ? Number(lag) : lag;
   if (!Number.isFinite(n)) return "—";
-  return numberFormatter.format(n);
+  return grouped(locale).format(n);
 }
 
 /** UTC-only timestamp (alias for `formatTimestamp(..., "utc")`). */
@@ -48,12 +93,17 @@ const BYTE_UNITS = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"] as const;
 /**
  * Format a byte count using IEC binary units.
  * Always returns 1–2 fractional digits for values ≥ 1 KiB, 0 for raw bytes.
+ * The numeric portion uses locale-aware decimal/thousands separators; the
+ * IEC unit suffix (KiB, MiB, …) is technical and stays untranslated.
  */
-export function formatBytes(bytes: number | bigint | null | undefined): string {
+export function formatBytes(
+  bytes: number | bigint | null | undefined,
+  locale: string = DEFAULT_LOCALE,
+): string {
   if (bytes === null || bytes === undefined) return "—";
   const n = typeof bytes === "bigint" ? Number(bytes) : bytes;
   if (!Number.isFinite(n)) return "—";
-  if (n < 1024) return `${Math.trunc(n)} B`;
+  if (n < 1024) return `${grouped(locale).format(Math.trunc(n))} B`;
 
   let value = n;
   let unitIdx = 0;
@@ -62,7 +112,7 @@ export function formatBytes(bytes: number | bigint | null | undefined): string {
     unitIdx += 1;
   }
   const digits = value >= 100 ? 0 : value >= 10 ? 1 : 2;
-  return `${value.toFixed(digits)} ${BYTE_UNITS[unitIdx]}`;
+  return `${fixed(locale, digits).format(value)} ${BYTE_UNITS[unitIdx]}`;
 }
 
 export type TimestampZone = "utc" | "local";
@@ -141,40 +191,52 @@ export function formatRelative(
  * Format a duration given in milliseconds as a compact human string.
  * Kafka retention convention: -1 ms means "infinite". `0`/unknown → "—".
  *   7 d, 12 h, 30 m, 45 s, 500 ms
+ * The numeric portion uses locale-aware decimal separators; unit suffixes
+ * (`ms`, `s`, `m`, `h`, `d`, `mo`, `y`) are kept English/short and stable.
  */
-export function formatDuration(ms: number | bigint | null | undefined): string {
+export function formatDuration(
+  ms: number | bigint | null | undefined,
+  locale: string = DEFAULT_LOCALE,
+): string {
   if (ms === null || ms === undefined) return "—";
   const n = typeof ms === "bigint" ? Number(ms) : ms;
   if (!Number.isFinite(n)) return "—";
   if (n < 0) return "∞";
   if (n === 0) return "0";
   const s = n / 1000;
-  if (s < 1) return `${Math.round(n)} ms`;
+  if (s < 1) return `${grouped(locale).format(Math.round(n))} ms`;
   const m = s / 60;
-  if (m < 1) return `${Math.round(s)} s`;
+  if (m < 1) return `${grouped(locale).format(Math.round(s))} s`;
   const h = m / 60;
-  if (h < 1) return `${Math.round(m)} m`;
+  if (h < 1) return `${grouped(locale).format(Math.round(m))} m`;
   const d = h / 24;
-  if (d < 1) return `${h >= 10 ? Math.round(h) : h.toFixed(1)} h`;
-  if (d < 30) return `${d >= 10 ? Math.round(d) : d.toFixed(1)} d`;
+  if (d < 1)
+    return `${h >= 10 ? grouped(locale).format(Math.round(h)) : fixed(locale, 1).format(h)} h`;
+  if (d < 30)
+    return `${d >= 10 ? grouped(locale).format(Math.round(d)) : fixed(locale, 1).format(d)} d`;
   const y = d / 365;
-  if (y < 1) return `${Math.round(d / 30)} mo`;
-  return `${y >= 10 ? Math.round(y) : y.toFixed(1)} y`;
+  if (y < 1) return `${grouped(locale).format(Math.round(d / 30))} mo`;
+  return `${y >= 10 ? grouped(locale).format(Math.round(y)) : fixed(locale, 1).format(y)} y`;
 }
 
 /**
  * Format a rate (messages per second) compactly: "1.2k/s", "3 msg/s",
  * "42.0M/s". `null`/`undefined`/negative → "—".
+ * The numeric portion uses locale-aware decimal separators; the `/s` and
+ * `k`/`M` suffixes are kept short and stable across locales.
  */
-export function formatRate(perSec: number | null | undefined): string {
+export function formatRate(
+  perSec: number | null | undefined,
+  locale: string = DEFAULT_LOCALE,
+): string {
   if (perSec === null || perSec === undefined) return "—";
   if (!Number.isFinite(perSec) || perSec < 0) return "—";
   if (perSec < 0.1) return "0/s";
-  if (perSec < 1) return `${perSec.toFixed(2)}/s`;
-  if (perSec < 10) return `${perSec.toFixed(1)}/s`;
-  if (perSec < 1_000) return `${Math.round(perSec)}/s`;
-  if (perSec < 1_000_000) return `${(perSec / 1_000).toFixed(1)}k/s`;
-  return `${(perSec / 1_000_000).toFixed(2)}M/s`;
+  if (perSec < 1) return `${fixed(locale, 2).format(perSec)}/s`;
+  if (perSec < 10) return `${fixed(locale, 1).format(perSec)}/s`;
+  if (perSec < 1_000) return `${grouped(locale).format(Math.round(perSec))}/s`;
+  if (perSec < 1_000_000) return `${fixed(locale, 1).format(perSec / 1_000)}k/s`;
+  return `${fixed(locale, 2).format(perSec / 1_000_000)}M/s`;
 }
 
 export type LagVariant = "neutral" | "warning" | "danger";
