@@ -8,7 +8,7 @@ import {
 import { Tag } from "@/components/Tag";
 import { KpiCard } from "@/components/KpiCard";
 import { Notice } from "@/components/Notice";
-import { useFormatters } from "@/lib/use-formatters";
+import { useFormatters, type Formatters } from "@/lib/use-formatters";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic")({
   component: TopicDetailLayout,
@@ -38,6 +38,7 @@ function tabPath(id: string): TabPath {
 
 function TopicDetailLayout() {
   const { cluster, topic } = Route.useParams();
+  const fmt = useFormatters();
 
   const detailQuery = useQuery({
     queryKey: ["topic", cluster, topic],
@@ -70,7 +71,7 @@ function TopicDetailLayout() {
         </div>
         <p className="mt-1 text-sm text-muted">
           {detailQuery.data
-            ? `${detailQuery.data.partitions.length} partitions · RF ${detailQuery.data.replication_factor} · ${retentionLabel(retention, configsError)}`
+            ? `${detailQuery.data.partitions.length} partitions · RF ${detailQuery.data.replication_factor} · ${retentionLabel(retention, configsError, fmt)}`
             : "Loading topic metadata…"}
         </p>
       </div>
@@ -124,7 +125,11 @@ function Breadcrumbs({ cluster, topic }: { cluster: string; topic: string }) {
   );
 }
 
-function retentionLabel(ms: string | undefined, configsError: string | undefined): string {
+function retentionLabel(
+  ms: string | undefined,
+  configsError: string | undefined,
+  fmt: Formatters,
+): string {
   if (!ms) {
     if (configsError === "unauthorized") return "retention restricted";
     if (configsError) return "retention unavailable";
@@ -134,9 +139,9 @@ function retentionLabel(ms: string | undefined, configsError: string | undefined
   if (!Number.isFinite(n)) return `retention ${ms}`;
   if (n <= 0) return "retention ∞";
   const hours = n / 3_600_000;
-  if (hours < 24) return `${hours.toFixed(1)}h retention`;
+  if (hours < 24) return `${fmt.decimal(hours, 1)}h retention`;
   const days = hours / 24;
-  return `${days.toFixed(1)}d retention`;
+  return `${fmt.decimal(days, 1)}d retention`;
 }
 
 function KpiStrip({

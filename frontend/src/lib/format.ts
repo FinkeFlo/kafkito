@@ -56,6 +56,22 @@ export function formatNumber(
 }
 
 /**
+ * Format a decimal value with a fixed number of fractional digits using the
+ * locale-aware decimal separator (e.g. `1.5` → "1,5" in de-DE, "1.5" in en-US).
+ * Returns "—" for null/undefined/NaN.
+ */
+export function formatDecimal(
+  n: number | bigint | null | undefined,
+  digits: number,
+  locale: string = DEFAULT_LOCALE,
+): string {
+  if (n === null || n === undefined) return "—";
+  const num = typeof n === "bigint" ? Number(n) : n;
+  if (!Number.isFinite(num)) return "—";
+  return fixed(locale, digits).format(num);
+}
+
+/**
  * Format a count with locale-aware compact notation for dense data-grid cells.
  * In en-US: `formatCount(8_420_000)` → "8.42M".
  * In de-DE: `formatCount(8_420_000)` → "8,42 Mio.".

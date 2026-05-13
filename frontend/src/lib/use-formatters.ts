@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import {
   formatBytes,
   formatCount,
+  formatDecimal,
   formatDuration,
   formatLag,
   formatNumber,
@@ -16,6 +17,7 @@ export type Formatters = {
   bytes: (n: number | bigint | null | undefined) => string;
   rate: (n: number | null | undefined) => string;
   duration: (n: number | bigint | null | undefined) => string;
+  decimal: (n: number | bigint | null | undefined, digits: number) => string;
 };
 
 /**
@@ -35,6 +37,7 @@ export function useFormatters(): Formatters {
       bytes: (n) => formatBytes(n, effectiveLocale),
       rate: (n) => formatRate(n, effectiveLocale),
       duration: (n) => formatDuration(n, effectiveLocale),
+      decimal: (n, digits) => formatDecimal(n, digits, effectiveLocale),
     }),
     [effectiveLocale],
   );

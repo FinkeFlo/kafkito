@@ -24,6 +24,7 @@ import { MonoId } from "@/components/mono-id";
 import { SearchInput } from "@/components/search-input";
 import { Highlight } from "@/components/highlight";
 import { useFuzzy } from "@/lib/fuzzy";
+import { useFormatters } from "@/lib/use-formatters";
 import { useTranslation } from "react-i18next";
 import { Users } from "lucide-react";
 
@@ -305,6 +306,7 @@ function GroupDetailPanel({ cluster, group }: { cluster: string; group: string }
 }
 
 function GroupDetailBody({ cluster, detail }: { cluster: string; detail: GroupDetail }) {
+  const fmt = useFormatters();
   const byTopic = useMemo(() => {
     const m = new Map<string, GroupDetail["offsets"]>();
     for (const o of detail.offsets) {
@@ -336,7 +338,7 @@ function GroupDetailBody({ cluster, detail }: { cluster: string; detail: GroupDe
             <Metric label="Topics" value={byTopic.length} />
             <Metric
               label="Total lag"
-              value={detail.lag_known ? formatNum(detail.lag) : "?"}
+              value={detail.lag_known ? fmt.count(detail.lag) : "?"}
               highlight={detail.lag_known && detail.lag > 0}
             />
           </div>
@@ -435,7 +437,7 @@ function GroupDetailBody({ cluster, detail }: { cluster: string; detail: GroupDe
                     <span>{offsets.length} partitions</span>
                     {topicLag > 0 && (
                       <span className="font-semibold text-warning">
-                        lag {formatNum(topicLag)}
+                        lag {fmt.count(topicLag)}
                       </span>
                     )}
                   </div>
@@ -479,7 +481,7 @@ function GroupDetailBody({ cluster, detail }: { cluster: string; detail: GroupDe
                               <span className="text-subtle-text">0</span>
                             ) : (
                               <span className="font-semibold text-warning">
-                                {formatNum(o.lag)}
+                                {fmt.count(o.lag)}
                               </span>
                             )}
                           </td>
@@ -527,14 +529,6 @@ function Metric({
       </div>
     </div>
   );
-}
-
-function formatNum(n: number): string {
-  if (n < 1000) return String(n);
-  if (n < 1_000_000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";
-  if (n < 1_000_000_000)
-    return (n / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
-  return (n / 1_000_000_000).toFixed(1).replace(/\.0$/, "") + "B";
 }
 
 function GroupActions({

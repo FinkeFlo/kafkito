@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { fetchTopicDetail, type PartitionInfo } from "@/lib/api";
+import { useFormatters, type Formatters } from "@/lib/use-formatters";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic/")({
   component: OverviewTab,
@@ -8,6 +9,7 @@ export const Route = createFileRoute("/clusters/$cluster/topics/$topic/")({
 
 function OverviewTab() {
   const { cluster, topic } = Route.useParams();
+  const fmt = useFormatters();
 
   const detailQuery = useQuery({
     queryKey: ["topic", cluster, topic],
@@ -32,21 +34,23 @@ function OverviewTab() {
 
   return (
     <div className="space-y-6">
-      <SummaryCards detail={detailQuery.data} />
-      <PartitionsTable partitions={detailQuery.data.partitions} />
+      <SummaryCards detail={detailQuery.data} fmt={fmt} />
+      <PartitionsTable partitions={detailQuery.data.partitions} fmt={fmt} />
     </div>
   );
 }
 
 function SummaryCards({
   detail,
+  fmt,
 }: {
   detail: { partitions: PartitionInfo[]; replication_factor: number; messages: number; is_internal: boolean };
+  fmt: Formatters;
 }) {
   const items = [
     { label: "Partitions", value: detail.partitions.length.toString() },
     { label: "Replication", value: detail.replication_factor.toString() },
-    { label: "Messages", value: detail.messages.toLocaleString() },
+    { label: "Messages", value: fmt.number(detail.messages) },
     { label: "Kind", value: detail.is_internal ? "internal" : "user" },
   ];
   return (
@@ -66,7 +70,13 @@ function SummaryCards({
   );
 }
 
-function PartitionsTable({ partitions }: { partitions: PartitionInfo[] }) {
+function PartitionsTable({
+  partitions,
+  fmt,
+}: {
+  partitions: PartitionInfo[];
+  fmt: Formatters;
+}) {
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm">
       <div className="border-b border-[var(--color-border)] p-3 text-sm font-semibold">
@@ -97,7 +107,7 @@ function PartitionsTable({ partitions }: { partitions: PartitionInfo[] }) {
               </td>
               <td className="px-4 py-2 tabular-nums">{p.start_offset}</td>
               <td className="px-4 py-2 tabular-nums">{p.end_offset}</td>
-              <td className="px-4 py-2 tabular-nums">{p.messages.toLocaleString()}</td>
+              <td className="px-4 py-2 tabular-nums">{fmt.number(p.messages)}</td>
             </tr>
           ))}
         </tbody>
