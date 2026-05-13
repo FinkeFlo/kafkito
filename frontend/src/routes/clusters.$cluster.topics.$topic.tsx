@@ -1,25 +1,13 @@
-import { createFileRoute, Link, Outlet, useNavigate } from "@tanstack/react-router";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import {
-  fetchClusters,
   fetchTopicConsumers,
   fetchTopicDetail,
-  deleteTopic,
-  deleteRecords,
-  can,
-  type Capabilities,
-  type PartitionInfo,
   type TopicDetail,
 } from "@/lib/api";
-import { useAuth } from "@/auth/hooks";
-import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Tag } from "@/components/Tag";
 import { KpiCard } from "@/components/KpiCard";
-import { Button } from "@/components/button";
-import { Modal } from "@/components/Modal";
 import { Notice } from "@/components/Notice";
-import { Input } from "@/components/Input";
 import { useFormatters } from "@/lib/use-formatters";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic")({
@@ -51,15 +39,6 @@ function tabPath(id: string): TabPath {
 function TopicDetailLayout() {
   const { cluster, topic } = Route.useParams();
 
-  const clustersQuery = useQuery({
-    queryKey: ["clusters"],
-    queryFn: fetchClusters,
-  });
-  const caps = useMemo(
-    () => clustersQuery.data?.find((c) => c.name === cluster)?.capabilities,
-    [clustersQuery.data, cluster],
-  );
-
   const detailQuery = useQuery({
     queryKey: ["topic", cluster, topic],
     queryFn: () => fetchTopicDetail(cluster, topic),
@@ -84,20 +63,10 @@ function TopicDetailLayout() {
     <div className="space-y-5 px-6 py-6">
       <div>
         <Breadcrumbs cluster={cluster} topic={topic} />
-        <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-mono text-2xl font-semibold tracking-tight">{topic}</h1>
-            {detailQuery.data?.is_internal && <Tag>INTERNAL</Tag>}
-            {schemaType && <Tag variant="info">{schemaType.toUpperCase()}</Tag>}
-          </div>
-          {cluster && detailQuery.data && (
-            <TopicActions
-              cluster={cluster}
-              topic={topic}
-              partitions={detailQuery.data.partitions}
-              caps={caps}
-            />
-          )}
+        <div className="mt-1 flex flex-wrap items-center gap-3">
+          <h1 className="font-mono text-2xl font-semibold tracking-tight">{topic}</h1>
+          {detailQuery.data?.is_internal && <Tag>INTERNAL</Tag>}
+          {schemaType && <Tag variant="info">{schemaType.toUpperCase()}</Tag>}
         </div>
         <p className="mt-1 text-sm text-muted">
           {detailQuery.data
@@ -205,299 +174,5 @@ function KpiStrip({
       />
       <KpiCard label="Consumers" value={consumerCount} />
     </div>
-  );
-}
-
-function TopicActions({
-  cluster,
-  topic,
-  partitions,
-  caps,
-}: {
-  cluster: string;
-  topic: string;
-  partitions: PartitionInfo[];
-  caps?: Capabilities;
-}) {
-  const qc = useQueryClient();
-  const navigate = useNavigate();
-  const [truncOpen, setTruncOpen] = useState(false);
-  const [delOpen, setDelOpen] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const delMut = useMutation({
-    mutationFn: () => deleteTopic(cluster, topic),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["topics", cluster] });
-      navigate({ to: "/clusters/$cluster/topics", params: { cluster } });
-    },
-    onError: (e: Error) => setErr(e.message),
-  });
-
-  const { me } = useAuth();
-  const rbacAllowsDelete = can(me, cluster, "topic", "delete", topic);
-  const canDelete = caps?.delete_topic !== false && rbacAllowsDelete;
-  const canTruncate = caps?.delete_topic !== false && rbacAllowsDelete;
-  const deleteReason = !rbacAllowsDelete
-    ? "forbidden by RBAC policy"
-    : (caps?.errors?.delete_topic ?? "DELETE on TOPIC required");
-
-  // RBAC / capability reason is load-bearing — wire it via aria-describedby
-  // and an inline `<Notice>` instead of hover-only `title=`.
-  const truncReasonId = "topic-truncate-disabled-reason";
-  const delReasonId = "topic-delete-disabled-reason";
-  return (
-    <div className="flex flex-col items-end gap-2">
-      <div className="flex gap-2">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => setTruncOpen(true)}
-          disabled={!canTruncate}
-          aria-describedby={!canTruncate ? truncReasonId : undefined}
-        >
-          Delete records…
-        </Button>
-        <Button
-          variant="danger"
-          size="sm"
-          onClick={() => setDelOpen(true)}
-          disabled={delMut.isPending || !canDelete}
-          aria-describedby={!canDelete ? delReasonId : undefined}
-        >
-          {delMut.isPending ? "Deleting…" : "Delete topic"}
-        </Button>
-      </div>
-      {!canTruncate ? (
-        <span id={truncReasonId} className="sr-only">
-          {deleteReason}
-        </span>
-      ) : null}
-      {!canDelete ? (
-        <span id={delReasonId} className="sr-only">
-          {deleteReason}
-        </span>
-      ) : null}
-      <ConfirmDialog
-        open={delOpen}
-        onOpenChange={setDelOpen}
-        title={`Delete topic "${topic}"?`}
-        description={`This will permanently remove the topic on cluster "${cluster}". This cannot be undone.`}
-        confirmPhrase={topic}
-        confirmLabel="Delete topic"
-        variant="danger"
-        onConfirm={() => {
-          setErr(null);
-          delMut.mutate();
-        }}
-      />
-      {err && (
-        <div className="max-w-xs">
-          <Notice intent="danger">{err}</Notice>
-        </div>
-      )}
-      {truncOpen && (
-        <DeleteRecordsModal
-          cluster={cluster}
-          topic={topic}
-          partitions={partitions}
-          onClose={() => setTruncOpen(false)}
-        />
-      )}
-    </div>
-  );
-}
-
-function DeleteRecordsModal({
-  cluster,
-  topic,
-  partitions,
-  onClose,
-}: {
-  cluster: string;
-  topic: string;
-  partitions: PartitionInfo[];
-  onClose: () => void;
-}) {
-  const qc = useQueryClient();
-  const fmt = useFormatters();
-  const [sel, setSel] = useState<Record<number, boolean>>(() =>
-    Object.fromEntries(partitions.map((p) => [p.partition, true])),
-  );
-  const [mode, setMode] = useState<"all" | "offset">("all");
-  const [offsets, setOffsets] = useState<Record<number, string>>(() =>
-    Object.fromEntries(partitions.map((p) => [p.partition, String(p.end_offset)])),
-  );
-  const [err, setErr] = useState<string | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [result, setResult] = useState<
-    | { partition: number; low_watermark: number; error?: string }[]
-    | null
-  >(null);
-
-  const mut = useMutation({
-    mutationFn: async () => {
-      const body: Record<number, number> = {};
-      for (const p of partitions) {
-        if (!sel[p.partition]) continue;
-        body[p.partition] = mode === "all" ? -1 : Number(offsets[p.partition] ?? 0);
-      }
-      return deleteRecords(cluster, topic, body);
-    },
-    onSuccess: (r) => {
-      setResult(r.results);
-      qc.invalidateQueries({ queryKey: ["topic", cluster, topic] });
-      qc.invalidateQueries({ queryKey: ["messages", cluster, topic] });
-    },
-    onError: (e: Error) => setErr(e.message),
-  });
-
-  const anySelected = Object.values(sel).some(Boolean);
-  const selectedPartitions = partitions
-    .filter((p) => sel[p.partition])
-    .map((p) => p.partition);
-  const confirmDescription =
-    mode === "all"
-      ? `This truncates partitions ${selectedPartitions.join(",")} (${selectedPartitions.length} of ${partitions.length}) to their end offset on topic "${topic}". Cannot be undone.`
-      : `This deletes records before the chosen offset on partitions ${selectedPartitions.join(",")} (${selectedPartitions.length} of ${partitions.length}) on topic "${topic}". Cannot be undone.`;
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      size="lg"
-      title={
-        <span className="flex flex-col">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-            Delete records from
-          </span>
-          <span className="font-mono text-[14px] font-semibold">{topic}</span>
-        </span>
-      }
-      actions={
-        <>
-          <span className="mr-auto text-xs text-muted">
-            {fmt.bytes(0)} to be freed · estimate
-          </span>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Close
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            disabled={!anySelected || mut.isPending}
-            onClick={() => setConfirmOpen(true)}
-          >
-            {mut.isPending ? "Running…" : "Delete records"}
-          </Button>
-          <ConfirmDialog
-            open={confirmOpen}
-            onOpenChange={setConfirmOpen}
-            title={`Delete records from "${topic}"?`}
-            description={confirmDescription}
-            confirmPhrase={topic}
-            confirmLabel="Delete records"
-            variant="danger"
-            onConfirm={() => {
-              setErr(null);
-              setResult(null);
-              mut.mutate();
-            }}
-          />
-        </>
-      }
-    >
-      <div className="space-y-3 text-sm">
-        <Notice intent="warning">
-          This truncates the log per partition. Consumers reading older offsets
-          will skip ahead. Cannot be undone.
-        </Notice>
-        <div className="flex gap-4 text-xs">
-          <label className="flex items-center gap-1">
-            <input
-              type="radio"
-              checked={mode === "all"}
-              onChange={() => setMode("all")}
-            />
-            Delete all (truncate to end)
-          </label>
-          <label className="flex items-center gap-1">
-            <input
-              type="radio"
-              checked={mode === "offset"}
-              onChange={() => setMode("offset")}
-            />
-            Keep records at/after offset
-          </label>
-        </div>
-        <table className="w-full text-xs">
-          <thead className="text-left text-[11px] uppercase tracking-wider text-muted">
-            <tr>
-              <th className="py-1"></th>
-              <th className="py-1">Partition</th>
-              <th className="py-1 text-right">Start</th>
-              <th className="py-1 text-right">End</th>
-              {mode === "offset" && <th className="py-1 text-right">Keep from</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {partitions.map((p) => (
-              <tr key={p.partition} className="border-t border-border">
-                <td className="py-1">
-                  <input
-                    type="checkbox"
-                    checked={!!sel[p.partition]}
-                    onChange={(e) =>
-                      setSel((s) => ({ ...s, [p.partition]: e.target.checked }))
-                    }
-                  />
-                </td>
-                <td className="py-1 font-mono text-[13px] tabular-nums">{p.partition}</td>
-                <td className="py-1 text-right font-mono text-[13px] tabular-nums text-muted">
-                  {p.start_offset}
-                </td>
-                <td className="py-1 text-right font-mono text-[13px] tabular-nums text-muted">
-                  {p.end_offset}
-                </td>
-                {mode === "offset" && (
-                  <td className="py-1 text-right">
-                    <Input
-                      value={offsets[p.partition] ?? ""}
-                      onChange={(e) =>
-                        setOffsets((o) => ({
-                          ...o,
-                          [p.partition]: e.target.value,
-                        }))
-                      }
-                      className="h-7 w-24 text-right font-mono text-xs"
-                    />
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {result && (
-          <div className="rounded-md border border-border bg-subtle p-2 text-xs">
-            <div className="mb-1 font-semibold">Result</div>
-            <ul className="space-y-0.5 font-mono">
-              {result.map((r) => (
-                <li key={r.partition}>
-                  p{r.partition}:{" "}
-                  {r.error ? (
-                    <span className="text-danger">{r.error}</span>
-                  ) : (
-                    <span className="text-success">
-                      low-watermark = {r.low_watermark}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {err && <Notice intent="danger">{err}</Notice>}
-      </div>
-    </Modal>
   );
 }
