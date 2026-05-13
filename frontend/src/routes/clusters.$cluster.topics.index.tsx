@@ -25,7 +25,7 @@ import { Modal } from "@/components/Modal";
 import { Input } from "@/components/Input";
 import { Notice } from "@/components/Notice";
 import { useFuzzy, type HighlightRange } from "@/lib/fuzzy";
-import { formatBytes, formatCount, formatDuration, formatNumber, formatRate } from "@/lib/format";
+import { useFormatters } from "@/lib/use-formatters";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/")({
   component: TopicsPage,
@@ -78,6 +78,7 @@ function TopicsPageInner({
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const { me } = useAuth();
+  const fmt = useFormatters();
   const rbacAllowsCreate = cluster ? can(me, cluster, "topic", "edit") : false;
   const caps = clusterInfo?.capabilities;
   const createDisabledReason = !cluster
@@ -98,7 +99,7 @@ function TopicsPageInner({
   const subtitle = !topics || !cluster
     ? "—"
     : anySize
-      ? `${visible.length} topics · ${partitionSum} partitions · ${formatBytes(totalSize)} retained`
+      ? `${visible.length} topics · ${partitionSum} partitions · ${fmt.bytes(totalSize)} retained`
       : `${visible.length} topics · ${partitionSum} partitions`;
 
   const createReasonId = "topics-create-disabled-reason";
@@ -297,6 +298,7 @@ function TopicRow({
   showSize: boolean;
   showRetention: boolean;
 }) {
+  const fmt = useFormatters();
   return (
     <DataTableRow className="cursor-pointer" onClick={onClick}>
       <td className="px-4 py-2.5">
@@ -315,14 +317,14 @@ function TopicRow({
         {topic.replication_factor}
       </td>
       {/* TODO(backend): per-topic msg rate (rate_per_sec aggregated server-side) */}
-      <MetricCell align="right" value={topic.messages} format={formatCount} />
+      <MetricCell align="right" value={topic.messages} format={fmt.count} />
       {showSize && (
-        <MetricCell align="right" value={topic.size_bytes} format={formatBytes} />
+        <MetricCell align="right" value={topic.size_bytes} format={fmt.bytes} />
       )}
-      <MetricCell align="right" value={topic.rate_per_sec} format={formatRate} />
-      <MetricCell align="right" value={topic.lag} format={formatCount} />
+      <MetricCell align="right" value={topic.rate_per_sec} format={fmt.rate} />
+      <MetricCell align="right" value={topic.lag} format={fmt.count} />
       {showRetention && (
-        <MetricCell value={topic.retention_ms} format={formatDuration} />
+        <MetricCell value={topic.retention_ms} format={fmt.duration} />
       )}
     </DataTableRow>
   );
@@ -391,6 +393,7 @@ function CreateTopicModal({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  const fmt = useFormatters();
   const [name, setName] = useState("");
   const [partitions, setPartitions] = useState(1);
   const [rf, setRF] = useState(1);
@@ -434,7 +437,7 @@ function CreateTopicModal({
       actions={
         <>
           <span className="mr-auto text-xs text-muted">
-            {partitions} × {formatNumber(partitions)} · RF {rf}
+            {partitions} × {fmt.number(partitions)} · RF {rf}
           </span>
           <Button variant="ghost" size="sm" onClick={onClose}>
             Cancel

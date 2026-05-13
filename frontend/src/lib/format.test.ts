@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { formatBytes, formatCount, formatDuration, formatRate } from "./format";
+import {
+  formatBytes,
+  formatCount,
+  formatDuration,
+  formatNumber,
+  formatRate,
+} from "./format";
 
 const oneSecondMs = 1_000;
 const oneMinuteMs = 60_000;
@@ -110,10 +116,43 @@ describe("formatCount", () => {
 
   it.each<[number, string]>([
     [42, "42"],
-    [1.5 * oneThousand, "1.5k"],
-    [2.5 * oneMillion, "2.50M"],
-    [3.2 * oneBillion, "3.20B"],
-  ])("scales k/M/B threshold %i", (input, expected) => {
+    [1.5 * oneThousand, "1.5K"],
+    [1_965_590, "1.97M"],
+    [2.5 * oneMillion, "2.5M"],
+    [3.2 * oneBillion, "3.2B"],
+  ])("scales k/M/B threshold %i (en-US, Intl compact short)", (input, expected) => {
     expect(formatCount(input)).toBe(expected);
+  });
+
+  it.each<[number, string]>([
+    [42, "42"],
+    [1_500, "1500"],
+    [1_965_590, "1,97\u00a0Mio."],
+    [2_500_000, "2,5\u00a0Mio."],
+    [3_200_000_000, "3,2\u00a0Mrd."],
+  ])("uses German decimal separators and CLDR compact suffixes %i (de-DE)", (input, expected) => {
+    expect(formatCount(input, "de-DE")).toBe(expected);
+  });
+});
+
+describe("locale-aware separators (regression: real de-DE behavior)", () => {
+  it("groups thousands with dots in de-DE (formatNumber)", () => {
+    expect(formatNumber(1_965_590, "de-DE")).toBe("1.965.590");
+  });
+
+  it("groups thousands with commas in en-US (formatNumber)", () => {
+    expect(formatNumber(1_965_590, "en-US")).toBe("1,965,590");
+  });
+
+  it("uses comma decimal separator in de-DE (formatRate)", () => {
+    expect(formatRate(3.4, "de-DE")).toBe("3,4/s");
+  });
+
+  it("uses comma decimal separator in de-DE (formatBytes)", () => {
+    expect(formatBytes(1_536, "de-DE")).toBe("1,50 KiB");
+  });
+
+  it("uses comma decimal separator in de-DE (formatDuration)", () => {
+    expect(formatDuration(3_600_000, "de-DE")).toBe("1,0 h");
   });
 });
