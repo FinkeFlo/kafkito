@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatBytes,
   formatCount,
+  formatDecimal,
   formatDuration,
   formatNumber,
   formatRate,
@@ -154,5 +155,23 @@ describe("locale-aware separators (regression: real de-DE behavior)", () => {
 
   it("uses comma decimal separator in de-DE (formatDuration)", () => {
     expect(formatDuration(3_600_000, "de-DE")).toBe("1,0 h");
+  });
+
+  it("uses comma decimal separator in de-DE (formatDecimal)", () => {
+    expect(formatDecimal(1.5, 1, "de-DE")).toBe("1,5");
+  });
+
+  it("uses dot decimal separator in en-US (formatDecimal)", () => {
+    expect(formatDecimal(1.5, 1, "en-US")).toBe("1.5");
+  });
+
+  it("pads to the requested fractional digits (formatDecimal)", () => {
+    expect(formatDecimal(1, 2, "en-US")).toBe("1.00");
+  });
+
+  it("returns sentinel for null/NaN (formatDecimal)", () => {
+    expect(formatDecimal(null, 1)).toBe("—");
+    expect(formatDecimal(undefined, 1)).toBe("—");
+    expect(formatDecimal(Number.NaN, 1)).toBe("—");
   });
 });
