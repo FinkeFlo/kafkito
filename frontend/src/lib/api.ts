@@ -79,6 +79,13 @@ export interface TopicDetail {
   replication_factor: number;
   messages: number;
   configs: TopicConfigEntry[];
+  /**
+   * Non-empty when DescribeConfigs failed for this topic and `configs` is
+   * incomplete. Known codes:
+   *   - "unauthorized": missing DescribeConfigs ACL on the topic / cluster.
+   *   - "unavailable":  any other broker-side error.
+   */
+  configs_error?: "unauthorized" | "unavailable" | string;
   size_bytes?: number;
 }
 

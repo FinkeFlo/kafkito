@@ -78,6 +78,7 @@ function TopicDetailLayout() {
     (c) => c.name === "compression.type" || c.name === "value.schema.type",
   )?.value;
   const retention = detailQuery.data?.configs?.find((c) => c.name === "retention.ms")?.value;
+  const configsError = detailQuery.data?.configs_error;
 
   return (
     <div className="space-y-5 px-6 py-6">
@@ -100,7 +101,7 @@ function TopicDetailLayout() {
         </div>
         <p className="mt-1 text-sm text-muted">
           {detailQuery.data
-            ? `${detailQuery.data.partitions.length} partitions · RF ${detailQuery.data.replication_factor} · ${retentionLabel(retention)}`
+            ? `${detailQuery.data.partitions.length} partitions · RF ${detailQuery.data.replication_factor} · ${retentionLabel(retention, configsError)}`
             : "Loading topic metadata…"}
         </p>
       </div>
@@ -154,8 +155,12 @@ function Breadcrumbs({ cluster, topic }: { cluster: string; topic: string }) {
   );
 }
 
-function retentionLabel(ms: string | undefined): string {
-  if (!ms) return "retention —";
+function retentionLabel(ms: string | undefined, configsError: string | undefined): string {
+  if (!ms) {
+    if (configsError === "unauthorized") return "retention restricted";
+    if (configsError) return "retention unavailable";
+    return "retention —";
+  }
   const n = Number(ms);
   if (!Number.isFinite(n)) return `retention ${ms}`;
   if (n <= 0) return "retention ∞";

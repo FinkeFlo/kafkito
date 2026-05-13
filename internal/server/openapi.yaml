@@ -558,6 +558,14 @@ components:
         configs:
           type: array
           items: { $ref: "#/components/schemas/TopicConfigEntry" }
+        configs_error:
+          type: string
+          description: >
+            Non-empty when DescribeConfigs failed for this topic and the
+            `configs` array is incomplete. Known codes: `unauthorized`
+            (missing DescribeConfigs ACL on the topic / cluster),
+            `unavailable` (any other broker-side error).
+          enum: [unauthorized, unavailable]
     PartitionInfo:
       type: object
       properties:

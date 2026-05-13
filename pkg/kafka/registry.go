@@ -23,6 +23,7 @@ import (
 	"github.com/FinkeFlo/kafkito/pkg/config"
 	"github.com/FinkeFlo/kafkito/pkg/masking"
 	"github.com/twmb/franz-go/pkg/kadm"
+	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"github.com/twmb/franz-go/pkg/sasl/plain"
@@ -290,6 +291,13 @@ type TopicDetail struct {
 	ReplicationFactor int                `json:"replication_factor"`
 	Messages          int64              `json:"messages"`
 	Configs           []TopicConfigEntry `json:"configs"`
+	// ConfigsError signals that DescribeConfigs failed for this topic and
+	// callers should treat Configs as incomplete. Empty when configs were
+	// read successfully. Known codes: "unauthorized" (missing
+	// DescribeConfigs ACL on the topic), "unavailable" (any other broker
+	// error). UI surfaces this so users see "permission missing" instead
+	// of a silently empty retention / configs view.
+	ConfigsError string `json:"configs_error,omitempty"`
 	// SizeBytes is the leader-replica byte sum from the metrics collector.
 	// Nil when the collector has no snapshot yet for this topic, distinct
 	// from "known zero".
@@ -396,10 +404,14 @@ func (r *Registry) DescribeTopic(ctx context.Context, cluster, topic string) (*T
 	}
 
 	configs := []TopicConfigEntry{}
+	var configsErr string
 	rcs, err := adm.DescribeTopicConfigs(ctx, topic)
 	if err == nil {
 		for _, rc := range rcs {
 			if rc.Err != nil {
+				if code := classifyConfigsErr(rc.Err); code != "" && configsErr == "" {
+					configsErr = code
+				}
 				continue
 			}
 			for _, c := range rc.Configs {
@@ -420,6 +432,10 @@ func (r *Registry) DescribeTopic(ctx context.Context, cluster, topic string) (*T
 			}
 		}
 	} else {
+		configsErr = classifyConfigsErr(err)
+		if configsErr == "" {
+			configsErr = "unavailable"
+		}
 		r.log.Warn("describe topic configs failed", "cluster", cluster, "topic", topic, "err", err)
 	}
 
@@ -430,6 +446,7 @@ func (r *Registry) DescribeTopic(ctx context.Context, cluster, topic string) (*T
 		ReplicationFactor: rf,
 		Messages:          total,
 		Configs:           configs,
+		ConfigsError:      configsErr,
 	}
 	if snap, ok := r.ClusterMetricsSnapshot(cluster); ok {
 		if m, ok := snap.PerTopic[topic]; ok && m.HaveSize {
@@ -437,6 +454,20 @@ func (r *Registry) DescribeTopic(ctx context.Context, cluster, topic string) (*T
 		}
 	}
 	return out, nil
+}
+
+// classifyConfigsErr maps a DescribeConfigs error to a short, UI-friendly
+// code stored in TopicDetail.ConfigsError. Empty means "not classifiable"
+// (caller should fall back to a generic code).
+func classifyConfigsErr(err error) string {
+	if err == nil {
+		return ""
+	}
+	if errors.Is(err, kerr.TopicAuthorizationFailed) ||
+		errors.Is(err, kerr.ClusterAuthorizationFailed) {
+		return "unauthorized"
+	}
+	return "unavailable"
 }
 
 // Describe returns ClusterInfo for every configured cluster, each probed

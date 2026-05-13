@@ -10,6 +10,7 @@ import {
   type TopicConfigEntry,
 } from "@/lib/api";
 import { useAuth } from "@/auth/hooks";
+import { Notice } from "@/components/Notice";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic/configs")({
   component: ConfigsTab,
@@ -42,13 +43,31 @@ function ConfigsTab() {
 
   if (!detailQuery.data) return null;
 
+  const configsError = detailQuery.data.configs_error;
+  const noticeIntent = configsError === "unauthorized" ? "warning" : "danger";
+  const noticeTitle =
+    configsError === "unauthorized"
+      ? "Permission missing"
+      : "Configs unavailable";
+  const noticeBody =
+    configsError === "unauthorized"
+      ? "kafkito cannot read this topic's configuration because the broker denied DescribeConfigs. Ask the cluster admin to grant DescribeConfigs on this topic (or topic prefix) to the API key in use."
+      : "The broker returned an error while reading this topic's configuration. Retries are made every few seconds; check the kafkito logs for details.";
+
   return (
-    <ConfigsTable
-      cluster={cluster}
-      topic={topic}
-      configs={detailQuery.data.configs}
-      caps={caps}
-    />
+    <div className="space-y-4">
+      {configsError && (
+        <Notice intent={noticeIntent} title={noticeTitle}>
+          {noticeBody}
+        </Notice>
+      )}
+      <ConfigsTable
+        cluster={cluster}
+        topic={topic}
+        configs={detailQuery.data.configs}
+        caps={caps}
+      />
+    </div>
   );
 }
 
