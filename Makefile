@@ -1,4 +1,4 @@
-.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev proto proto-lint e2e e2e-up e2e-test e2e-down e2e-clean help
+.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev proto proto-lint e2e e2e-up e2e-test e2e-down e2e-clean release help
 
 BIN := bin/kafkito
 PKG := ./...
@@ -28,6 +28,7 @@ help:
 	@echo "  docker-build       - docker build -t $(IMAGE)"
 	@echo "  compose-up/down    - docker compose lifecycle"
 	@echo "  e2e                - opt-in Playwright walks against a local fixture stack"
+	@echo "  release            - interactive release+deploy runbook (scripts/release.sh)"
 
 frontend-install:
 	cd frontend && bun install
@@ -65,6 +66,11 @@ lint:
 
 tidy:
 	go mod tidy
+
+# Interactive release + QAS deploy runbook. Confirms before tagging/pushing
+# and before cf push. See scripts/release.sh header for env knobs.
+release:
+	./scripts/release.sh
 
 docker-build:
 	docker build --build-arg VERSION=$(VERSION) -t $(IMAGE) .
