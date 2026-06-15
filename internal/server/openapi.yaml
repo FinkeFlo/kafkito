@@ -694,6 +694,7 @@ components:
               partition: { type: integer }
               old_offset: { type: integer, format: int64 }
               new_offset: { type: integer, format: int64 }
+              end_offset: { type: integer, format: int64 }
               error: { type: string }
     ACL:
       type: object

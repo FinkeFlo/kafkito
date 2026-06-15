@@ -407,6 +407,7 @@ export interface ResetOffsetResult {
   partition: number;
   old_offset: number;
   new_offset: number;
+  end_offset: number;
   error?: string;
 }
 
