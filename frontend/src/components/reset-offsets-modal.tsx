@@ -1,5 +1,10 @@
-import { useMemo, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   resetGroupOffsets,
   type GroupDetail,
@@ -58,7 +63,6 @@ export function ResetOffsetsModal({
   const [partSel, setPartSel] = useState<Record<number, boolean>>({});
   const [err, setErr] = useState<string | null>(null);
   const [result, setResult] = useState<ResetOffsetResult[] | null>(null);
-  const [dryResult, setDryResult] = useState<typeof result>(null);
   const [commitOpen, setCommitOpen] = useState(false);
 
   const topicParts = useMemo(
@@ -78,11 +82,55 @@ export function ResetOffsetsModal({
     Number.isFinite(timestampNum) &&
     timestampNum > 0;
   const localValue = timestampValid ? msToLocalInput(timestampNum) : "";
-  const strategyReady = strategy === "timestamp" ? timestampValid : true;
+
+  const offsetValid =
+    strategy !== "offset" ||
+    (offset.trim() !== "" && Number.isFinite(Number(offset)));
+  const shiftValid =
+    strategy !== "shift-by" ||
+    (shift.trim() !== "" && Number.isFinite(Number(shift)));
+  const strategyReady =
+    (strategy === "timestamp" ? timestampValid : true) &&
+    offsetValid &&
+    shiftValid;
 
   const setRelativeHours = (hours: number) => {
     setTimestampMs(String(Date.now() - hours * 3600_000));
   };
+
+  // Preview always covers every partition of the topic so the projection is
+  // visible before any selection. Partition selection only governs the commit.
+  const previewBody = useMemo(
+    () => ({
+      topic,
+      strategy,
+      offset: strategy === "offset" ? Number(offset) : undefined,
+      timestamp_ms: strategy === "timestamp" ? Number(timestampMs) : undefined,
+      shift: strategy === "shift-by" ? Number(shift) : undefined,
+    }),
+    [topic, strategy, offset, timestampMs, shift],
+  );
+
+  // Debounce the preview inputs so typing doesn't fire a dry-run per keystroke.
+  const [debouncedBody, setDebouncedBody] = useState(previewBody);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedBody(previewBody), 400);
+    return () => clearTimeout(t);
+  }, [previewBody]);
+
+  const previewQuery = useQuery({
+    queryKey: ["reset-offsets-preview", cluster, detail.group_id, debouncedBody],
+    queryFn: () =>
+      resetGroupOffsets(cluster, detail.group_id, {
+        ...debouncedBody,
+        dry_run: true,
+      }),
+    enabled: !!topic && strategyReady,
+    placeholderData: keepPreviousData,
+    staleTime: 10_000,
+    retry: false,
+  });
+  const previewRows = previewQuery.data?.results ?? null;
 
   const buildBody = (dry_run: boolean) => ({
     topic,
@@ -94,11 +142,6 @@ export function ResetOffsetsModal({
     dry_run,
   });
 
-  const dryMut = useMutation({
-    mutationFn: () => resetGroupOffsets(cluster, detail.group_id, buildBody(true)),
-    onSuccess: (r) => setDryResult(r.results),
-    onError: (e: Error) => setErr(e.message),
-  });
   const commitMut = useMutation({
     mutationFn: () => resetGroupOffsets(cluster, detail.group_id, buildBody(false)),
     onSuccess: (r) => {
@@ -125,18 +168,6 @@ export function ResetOffsetsModal({
             Close
           </Button>
           <Button
-            variant="secondary"
-            size="sm"
-            disabled={dryMut.isPending || !strategyReady}
-            onClick={() => {
-              setErr(null);
-              setResult(null);
-              dryMut.mutate();
-            }}
-          >
-            {dryMut.isPending ? "…" : "Preview"}
-          </Button>
-          <Button
             variant="primary"
             size="sm"
             disabled={
@@ -156,7 +187,6 @@ export function ResetOffsetsModal({
             confirmLabel="Commit reset"
             onConfirm={() => {
               setErr(null);
-              setDryResult(null);
               commitMut.mutate();
             }}
           />
@@ -255,9 +285,7 @@ export function ResetOffsetsModal({
             </div>
             {timestampValid ? (
               <p className="text-xs text-muted">
-                Resolves to{" "}
-                <Timestamp value={timestampNum} zone="utc" /> · epoch ms{" "}
-                <span className="font-mono text-text">{timestampNum}</span>
+                Resolves to <Timestamp value={timestampNum} zone="utc" /> (UTC)
               </p>
             ) : (
               <Notice intent="warning">
@@ -341,71 +369,113 @@ export function ResetOffsetsModal({
           )}
         </div>
 
-        {(dryResult || result) && (
-          <div className="rounded-md border border-border bg-subtle p-2 text-xs">
-            <div className="mb-1 font-semibold">
-              {result ? "Committed" : "Preview (dry-run)"}
-            </div>
-            {(() => {
-              const rows = (result ?? dryResult)!;
-              const lagOf = (r: ResetOffsetResult): number | null =>
-                r.error || r.new_offset < 0 || r.end_offset < 0
-                  ? null
-                  : Math.max(0, r.end_offset - r.new_offset);
-              const known = rows.map(lagOf).filter((l): l is number => l !== null);
-              const totalLag =
-                known.length > 0 ? known.reduce((a, b) => a + b, 0) : null;
-              return (
-                <>
-                  <table className="w-full font-mono">
-                    <thead className="text-[10px] uppercase tracking-wider text-subtle-text">
-                      <tr>
-                        <th className="text-left">partition</th>
-                        <th className="text-right">old</th>
-                        <th className="text-right">→ new</th>
-                        <th className="text-right pl-4">end</th>
-                        <th className="text-right pl-4">≈ new lag</th>
-                        <th className="text-left pl-4">error</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((r) => {
-                        const lag = lagOf(r);
-                        return (
-                          <tr key={r.partition}>
-                            <td>p{r.partition}</td>
-                            <td className="text-right text-muted">
-                              {r.old_offset >= 0 ? r.old_offset : "—"}
-                            </td>
-                            <td className="text-right">
-                              {r.new_offset >= 0 ? r.new_offset : "—"}
-                            </td>
-                            <td className="text-right pl-4 text-muted">
-                              {r.end_offset >= 0 ? r.end_offset : "—"}
-                            </td>
-                            <td className="text-right pl-4">
-                              {lag !== null ? lag : "—"}
-                            </td>
-                            <td className="pl-4 text-danger">{r.error ?? ""}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  <div className="mt-2 flex items-center justify-between border-t border-border pt-2">
-                    <span className="text-muted">
-                      ≈ total lag after reset
-                    </span>
-                    <LagBadge value={totalLag} />
-                  </div>
-                  <p className="mt-1 text-[10px] text-subtle-text">
-                    At preview time — live traffic may increase this.
-                  </p>
-                </>
-              );
-            })()}
+        <div className="rounded-md border border-border bg-subtle p-2 text-xs">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="font-semibold">
+              {result ? "Committed" : "Lag preview"}
+            </span>
+            {!result && previewQuery.isFetching && (
+              <span className="text-[10px] text-subtle-text">updating…</span>
+            )}
           </div>
-        )}
+          {(() => {
+            const committed = !!result;
+            const rows = result ?? previewRows;
+
+            if (!committed && !strategyReady) {
+              return (
+                <p className="text-subtle-text">
+                  Enter a valid value to preview the projected lag.
+                </p>
+              );
+            }
+            if (!committed && previewQuery.isError) {
+              return (
+                <p className="text-danger">
+                  {(previewQuery.error as Error).message}
+                </p>
+              );
+            }
+            if (!rows) {
+              return <p className="text-subtle-text">Calculating preview…</p>;
+            }
+            if (rows.length === 0) {
+              return (
+                <p className="text-subtle-text">No partitions to preview.</p>
+              );
+            }
+
+            // Lag after the operation for a partition: selected (or committed)
+            // partitions move to the new offset, everything else keeps its
+            // current committed offset.
+            const lagAfter = (r: ResetOffsetResult): number | null => {
+              const base =
+                committed || partSel[r.partition] ? r.new_offset : r.old_offset;
+              if (r.error || base < 0 || r.end_offset < 0) return null;
+              return Math.max(0, r.end_offset - base);
+            };
+            const known = rows
+              .map(lagAfter)
+              .filter((l): l is number => l !== null);
+            const totalLag =
+              known.length > 0 ? known.reduce((a, b) => a + b, 0) : null;
+
+            return (
+              <>
+                <table className="w-full font-mono">
+                  <thead className="text-[10px] uppercase tracking-wider text-subtle-text">
+                    <tr>
+                      <th className="text-left">partition</th>
+                      <th className="text-right">old</th>
+                      <th className="text-right">→ new</th>
+                      <th className="text-right pl-4">end</th>
+                      <th className="text-right pl-4">≈ lag after</th>
+                      <th className="text-left pl-4">error</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => {
+                      const lag = lagAfter(r);
+                      const active = committed || !!partSel[r.partition];
+                      return (
+                        <tr
+                          key={r.partition}
+                          className={active ? "" : "text-subtle-text"}
+                        >
+                          <td className={active ? "text-accent" : undefined}>
+                            p{r.partition}
+                          </td>
+                          <td className="text-right text-muted">
+                            {r.old_offset >= 0 ? r.old_offset : "—"}
+                          </td>
+                          <td className="text-right">
+                            {r.new_offset >= 0 ? r.new_offset : "—"}
+                          </td>
+                          <td className="text-right pl-4 text-muted">
+                            {r.end_offset >= 0 ? r.end_offset : "—"}
+                          </td>
+                          <td className="text-right pl-4">
+                            {lag !== null ? lag : "—"}
+                          </td>
+                          <td className="pl-4 text-danger">{r.error ?? ""}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div className="mt-2 flex items-center justify-between border-t border-border pt-2">
+                  <span className="text-muted">≈ total group lag after reset</span>
+                  <LagBadge value={totalLag} />
+                </div>
+                <p className="mt-1 text-[10px] text-subtle-text">
+                  {committed
+                    ? "At commit time — live traffic may increase this."
+                    : "Highlighted rows are the partitions you have selected to reset. At preview time — live traffic may increase this."}
+                </p>
+              </>
+            );
+          })()}
+        </div>
         {err && (
           <Notice intent="danger">
             {err}
