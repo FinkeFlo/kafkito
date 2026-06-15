@@ -48,6 +48,7 @@ type ResetOffsetResult struct {
 	Partition int32  `json:"partition"`
 	OldOffset int64  `json:"old_offset"` // -1 if no prior commit
 	NewOffset int64  `json:"new_offset"`
+	EndOffset int64  `json:"end_offset"` // log-end offset, -1 if unknown
 	Error     string `json:"error,omitempty"`
 }
 
@@ -138,10 +139,13 @@ func (r *Registry) ResetOffsets(ctx context.Context, cluster, group string, req 
 	toCommit := kadm.Offsets{}
 	results := make([]ResetOffsetResult, 0, len(targets))
 	for _, p := range targets {
-		res := ResetOffsetResult{Partition: p, OldOffset: -1, NewOffset: -1}
+		res := ResetOffsetResult{Partition: p, OldOffset: -1, NewOffset: -1, EndOffset: -1}
 
 		if c, ok := committed.Lookup(req.Topic, p); ok && c.Err == nil {
 			res.OldOffset = c.At
+		}
+		if e, ok := ends.Lookup(req.Topic, p); ok && e.Err == nil {
+			res.EndOffset = e.Offset
 		}
 
 		var newAt int64 = -1

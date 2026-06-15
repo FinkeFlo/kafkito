@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   resetGroupOffsets,
   type GroupDetail,
+  type ResetOffsetResult,
   type ResetStrategy,
 } from "@/lib/api";
 import { Button } from "@/components/button";
@@ -10,6 +11,28 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Input } from "@/components/Input";
 import { Modal } from "@/components/Modal";
 import { Notice } from "@/components/Notice";
+import { Timestamp } from "@/components/timestamp";
+import { LagBadge } from "@/components/lag-badge";
+
+function pad(n: number, width = 2): string {
+  return String(n).padStart(width, "0");
+}
+
+/** Epoch ms → "YYYY-MM-DDTHH:mm:ss" in the browser's local time for the picker. */
+function msToLocalInput(ms: number): string {
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return "";
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  );
+}
+
+/** datetime-local value (local time) → epoch ms. NaN when empty/invalid. */
+function localInputToMs(value: string): number {
+  if (!value) return Number.NaN;
+  return new Date(value).getTime();
+}
 
 export function ResetOffsetsModal({
   cluster,
@@ -34,15 +57,7 @@ export function ResetOffsetsModal({
   const [shift, setShift] = useState("-100");
   const [partSel, setPartSel] = useState<Record<number, boolean>>({});
   const [err, setErr] = useState<string | null>(null);
-  const [result, setResult] = useState<
-    | {
-        partition: number;
-        old_offset: number;
-        new_offset: number;
-        error?: string;
-      }[]
-    | null
-  >(null);
+  const [result, setResult] = useState<ResetOffsetResult[] | null>(null);
   const [dryResult, setDryResult] = useState<typeof result>(null);
   const [commitOpen, setCommitOpen] = useState(false);
 
@@ -56,6 +71,18 @@ export function ResetOffsetsModal({
   );
 
   const selectedParts = topicParts.filter((p) => partSel[p]);
+
+  const timestampNum = Number(timestampMs);
+  const timestampValid =
+    timestampMs.trim() !== "" &&
+    Number.isFinite(timestampNum) &&
+    timestampNum > 0;
+  const localValue = timestampValid ? msToLocalInput(timestampNum) : "";
+  const strategyReady = strategy === "timestamp" ? timestampValid : true;
+
+  const setRelativeHours = (hours: number) => {
+    setTimestampMs(String(Date.now() - hours * 3600_000));
+  };
 
   const buildBody = (dry_run: boolean) => ({
     topic,
@@ -100,7 +127,7 @@ export function ResetOffsetsModal({
           <Button
             variant="secondary"
             size="sm"
-            disabled={dryMut.isPending}
+            disabled={dryMut.isPending || !strategyReady}
             onClick={() => {
               setErr(null);
               setResult(null);
@@ -112,7 +139,9 @@ export function ResetOffsetsModal({
           <Button
             variant="primary"
             size="sm"
-            disabled={commitMut.isPending || selectedParts.length === 0}
+            disabled={
+              commitMut.isPending || selectedParts.length === 0 || !strategyReady
+            }
             onClick={() => setCommitOpen(true)}
           >
             {commitMut.isPending ? "Committing…" : "Commit reset"}
@@ -165,7 +194,7 @@ export function ResetOffsetsModal({
               <option value="earliest">earliest (log start)</option>
               <option value="latest">latest (log end)</option>
               <option value="offset">specific offset</option>
-              <option value="timestamp">timestamp (ms)</option>
+              <option value="timestamp">timestamp</option>
               <option value="shift-by">shift-by (delta)</option>
             </select>
           </label>
@@ -186,16 +215,56 @@ export function ResetOffsetsModal({
           </label>
         )}
         {strategy === "timestamp" && (
-          <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Timestamp (epoch ms)
-            </span>
-            <Input
-              value={timestampMs}
-              onChange={(e) => setTimestampMs(e.target.value)}
-              className="mt-1 font-mono"
-            />
-          </label>
+          <div className="space-y-2">
+            <div className="block">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                Date &amp; time
+              </span>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <label htmlFor="reset-offsets-timestamp" className="sr-only">
+                  Date &amp; time
+                </label>
+                <Input
+                  id="reset-offsets-timestamp"
+                  type="datetime-local"
+                  step="1"
+                  value={localValue}
+                  onChange={(e) => {
+                    const ms = localInputToMs(e.target.value);
+                    setTimestampMs(Number.isFinite(ms) ? String(ms) : "");
+                  }}
+                  className="max-w-[16rem] font-mono"
+                />
+                <div className="flex gap-1.5">
+                  {[
+                    { label: "-1h", hours: 1 },
+                    { label: "-6h", hours: 6 },
+                    { label: "-24h", hours: 24 },
+                  ].map((q) => (
+                    <button
+                      key={q.label}
+                      type="button"
+                      onClick={() => setRelativeHours(q.hours)}
+                      className="rounded border border-border bg-panel px-2 py-1 text-xs font-mono text-muted hover:border-border-hover hover:text-text"
+                    >
+                      {q.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            {timestampValid ? (
+              <p className="text-xs text-muted">
+                Resolves to{" "}
+                <Timestamp value={timestampNum} zone="utc" /> · epoch ms{" "}
+                <span className="font-mono text-text">{timestampNum}</span>
+              </p>
+            ) : (
+              <Notice intent="warning">
+                Pick a valid date and time.
+              </Notice>
+            )}
+          </div>
         )}
         {strategy === "shift-by" && (
           <label className="block">
@@ -277,30 +346,64 @@ export function ResetOffsetsModal({
             <div className="mb-1 font-semibold">
               {result ? "Committed" : "Preview (dry-run)"}
             </div>
-            <table className="w-full font-mono">
-              <thead className="text-[10px] uppercase tracking-wider text-subtle-text">
-                <tr>
-                  <th className="text-left">partition</th>
-                  <th className="text-right">old</th>
-                  <th className="text-right">→ new</th>
-                  <th className="text-left pl-4">error</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(result ?? dryResult)!.map((r) => (
-                  <tr key={r.partition}>
-                    <td>p{r.partition}</td>
-                    <td className="text-right text-muted">
-                      {r.old_offset >= 0 ? r.old_offset : "—"}
-                    </td>
-                    <td className="text-right">
-                      {r.new_offset >= 0 ? r.new_offset : "—"}
-                    </td>
-                    <td className="pl-4 text-danger">{r.error ?? ""}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {(() => {
+              const rows = (result ?? dryResult)!;
+              const lagOf = (r: ResetOffsetResult): number | null =>
+                r.error || r.new_offset < 0 || r.end_offset < 0
+                  ? null
+                  : Math.max(0, r.end_offset - r.new_offset);
+              const known = rows.map(lagOf).filter((l): l is number => l !== null);
+              const totalLag =
+                known.length > 0 ? known.reduce((a, b) => a + b, 0) : null;
+              return (
+                <>
+                  <table className="w-full font-mono">
+                    <thead className="text-[10px] uppercase tracking-wider text-subtle-text">
+                      <tr>
+                        <th className="text-left">partition</th>
+                        <th className="text-right">old</th>
+                        <th className="text-right">→ new</th>
+                        <th className="text-right pl-4">end</th>
+                        <th className="text-right pl-4">≈ new lag</th>
+                        <th className="text-left pl-4">error</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r) => {
+                        const lag = lagOf(r);
+                        return (
+                          <tr key={r.partition}>
+                            <td>p{r.partition}</td>
+                            <td className="text-right text-muted">
+                              {r.old_offset >= 0 ? r.old_offset : "—"}
+                            </td>
+                            <td className="text-right">
+                              {r.new_offset >= 0 ? r.new_offset : "—"}
+                            </td>
+                            <td className="text-right pl-4 text-muted">
+                              {r.end_offset >= 0 ? r.end_offset : "—"}
+                            </td>
+                            <td className="text-right pl-4">
+                              {lag !== null ? lag : "—"}
+                            </td>
+                            <td className="pl-4 text-danger">{r.error ?? ""}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div className="mt-2 flex items-center justify-between border-t border-border pt-2">
+                    <span className="text-muted">
+                      ≈ total lag after reset
+                    </span>
+                    <LagBadge value={totalLag} />
+                  </div>
+                  <p className="mt-1 text-[10px] text-subtle-text">
+                    At preview time — live traffic may increase this.
+                  </p>
+                </>
+              );
+            })()}
           </div>
         )}
         {err && (

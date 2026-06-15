@@ -158,10 +158,12 @@ func TestIntegration_ResetOffsets(t *testing.T) {
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	require.NoError(t, lastErr, "reset earliest")
+	require.NoError(t, err, "reset earliest")
 	require.NotNil(t, res)
 	require.Len(t, res.Results, 1)
 	require.EqualValues(t, 0, res.Results[0].NewOffset)
+	// Log-end offset is exposed for the lag preview regardless of strategy.
+	require.EqualValues(t, 5, res.Results[0].EndOffset)
 
 	// Reset to latest (=5).
 	res, err := reg.ResetOffsets(ctx, "it", group, ResetOffsetsRequest{
