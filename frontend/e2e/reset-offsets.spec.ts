@@ -19,16 +19,16 @@ test.describe("Reset Offsets walk (Q-001 fixture)", () => {
     await expect(modal).toBeVisible();
 
     const commitButton = modal.getByRole("button", { name: /commit reset/i });
+    // All partitions are selected by default, so commit is enabled up-front.
+    await expect(commitButton).toBeEnabled();
+
+    // Deselecting every partition re-enables the guard.
+    await modal.getByRole("button", { name: /^none$/ }).click();
     await expect(commitButton).toBeDisabled();
     await expect(modal).toContainText(/pick at least one partition/i);
 
-    // Partition checkbox is intentionally sr-only (visual chip lives on the
-    // label). Playwright's actuator targets the input bbox which is clipped,
-    // so { force: true } skips actionability — the test still verifies the
-    // labelled checkbox toggles, which is the user-observable contract.
-    await modal
-      .getByRole("checkbox", { name: /^p0$/ })
-      .check({ force: true });
+    // Re-select all partitions to proceed.
+    await modal.getByRole("button", { name: /^all$/ }).click();
     await expect(commitButton).toBeEnabled();
 
     await commitButton.click();

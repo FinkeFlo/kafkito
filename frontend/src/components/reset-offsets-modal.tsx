@@ -39,6 +39,16 @@ function localInputToMs(value: string): number {
   return new Date(value).getTime();
 }
 
+function partitionsForTopic(detail: GroupDetail, topic: string): number[] {
+  return detail.offsets
+    .filter((o) => o.topic === topic)
+    .map((o) => o.partition);
+}
+
+function selectAll(parts: number[]): Record<number, boolean> {
+  return Object.fromEntries(parts.map((p) => [p, true]));
+}
+
 export function ResetOffsetsModal({
   cluster,
   detail,
@@ -60,7 +70,11 @@ export function ResetOffsetsModal({
   const [offset, setOffset] = useState("0");
   const [timestampMs, setTimestampMs] = useState(String(Date.now() - 3600_000));
   const [shift, setShift] = useState("-100");
-  const [partSel, setPartSel] = useState<Record<number, boolean>>({});
+  // All partitions of the initial topic are selected by default; resetting the
+  // whole consumer group is the common case.
+  const [partSel, setPartSel] = useState<Record<number, boolean>>(() =>
+    selectAll(partitionsForTopic(detail, topics[0] ?? "")),
+  );
   const [err, setErr] = useState<string | null>(null);
   const [result, setResult] = useState<ResetOffsetResult[] | null>(null);
   const [commitOpen, setCommitOpen] = useState(false);
@@ -203,7 +217,7 @@ export function ResetOffsetsModal({
               value={topic}
               onChange={(e) => {
                 setTopic(e.target.value);
-                setPartSel({});
+                setPartSel(selectAll(partitionsForTopic(detail, e.target.value)));
               }}
               className="mt-1 h-9 w-full rounded-md border border-border bg-panel px-2 font-mono text-sm hover:border-border-hover"
             >

@@ -71,6 +71,20 @@ describe("ResetOffsetsModal partition picker a11y", () => {
       expect(checkbox).not.toHaveClass("hidden");
     },
   );
+
+  it("selects every partition by default and enables Commit reset", () => {
+    renderModal([0, 1, 2]);
+
+    for (const p of [0, 1, 2]) {
+      expect(
+        screen.getByRole("checkbox", { name: new RegExp(`^p${p}$`) }),
+      ).toBeChecked();
+    }
+    expect(screen.getByText(/3 of 3 selected/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /commit reset/i }),
+    ).toBeEnabled();
+  });
 });
 
 describe("ResetOffsetsModal timestamp strategy", () => {
@@ -135,8 +149,7 @@ describe("ResetOffsetsModal timestamp strategy", () => {
     expect(body.dry_run).toBe(true);
   });
 
-  it("auto-previews the approximate consumer lag (end - new) for selected partitions and as a total", async () => {
-    const user = userEvent.setup();
+  it("auto-previews the approximate consumer lag (end - new) for all partitions by default and as a total", async () => {
     resetGroupOffsets.mockResolvedValue({
       group: "g1",
       topic: "t1",
@@ -148,10 +161,8 @@ describe("ResetOffsetsModal timestamp strategy", () => {
     });
     renderModal([0, 1]);
 
-    // Preview is always visible; selecting partitions projects their new lag.
-    await user.click(screen.getByRole("checkbox", { name: /^p0$/ }));
-    await user.click(screen.getByRole("checkbox", { name: /^p1$/ }));
-
+    // All partitions are selected by default, so the projected new lag shows
+    // immediately without toggling anything.
     // p0 lag = 100 - 80 = 20, p1 lag = 100 - 30 = 70, total = 90.
     await waitFor(() =>
       expect(
