@@ -82,6 +82,10 @@ export function ClusterPill({ className }: { className?: string }) {
     });
   }, [open, sorted, cluster]);
 
+  useEffect(() => {
+    setActiveIdx(0);
+  }, [query]);
+
   if (isLoading && !clusters) {
     return (
       <span
@@ -112,10 +116,6 @@ export function ClusterPill({ className }: { className?: string }) {
       </Link>
     );
   }
-
-  useEffect(() => {
-    setActiveIdx(0);
-  }, [query]);
 
   const onListKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (visible.length === 0) return;
