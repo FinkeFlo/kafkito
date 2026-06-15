@@ -46,6 +46,12 @@ function renderModal(parts: number[]) {
 describe("ResetOffsetsModal partition picker a11y", () => {
   beforeEach(() => {
     resetGroupOffsets.mockReset();
+    resetGroupOffsets.mockResolvedValue({
+      group: "g1",
+      topic: "t1",
+      dry_run: true,
+      results: [],
+    });
   });
   it.each([0, 1, 2])(
     "renders partition %i checkbox with a discoverable accessible name",
@@ -70,6 +76,12 @@ describe("ResetOffsetsModal partition picker a11y", () => {
 describe("ResetOffsetsModal timestamp strategy", () => {
   beforeEach(() => {
     resetGroupOffsets.mockReset();
+    resetGroupOffsets.mockResolvedValue({
+      group: "g1",
+      topic: "t1",
+      dry_run: true,
+      results: [],
+    });
   });
 
   it("renders a date & time picker with relative quick buttons instead of a raw epoch field", async () => {
@@ -89,18 +101,14 @@ describe("ResetOffsetsModal timestamp strategy", () => {
     expect(screen.getByRole("button", { name: "-1h" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "-6h" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "-24h" })).toBeInTheDocument();
-    // Power-user affordance: the resolved epoch ms is still surfaced.
-    expect(screen.getByText(/epoch ms/i)).toBeInTheDocument();
+    // The picker resolves to a human-readable UTC instant; the raw epoch ms
+    // (internal wire format) is intentionally not surfaced to users.
+    expect(screen.getByText(/resolves to/i)).toBeInTheDocument();
+    expect(screen.queryByText(/epoch ms/i)).not.toBeInTheDocument();
   });
 
-  it("sends a numeric timestamp_ms derived from the picker value", async () => {
+  it("auto-previews with a numeric timestamp_ms derived from the picker value", async () => {
     const user = userEvent.setup();
-    resetGroupOffsets.mockResolvedValue({
-      group: "g1",
-      topic: "t1",
-      dry_run: true,
-      results: [],
-    });
     const { container } = renderModal([0]);
 
     await user.selectOptions(
@@ -113,16 +121,21 @@ describe("ResetOffsetsModal timestamp strategy", () => {
     await user.clear(picker);
     await user.type(picker, "2026-06-15T14:45:00");
 
-    await user.click(screen.getByRole("button", { name: /^preview$/i }));
-
-    await waitFor(() => expect(resetGroupOffsets).toHaveBeenCalled());
+    // No Preview button: the dry-run fires automatically (debounced).
+    await waitFor(
+      () =>
+        expect(resetGroupOffsets.mock.calls.at(-1)?.[2]?.strategy).toBe(
+          "timestamp",
+        ),
+      { timeout: 2000 },
+    );
     const body = resetGroupOffsets.mock.calls.at(-1)![2];
-    expect(body.strategy).toBe("timestamp");
     expect(typeof body.timestamp_ms).toBe("number");
     expect(body.timestamp_ms).toBe(new Date("2026-06-15T14:45:00").getTime());
+    expect(body.dry_run).toBe(true);
   });
 
-  it("previews the approximate consumer lag (end - new) per partition and as a total", async () => {
+  it("auto-previews the approximate consumer lag (end - new) for selected partitions and as a total", async () => {
     const user = userEvent.setup();
     resetGroupOffsets.mockResolvedValue({
       group: "g1",
@@ -135,11 +148,15 @@ describe("ResetOffsetsModal timestamp strategy", () => {
     });
     renderModal([0, 1]);
 
-    await user.click(screen.getByRole("button", { name: /^preview$/i }));
+    // Preview is always visible; selecting partitions projects their new lag.
+    await user.click(screen.getByRole("checkbox", { name: /^p0$/ }));
+    await user.click(screen.getByRole("checkbox", { name: /^p1$/ }));
 
     // p0 lag = 100 - 80 = 20, p1 lag = 100 - 30 = 70, total = 90.
     await waitFor(() =>
-      expect(screen.getByText(/total lag after reset/i)).toBeInTheDocument(),
+      expect(
+        screen.getByText(/total group lag after reset/i),
+      ).toBeInTheDocument(),
     );
     expect(screen.getByText("20")).toBeInTheDocument();
     expect(screen.getByText("70")).toBeInTheDocument();
