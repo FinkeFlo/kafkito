@@ -94,9 +94,9 @@ type SearchOptions struct {
 
 // SearchStats is the per-response summary.
 type SearchStats struct {
-	Scanned         int                      `json:"scanned"`
-	Matched         int                      `json:"matched"`
-	BudgetExhausted bool                     `json:"budget_exhausted"`
+	Scanned         int  `json:"scanned"`
+	Matched         int  `json:"matched"`
+	BudgetExhausted bool `json:"budget_exhausted"`
 	// TimedOut is true when the scan stopped because the per-call timeout
 	// elapsed before the budget or the partition range was exhausted.
 	TimedOut bool `json:"timed_out"`
