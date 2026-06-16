@@ -629,6 +629,8 @@ export interface SearchStats {
   scanned: number;
   matched: number;
   budget_exhausted: boolean;
+  timed_out?: boolean;
+  more_available?: boolean;
   direction: SearchDirection;
   next_cursors?: Record<string, number>;
   resolved_range?: Record<string, { start: number; end: number }>;

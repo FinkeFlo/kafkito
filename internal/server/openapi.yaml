@@ -622,6 +622,8 @@ components:
             scanned: { type: integer }
             matched: { type: integer }
             budget_exhausted: { type: boolean }
+            timed_out: { type: boolean }
+            more_available: { type: boolean }
             direction: { type: string }
             parse_errors: { type: integer }
             next_cursors:

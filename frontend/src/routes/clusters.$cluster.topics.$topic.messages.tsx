@@ -186,13 +186,19 @@ function MessagesPanel({
   const [customTo, setCustomTo] = useState<string>("");
   const [direction, setDirection] = useState<SearchDirection>("newest_first");
   const [stopOnLimit, setStopOnLimit] = useState(true);
-  const [budget, setBudget] = useState(10000);
+  const [budget, setBudget] = useState(50000);
   const [searching, setSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<
     | { messages: Message[]; stats: SearchStats; req: SearchRequest }
     | null
   >(null);
   const [searchError, setSearchError] = useState<string | null>(null);
+  // Why the most recent (auto-chained) search stopped. Drives the result banner.
+  const [searchStopReason, setSearchStopReason] = useState<
+    "budget" | "complete" | "limit" | "stopped" | null
+  >(null);
+  // Set to true to abort an in-flight auto-chain between continuation calls.
+  const stopSearchRef = useRef(false);
 
   // Sample query (lazy, only when JSONPath search is open)
   const sampleQuery = useQuery<SampleResponse>({
@@ -364,14 +370,21 @@ function MessagesPanel({
   const resolvedRange = () =>
     computeTimeRange(rangeMode, preset, customFrom, customTo);
 
-  const runSearch = async (continuation?: Record<string, number>) => {
+  const runSearch = async (continueChain = false) => {
+    stopSearchRef.current = false;
     setSearching(true);
     setSearchError(null);
+    // A fresh search clears any previous result immediately so the list shows
+    // search results (empty until the first match arrives) rather than the
+    // browse messages while scanning is still in progress.
+    if (!continueChain) {
+      setSearchResult(null);
+      setSearchStopReason(null);
+    }
     const { from_ts_ms, to_ts_ms } = resolvedRange();
-    const req: SearchRequest = {
+    const baseReq: SearchRequest = {
       partition,
       limit,
-      budget,
       direction,
       stop_on_limit: stopOnLimit,
       mode,
@@ -381,32 +394,98 @@ function MessagesPanel({
       zones: mode === "contains" ? ["value", "key", "headers"] : ["value"],
       from_ts_ms,
       to_ts_ms,
-      cursors: continuation,
     };
+
+    // Seed the accumulator from the existing result when continuing ("Search
+    // more"), otherwise start fresh. The Budget applies per invocation: a fresh
+    // search scans up to `budget` records; "Search more" grants another budget.
+    const prior = continueChain ? searchResult : null;
+    let accMessages: Message[] = prior ? [...prior.messages] : [];
+    let accScanned = prior ? prior.stats.scanned : 0;
+    let accMatched = prior ? prior.stats.matched : 0;
+    let cursors: Record<string, number> | undefined = prior
+      ? prior.stats.next_cursors
+      : undefined;
+
+    const budgetTarget = budget;
+    // Budget 0 / empty means "scan the entire topic": keep chaining until the
+    // range is exhausted (more_available=false), the limit is hit, or Stop.
+    const unlimited = budgetTarget <= 0;
+    // Per-call cap used in unlimited mode; the 12s server timeout is the real
+    // limiter, this just keeps each request bounded.
+    const PER_CALL_BUDGET = 1_000_000;
+    let scannedThisRun = 0;
+    let reason: "budget" | "complete" | "limit" | "stopped" = "complete";
+
     try {
-      const r = await searchMessages(cluster, topic, req);
-      setSearchResult((prev) => {
-        const prior = continuation && prev ? prev.messages : [];
-        return {
-          messages: [...prior, ...(r.messages ?? [])],
-          stats: r.search,
+      for (;;) {
+        let callBudget: number;
+        if (unlimited) {
+          callBudget = PER_CALL_BUDGET;
+        } else {
+          const remaining = budgetTarget - scannedThisRun;
+          if (remaining <= 0) {
+            reason = "budget";
+            break;
+          }
+          callBudget = remaining;
+        }
+        const req: SearchRequest = { ...baseReq, budget: callBudget, cursors };
+        const r = await searchMessages(cluster, topic, req);
+        const s = r.search;
+        accMessages = [...accMessages, ...(r.messages ?? [])];
+        accScanned += s.scanned;
+        accMatched += s.matched;
+        scannedThisRun += s.scanned;
+        cursors = s.next_cursors;
+
+        // Publish cumulative progress so the banner updates between calls.
+        setSearchResult({
+          messages: accMessages,
+          stats: { ...s, scanned: accScanned, matched: accMatched },
           req,
-        };
-      });
+        });
+
+        if (!s.more_available) {
+          reason = "complete";
+          break;
+        }
+        if (stopOnLimit && accMatched >= limit) {
+          reason = "limit";
+          break;
+        }
+        if (stopSearchRef.current) {
+          reason = "stopped";
+          break;
+        }
+        // Safety: a call that scanned nothing but reports more would loop forever.
+        if (s.scanned === 0) {
+          reason = "complete";
+          break;
+        }
+      }
+      setSearchStopReason(reason);
     } catch (err) {
       setSearchError((err as Error).message);
     } finally {
       setSearching(false);
+      stopSearchRef.current = false;
     }
+  };
+
+  const stopSearch = () => {
+    stopSearchRef.current = true;
   };
 
   const clearSearch = () => {
     setSearchResult(null);
     setSearchError(null);
+    setSearchStopReason(null);
   };
 
-  const rawMessages = searchResult
-    ? searchResult.messages
+  const inSearchMode = searchResult !== null || searching;
+  const rawMessages = inSearchMode
+    ? (searchResult?.messages ?? [])
     : [...(msgsQuery.data?.messages ?? []), ...tailMessages];
   const displayMessages = useMemo(() => {
     if (sortOrder === "oldest") return rawMessages;
@@ -543,9 +622,10 @@ function MessagesPanel({
           Refresh
         </button>
         <span className="text-xs text-[var(--color-text-muted)]">
-          {displayMessages.length}
-          {msgsQuery.isFetching && !searchResult && " · fetching…"}
-          {searching && " · searching…"}
+          {inSearchMode ? (searchResult?.stats.matched ?? 0) : displayMessages.length}
+          {!inSearchMode && msgsQuery.isFetching && " · fetching…"}
+          {searching &&
+            ` · ${searchResult?.stats.scanned ?? 0} scanned · searching…`}
         </span>
       </div>
 
@@ -788,11 +868,17 @@ function MessagesPanel({
               <label className="font-medium">Budget</label>
               <input
                 type="number"
-                min={100}
-                max={500000}
+                min={0}
+                max={1000000}
                 step={1000}
-                value={budget}
-                onChange={(e) => setBudget(Number(e.target.value) || 10000)}
+                value={budget === 0 ? "" : budget}
+                placeholder="alle"
+                title="Leer = ganzes Topic durchsuchen. Sonst: max. zu scannende Nachrichten pro Suche."
+                onChange={(e) =>
+                  setBudget(
+                    e.target.value === "" ? 0 : Number(e.target.value) || 0,
+                  )
+                }
                 className="w-24 rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1"
               />
             </div>
@@ -807,7 +893,15 @@ function MessagesPanel({
             >
               {searching ? "Searching…" : "Search"}
             </button>
-            {searchResult && (
+            {searching && (
+              <button
+                onClick={stopSearch}
+                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1 hover:border-[var(--color-border-strong)]"
+              >
+                Stop
+              </button>
+            )}
+            {searchResult && !searching && (
               <button
                 onClick={clearSearch}
                 className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1 hover:border-[var(--color-border-strong)]"
@@ -829,35 +923,46 @@ function MessagesPanel({
               </span>
               <span className="text-[var(--color-text-muted)]">
                 · {searchResult.stats.scanned} scanned
+                {searching && " …"}
               </span>
               {searchResult.stats.parse_errors > 0 && (
                 <span className="text-[var(--color-warning)]">
                   · {searchResult.stats.parse_errors} parse errors skipped
                 </span>
               )}
-              {searchResult.stats.budget_exhausted && (
+              {!searching && searchStopReason === "budget" && (
                 <span className="rounded bg-[var(--color-warning-subtle)] px-1.5 py-0.5 text-[var(--color-warning)]">
-                  Budget exhausted
+                  Budget reached
                 </span>
               )}
-              {searchResult.stats.durations_ms?.total !== undefined && (
-                <span className="text-[var(--color-text-subtle)]">
-                  · {searchResult.stats.durations_ms.total} ms
+              {!searching && searchStopReason === "limit" && (
+                <span className="rounded bg-[var(--color-warning-subtle)] px-1.5 py-0.5 text-[var(--color-warning)]">
+                  Limit reached
                 </span>
               )}
-              {searchResult.stats.next_cursors && (
-                <button
-                  onClick={() => {
-                    const raw = searchResult.stats.next_cursors ?? {};
-                    const cont: Record<string, number> = {};
-                    for (const [k, v] of Object.entries(raw)) cont[k] = v as number;
-                    runSearch(cont);
-                  }}
-                  disabled={searching}
-                  className="ml-auto rounded border border-[var(--color-border)] px-2 py-1 hover:border-[var(--color-border-strong)]"
-                >
-                  Search more →
-                </button>
+              {!searching && searchStopReason === "stopped" && (
+                <span className="rounded bg-[var(--color-warning-subtle)] px-1.5 py-0.5 text-[var(--color-warning)]">
+                  Stopped
+                </span>
+              )}
+              {!searching &&
+                searchStopReason === "complete" &&
+                !searchResult.stats.more_available && (
+                  <span className="rounded bg-[var(--color-success-subtle)] px-1.5 py-0.5 text-[var(--color-success)]">
+                    Range fully scanned
+                  </span>
+                )}
+              {!searching && (
+                <span className="ml-auto flex items-center gap-3">
+                  {searchResult.stats.more_available && (
+                    <button
+                      onClick={() => runSearch(true)}
+                      className="rounded border border-[var(--color-border)] px-2 py-1 hover:border-[var(--color-border-strong)]"
+                    >
+                      Search more →
+                    </button>
+                  )}
+                </span>
               )}
             </div>
           )}
@@ -867,6 +972,12 @@ function MessagesPanel({
       {msgsQuery.error && !searchResult && (
         <div className="m-3 rounded-md border border-[var(--color-danger)]/30 bg-[var(--color-danger-subtle)] p-3 text-sm text-[var(--color-danger)]">
           {(msgsQuery.error as Error).message}
+        </div>
+      )}
+
+      {displayMessages.length === 0 && searching && (
+        <div className="p-8 text-center text-sm text-[var(--color-text-subtle)]">
+          Searching… {searchResult?.stats.scanned ?? 0} scanned, no match yet.
         </div>
       )}
 
@@ -898,7 +1009,7 @@ function MessagesPanel({
         ))}
       </div>
 
-      {!searchResult && tailCursor && !live && (
+      {!inSearchMode && tailCursor && !live && (
         <div className="flex flex-col items-center gap-2 p-4">
           <button
             onClick={loadMore}

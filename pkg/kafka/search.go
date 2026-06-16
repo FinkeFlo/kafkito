@@ -97,11 +97,17 @@ type SearchStats struct {
 	Scanned         int                      `json:"scanned"`
 	Matched         int                      `json:"matched"`
 	BudgetExhausted bool                     `json:"budget_exhausted"`
-	Direction       SearchDirection          `json:"direction"`
-	NextCursors     map[int32]int64          `json:"next_cursors,omitempty"`
-	ResolvedRange   map[int32]PartitionRange `json:"resolved_range,omitempty"`
-	ParseErrors     int                      `json:"parse_errors"`
-	Durations       map[string]int64         `json:"durations_ms,omitempty"`
+	// TimedOut is true when the scan stopped because the per-call timeout
+	// elapsed before the budget or the partition range was exhausted.
+	TimedOut bool `json:"timed_out"`
+	// MoreAvailable is true when the resolved range was not fully scanned, i.e.
+	// a continuation call with NextCursors would scan additional records.
+	MoreAvailable bool                     `json:"more_available"`
+	Direction     SearchDirection          `json:"direction"`
+	NextCursors   map[int32]int64          `json:"next_cursors,omitempty"`
+	ResolvedRange map[int32]PartitionRange `json:"resolved_range,omitempty"`
+	ParseErrors   int                      `json:"parse_errors"`
+	Durations     map[string]int64         `json:"durations_ms,omitempty"`
 }
 
 // PartitionRange reports the offset window actually scanned on a partition.
@@ -344,6 +350,7 @@ func (r *Registry) SearchMessages(ctx context.Context, cluster, topic string, op
 	// the partition should be reseeked.
 	chunkDone := make(map[int32]bool, len(ranges))
 	budgetExhausted := false
+	timedOut := false
 	started := time.Now()
 
 	// advanceNewestChunks reseeks any partitions whose current chunk is done
@@ -386,6 +393,7 @@ scan:
 		fetches := cl.PollFetches(pollCtx)
 		if err := pollCtx.Err(); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
+				timedOut = true
 				break
 			}
 			return nil, err
@@ -543,10 +551,31 @@ scan:
 		}
 	}
 
+	// moreAvailable is true when at least one partition's continuation cursor
+	// still leaves a non-empty window to scan. This is precise: it is false
+	// exactly when every partition's range was fully consumed, so the UI can
+	// hide "Search more" without an extra empty round-trip.
+	moreAvailable := false
+	for p, rng := range ranges {
+		c := nextCursors[p]
+		switch opts.Direction {
+		case DirNewestFirst:
+			if c > rng.Start {
+				moreAvailable = true
+			}
+		default:
+			if c < rng.End {
+				moreAvailable = true
+			}
+		}
+	}
+
 	stats := SearchStats{
 		Scanned:         scanned,
 		Matched:         matched,
 		BudgetExhausted: budgetExhausted,
+		TimedOut:        timedOut,
+		MoreAvailable:   moreAvailable,
 		Direction:       opts.Direction,
 		NextCursors:     nextCursors,
 		ResolvedRange:   ranges,

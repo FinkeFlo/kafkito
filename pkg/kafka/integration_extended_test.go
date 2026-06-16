@@ -225,6 +225,10 @@ func TestIntegration_SearchMessages(t *testing.T) {
 	})
 	require.NoError(t, err, "contains search")
 	require.Equal(t, 3, containsRes.Stats.Matched, "contains 'shipped' should match 3 records")
+	// The whole 5-record range fits well under budget, so the scan completes the
+	// range: no continuation is available and it did not time out.
+	require.False(t, containsRes.Stats.MoreAvailable, "small range should be fully scanned")
+	require.False(t, containsRes.Stats.TimedOut, "search well under budget should not time out")
 
 	// 2) jsonpath $.amount > 1000 → 2 hits (id 3, 5).
 	jpRes, err := reg.SearchMessages(ctx, "it", topic, SearchOptions{
