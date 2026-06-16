@@ -1,6 +1,6 @@
 # kafkito
 
-> A modern, lightweight, single-binary UI for Apache Kafka.
+> Manage and observe Apache Kafka clusters from a single Go binary — topics, messages, consumer groups, schemas and ACLs in one web UI.
 
 **Status:** Pre-alpha (v0.0.x). APIs and on-disk formats may change without notice.
 
