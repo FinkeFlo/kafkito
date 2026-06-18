@@ -952,7 +952,7 @@ function MessagesPanel({
                 onChange={(e) => setStopOnLimit(e.target.checked)}
                 className="h-3.5 w-3.5"
               />
-              Stop after Limit matches
+              Stop after Limit matches ({limit})
             </label>
             <label className="flex items-center gap-1.5">
               <input
@@ -969,7 +969,7 @@ function MessagesPanel({
                   budgetUnlimited ? "text-[var(--color-text-subtle)]" : ""
                 }`}
               >
-                Budget
+                Max messages to scan
               </label>
               <input
                 type="number"
@@ -1038,7 +1038,7 @@ function MessagesPanel({
               )}
               {!searching && searchStopReason === "budget" && (
                 <span className="rounded bg-[var(--color-warning-subtle)] px-1.5 py-0.5 text-[var(--color-warning)]">
-                  Budget reached
+                  Scan limit reached
                 </span>
               )}
               {!searching && searchStopReason === "limit" && (
