@@ -117,6 +117,12 @@ export interface ConsumeParams {
   limit?: number;
   from?: "end" | "start" | "offset";
   offset?: number;
+  /**
+   * Per-partition seek offsets, used with `from: "offset"` when no single
+   * partition is selected (partition = all). Each listed partition is seeked
+   * to its offset, clamped server-side to the partition's low watermark.
+   */
+  partitionOffsets?: Record<number, number>;
   from_ts_ms?: number;
   to_ts_ms?: number;
   cursor?: string;
@@ -230,6 +236,12 @@ export async function fetchMessages(
   if (params.limit !== undefined) qs.set("limit", String(params.limit));
   if (params.from) qs.set("from", params.from);
   if (params.offset !== undefined) qs.set("offset", String(params.offset));
+  if (params.partitionOffsets) {
+    const pairs = Object.entries(params.partitionOffsets)
+      .map(([p, o]) => `${p}:${o}`)
+      .join(",");
+    if (pairs) qs.set("partition_offsets", pairs);
+  }
   if (params.from_ts_ms !== undefined) qs.set("from_ts_ms", String(params.from_ts_ms));
   if (params.to_ts_ms !== undefined) qs.set("to_ts_ms", String(params.to_ts_ms));
   if (params.cursor) qs.set("cursor", params.cursor);

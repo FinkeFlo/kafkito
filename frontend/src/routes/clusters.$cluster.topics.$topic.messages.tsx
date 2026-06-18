@@ -163,7 +163,51 @@ function MessagesPanel({
   const setMsgOffset = (v: number) =>
     navigate({ search: (prev) => ({ ...prev, msgOffset: v }) });
 
+  // Valid offset range for the current partition selection (single partition
+  // or all). Used to hint the input and clamp committed values.
+  const offsetBounds = useMemo(() => {
+    const sel =
+      partition >= 0
+        ? partitions.filter((p) => p.partition === partition)
+        : partitions;
+    if (sel.length === 0) return null;
+    const min = Math.min(...sel.map((p) => p.start_offset));
+    const maxEnd = Math.max(...sel.map((p) => p.end_offset));
+    return { min, max: Math.max(min, maxEnd - 1) };
+  }, [partition, partitions]);
+
+  // Local draft so typing an offset does not refetch on every keystroke; the
+  // value is committed (and clamped to the valid range) on Enter or blur.
+  const [offsetDraft, setOffsetDraft] = useState<string>(String(msgOffset));
+  useEffect(() => {
+    setOffsetDraft(String(msgOffset));
+  }, [msgOffset]);
+
+  const commitOffset = () => {
+    const parsed = Number(offsetDraft);
+    let next = Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : 0;
+    if (offsetBounds) {
+      next = Math.min(Math.max(next, offsetBounds.min), offsetBounds.max);
+    }
+    setOffsetDraft(String(next));
+    if (next !== msgOffset) setMsgOffset(next);
+  };
+
   const [live, setLive] = useState<boolean>(false);
+
+  const [limitDraft, setLimitDraft] = useState<string>(String(limit));
+  useEffect(() => {
+    setLimitDraft(String(limit));
+  }, [limit]);
+
+  const commitLimit = () => {
+    const parsed = Number(limitDraft);
+    let next = Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : 50;
+    if (next > 500) next = 500;
+    setLimitDraft(String(next));
+    if (next !== limit) setLimit(next);
+  };
+
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
 
   // Browse-level time-range filter (separate state from the search panel below)
@@ -187,6 +231,7 @@ function MessagesPanel({
   const [direction, setDirection] = useState<SearchDirection>("newest_first");
   const [stopOnLimit, setStopOnLimit] = useState(true);
   const [budget, setBudget] = useState(50000);
+  const [budgetUnlimited, setBudgetUnlimited] = useState(false);
   const [searching, setSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<
     | { messages: Message[]; stats: SearchStats; req: SearchRequest }
@@ -320,11 +365,26 @@ function MessagesPanel({
       partition,
       limit,
       from,
-      offset: from === "offset" ? msgOffset : undefined,
+      // Single partition selected: seek that partition. Partition = all:
+      // seek every partition to the same offset via partition_offsets so
+      // "from offset" works across the whole topic, not just one partition.
+      offset: from === "offset" && partition >= 0 ? msgOffset : undefined,
+      partitionOffsets:
+        from === "offset" && partition < 0 && partitions.length > 0
+          ? Object.fromEntries(partitions.map((p) => [p.partition, msgOffset]))
+          : undefined,
       from_ts_ms: browseRange.from_ts_ms,
       to_ts_ms: browseRange.to_ts_ms,
     }),
-    [partition, limit, from, msgOffset, browseRange.from_ts_ms, browseRange.to_ts_ms],
+    [
+      partition,
+      limit,
+      from,
+      msgOffset,
+      partitions,
+      browseRange.from_ts_ms,
+      browseRange.to_ts_ms,
+    ],
   );
 
   const msgsQuery = useQuery({
@@ -407,7 +467,7 @@ function MessagesPanel({
       ? prior.stats.next_cursors
       : undefined;
 
-    const budgetTarget = budget;
+    const budgetTarget = budgetUnlimited ? 0 : budget;
     // Budget 0 / empty means "scan the entire topic": keep chaining until the
     // range is exhausted (more_available=false), the limit is hit, or Stop.
     const unlimited = budgetTarget <= 0;
@@ -546,13 +606,36 @@ function MessagesPanel({
             <option value="offset">offset</option>
           </select>
           {from === "offset" && (
-            <input
-              value={String(msgOffset)}
-              onChange={(e) => setMsgOffset(Number(e.target.value) || 0)}
-              className="w-20 rounded border border-[var(--color-border)] px-2 py-1 text-xs font-mono"
-              placeholder="0"
-              disabled={!!searchResult}
-            />
+            <>
+              <input
+                value={offsetDraft}
+                onChange={(e) => setOffsetDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    commitOffset();
+                  }
+                }}
+                onBlur={commitOffset}
+                inputMode="numeric"
+                className="w-20 rounded border border-[var(--color-border)] px-2 py-1 text-xs font-mono"
+                placeholder="0"
+                disabled={!!searchResult}
+                title={
+                  offsetBounds
+                    ? partition < 0
+                      ? `Seeks every partition to this offset (valid ${offsetBounds.min}–${offsetBounds.max}). Press Enter to apply.`
+                      : `Valid ${offsetBounds.min}–${offsetBounds.max}. Press Enter to apply.`
+                    : "Press Enter to apply."
+                }
+              />
+              {offsetBounds && (
+                <span className="text-[var(--color-text-subtle)]">
+                  {partition < 0 ? "all · " : ""}
+                  {offsetBounds.min}–{offsetBounds.max}
+                </span>
+              )}
+            </>
           )}
         </div>
         <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
@@ -561,8 +644,15 @@ function MessagesPanel({
             type="number"
             min={1}
             max={500}
-            value={limit}
-            onChange={(e) => setLimit(Number(e.target.value) || 50)}
+            value={limitDraft}
+            onChange={(e) => setLimitDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitLimit();
+              }
+            }}
+            onBlur={commitLimit}
             className="w-20 rounded border border-[var(--color-border)] px-2 py-1 text-xs"
           />
         </div>
@@ -845,14 +935,14 @@ function MessagesPanel({
 
           <div className="flex flex-wrap items-center gap-3 text-xs">
             <div className="flex items-center gap-1.5">
-              <label className="font-medium">Richtung</label>
+              <label className="font-medium">Direction</label>
               <select
                 value={direction}
                 onChange={(e) => setDirection(e.target.value as SearchDirection)}
                 className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1"
               >
-                <option value="newest_first">neu → alt</option>
-                <option value="oldest_first">alt → neu</option>
+                <option value="newest_first">new → old</option>
+                <option value="oldest_first">old → new</option>
               </select>
             </div>
             <label className="flex items-center gap-1.5">
@@ -862,24 +952,40 @@ function MessagesPanel({
                 onChange={(e) => setStopOnLimit(e.target.checked)}
                 className="h-3.5 w-3.5"
               />
-              Stop bei Limit
+              Stop after Limit matches
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={budgetUnlimited}
+                onChange={(e) => setBudgetUnlimited(e.target.checked)}
+                className="h-3.5 w-3.5"
+              />
+              Scan whole topic
             </label>
             <div className="flex items-center gap-1.5">
-              <label className="font-medium">Budget</label>
+              <label
+                className={`font-medium ${
+                  budgetUnlimited ? "text-[var(--color-text-subtle)]" : ""
+                }`}
+              >
+                Budget
+              </label>
               <input
                 type="number"
-                min={0}
+                min={1}
                 max={1000000}
                 step={1000}
                 value={budget === 0 ? "" : budget}
-                placeholder="alle"
-                title="Leer = ganzes Topic durchsuchen. Sonst: max. zu scannende Nachrichten pro Suche."
+                disabled={budgetUnlimited}
+                placeholder="50000"
+                title="Max number of messages to scan per search. Enable 'Scan whole topic' to scan everything."
                 onChange={(e) =>
                   setBudget(
                     e.target.value === "" ? 0 : Number(e.target.value) || 0,
                   )
                 }
-                className="w-24 rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1"
+                className="w-24 rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1 disabled:opacity-50"
               />
             </div>
             <button
