@@ -54,10 +54,11 @@ type ClusterMetrics struct {
 	TotalLag      int64
 	TotalRate     float64
 
-	HaveRate  bool
-	HaveLag   bool
-	HaveSize  bool
-	UpdatedAt time.Time
+	HaveRate   bool
+	HaveLag    bool
+	HaveSize   bool
+	HaveGroups bool
+	UpdatedAt  time.Time
 
 	PerTopic map[string]TopicMetrics
 }
@@ -406,7 +407,10 @@ func (mc *metricsCollector) probe(
 	}
 
 	// ---- lag -------------------------------------------------------
-	snap.Groups = len(groups)
+	if groupsErr == nil {
+		snap.Groups = len(groups)
+		snap.HaveGroups = true
+	}
 	if offsetsErr == nil && endsErr == nil && ends != nil {
 		lagByTopic := make(map[string]int64, len(perTopic))
 		var totalLag int64
@@ -620,11 +624,13 @@ func (r *Registry) applyClusterAggregates(info *ClusterInfo) {
 	}
 	b := snap.Brokers
 	t := snap.Topics
-	g := snap.Groups
 	tm := snap.TotalMessages
 	info.Brokers = &b
 	info.Topics = &t
-	info.Groups = &g
+	if snap.HaveGroups {
+		g := snap.Groups
+		info.Groups = &g
+	}
 	info.TotalMessages = &tm
 	if snap.HaveLag {
 		v := snap.TotalLag
