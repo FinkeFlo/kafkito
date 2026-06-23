@@ -17,6 +17,7 @@ import {
 } from "@/lib/api";
 import { buildPathTree } from "@/lib/path-tree";
 import { buildJsonPath, type Token } from "@/lib/path-builder";
+import { dedupeMessages } from "@/lib/dedupe-messages";
 import { PathSense } from "@/components/path-sense";
 import { ArrayScopePopover } from "@/components/array-scope-popover";
 import { JsonInteractive } from "@/components/json-interactive";
@@ -548,14 +549,17 @@ function MessagesPanel({
     ? (searchResult?.messages ?? [])
     : [...(msgsQuery.data?.messages ?? []), ...tailMessages];
   const displayMessages = useMemo(() => {
-    if (sortOrder === "oldest") return rawMessages;
+    if (sortOrder === "oldest") return dedupeMessages(rawMessages);
     // Stable sort: newest timestamp first; ties broken by (partition, offset) desc
     // so concurrent records keep a deterministic order.
-    return [...rawMessages].sort((a, b) => {
-      if (b.timestamp_ms !== a.timestamp_ms) return b.timestamp_ms - a.timestamp_ms;
-      if (b.partition !== a.partition) return b.partition - a.partition;
-      return b.offset - a.offset;
-    });
+    return dedupeMessages(
+      [...rawMessages].sort((a, b) => {
+        if (b.timestamp_ms !== a.timestamp_ms)
+          return b.timestamp_ms - a.timestamp_ms;
+        if (b.partition !== a.partition) return b.partition - a.partition;
+        return b.offset - a.offset;
+      }),
+    );
   }, [rawMessages, sortOrder]);
 
   const firstJsonIdx = displayMessages.findIndex(
