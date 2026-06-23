@@ -271,6 +271,20 @@ describe("apiFetch — 403 CSRF retry semantics", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(mockedClearCsrfToken).not.toHaveBeenCalled();
   });
+
+  it("retries at most once on a persistent 403 (no infinite recursion)", async () => {
+    mockedGetCsrfToken.mockResolvedValue("tok");
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    // Always answer 403 Required — a naive retry would recurse forever.
+    fetchMock.mockResolvedValue(
+      makeResponse(403, { "x-csrf-token": "Required" }),
+    );
+
+    const res = await apiFetch("/x", { method: "POST" });
+
+    expect(res.status).toBe(403);
+    expect(fetchMock).toHaveBeenCalledTimes(2); // original + exactly one retry
+  });
 });
 
 describe("SessionExpiredError", () => {

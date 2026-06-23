@@ -18,7 +18,7 @@ const writeMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 //   approuter can run the OAuth code flow against XSUAA, throws
 //   SessionExpiredError so callers do not consume an undefined Response
 // - on 403 with "x-csrf-token: Required": single retry with a fresh token
-export async function apiFetch(input: RequestInfo, init: RequestInit = {}): Promise<Response> {
+export async function apiFetch(input: RequestInfo, init: RequestInit = {}, retried = false): Promise<Response> {
   const method = (init.method ?? 'GET').toUpperCase();
   const headers = new Headers(init.headers);
   headers.set('x-requested-with', 'XMLHttpRequest');
@@ -38,9 +38,9 @@ export async function apiFetch(input: RequestInfo, init: RequestInit = {}): Prom
     window.location.assign('/');
     throw new SessionExpiredError();
   }
-  if (res.status === 403 && res.headers.get('x-csrf-token') === 'Required') {
+  if (res.status === 403 && res.headers.get('x-csrf-token') === 'Required' && !retried) {
     clearCsrfToken();
-    return apiFetch(input, init);
+    return apiFetch(input, init, true);
   }
   return res;
 }
