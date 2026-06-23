@@ -5,7 +5,7 @@ vi.mock("./csrf", () => ({
   clearCsrfToken: vi.fn(),
 }));
 
-import { apiFetch, SessionExpiredError } from "./api";
+import { apiFetch, SessionExpiredError, __resetRedirectForTests } from "./api";
 import { clearCsrfToken, getCsrfToken } from "./csrf";
 
 const mockedGetCsrfToken = vi.mocked(getCsrfToken);
@@ -184,6 +184,7 @@ describe("apiFetch — method handling and CSRF header injection", () => {
 
 describe("apiFetch — 401 auth-loss redirect", () => {
   it("on 401 clears the CSRF cache, navigates to '/', and throws SessionExpiredError", async () => {
+    __resetRedirectForTests();
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
       makeResponse(401),
     );
@@ -193,6 +194,26 @@ describe("apiFetch — 401 auth-loss redirect", () => {
     expect(mockedClearCsrfToken).toHaveBeenCalledTimes(1);
     expect(window.location.assign).toHaveBeenCalledTimes(1);
     expect(window.location.assign).toHaveBeenCalledWith("/");
+  });
+
+  it("navigates to '/' only once across multiple concurrent 401s", async () => {
+    __resetRedirectForTests();
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(makeResponse(401));
+
+    const results = await Promise.allSettled([
+      apiFetch("/a"),
+      apiFetch("/b"),
+      apiFetch("/c"),
+    ]);
+
+    // Every call still rejects with SessionExpiredError…
+    for (const r of results) {
+      expect(r.status).toBe("rejected");
+      expect((r as PromiseRejectedResult).reason).toBeInstanceOf(SessionExpiredError);
+    }
+    // …but the top-window navigation happens at most once.
+    expect(window.location.assign).toHaveBeenCalledTimes(1);
   });
 
   it("on 200 (negative control) does NOT call window.location.assign and does NOT throw", async () => {
