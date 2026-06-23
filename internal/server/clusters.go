@@ -243,9 +243,8 @@ func (a *clusterAPI) consumeMessages(w http.ResponseWriter, r *http.Request) {
 
 	opts, err := parseConsumeQuery(r.URL.Query())
 	if err != nil {
-		if writeParamError(w, err) {
-			return
-		}
+		writeParamError(w, err)
+		return
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
@@ -288,9 +287,8 @@ func (a *clusterAPI) sampleMessages(w http.ResponseWriter, r *http.Request) {
 
 	opts, err := parseSampleQuery(r.URL.Query())
 	if err != nil {
-		if writeParamError(w, err) {
-			return
-		}
+		writeParamError(w, err)
+		return
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
@@ -757,9 +755,8 @@ func (a *clusterAPI) searchMessages(w http.ResponseWriter, r *http.Request) {
 
 	opts, err := parseSearchBody(r)
 	if err != nil {
-		if writeParamError(w, err) {
-			return
-		}
+		writeParamError(w, err)
+		return
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
