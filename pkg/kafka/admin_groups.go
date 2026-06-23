@@ -133,8 +133,9 @@ func (r *Registry) ResetOffsets(ctx context.Context, cluster, group string, req 
 
 	// 4) Also fetch the log-end offsets so we can clamp user-provided absolute offsets
 	//    to the valid range [start, end].
-	ends, _ := adm.ListEndOffsets(ctx, req.Topic)
-	starts, _ := adm.ListStartOffsets(ctx, req.Topic)
+	ends, endsErr := adm.ListEndOffsets(ctx, req.Topic)
+	starts, startsErr := adm.ListStartOffsets(ctx, req.Topic)
+	boundsErr := endsErr != nil || startsErr != nil
 
 	toCommit := kadm.Offsets{}
 	results := make([]ResetOffsetResult, 0, len(targets))
@@ -161,24 +162,18 @@ func (r *Registry) ResetOffsets(ctx context.Context, cluster, group string, req 
 				res.Error = "partition offset not resolved"
 			}
 		case ResetToOffset:
-			newAt = req.Offset
-			if s, ok := starts.Lookup(req.Topic, p); ok && s.Err == nil && newAt < s.Offset {
-				newAt = s.Offset
-			}
-			if e, ok := ends.Lookup(req.Topic, p); ok && e.Err == nil && newAt > e.Offset {
-				newAt = e.Offset
+			if boundsErr {
+				res.Error = "offset bounds unavailable; refusing to commit an unclamped absolute offset"
+			} else {
+				newAt = clampToBounds(req.Offset, starts, ends, req.Topic, p)
 			}
 		case ResetShiftBy:
 			if res.OldOffset < 0 {
 				res.Error = "no prior commit to shift from"
+			} else if boundsErr {
+				res.Error = "offset bounds unavailable; refusing to commit an unclamped shifted offset"
 			} else {
-				newAt = res.OldOffset + req.Shift
-				if s, ok := starts.Lookup(req.Topic, p); ok && s.Err == nil && newAt < s.Offset {
-					newAt = s.Offset
-				}
-				if e, ok := ends.Lookup(req.Topic, p); ok && e.Err == nil && newAt > e.Offset {
-					newAt = e.Offset
-				}
+				newAt = clampToBounds(res.OldOffset+req.Shift, starts, ends, req.Topic, p)
 			}
 		}
 
@@ -216,6 +211,19 @@ func (r *Registry) ResetOffsets(ctx context.Context, cluster, group string, req 
 		}
 	}
 	return out, nil
+}
+
+// clampToBounds clamps off into [start, end] for topic/partition p, using only
+// bound entries that have no per-partition error. A missing or errored bound on
+// one side leaves that side unconstrained.
+func clampToBounds(off int64, starts, ends kadm.ListedOffsets, topic string, p int32) int64 {
+	if s, ok := starts.Lookup(topic, p); ok && s.Err == nil && off < s.Offset {
+		off = s.Offset
+	}
+	if e, ok := ends.Lookup(topic, p); ok && e.Err == nil && off > e.Offset {
+		off = e.Offset
+	}
+	return off
 }
 
 // DeleteGroup removes an empty/dead consumer group.
