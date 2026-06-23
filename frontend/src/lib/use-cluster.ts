@@ -121,7 +121,20 @@ export function useCluster(): UseClusterResult {
   );
 
   const fromUrl = params.cluster ? decodeURIComponent(params.cluster) : undefined;
-  const stored = readStored();
+
+  // Hold the stored cluster in state synced via a `storage` listener so the
+  // hook re-renders when another tab writes a kafkito key.
+  const [stored, setStored] = useState<string | null>(() => readStored());
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      // Re-read on any kafkito storage change (or a generic clear with key null).
+      if (e.key === null || e.key.startsWith("kafkito.")) {
+        setStored(readStored());
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const cluster = useMemo<string | null>(() => {
     if (fromUrl && known(fromUrl)) return fromUrl;
