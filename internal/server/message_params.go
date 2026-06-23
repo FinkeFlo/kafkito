@@ -17,6 +17,10 @@ import (
 	kafkapkg "github.com/FinkeFlo/kafkito/pkg/kafka"
 )
 
+// maxSearchBodyBytes bounds the search request body to protect against memory
+// exhaustion, matching the cap used by the other JSON handlers.
+const maxSearchBodyBytes = 1 << 20
+
 // maxPartitionOffsetsEntries caps the comma-separated partition_offsets
 // query value. A topic with thousands of partitions is exotic; this guard
 // stops a malicious or malformed input from forcing quadratic admin work
@@ -234,9 +238,10 @@ type searchRequestBody struct {
 
 // parseSearchBody decodes the request body and maps it to SearchOptions.
 // Returns a *paramError on bad input.
-func parseSearchBody(r *http.Request) (kafkapkg.SearchOptions, error) {
+func parseSearchBody(w http.ResponseWriter, r *http.Request) (kafkapkg.SearchOptions, error) {
 	var body searchRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxSearchBodyBytes))
+	if err := dec.Decode(&body); err != nil && !errors.Is(err, io.EOF) {
 		return kafkapkg.SearchOptions{}, badParam("invalid json body: " + err.Error())
 	}
 	opts := kafkapkg.SearchOptions{
