@@ -403,8 +403,10 @@ function MessagesPanel({
   const [tailCursor, setTailCursor] = useState<string | undefined>(undefined);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const loadGenRef = useRef(0);
 
   useEffect(() => {
+    loadGenRef.current += 1;
     setTailMessages([]);
     setTailCursor(msgsQuery.data?.next_cursor);
     setLoadMoreError(null);
@@ -412,6 +414,7 @@ function MessagesPanel({
 
   const loadMore = async () => {
     if (!tailCursor) return;
+    const gen = loadGenRef.current;
     setLoadingMore(true);
     setLoadMoreError(null);
     try {
@@ -419,12 +422,14 @@ function MessagesPanel({
         ...params,
         cursor: tailCursor,
       });
+      if (loadGenRef.current !== gen) return; // filter changed mid-flight; drop this page
       setTailMessages((prev) => [...prev, ...(next.messages ?? [])]);
       setTailCursor(next.has_more ? next.next_cursor : undefined);
     } catch (err) {
+      if (loadGenRef.current !== gen) return;
       setLoadMoreError((err as Error).message);
     } finally {
-      setLoadingMore(false);
+      if (loadGenRef.current === gen) setLoadingMore(false);
     }
   };
 
