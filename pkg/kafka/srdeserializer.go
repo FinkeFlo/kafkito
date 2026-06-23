@@ -117,19 +117,14 @@ func (d *SRDecoder) Decode(ctx context.Context, b []byte) (rendered string, meta
 
 func (d *SRDecoder) lookup(ctx context.Context, id uint32) (srEntry, error) {
 	d.mu.RLock()
-	if e, ok := d.cache[id]; ok {
-		d.mu.RUnlock()
-		return e, nil
-	}
+	e, ok := d.cache[id]
 	d.mu.RUnlock()
-
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	// re-check under write lock
-	if e, ok := d.cache[id]; ok {
+	if ok {
 		return e, nil
 	}
 
+	// Fetch WITHOUT holding the lock so a slow registry does not serialize
+	// decoding of unrelated schema IDs.
 	sv, err := d.sr.GetSchemaByID(ctx, int(id))
 	if err != nil {
 		return srEntry{}, fmt.Errorf("fetch schema id %d: %w", id, err)
@@ -147,7 +142,16 @@ func (d *SRDecoder) lookup(ctx context.Context, id uint32) (srEntry, error) {
 		}
 		entry.parsedAvro = parsed
 	}
+
+	d.mu.Lock()
+	// Another goroutine may have stored the same id while we fetched; prefer
+	// the existing entry to keep a single canonical value.
+	if existing, ok := d.cache[id]; ok {
+		d.mu.Unlock()
+		return existing, nil
+	}
 	d.cache[id] = entry
+	d.mu.Unlock()
 	return entry, nil
 }
 
