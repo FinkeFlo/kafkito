@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PathTree } from "@/lib/path-tree";
 
 export interface PathSenseProps {
@@ -70,6 +70,7 @@ export function PathSense({
 }: PathSenseProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   // Sync local query with controlled value when it changes from the outside.
   useEffect(() => {
@@ -91,15 +92,23 @@ export function PathSense({
     } else if (e.key === "ArrowDown") {
       setOpen(true);
     } else if (e.key === "Tab") {
-      if (/\[(\*|\d+)\]/.test(value)) {
+      if (/\[(\*|\d+)\]/.test(query)) {
         e.preventDefault();
-        onChange(toggleArraySegment(value));
+        onChange(toggleArraySegment(query));
       }
     }
   };
 
   return (
-    <div className="relative">
+    <div
+      ref={rootRef}
+      className="relative"
+      onBlur={(e) => {
+        if (!rootRef.current?.contains(e.relatedTarget as Node | null)) {
+          setOpen(false);
+        }
+      }}
+    >
       <input
         role="combobox"
         aria-expanded={open}

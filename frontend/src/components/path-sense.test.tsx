@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PathSense } from "./path-sense";
 import type { PathInfo, PathTree } from "@/lib/path-tree";
+
+// PathTree is a Map<string, PathInfo>; an empty Map means toRows(tree)
+// returns no rows so the dropdown shows the manual-entry hint.
+const emptyTree: PathTree = new Map();
 
 function makeTree(entries: Array<[string, Partial<PathInfo>]>): PathTree {
   const t: PathTree = new Map();
@@ -152,5 +156,37 @@ describe("PathSense", () => {
     await user.keyboard("{Escape}");
 
     expect(screen.queryByText("$.x")).not.toBeInTheDocument();
+  });
+
+  it("closes the dropdown when focus leaves the component", () => {
+    render(
+      <div>
+        <PathSense tree={emptyTree} value="" onChange={vi.fn()} onPick={vi.fn()} />
+        <button type="button">outside</button>
+      </div>,
+    );
+    const input = screen.getByRole("combobox");
+    fireEvent.focus(input);
+    expect(input).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.blur(input, { relatedTarget: screen.getByText("outside") });
+
+    expect(input).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("Tab toggles the array segment based on the freshly typed query, not the lagging value prop", () => {
+    const onChange = vi.fn();
+    render(
+      <PathSense tree={emptyTree} value="a[0].b" onChange={onChange} onPick={vi.fn()} />,
+    );
+    const input = screen.getByRole("combobox");
+    // Simulate the user typing a new array path that the parent has not yet echoed back.
+    fireEvent.change(input, { target: { value: "items[2].sku" } });
+    onChange.mockClear();
+
+    fireEvent.keyDown(input, { key: "Tab" });
+
+    // It must toggle "items[2]" -> "items[*]", derived from the typed query.
+    expect(onChange).toHaveBeenCalledWith("items[*].sku");
   });
 });
