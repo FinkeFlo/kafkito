@@ -199,9 +199,9 @@ export function ResetOffsetsModal({
             description={`This will overwrite committed offsets for group "${detail.group_id}" on topic "${topic}". Partitions: ${selectedParts.join(",")} (${selectedParts.length} of ${topicParts.length}).`}
             confirmPhrase={detail.group_id}
             confirmLabel="Commit reset"
-            onConfirm={() => {
+            onConfirm={async () => {
               setErr(null);
-              commitMut.mutate();
+              await commitMut.mutateAsync();
             }}
           />
         </>
