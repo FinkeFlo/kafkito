@@ -94,6 +94,30 @@ describe("JsonInteractive", () => {
     expect(screen.getByText(String(arrayLength - 1))).toBeInTheDocument();
   });
 
+  it("re-derives collapse state when the same position receives a larger array", () => {
+    const smallLength = ARRAY_COLLAPSE_THRESHOLD - 1;
+    const largeLength = ARRAY_COLLAPSE_THRESHOLD + 150;
+    const small = Array.from({ length: smallLength }, (_, i) => i);
+    const large = Array.from({ length: largeLength }, (_, i) => i);
+
+    const { rerender } = render(
+      <JsonInteractive value={{ items: small }} onPick={() => {}} />,
+    );
+    // Below threshold: fully expanded, no collapse control.
+    expect(
+      screen.queryByRole("button", { name: /Show all/i }),
+    ).not.toBeInTheDocument();
+
+    // Same React position, larger dataset crossing the threshold: must remount
+    // and re-derive expanded so the collapse control reappears.
+    rerender(<JsonInteractive value={{ items: large }} onPick={() => {}} />);
+    expect(
+      screen.getByRole("button", {
+        name: new RegExp(`Show all ${largeLength}`, "i"),
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("falls back to <pre> for messages over the size limit", () => {
     const overLimit = SIZE_LIMIT_BYTES + 100_000;
     const giant = "x".repeat(overLimit);
