@@ -9,7 +9,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/hamba/avro/v2"
 	"github.com/stretchr/testify/assert"
@@ -122,4 +124,49 @@ func TestIsSRFramed_RecognisesByteLayout(t *testing.T) {
 			assert.Equal(t, tc.want, IsSRFramed(tc.raw))
 		})
 	}
+}
+
+func TestSRDecoderLookup_FetchDoesNotHoldLockForOtherIDs(t *testing.T) {
+	t.Parallel()
+
+	release := make(chan struct{})
+	var hits int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/schemas/ids/1", func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		<-release // block until the test releases id=1
+		_, _ = w.Write([]byte(`{"schema":"\"string\"","schemaType":"AVRO","subject":"s","version":1}`))
+	})
+	mux.HandleFunc("/schemas/ids/2", func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		_, _ = w.Write([]byte(`{"schema":"\"string\"","schemaType":"AVRO","subject":"s","version":1}`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	sr := newSchemaRegistryClient(config.SchemaRegistryConfig{URL: srv.URL})
+	dec := NewSRDecoder(sr)
+
+	// Goroutine A blocks fetching id=1.
+	started := make(chan struct{})
+	go func() {
+		close(started)
+		_, _ = dec.lookup(context.Background(), 1)
+	}()
+	<-started
+
+	// id=2 must resolve even while id=1's fetch is in flight (no global lock held during fetch).
+	done := make(chan error, 1)
+	go func() {
+		_, err := dec.lookup(context.Background(), 2)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		assert.NoError(t, err, "id=2 lookup must complete while id=1 fetch is blocked")
+	case <-time.After(2 * time.Second):
+		t.Fatal("id=2 lookup blocked behind id=1 fetch — write lock is still held during the HTTP call")
+	}
+	close(release)
 }
