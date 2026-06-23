@@ -60,6 +60,8 @@ export function ConfirmDialog({
     try {
       await onConfirm();
       onOpenChange(false);
+    } catch {
+      // Keep the dialog open so the caller can surface the error inline.
     } finally {
       setBusy(false);
     }
