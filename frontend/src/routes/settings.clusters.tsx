@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
@@ -16,6 +16,7 @@ import {
   exportBundle,
   importBundle,
   listPrivateClusters,
+  subscribePrivateClusters,
   upsertPrivateCluster,
   type PrivateCluster,
   type PrivateClusterAuth,
@@ -113,9 +114,15 @@ function fromPrivateCluster(c: PrivateCluster): FormState {
 function ClusterSettingsPage() {
   // Subscribe via the hook so list refreshes on any mutation.
   useCluster();
-  const [tick, setTick] = useState(0);
-  const items = useMemo(() => listPrivateClusters(), [tick]);
-  const forceRefresh = () => setTick((n) => n + 1);
+  const [items, setItems] = useState(() => listPrivateClusters());
+  const forceRefresh = () => setItems(listPrivateClusters());
+  useEffect(() => {
+    // subscribePrivateClusters covers both the `storage` event and the
+    // custom `kafkito:private-clusters-changed` event, so a private-cluster
+    // add/edit/delete from another tab refreshes this table.
+    const unsub = subscribePrivateClusters(() => setItems(listPrivateClusters()));
+    return unsub;
+  }, []);
 
   const [form, setForm] = useState<FormState | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<PrivateCluster | null>(null);
