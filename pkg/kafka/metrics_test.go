@@ -250,6 +250,49 @@ func TestEnsureFresh_StoresSnapshot_OnSuccessfulProbe(t *testing.T) {
 	assert.Equal(t, 1, state.snapshot.Brokers)
 }
 
+func TestApplyClusterAggregates_LeavesGroupsNil_WhenGroupsUnknown(t *testing.T) {
+	t.Parallel()
+
+	r := NewRegistry(nil, slog.Default())
+	r.StartMetrics(context.Background(), time.Hour) // collector with a long interval; we seed manually
+	defer r.Close()
+
+	r.metrics.statesMu.Lock()
+	r.metrics.states["c"] = &clusterState{
+		snapshot: ClusterMetrics{Brokers: 3, Topics: 5, Groups: 0, HaveGroups: false},
+		hasSnap:  true,
+	}
+	r.metrics.statesMu.Unlock()
+
+	info := &ClusterInfo{Name: "c"}
+	r.applyClusterAggregates(info)
+
+	assert.Nil(t, info.Groups, "groups must be nil (unknown), not a measured 0, when group listing failed")
+	require.NotNil(t, info.Brokers)
+	assert.Equal(t, 3, *info.Brokers, "known fields still populate")
+}
+
+func TestApplyClusterAggregates_SetsGroups_WhenKnown(t *testing.T) {
+	t.Parallel()
+
+	r := NewRegistry(nil, slog.Default())
+	r.StartMetrics(context.Background(), time.Hour)
+	defer r.Close()
+
+	r.metrics.statesMu.Lock()
+	r.metrics.states["c"] = &clusterState{
+		snapshot: ClusterMetrics{Groups: 7, HaveGroups: true},
+		hasSnap:  true,
+	}
+	r.metrics.statesMu.Unlock()
+
+	info := &ClusterInfo{Name: "c"}
+	r.applyClusterAggregates(info)
+
+	require.NotNil(t, info.Groups)
+	assert.Equal(t, 7, *info.Groups)
+}
+
 func TestEnsureFresh_ReturnsCachedSnapshot_WithinTTL(t *testing.T) {
 	t.Parallel()
 
