@@ -103,7 +103,11 @@ function GroupsPage() {
       />
 
       {selected && group && (
-        <GroupDetailPanel cluster={selected} group={group} />
+        <GroupDetailPanel
+          cluster={selected}
+          group={group}
+          onDeleted={() => setGroup(undefined)}
+        />
       )}
     </div>
   );
@@ -281,7 +285,15 @@ function GroupsTable({
   );
 }
 
-function GroupDetailPanel({ cluster, group }: { cluster: string; group: string }) {
+function GroupDetailPanel({
+  cluster,
+  group,
+  onDeleted,
+}: {
+  cluster: string;
+  group: string;
+  onDeleted?: () => void;
+}) {
   const q = useQuery({
     queryKey: ["group", cluster, group],
     queryFn: () => fetchGroupDetail(cluster, group),
@@ -302,10 +314,18 @@ function GroupDetailPanel({ cluster, group }: { cluster: string; group: string }
     );
   }
   if (!q.data) return null;
-  return <GroupDetailBody cluster={cluster} detail={q.data} />;
+  return <GroupDetailBody cluster={cluster} detail={q.data} onDeleted={onDeleted} />;
 }
 
-function GroupDetailBody({ cluster, detail }: { cluster: string; detail: GroupDetail }) {
+function GroupDetailBody({
+  cluster,
+  detail,
+  onDeleted,
+}: {
+  cluster: string;
+  detail: GroupDetail;
+  onDeleted?: () => void;
+}) {
   const fmt = useFormatters();
   const byTopic = useMemo(() => {
     const m = new Map<string, GroupDetail["offsets"]>();
@@ -343,7 +363,7 @@ function GroupDetailBody({ cluster, detail }: { cluster: string; detail: GroupDe
             />
           </div>
         </div>
-        <GroupActions cluster={cluster} detail={detail} />
+        <GroupActions cluster={cluster} detail={detail} onDeleted={onDeleted} />
       </div>
 
       <div className="rounded-xl border border-border bg-panel">
@@ -534,9 +554,11 @@ function Metric({
 function GroupActions({
   cluster,
   detail,
+  onDeleted,
 }: {
   cluster: string;
   detail: GroupDetail;
+  onDeleted?: () => void;
 }) {
   const qc = useQueryClient();
   const [resetOpen, setResetOpen] = useState(false);
@@ -550,6 +572,9 @@ function GroupActions({
     mutationFn: () => deleteGroup(cluster, detail.group_id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["groups", cluster] });
+      // Clear the selection so GroupDetailPanel unmounts and stops polling the
+      // now-deleted group.
+      onDeleted?.();
     },
     onError: (e: Error) => setErr(e.message),
   });
