@@ -16,6 +16,7 @@ import {
 } from "../lib/api";
 import { useCluster } from "../lib/use-cluster";
 import { useFuzzy } from "../lib/fuzzy";
+import { latestVersion } from "../lib/schema-version";
 import {
   Boxes,
   FileJson,
@@ -222,7 +223,7 @@ export function CommandPalette() {
           label: s.name,
           cluster: activeCluster,
           subject: s.name,
-          latest: s.versions[s.versions.length - 1] ?? 1,
+          latest: latestVersion(s.versions),
           versions: s.versions.length,
         }))
       : [];
