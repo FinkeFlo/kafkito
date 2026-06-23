@@ -410,6 +410,7 @@ function MessagesPanel({
     setTailMessages([]);
     setTailCursor(msgsQuery.data?.next_cursor);
     setLoadMoreError(null);
+    setLoadingMore(false);
   }, [msgsQuery.data]);
 
   const loadMore = async () => {
@@ -557,6 +558,7 @@ function MessagesPanel({
     if (sortOrder === "oldest") return dedupeMessages(rawMessages);
     // Stable sort: newest timestamp first; ties broken by (partition, offset) desc
     // so concurrent records keep a deterministic order.
+    // Dedupe after sort: real duplicates are byte-identical (same timestamp), so survivor choice is stable.
     return dedupeMessages(
       [...rawMessages].sort((a, b) => {
         if (b.timestamp_ms !== a.timestamp_ms)
