@@ -8,6 +8,13 @@ export class SessionExpiredError extends Error {
 
 const writeMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+let redirecting = false;
+
+// Test-only: reset the one-shot redirect guard between cases.
+export function __resetRedirectForTests(): void {
+  redirecting = false;
+}
+
 // apiFetch is a fetch wrapper for SPA<->approuter<->backend traffic:
 // - always sends cookies (approuter session)
 // - always sends x-requested-with: XMLHttpRequest so @sap/approuter answers
@@ -35,7 +42,10 @@ export async function apiFetch(input: RequestInfo, init: RequestInit = {}, retri
   const res = await fetch(input, { ...init, method, headers, credentials: 'include' });
   if (res.status === 401) {
     clearCsrfToken();
-    window.location.assign('/');
+    if (!redirecting) {
+      redirecting = true;
+      window.location.assign('/');
+    }
     throw new SessionExpiredError();
   }
   if (res.status === 403 && res.headers.get('x-csrf-token') === 'Required' && !retried) {
