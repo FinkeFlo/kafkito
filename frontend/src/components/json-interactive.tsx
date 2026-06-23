@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { Token } from "@/lib/path-builder";
+import { buildJsonPath, type Token } from "@/lib/path-builder";
 
 export interface JsonInteractiveProps {
   value: unknown;
@@ -82,6 +82,7 @@ function Node({ node, trail, arrayLengths, onPick, indent }: NodeProps) {
   if (Array.isArray(node)) {
     return (
       <ArrayNode
+        key={`${buildJsonPath(trail)}:${node.length}`}
         arr={node}
         trail={trail}
         arrayLengths={arrayLengths}
