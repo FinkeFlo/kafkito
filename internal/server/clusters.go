@@ -753,7 +753,7 @@ func (a *clusterAPI) searchMessages(w http.ResponseWriter, r *http.Request) {
 	cluster := chi.URLParam(r, "cluster")
 	topic := chi.URLParam(r, "topic")
 
-	opts, err := parseSearchBody(r)
+	opts, err := parseSearchBody(w, r)
 	if err != nil {
 		writeParamError(w, err)
 		return

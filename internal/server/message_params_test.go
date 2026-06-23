@@ -231,8 +231,9 @@ func TestParseSearchBody(t *testing.T) {
 			t.Parallel()
 
 			req := httptest.NewRequest("POST", "/x", strings.NewReader(tc.body))
+			rec := httptest.NewRecorder()
 
-			opts, err := parseSearchBody(req)
+			opts, err := parseSearchBody(rec, req)
 
 			if tc.wantErr != "" {
 				var pe *paramError
@@ -285,6 +286,33 @@ func TestParseSampleQueryCapsN(t *testing.T) {
 			assert.Equal(t, tc.wantLimit, opts.Limit)
 		})
 	}
+}
+
+func TestParseSearchBody_RejectsOversizedBody(t *testing.T) {
+	t.Parallel()
+
+	huge := `{"value":"` + strings.Repeat("A", (1<<20)+1024) + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/x/messages/search", strings.NewReader(huge))
+	rec := httptest.NewRecorder()
+
+	_, err := parseSearchBody(rec, req)
+
+	require.Error(t, err, "a body larger than the cap must be rejected")
+	var pe *paramError
+	assert.True(t, errors.As(err, &pe), "over-cap body must surface as a client paramError, got %T", err)
+}
+
+func TestParseSearchBody_AcceptsSmallValidBody(t *testing.T) {
+	t.Parallel()
+
+	req := httptest.NewRequest(http.MethodPost, "/x/messages/search",
+		strings.NewReader(`{"value":"hello","mode":"contains"}`))
+	rec := httptest.NewRecorder()
+
+	opts, err := parseSearchBody(rec, req)
+
+	require.NoError(t, err)
+	assert.Equal(t, "hello", opts.Value)
 }
 
 func TestWriteParamError_HandlesNonParamErrorWithGeneric400(t *testing.T) {
