@@ -24,6 +24,18 @@ import (
 // cluster has no schema_registry.url configured.
 var ErrNoSchemaRegistry = errors.New("schema registry not configured for cluster")
 
+// SRError is a typed Schema Registry error carrying the HTTP status and the
+// Confluent error_code so callers can classify failures without string-matching.
+type SRError struct {
+	Status  int
+	Code    int
+	Message string
+}
+
+func (e *SRError) Error() string {
+	return fmt.Sprintf("sr %d: %s", e.Status, e.Message)
+}
+
 // Subject represents a Schema Registry subject with its available versions.
 type Subject struct {
 	Name     string `json:"name"`
@@ -128,14 +140,17 @@ func (c *SchemaRegistryClient) do(ctx context.Context, method, path string, body
 	if res.StatusCode >= 400 {
 		data, _ := io.ReadAll(res.Body)
 		// SR errors look like {"error_code":40401,"message":"..."}
-		var srErr struct {
+		var parsed struct {
 			Code    int    `json:"error_code"`
 			Message string `json:"message"`
 		}
-		if err := json.Unmarshal(data, &srErr); err == nil && srErr.Message != "" {
-			return fmt.Errorf("sr %d: %s", res.StatusCode, srErr.Message)
+		msg := strings.TrimSpace(string(data))
+		code := 0
+		if err := json.Unmarshal(data, &parsed); err == nil && parsed.Message != "" {
+			msg = parsed.Message
+			code = parsed.Code
 		}
-		return fmt.Errorf("sr %d: %s", res.StatusCode, strings.TrimSpace(string(data)))
+		return &SRError{Status: res.StatusCode, Code: code, Message: msg}
 	}
 	if out == nil {
 		return nil
@@ -183,7 +198,8 @@ func (c *SchemaRegistryClient) SubjectConfig(ctx context.Context, subject string
 	var out SubjectConfig
 	p := "/config/" + url.PathEscape(subject)
 	err := c.do(ctx, http.MethodGet, p, nil, &out)
-	if err != nil && strings.Contains(err.Error(), "40401") {
+	var srErr *SRError
+	if errors.As(err, &srErr) && (srErr.Code == 40401 || srErr.Status == http.StatusNotFound) {
 		// subject has no override; read global
 		err = c.do(ctx, http.MethodGet, "/config", nil, &out)
 	}
