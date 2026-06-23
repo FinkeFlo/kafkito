@@ -130,6 +130,17 @@ func (r *Registry) ListGroups(ctx context.Context, cluster string) ([]GroupInfo,
 	return out, nil
 }
 
+// logEndOffset returns the log-end offset for topic/partition p, or -1 when the
+// partition is missing, carries a per-partition error, or reports a negative
+// (sentinel) offset. kadm's Lookup reports ok=true even for error entries, so
+// the Err and sign checks are required to avoid computing bogus lag.
+func logEndOffset(ends kadm.ListedOffsets, topic string, p int32) int64 {
+	if eo, ok := ends.Lookup(topic, p); ok && eo.Err == nil && eo.Offset >= 0 {
+		return eo.Offset
+	}
+	return -1
+}
+
 // DescribeGroup returns the full detail of a single consumer group.
 func (r *Registry) DescribeGroup(ctx context.Context, cluster, group string) (*GroupDetail, error) {
 	adm, err := r.Admin(cluster)
@@ -223,10 +234,7 @@ func (r *Registry) DescribeGroup(ctx context.Context, cluster, group string) (*G
 				if oe.Err != nil {
 					continue
 				}
-				logEnd := int64(-1)
-				if eo, ok := ends.Lookup(topic, p); ok {
-					logEnd = eo.Offset
-				}
+				logEnd := logEndOffset(ends, topic, p)
 				lag := int64(-1)
 				if logEnd >= 0 && oe.At >= 0 {
 					l := logEnd - oe.At
