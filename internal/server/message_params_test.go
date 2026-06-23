@@ -4,7 +4,9 @@
 package server
 
 import (
+	"encoding/json"
 	"errors"
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
@@ -285,6 +287,31 @@ func TestParseSampleQueryCapsN(t *testing.T) {
 	}
 }
 
+func TestWriteParamError_HandlesNonParamErrorWithGeneric400(t *testing.T) {
+	t.Parallel()
+
+	rec := httptest.NewRecorder()
+	handled := writeParamError(rec, errors.New("some unexpected non-param error"))
+
+	assert.True(t, handled, "writeParamError must report it handled the error so the caller returns")
+	assert.Equal(t, http.StatusBadRequest, rec.Code, "non-paramError must still produce a 400, not fall through")
+
+	var body map[string]string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.NotEmpty(t, body["error"], "a client-facing error message must be present")
+}
+
+func TestWriteParamError_PreservesParamErrorStatusAndMessage(t *testing.T) {
+	t.Parallel()
+
+	rec := httptest.NewRecorder()
+	handled := writeParamError(rec, badParam("partition must be an integer"))
+
+	assert.True(t, handled)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Contains(t, rec.Body.String(), "partition must be an integer")
+}
+
 func TestWriteParamError(t *testing.T) {
 	t.Parallel()
 
@@ -294,7 +321,8 @@ func TestWriteParamError(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), `"nope"`)
 
 	rec2 := httptest.NewRecorder()
-	assert.False(t,
+	assert.True(t,
 		writeParamError(rec2, errors.New("plain")),
-		"writeParamError should not handle plain error")
+		"writeParamError must always return true so callers can return immediately")
+	assert.Equal(t, 400, rec2.Code)
 }
