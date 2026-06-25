@@ -33,7 +33,7 @@ func TestDecodePrivateClusterHeader_AcceptsValidConfig(t *testing.T) {
 
 	good := config.ClusterConfig{
 		Name:    "mine",
-		Brokers: []string{"localhost:9092"},
+		Brokers: []string{"203.0.113.10:9092"},
 		Auth:    config.AuthConfig{Type: "none"},
 	}
 
@@ -41,7 +41,7 @@ func TestDecodePrivateClusterHeader_AcceptsValidConfig(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, got.Brokers, 1)
-	assert.Equal(t, "localhost:9092", got.Brokers[0])
+	assert.Equal(t, "203.0.113.10:9092", got.Brokers[0])
 }
 
 func TestDecodePrivateClusterHeader_RejectsInvalidEncoding(t *testing.T) {
@@ -69,7 +69,7 @@ func TestDecodePrivateClusterHeader_RejectsInvalidEncoding(t *testing.T) {
 		},
 		{
 			name: "bad_auth",
-			raw:  base64.StdEncoding.EncodeToString([]byte(`{"name":"x","brokers":["a:1"],"auth":{"type":"plain"}}`)),
+			raw:  base64.StdEncoding.EncodeToString([]byte(`{"name":"x","brokers":["203.0.113.10:9092"],"auth":{"type":"plain"}}`)),
 		},
 	}
 	for _, tc := range cases {
@@ -87,13 +87,13 @@ func TestDecodePrivateClusterHeader_RejectsInvalidEncoding(t *testing.T) {
 func TestPrivateClusterMiddleware_StoresDecodedConfigInContext_WhenHeaderValid(t *testing.T) {
 	t.Parallel()
 
-	cfg := config.ClusterConfig{Name: "x", Brokers: []string{"a:1"}}
+	cfg := config.ClusterConfig{Name: "x", Brokers: []string{"203.0.113.10:9092"}}
 	var seen bool
 	next := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		got, ok := privateClusterFromContext(r.Context())
 		require.True(t, ok, "ctx must carry decoded config")
 		require.Len(t, got.Brokers, 1)
-		assert.Equal(t, "a:1", got.Brokers[0])
+		assert.Equal(t, "203.0.113.10:9092", got.Brokers[0])
 		seen = true
 	})
 	h := privateClusterMiddleware(next)
@@ -167,7 +167,7 @@ func TestResolvePrivateClusterParam_RewritesSentinelToFingerprint_WhenRouted(t *
 	t.Parallel()
 
 	reg := kafkapkg.NewRegistry(nil, slog.Default())
-	cfg := config.ClusterConfig{Brokers: []string{"x:1"}}
+	cfg := config.ClusterConfig{Brokers: []string{"203.0.113.10:9092"}}
 	expected, err := reg.UseAdhoc(cfg)
 	require.NoError(t, err, "seed adhoc registration")
 
