@@ -16,12 +16,14 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/FinkeFlo/kafkito/pkg/config"
 	"github.com/FinkeFlo/kafkito/pkg/masking"
+	"github.com/FinkeFlo/kafkito/pkg/netguard"
 	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -192,6 +194,11 @@ func (r *Registry) Client(name string) (*kgo.Client, error) {
 
 // clientOpts builds the kgo option slice for a configured cluster,
 // including SASL and TLS when requested.
+//
+// For ad-hoc (private) clusters a dial-time SSRF guard is added via
+// kgo.Dialer so that broker connections cannot be redirected to the cloud
+// metadata endpoint by DNS rebinding (finding #4). Operator-configured
+// clusters keep the default kgo dialer — no behavior change for them.
 func clientOpts(cfg config.ClusterConfig, log *slog.Logger) []kgo.Opt {
 	opts := []kgo.Opt{
 		kgo.SeedBrokers(cfg.Brokers...),
@@ -199,6 +206,14 @@ func clientOpts(cfg config.ClusterConfig, log *slog.Logger) []kgo.Opt {
 		kgo.WithLogger(kgoSlogAdapter{log: log}),
 		kgo.MetadataMaxAge(30 * time.Second),
 		kgo.RequestTimeoutOverhead(5 * time.Second),
+	}
+
+	// Ad-hoc clusters originate from untrusted user-supplied broker addresses,
+	// so the dial is guarded against DNS-rebinding SSRF (finding #4, MEDIUM).
+	// Operator-configured clusters are intentionally unguarded — they may
+	// legitimately point at localhost or internal addresses.
+	if IsAdhoc(cfg.Name) {
+		opts = append(opts, kgo.Dialer(netguard.GuardedDialContext(&net.Dialer{Timeout: 10 * time.Second})))
 	}
 
 	if cfg.TLS.Enabled {
