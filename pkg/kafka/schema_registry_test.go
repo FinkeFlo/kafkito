@@ -5,6 +5,7 @@ package kafka
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -54,4 +55,20 @@ func TestSubjectConfig_FallsBackToGlobalOnlyOnRealNotFound(t *testing.T) {
 		require.Error(t, err, "a 500 mentioning 40401 must NOT be treated as not-found")
 		assert.Contains(t, err.Error(), "internal error")
 	})
+}
+
+func TestSchemaRegistryDo_RefusesBasicAuthOverPlaintextHTTP(t *testing.T) {
+	t.Parallel()
+
+	c := newSchemaRegistryClient(config.SchemaRegistryConfig{
+		URL:      "http://sr.internal:8081",
+		Username: "user",
+		Password: "secret",
+	})
+
+	err := c.do(context.Background(), http.MethodGet, "/subjects", nil, nil)
+
+	require.Error(t, err, "credentials over http must be refused before sending")
+	assert.True(t, errors.Is(err, ErrInsecureSchemaRegistryAuth),
+		"want ErrInsecureSchemaRegistryAuth, got %v", err)
 }
