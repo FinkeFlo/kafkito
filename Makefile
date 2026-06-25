@@ -115,7 +115,9 @@ e2e-up:
 	cd frontend && bun run build
 	go build -tags devauth -ldflags "-X main.version=e2e-dev" -o bin/kafkito-e2e ./cmd/kafkito
 	@echo "e2e: starting kafkito-e2e on port $(E2E_PORT)"
-	@KAFKITO_KAFKA_BROKERS=localhost:39092 PORT=$(E2E_PORT) KAFKITO_AUTH_MODE=off \
+	@# Bind loopback (not :PORT) so KAFKITO_AUTH_MODE=off is permitted by the
+	@# auth-mode guard without the KAFKITO_INSECURE_AUTH_OFF escape hatch.
+	@KAFKITO_KAFKA_BROKERS=localhost:39092 KAFKITO_SERVER_ADDR=127.0.0.1:$(E2E_PORT) KAFKITO_AUTH_MODE=off \
 		./bin/kafkito-e2e > $(E2E_LOG) 2>&1 & echo $$! > $(E2E_PID)
 	@ok=0; for i in $$(seq 1 30); do \
 		if curl -fsS http://localhost:$(E2E_PORT)/api/v1/me >/dev/null 2>&1; then \
