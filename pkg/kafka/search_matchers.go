@@ -218,8 +218,9 @@ func xmlPathEval(expr *xpath.Expr) pathEval {
 // (any, the JSON-parsed value if parseable, otherwise null), headers (object),
 // partition (number), offset (number), timestampMs (number).
 type jsMatcher struct {
-	prog *goja.Program
-	src  string
+	rt  *goja.Runtime
+	fn  goja.Callable
+	src string
 }
 
 func newJSMatcher(script string) (*jsMatcher, error) {
@@ -238,30 +239,38 @@ func newJSMatcher(script string) (*jsMatcher, error) {
 	if err != nil {
 		return nil, fmt.Errorf("js filter compile: %w", err)
 	}
-	return &jsMatcher{prog: prog, src: script}, nil
-}
-
-func (j *jsMatcher) match(m *Message) (bool, error) {
+	// Build the runtime and extract the callable once; reused for every
+	// message in the scan to avoid per-record allocation amplification.
 	rt := goja.New()
-	// Hard limit script execution to ~100ms per message.
-	done := make(chan struct{})
-	defer close(done)
-	go func() {
-		select {
-		case <-time.After(100 * time.Millisecond):
-			rt.Interrupt("kafkito-filter timeout")
-		case <-done:
-		}
-	}()
-
-	v, err := rt.RunProgram(j.prog)
+	v, err := rt.RunProgram(prog)
 	if err != nil {
-		return false, fmt.Errorf("js filter run: %w", err)
+		return nil, fmt.Errorf("js filter run: %w", err)
 	}
 	fn, ok := goja.AssertFunction(v)
 	if !ok {
-		return false, errors.New("js filter did not compile to a function")
+		return nil, errors.New("js filter did not compile to a function")
 	}
+	return &jsMatcher{rt: rt, fn: fn, src: script}, nil
+}
+
+// match evaluates the filter against m. The runtime is reused across calls
+// (the search poll loop is single-goroutine). A stoppable per-call timer arms
+// an interrupt to bound a single pathological expression; ClearInterrupt resets
+// the runtime so the next message is unaffected.
+func (j *jsMatcher) match(m *Message) (bool, error) {
+	done := make(chan struct{})
+	defer close(done)
+	timer := time.NewTimer(100 * time.Millisecond)
+	defer timer.Stop()
+	go func() {
+		select {
+		case <-timer.C:
+			j.rt.Interrupt("kafkito-filter timeout")
+		case <-done:
+		}
+	}()
+	defer j.rt.ClearInterrupt()
+
 	var parsed any
 	if m.Value != "" {
 		_ = json.Unmarshal([]byte(m.Value), &parsed)
@@ -270,14 +279,14 @@ func (j *jsMatcher) match(m *Message) (bool, error) {
 	for k, v := range m.Headers {
 		headers[k] = v
 	}
-	res, err := fn(goja.Undefined(),
-		rt.ToValue(m.Key),
-		rt.ToValue(m.Value),
-		rt.ToValue(parsed),
-		rt.ToValue(headers),
-		rt.ToValue(m.Partition),
-		rt.ToValue(m.Offset),
-		rt.ToValue(m.Timestamp),
+	res, err := j.fn(goja.Undefined(),
+		j.rt.ToValue(m.Key),
+		j.rt.ToValue(m.Value),
+		j.rt.ToValue(parsed),
+		j.rt.ToValue(headers),
+		j.rt.ToValue(m.Partition),
+		j.rt.ToValue(m.Offset),
+		j.rt.ToValue(m.Timestamp),
 	)
 	if err != nil {
 		return false, fmt.Errorf("js filter run: %w", err)
