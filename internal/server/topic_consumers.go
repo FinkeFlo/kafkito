@@ -52,9 +52,7 @@ func (a *clusterAPI) listTopicConsumers(w http.ResponseWriter, r *http.Request) 
 				"error": "unknown topic: " + topic,
 			})
 		default:
-			writeJSON(w, http.StatusBadGateway, map[string]string{
-				"error": "kafka: " + err.Error(),
-			})
+			gatewayError(ctx, w, a.log, "list consumers for topic "+topic, err)
 		}
 		return
 	}
