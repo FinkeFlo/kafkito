@@ -6,6 +6,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -45,5 +46,6 @@ func deny(w http.ResponseWriter, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("WWW-Authenticate", `Bearer realm="kafkito"`)
 	w.WriteHeader(http.StatusUnauthorized)
-	_, _ = w.Write([]byte(`{"error":"unauthorized","message":"` + msg + `"}`))
+	body, _ := json.Marshal(map[string]string{"error": "unauthorized", "message": msg})
+	_, _ = w.Write(body)
 }
