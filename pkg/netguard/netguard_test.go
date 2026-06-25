@@ -97,7 +97,7 @@ func TestGuardedDialContext_FailoverToSecondIP(t *testing.T) {
 	// stubConn is a real *net.Conn obtained from net.Pipe() so the caller
 	// receives a valid, closeable connection without any real listening socket.
 	clientConn, serverConn := net.Pipe()
-	defer serverConn.Close()
+	defer func() { _ = serverConn.Close() }()
 
 	dialOne := func(_ context.Context, _, addr string) (net.Conn, error) {
 		host, _, err := net.SplitHostPort(addr)
@@ -114,5 +114,5 @@ func TestGuardedDialContext_FailoverToSecondIP(t *testing.T) {
 
 	conn, err := dial(context.Background(), "tcp", "myfakehost.internal:"+port)
 	require.NoError(t, err, "dialer must fall over to the second IP and succeed")
-	conn.Close()
+	_ = conn.Close()
 }
