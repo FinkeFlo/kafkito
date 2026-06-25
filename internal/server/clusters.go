@@ -175,7 +175,7 @@ func (a *clusterAPI) listTopics(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Slice(topics, func(i, j int) bool { return topics[i].Name < topics[j].Name })
 	if a.policy != nil && a.policy.Enabled() {
-		user := r.Header.Get(a.policy.Header())
+		user := rbacSubject(r, a.policy)
 		topics = filterTopicsByRBAC(topics, a.policy, user, name)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -370,7 +370,7 @@ func (a *clusterAPI) listGroups(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if a.policy != nil && a.policy.Enabled() {
-		user := r.Header.Get(a.policy.Header())
+		user := rbacSubject(r, a.policy)
 		groups = filterGroupsByRBAC(groups, a.policy, user, cluster)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
