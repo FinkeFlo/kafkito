@@ -102,3 +102,53 @@ func TestSchemaRegistryDo_RefusesBasicAuthOverPlaintextHTTP(t *testing.T) {
 	assert.True(t, errors.Is(err, ErrInsecureSchemaRegistryAuth),
 		"want ErrInsecureSchemaRegistryAuth, got %v", err)
 }
+
+// TestRegistry_SchemaRegistry_GuardednessFromNamePrefix verifies that
+// SchemaRegistry derives ad-hoc (guarded) status from the cluster name prefix,
+// not from the r.adhocLastUsed map. An adhoc-named cluster gets a guarded
+// client (blocks on loopback), while an operator-configured cluster gets an
+// unguarded one (can reach loopback).
+func TestRegistry_SchemaRegistry_GuardednessFromNamePrefix(t *testing.T) {
+	t.Parallel()
+
+	// Start a loopback server so the unguarded client has something to reach.
+	// Use t.Cleanup instead of defer so the server outlives any parallel subtests.
+	mux := http.NewServeMux()
+	mux.HandleFunc("/subjects", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.schemaregistry.v1+json")
+		_, _ = w.Write([]byte(`[]`))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	srCfg := config.SchemaRegistryConfig{URL: srv.URL}
+
+	// Build a registry that knows two clusters: one operator-configured
+	// (plain name) and one adhoc-named (AdhocPrefix + fingerprint).
+	adhocName := AdhocPrefix + "deadbeef01234567"
+	reg := NewRegistry([]config.ClusterConfig{
+		{Name: "configured", Brokers: []string{"localhost:9092"}, SchemaRegistry: srCfg},
+		{Name: adhocName, Brokers: []string{"localhost:9092"}, SchemaRegistry: config.SchemaRegistryConfig{URL: "http://127.0.0.1:9/"}},
+	}, nil)
+
+	t.Run("configured_cluster_is_unguarded", func(t *testing.T) {
+		t.Parallel()
+		client, err := reg.SchemaRegistry("configured")
+		require.NoError(t, err)
+
+		var out []string
+		err = client.do(context.Background(), http.MethodGet, "/subjects", nil, &out)
+		require.NoError(t, err, "operator-configured SR client must reach loopback httptest server")
+	})
+
+	t.Run("adhoc_cluster_is_guarded", func(t *testing.T) {
+		t.Parallel()
+		client, err := reg.SchemaRegistry(adhocName)
+		require.NoError(t, err)
+
+		err = client.do(context.Background(), http.MethodGet, "/subjects", nil, nil)
+		require.Error(t, err, "adhoc SR client must be guarded and block loopback dial")
+		assert.True(t, errors.Is(err, netguard.ErrBlockedAddress),
+			"expected ErrBlockedAddress, got: %v", err)
+	})
+}
