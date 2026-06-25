@@ -25,13 +25,28 @@ func withSubject(ctx context.Context, subject string) context.Context {
 	return context.WithValue(ctx, rbacSubjectKey, subject)
 }
 
+// rbacSubject resolves the RBAC identity for the request. A verified JWT
+// principal (set by auth.Middleware) is authoritative: when present, the
+// client-supplied identity header is ignored to prevent header-spoofing
+// privilege escalation. UserName is preferred over Subject to match handleMe.
+// The header is consulted only when no principal exists (auth disabled).
+func rbacSubject(r *http.Request, policy *rbac.Policy) string {
+	if p, ok := auth.PrincipalFromContext(r.Context()); ok {
+		if p.UserName != "" {
+			return p.UserName
+		}
+		return p.Subject
+	}
+	return r.Header.Get(policy.Header())
+}
+
 // rbacMiddleware enforces RBAC for cluster routes. The identity is resolved
 // from the configured header; the resource/action is derived from the matched
 // chi route pattern and HTTP method.
 func rbacMiddleware(policy *rbac.Policy) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			user := r.Header.Get(policy.Header())
+			user := rbacSubject(r, policy)
 			r = r.WithContext(withSubject(r.Context(), user))
 
 			if !policy.Enabled() {
@@ -187,16 +202,12 @@ func handleMe(policy *rbac.Policy) http.HandlerFunc {
 		)
 		if p, ok := auth.PrincipalFromContext(r.Context()); ok {
 			hasJWT = true
-			user = p.Subject
-			if p.UserName != "" {
-				user = p.UserName
-			}
 			email = p.Email
 			scopes = p.Scopes
 			tenant = p.Tenant
-		} else {
-			user = r.Header.Get(policy.Header())
 		}
+		// rbacSubject is the single identity resolver: principal first, header fallback.
+		user = rbacSubject(r, policy)
 		writeJSON(w, http.StatusOK, map[string]any{
 			"user":         user,
 			"email":        email,

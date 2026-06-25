@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/FinkeFlo/kafkito/internal/auth"
 	"github.com/FinkeFlo/kafkito/pkg/config"
 	"github.com/FinkeFlo/kafkito/pkg/rbac"
 )
@@ -342,4 +343,74 @@ func TestResolvePermission_ReturnsEmpty_WhenNoChiRouteContext(t *testing.T) {
 	assert.Empty(t, rn)
 	assert.Empty(t, a)
 	assert.False(t, rb)
+}
+
+func TestRBACSubject_VerifiedPrincipalOverridesHeader(t *testing.T) {
+	t.Parallel()
+
+	policy := policyAllowAll() // identity header is rbacTestHeader ("X-Test-User")
+
+	t.Run("principal_username_wins_over_spoofed_header", func(t *testing.T) {
+		t.Parallel()
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set(rbacTestHeader, "attacker-admin")
+		req = req.WithContext(auth.WithPrincipal(req.Context(),
+			&auth.Principal{Subject: "sub-123", UserName: "real-user"}))
+
+		assert.Equal(t, "real-user", rbacSubject(req, policy),
+			"verified UserName must override the client-supplied header")
+	})
+
+	t.Run("principal_subject_used_when_no_username", func(t *testing.T) {
+		t.Parallel()
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set(rbacTestHeader, "attacker-admin")
+		req = req.WithContext(auth.WithPrincipal(req.Context(),
+			&auth.Principal{Subject: "sub-123"}))
+
+		assert.Equal(t, "sub-123", rbacSubject(req, policy),
+			"Subject must be used when UserName is empty")
+	})
+
+	t.Run("header_used_only_when_no_principal", func(t *testing.T) {
+		t.Parallel()
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set(rbacTestHeader, "header-user")
+
+		assert.Equal(t, "header-user", rbacSubject(req, policy),
+			"header is the fallback only when no verified principal is present")
+	})
+}
+
+func TestRBACMiddleware_DeniesHeaderSpoofWhenPrincipalLacksRole(t *testing.T) {
+	t.Parallel()
+
+	// policyAllowAll grants admin only to userAdmin ("alice"); mallory has no role.
+	policy := policyAllowAll()
+	called := false
+	leaf := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	})
+	// inject a verified principal of "mallory" BEFORE the rbac middleware runs
+	r := chi.NewRouter()
+	r.Group(func(g chi.Router) {
+		g.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				ctx := auth.WithPrincipal(req.Context(), &auth.Principal{UserName: userMallory})
+				next.ServeHTTP(w, req.WithContext(ctx))
+			})
+		})
+		g.Use(rbacMiddleware(policy))
+		g.Delete("/clusters/{cluster}/topics/{topic}", leaf)
+	})
+
+	req := httptest.NewRequest(http.MethodDelete, "/clusters/"+clusterShared+"/topics/orders", nil)
+	req.Header.Set(rbacTestHeader, userAdmin) // spoof admin via header
+	rec := httptest.NewRecorder()
+
+	r.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusForbidden, rec.Code, "spoofed admin header must not grant access")
+	assert.False(t, called, "leaf handler must not run for a denied request")
 }

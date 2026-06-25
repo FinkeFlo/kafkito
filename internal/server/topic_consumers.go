@@ -21,7 +21,7 @@ func (a *clusterAPI) listTopicConsumers(w http.ResponseWriter, r *http.Request) 
 	topic := chi.URLParam(r, "topic")
 
 	if a.policy != nil && a.policy.Enabled() {
-		user := r.Header.Get(a.policy.Header())
+		user := rbacSubject(r, a.policy)
 		// Topic-level gate: the user must be allowed to view the topic itself.
 		if !a.policy.Allow(user, cluster, "topic", topic, "view") {
 			writeJSON(w, http.StatusForbidden, map[string]string{
@@ -60,7 +60,7 @@ func (a *clusterAPI) listTopicConsumers(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if a.policy != nil && a.policy.Enabled() {
-		user := r.Header.Get(a.policy.Header())
+		user := rbacSubject(r, a.policy)
 		consumers = filterTopicConsumersByRBAC(consumers, a.policy, user, cluster)
 	}
 
