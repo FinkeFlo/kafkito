@@ -217,6 +217,15 @@ func xmlPathEval(expr *xpath.Expr) pathEval {
 // using goja. The expression has access to: key (string), value (string), parsed
 // (any, the JSON-parsed value if parseable, otherwise null), headers (object),
 // partition (number), offset (number), timestampMs (number).
+//
+// Runtime reuse: the goja runtime (rt) and compiled function (fn) are created
+// once at construction and reused for every subsequent match call. This amortises
+// the cost of JS heap allocation and compilation across all messages in a scan.
+// Filter expressions MUST be side-effect-free: they must not read from or write
+// to persistent global state (e.g. globalThis._counter++). Cross-message
+// mutation of globals is explicitly unsupported; its effect is undefined and may
+// change in any future release. Variables declared with var/let/const inside the
+// filter body are scoped to the function call and do not leak between messages.
 type jsMatcher struct {
 	rt  *goja.Runtime
 	fn  goja.Callable
@@ -257,7 +266,21 @@ func newJSMatcher(script string) (*jsMatcher, error) {
 // (the search poll loop is single-goroutine). A stoppable per-call timer arms
 // an interrupt to bound a single pathological expression; ClearInterrupt resets
 // the runtime so the next message is unaffected.
+//
+// Stale-interrupt guard: ClearInterrupt is called unconditionally at the START
+// of each match invocation to discard any interrupt flag left by a prior call.
+// This covers the race where the per-call watchdog goroutine fires after a fast
+// script returns (timer fires after done is closed but before the goroutine
+// selects on done), which would otherwise leave the runtime in an interrupted
+// state and abort the very next match with a spurious "interrupted" error.
+// The deferred ClearInterrupt at the end provides defence-in-depth for the same
+// scenario in reverse (interrupt fires after fn returns but before the defer
+// runs), and also resets the runtime if fn itself was interrupted mid-execution.
 func (j *jsMatcher) match(m *Message) (bool, error) {
+	// Clear any stale interrupt from a previous call before doing any work.
+	// This is the primary guard against the timer-race described above.
+	j.rt.ClearInterrupt()
+
 	done := make(chan struct{})
 	defer close(done)
 	timer := time.NewTimer(100 * time.Millisecond)
