@@ -54,7 +54,7 @@ func TestSRDecoder_AvroRoundtrip_DecodesPayloadAndExposesMetadata(t *testing.T) 
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	sr := newSchemaRegistryClient(config.SchemaRegistryConfig{URL: srv.URL})
+	sr := newSchemaRegistryClient(config.SchemaRegistryConfig{URL: srv.URL}, false)
 	dec := NewSRDecoder(sr)
 	require.NotNil(t, dec)
 
@@ -87,7 +87,7 @@ func TestSRDecoder_AvroRoundtrip_DecodesPayloadAndExposesMetadata(t *testing.T) 
 func TestSRDecoder_NotFramed_ReturnsFalseAndZeroMeta(t *testing.T) {
 	t.Parallel()
 
-	sr := newSchemaRegistryClient(config.SchemaRegistryConfig{URL: "http://example.invalid"})
+	sr := newSchemaRegistryClient(config.SchemaRegistryConfig{URL: "http://example.invalid"}, false)
 	dec := NewSRDecoder(sr)
 
 	_, meta, ok, err := dec.Decode(context.Background(), []byte("plain text"))
@@ -144,7 +144,7 @@ func TestSRDecoderLookup_FetchDoesNotHoldLockForOtherIDs(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	sr := newSchemaRegistryClient(config.SchemaRegistryConfig{URL: srv.URL})
+	sr := newSchemaRegistryClient(config.SchemaRegistryConfig{URL: srv.URL}, false)
 	dec := NewSRDecoder(sr)
 
 	// Goroutine A blocks fetching id=1.

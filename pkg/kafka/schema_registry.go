@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	"github.com/FinkeFlo/kafkito/pkg/config"
+	"github.com/FinkeFlo/kafkito/pkg/netguard"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -92,21 +94,36 @@ type SchemaRegistryClient struct {
 	http *http.Client
 }
 
-func newSchemaRegistryClient(cfg config.SchemaRegistryConfig) *SchemaRegistryClient {
+func newSchemaRegistryClient(cfg config.SchemaRegistryConfig, guarded bool) *SchemaRegistryClient {
 	tr := &http.Transport{}
 	if strings.HasPrefix(cfg.URL, "https://") && cfg.InsecureSkipVerify {
 		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // opt-in
 	}
+	hc := &http.Client{Timeout: 10 * time.Second, Transport: tr}
+	if guarded {
+		tr.DialContext = netguard.GuardedDialContext(&net.Dialer{Timeout: 10 * time.Second})
+		hc.CheckRedirect = func(*http.Request, []*http.Request) error {
+			return errors.New("schema registry redirects are not allowed for private clusters")
+		}
+	}
 	return &SchemaRegistryClient{
 		base: strings.TrimRight(cfg.URL, "/"),
 		cfg:  cfg,
-		http: &http.Client{Timeout: 10 * time.Second, Transport: tr},
+		http: hc,
 	}
 }
 
 // SchemaRegistry returns a configured client for the cluster, or an error
-// if SR is not configured.
+// if SR is not configured. For ad-hoc (private) clusters the returned client
+// uses a guarded dialer that blocks SSRF at dial time to defend against DNS
+// rebinding. Operator-configured clusters are not guarded (they may
+// legitimately point SR at localhost, and the existing tests rely on this).
 func (r *Registry) SchemaRegistry(cluster string) (*SchemaRegistryClient, error) {
+	// Read r.clusters and r.adhocLastUsed with the same (unlocked) discipline
+	// this method already used for r.clusters. Acquiring r.mu here would invert
+	// the mu -> srMu order taken by sweepAdhocLocked (whose caller srDecoderFor
+	// already holds r.srMu before calling SchemaRegistry), creating an AB-BA
+	// deadlock the race detector cannot catch.
 	cc, ok := r.clusters[cluster]
 	if !ok {
 		return nil, ErrUnknownCluster
@@ -114,7 +131,8 @@ func (r *Registry) SchemaRegistry(cluster string) (*SchemaRegistryClient, error)
 	if strings.TrimSpace(cc.SchemaRegistry.URL) == "" {
 		return nil, ErrNoSchemaRegistry
 	}
-	return newSchemaRegistryClient(cc.SchemaRegistry), nil
+	_, isAdhoc := r.adhocLastUsed[cluster]
+	return newSchemaRegistryClient(cc.SchemaRegistry, isAdhoc), nil
 }
 
 func (c *SchemaRegistryClient) do(ctx context.Context, method, path string, body any, out any) error {

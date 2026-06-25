@@ -14,7 +14,37 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/FinkeFlo/kafkito/pkg/config"
+	"github.com/FinkeFlo/kafkito/pkg/netguard"
 )
+
+func TestSchemaRegistryClient_GuardedRefusesLoopbackDial(t *testing.T) {
+	t.Parallel()
+
+	c := newSchemaRegistryClient(config.SchemaRegistryConfig{URL: "http://127.0.0.1:9/"}, true)
+	err := c.do(context.Background(), http.MethodGet, "/subjects", nil, nil)
+
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, netguard.ErrBlockedAddress),
+		"expected ErrBlockedAddress, got: %v", err)
+}
+
+func TestSchemaRegistryClient_UnguardedReachesLoopback(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/subjects", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.schemaregistry.v1+json")
+		_, _ = w.Write([]byte(`[]`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	c := newSchemaRegistryClient(config.SchemaRegistryConfig{URL: srv.URL}, false)
+	var out []string
+	err := c.do(context.Background(), http.MethodGet, "/subjects", nil, &out)
+
+	require.NoError(t, err, "unguarded client must reach loopback httptest server")
+}
 
 func TestSubjectConfig_FallsBackToGlobalOnlyOnRealNotFound(t *testing.T) {
 	t.Parallel()
@@ -31,7 +61,7 @@ func TestSubjectConfig_FallsBackToGlobalOnlyOnRealNotFound(t *testing.T) {
 		})
 		srv := httptest.NewServer(mux)
 		defer srv.Close()
-		c := newSchemaRegistryClient(config.SchemaRegistryConfig{URL: srv.URL})
+		c := newSchemaRegistryClient(config.SchemaRegistryConfig{URL: srv.URL}, false)
 
 		cfg, err := c.SubjectConfig(context.Background(), "orders")
 
@@ -48,7 +78,7 @@ func TestSubjectConfig_FallsBackToGlobalOnlyOnRealNotFound(t *testing.T) {
 		})
 		srv := httptest.NewServer(mux)
 		defer srv.Close()
-		c := newSchemaRegistryClient(config.SchemaRegistryConfig{URL: srv.URL})
+		c := newSchemaRegistryClient(config.SchemaRegistryConfig{URL: srv.URL}, false)
 
 		_, err := c.SubjectConfig(context.Background(), "x40401y")
 
@@ -64,7 +94,7 @@ func TestSchemaRegistryDo_RefusesBasicAuthOverPlaintextHTTP(t *testing.T) {
 		URL:      "http://sr.internal:8081",
 		Username: "user",
 		Password: "secret",
-	})
+	}, false)
 
 	err := c.do(context.Background(), http.MethodGet, "/subjects", nil, nil)
 
