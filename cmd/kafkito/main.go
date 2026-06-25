@@ -63,11 +63,6 @@ func main() {
 	if mode == "" {
 		mode = "off"
 	}
-	// Guard: production binaries must never run "off" mode.
-	if mode == "off" && os.Getenv("VCAP_APPLICATION") != "" {
-		logger.Error("KAFKITO_AUTH_MODE=off is forbidden when running on Cloud Foundry")
-		os.Exit(2)
-	}
 
 	modeCfg := auth.ModeConfig{Mode: mode}
 	populateAuthConfigFromEnv(&modeCfg)
@@ -80,6 +75,11 @@ func main() {
 	logger.Info("auth initialised", "mode", mode)
 
 	addr := listenAddress(cfg.Server.Addr)
+	if err := guardAuthMode(mode, addr, os.Getenv); err != nil {
+		logger.Error("insecure auth configuration", "mode", mode, "addr", addr, "err", err)
+		os.Exit(2)
+	}
+
 	srv := &http.Server{
 		Addr: addr,
 		Handler: server.New(server.Options{
