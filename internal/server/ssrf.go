@@ -9,32 +9,14 @@ import (
 	"net/netip"
 	"net/url"
 	"strings"
+
+	"github.com/FinkeFlo/kafkito/pkg/netguard"
 )
 
-// metadataIP is the cloud instance-metadata address (AWS/GCP/Azure). It is
-// link-local and therefore already covered by blockedIP, but named for clarity.
-var metadataIP = netip.MustParseAddr("169.254.169.254")
-
 // blockedIP reports whether an outbound connection to ip must be refused to
-// prevent SSRF. Loopback, link-local (incl. the cloud metadata endpoint),
-// multicast, and unspecified addresses are blocked. Private RFC-1918 ranges
-// are intentionally allowed: legitimate private clusters live there.
+// prevent SSRF. Delegates to netguard.BlockedIP.
 func blockedIP(ip netip.Addr) bool {
-	ip = ip.Unmap()
-	switch {
-	case ip == metadataIP:
-		return true
-	case ip.IsLoopback():
-		return true
-	case ip.IsLinkLocalUnicast(), ip.IsLinkLocalMulticast():
-		return true
-	case ip.IsUnspecified():
-		return true
-	case ip.IsMulticast():
-		return true
-	default:
-		return false
-	}
+	return netguard.BlockedIP(ip)
 }
 
 // validateOutboundHost resolves host (a "host" or "host:port") and returns an
