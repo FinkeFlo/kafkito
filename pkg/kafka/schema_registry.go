@@ -24,6 +24,11 @@ import (
 // cluster has no schema_registry.url configured.
 var ErrNoSchemaRegistry = errors.New("schema registry not configured for cluster")
 
+// ErrInsecureSchemaRegistryAuth is returned when basic-auth credentials are
+// configured for a non-HTTPS schema registry URL; sending them would leak the
+// password in cleartext, so the request is refused.
+var ErrInsecureSchemaRegistryAuth = errors.New("schema registry basic auth requires https")
+
 // SRError is a typed Schema Registry error carrying the HTTP status and the
 // Confluent error_code so callers can classify failures without string-matching.
 type SRError struct {
@@ -113,6 +118,9 @@ func (r *Registry) SchemaRegistry(cluster string) (*SchemaRegistryClient, error)
 }
 
 func (c *SchemaRegistryClient) do(ctx context.Context, method, path string, body any, out any) error {
+	if c.cfg.Username != "" && !strings.HasPrefix(strings.ToLower(c.cfg.URL), "https://") {
+		return ErrInsecureSchemaRegistryAuth
+	}
 	var rdr io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
