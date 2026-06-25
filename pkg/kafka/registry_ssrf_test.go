@@ -85,3 +85,83 @@ func TestClientOpts_ConfiguredCluster_NoSSRFGuard(t *testing.T) {
 	assert.False(t, errors.Is(err, netguard.ErrBlockedAddress),
 		"configured cluster must NOT trigger ErrBlockedAddress, got: %v", err)
 }
+
+// TestClientOpts_AdhocCluster_TLSEnabled_ConstructsWithoutConflict is the
+// regression test for the Dialer+DialTLSConfig conflict. An ad-hoc cluster with
+// TLS.Enabled previously appended BOTH kgo.Dialer and kgo.DialTLSConfig, which
+// franz-go rejects at kgo.NewClient with "cannot set both Dialer and
+// DialTLSConfig". TLS is the common case for cloud/user-supplied brokers, so
+// this broke every operation for ad-hoc TLS clusters. NewClient does not dial,
+// so no real broker is needed.
+func TestClientOpts_AdhocCluster_TLSEnabled_ConstructsWithoutConflict(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.ClusterConfig{
+		Name:    adhocName(),
+		Brokers: []string{"broker.example.com:9093"},
+	}
+	cfg.TLS.Enabled = true
+
+	opts := clientOpts(cfg, slog.Default())
+	cl, err := kgo.NewClient(opts...)
+
+	require.NoError(t, err,
+		"adhoc TLS cluster must construct without the Dialer+DialTLSConfig conflict")
+	require.NotNil(t, cl)
+	cl.Close()
+}
+
+// TestClientOpts_AdhocCluster_TLSInsecure_ConstructsWithoutConflict covers the
+// same regression with InsecureSkipVerify set (common for self-signed dev
+// brokers supplied via the X-Kafkito-Cluster header).
+func TestClientOpts_AdhocCluster_TLSInsecure_ConstructsWithoutConflict(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.ClusterConfig{
+		Name:    adhocName(),
+		Brokers: []string{"broker.example.com:9093"},
+	}
+	cfg.TLS.Enabled = true
+	cfg.TLS.InsecureSkipVerify = true
+
+	opts := clientOpts(cfg, slog.Default())
+	cl, err := kgo.NewClient(opts...)
+
+	require.NoError(t, err,
+		"adhoc TLS (insecure) cluster must construct without the Dialer+DialTLSConfig conflict")
+	require.NotNil(t, cl)
+	cl.Close()
+}
+
+// TestClientOpts_ConfiguredCluster_TLSEnabled_UsesDialTLSConfigPath confirms the
+// operator (non-ad-hoc) TLS path is unchanged: it still constructs cleanly via
+// kgo.DialTLSConfig (no guarded dialer). The construction succeeding without a
+// conflict implies DialTLSConfig was used without a competing kgo.Dialer.
+func TestClientOpts_ConfiguredCluster_TLSEnabled_UsesDialTLSConfigPath(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.ClusterConfig{
+		Name:    configuredName(),
+		Brokers: []string{"broker.example.com:9093"},
+	}
+	cfg.TLS.Enabled = true
+
+	opts := clientOpts(cfg, slog.Default())
+	cl, err := kgo.NewClient(opts...)
+
+	require.NoError(t, err, "operator TLS cluster must construct cleanly via DialTLSConfig")
+	require.NotNil(t, cl)
+	cl.Close()
+}
+
+// TestAdhocPrefixMatchesConfigConstant guards the finding-#1 safety invariant:
+// the ad-hoc detection in pkg/kafka (AdhocPrefix) and the validation guard in
+// pkg/config (AdhocClusterPrefix) are two independent "__adhoc_" constants.
+// They must stay equal or operator-config validation and ad-hoc routing could
+// disagree about which names are reserved.
+func TestAdhocPrefixMatchesConfigConstant(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, config.AdhocClusterPrefix, AdhocPrefix,
+		"pkg/kafka.AdhocPrefix and pkg/config.AdhocClusterPrefix must stay equal")
+}

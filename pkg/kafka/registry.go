@@ -195,10 +195,14 @@ func (r *Registry) Client(name string) (*kgo.Client, error) {
 // clientOpts builds the kgo option slice for a configured cluster,
 // including SASL and TLS when requested.
 //
-// For ad-hoc (private) clusters a dial-time SSRF guard is added via
-// kgo.Dialer so that broker connections cannot be redirected to the cloud
-// metadata endpoint by DNS rebinding (finding #4). Operator-configured
-// clusters keep the default kgo dialer — no behavior change for them.
+// For ad-hoc (private) clusters a dial-time SSRF guard is installed via a
+// single kgo.Dialer so that broker connections cannot be redirected to the
+// cloud metadata endpoint by DNS rebinding (finding #4). When TLS is enabled
+// for an ad-hoc cluster the TLS handshake is performed INSIDE that guarded
+// dialer (see guardedTLSDialer) rather than via kgo.DialTLSConfig: franz-go
+// rejects setting both kgo.Dialer and kgo.DialTLSConfig together. Operator-
+// configured clusters keep the default kgo dialer plus kgo.DialTLSConfig — no
+// behavior change for them.
 func clientOpts(cfg config.ClusterConfig, log *slog.Logger) []kgo.Opt {
 	opts := []kgo.Opt{
 		kgo.SeedBrokers(cfg.Brokers...),
@@ -208,19 +212,22 @@ func clientOpts(cfg config.ClusterConfig, log *slog.Logger) []kgo.Opt {
 		kgo.RequestTimeoutOverhead(5 * time.Second),
 	}
 
+	if cfg.TLS.Enabled && cfg.TLS.InsecureSkipVerify {
+		log.Warn("TLS verification disabled for cluster (InsecureSkipVerify=true)",
+			slog.String("cluster", cfg.Name))
+	}
+
 	// Ad-hoc clusters originate from untrusted user-supplied broker addresses,
 	// so the dial is guarded against DNS-rebinding SSRF (finding #4, MEDIUM).
 	// Operator-configured clusters are intentionally unguarded — they may
 	// legitimately point at localhost or internal addresses.
 	if IsAdhoc(cfg.Name) {
-		opts = append(opts, kgo.Dialer(netguard.GuardedDialContext(&net.Dialer{Timeout: 10 * time.Second})))
-	}
-
-	if cfg.TLS.Enabled {
-		if cfg.TLS.InsecureSkipVerify {
-			log.Warn("TLS verification disabled for cluster (InsecureSkipVerify=true)",
-				slog.String("cluster", cfg.Name))
-		}
+		// A single dialer covers both the SSRF guard and (when enabled) the
+		// TLS handshake. We must NOT also pass kgo.DialTLSConfig here, because
+		// franz-go errors out if Dialer and DialTLSConfig are both set.
+		opts = append(opts, kgo.Dialer(guardedTLSDialer(cfg.TLS)))
+	} else if cfg.TLS.Enabled {
+		// Operator clusters: keep the original DialTLSConfig path unchanged.
 		// #nosec G402 -- InsecureSkipVerify is operator-controlled and
 		// documented for dev/self-signed setups.
 		opts = append(opts, kgo.DialTLSConfig(&tls.Config{
@@ -250,6 +257,53 @@ func clientOpts(cfg config.ClusterConfig, log *slog.Logger) []kgo.Opt {
 	}
 
 	return opts
+}
+
+// guardedTLSDialer returns a kgo.Dialer-compatible dial function for ad-hoc
+// (private) clusters. It always routes the connection through the SSRF guard
+// (netguard.GuardedDialContext), which validates every resolved address and
+// dials the validated IP literal to close the resolve->dial TOCTOU window.
+//
+// When TLS is enabled it performs the TLS handshake itself on top of the
+// guarded connection, instead of relying on kgo.DialTLSConfig (which cannot be
+// combined with kgo.Dialer in franz-go). Because the guard dials an IP literal,
+// the per-dial tls.Config.ServerName is set to the original hostname parsed
+// from the dialer's addr argument so certificate verification still works; the
+// shared base config is cloned per dial to avoid concurrent mutation.
+func guardedTLSDialer(tlsCfg config.TLSConfig) func(ctx context.Context, network, host string) (net.Conn, error) {
+	guarded := netguard.GuardedDialContext(&net.Dialer{Timeout: 10 * time.Second})
+	if !tlsCfg.Enabled {
+		return guarded
+	}
+	// #nosec G402 -- InsecureSkipVerify is operator/user-controlled and
+	// documented for dev/self-signed setups; mirrors the DialTLSConfig path.
+	base := &tls.Config{
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: tlsCfg.InsecureSkipVerify,
+	}
+	return func(ctx context.Context, network, host string) (net.Conn, error) {
+		conn, err := guarded(ctx, network, host)
+		if err != nil {
+			return nil, err
+		}
+		// Set ServerName to the original hostname (not the validated IP we
+		// actually dialed) so cert verification matches the SAN/CN. Fall back
+		// to the raw host if it has no port (defensive; kgo always passes one).
+		serverName := host
+		if h, _, splitErr := net.SplitHostPort(host); splitErr == nil {
+			serverName = h
+		}
+		cfg := base.Clone()
+		if cfg.ServerName == "" {
+			cfg.ServerName = serverName
+		}
+		tlsConn := tls.Client(conn, cfg)
+		if hsErr := tlsConn.HandshakeContext(ctx); hsErr != nil {
+			_ = conn.Close()
+			return nil, fmt.Errorf("tls handshake to %s: %w", host, hsErr)
+		}
+		return tlsConn, nil
+	}
 }
 
 // Admin returns a kadm.Client bound to the named cluster's kgo.Client.
