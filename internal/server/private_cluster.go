@@ -89,6 +89,9 @@ func validatePrivateClusterConfig(cfg config.ClusterConfig) error {
 		if strings.TrimSpace(b) == "" {
 			return errors.New("broker address must not be empty")
 		}
+		if err := validateOutboundHost(strings.TrimSpace(b)); err != nil {
+			return fmt.Errorf("broker %q: %w", b, err)
+		}
 	}
 	t := strings.ToLower(strings.TrimSpace(cfg.Auth.Type))
 	switch t {
@@ -99,6 +102,11 @@ func validatePrivateClusterConfig(cfg config.ClusterConfig) error {
 		}
 	default:
 		return fmt.Errorf("auth.type %q not supported", cfg.Auth.Type)
+	}
+	if u := strings.TrimSpace(cfg.SchemaRegistry.URL); u != "" {
+		if err := validateOutboundURL(u); err != nil {
+			return fmt.Errorf("schema_registry.url: %w", err)
+		}
 	}
 	return nil
 }
