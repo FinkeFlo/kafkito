@@ -138,6 +138,15 @@ func (a *clusterAPI) testCluster(w http.ResponseWriter, r *http.Request) {
 		info.AuthType = "none"
 	}
 	if err := a.reg.Ping(pingCtx, name); err != nil {
+		// Intentional: testCluster is a user-invoked diagnostic for a cluster
+		// the caller supplied and owns. Returning the raw connection error is
+		// the point of this endpoint — it tells the user exactly why their
+		// broker is unreachable (wrong host/port, TLS mismatch, SASL failure,
+		// etc.). This is NOT an accidental gatewayError leak; do not route
+		// through gatewayError here.
+		if a.log != nil {
+			a.log.ErrorContext(pingCtx, "testCluster ping failed", "err", err)
+		}
 		info.Reachable = false
 		info.Error = err.Error()
 	} else {
@@ -433,6 +442,33 @@ func (a *clusterAPI) produceMessage(w http.ResponseWriter, r *http.Request) {
 func isClientProduceErr(msg string) bool {
 	return strings.Contains(msg, "invalid base64") ||
 		strings.Contains(msg, "unsupported encoding")
+}
+
+// isACLClientErr reports whether a Kafka ACL error originates from bad
+// caller-supplied input (400) rather than a broker-side failure (502).
+// Used by createACL and deleteACL.
+func isACLClientErr(msg string) bool {
+	return strings.Contains(msg, "required") || strings.Contains(msg, "validate") ||
+		strings.Contains(msg, "resource_type") || strings.Contains(msg, "pattern_type") ||
+		strings.Contains(msg, "operation") || strings.Contains(msg, "permission_type")
+}
+
+// isSCRAMClientErr reports whether a Kafka SCRAM error originates from bad
+// caller-supplied input (400) rather than a broker-side failure (502).
+// Used by upsertSCRAMUser and deleteSCRAMUser.
+func isSCRAMClientErr(msg string) bool {
+	return strings.Contains(msg, "required") || strings.Contains(msg, "mechanism") ||
+		strings.Contains(msg, "iterations")
+}
+
+// isSearchClientErr reports whether a search error originates from bad
+// caller-supplied input (400) rather than a broker-side failure (502).
+// Used by searchMessages.
+func isSearchClientErr(msg string) bool {
+	return strings.Contains(msg, "jsonpath") || strings.Contains(msg, "xpath") ||
+		strings.Contains(msg, "regex") || strings.Contains(msg, "numeric op") ||
+		strings.Contains(msg, "unknown search mode") || strings.Contains(msg, "unknown operator") ||
+		strings.Contains(msg, "js filter")
 }
 
 // resetGroupOffsets issues an offset reset for a single group+topic.
@@ -766,11 +802,10 @@ func (a *clusterAPI) searchMessages(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		msg := err.Error()
-		if strings.Contains(msg, "jsonpath") || strings.Contains(msg, "xpath") ||
-			strings.Contains(msg, "regex") || strings.Contains(msg, "numeric op") ||
-			strings.Contains(msg, "unknown search mode") || strings.Contains(msg, "unknown operator") ||
-			strings.Contains(msg, "js filter") {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
+		if isSearchClientErr(msg) {
+			// searchMessages preserves the original contract: 400 body uses
+			// the raw msg with no "kafka: " prefix (unlike sibling handlers).
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg})
 			return
 		}
 		gatewayError(ctx, w, a.log, "search messages", err)
@@ -800,9 +835,7 @@ func (a *clusterAPI) createACL(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		msg := err.Error()
-		if strings.Contains(msg, "required") || strings.Contains(msg, "validate") ||
-			strings.Contains(msg, "resource_type") || strings.Contains(msg, "pattern_type") ||
-			strings.Contains(msg, "operation") || strings.Contains(msg, "permission_type") {
+		if isACLClientErr(msg) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
 			return
 		}
@@ -829,9 +862,7 @@ func (a *clusterAPI) deleteACL(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		msg := err.Error()
-		if strings.Contains(msg, "required") || strings.Contains(msg, "validate") ||
-			strings.Contains(msg, "resource_type") || strings.Contains(msg, "pattern_type") ||
-			strings.Contains(msg, "operation") || strings.Contains(msg, "permission_type") {
+		if isACLClientErr(msg) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
 			return
 		}
@@ -881,8 +912,7 @@ func (a *clusterAPI) upsertSCRAMUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		msg := err.Error()
-		if strings.Contains(msg, "required") || strings.Contains(msg, "mechanism") ||
-			strings.Contains(msg, "iterations") {
+		if isSCRAMClientErr(msg) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
 			return
 		}
@@ -919,7 +949,7 @@ func (a *clusterAPI) deleteSCRAMUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		msg := lastErr.Error()
-		if strings.Contains(msg, "required") || strings.Contains(msg, "mechanism") {
+		if isSCRAMClientErr(msg) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
 			return
 		}
