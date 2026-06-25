@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"os"
 	"sort"
@@ -41,6 +42,7 @@ func testConnectionTimeout() time.Duration {
 type clusterAPI struct {
 	reg    *kafkapkg.Registry
 	policy *rbac.Policy
+	log    *slog.Logger
 }
 
 func (a *clusterAPI) mount(r chi.Router) {
@@ -168,9 +170,7 @@ func (a *clusterAPI) listTopics(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
-		writeJSON(w, http.StatusBadGateway, map[string]string{
-			"error": "kafka: " + err.Error(),
-		})
+		gatewayError(ctx, w, a.log, "list topics", err)
 		return
 	}
 	sort.Slice(topics, func(i, j int) bool { return topics[i].Name < topics[j].Name })
@@ -200,9 +200,7 @@ func (a *clusterAPI) describeTopic(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
-		writeJSON(w, http.StatusBadGateway, map[string]string{
-			"error": "kafka: " + err.Error(),
-		})
+		gatewayError(ctx, w, a.log, "describe topic", err)
 		return
 	}
 	sort.Slice(detail.Partitions, func(i, j int) bool {
@@ -256,7 +254,7 @@ func (a *clusterAPI) consumeMessages(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
 			return
 		}
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kafka: " + err.Error()})
+		gatewayError(ctx, w, a.log, "consume messages", err)
 		return
 	}
 	resp := map[string]any{
@@ -300,7 +298,7 @@ func (a *clusterAPI) sampleMessages(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
 			return
 		}
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kafka: " + err.Error()})
+		gatewayError(ctx, w, a.log, "sample messages", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -322,7 +320,7 @@ func (a *clusterAPI) getCapabilities(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
 			return
 		}
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kafka: " + err.Error()})
+		gatewayError(ctx, w, a.log, "get capabilities", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -349,7 +347,7 @@ func (a *clusterAPI) listBrokers(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
 			return
 		}
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kafka: " + err.Error()})
+		gatewayError(ctx, w, a.log, "list brokers", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"cluster": cluster, "brokers": brokers})
@@ -366,7 +364,7 @@ func (a *clusterAPI) listGroups(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
 			return
 		}
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kafka: " + err.Error()})
+		gatewayError(ctx, w, a.log, "list groups", err)
 		return
 	}
 	if a.policy != nil && a.policy.Enabled() {
@@ -391,7 +389,7 @@ func (a *clusterAPI) describeGroup(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
 			return
 		}
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kafka: " + err.Error()})
+		gatewayError(ctx, w, a.log, "describe group", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, d)
@@ -422,11 +420,11 @@ func (a *clusterAPI) produceMessage(w http.ResponseWriter, r *http.Request) {
 		}
 		// Encoding issues are client errors; everything else is 502.
 		msg := err.Error()
-		status := http.StatusBadGateway
 		if isClientProduceErr(msg) {
-			status = http.StatusBadRequest
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
+			return
 		}
-		writeJSON(w, status, map[string]string{"error": "kafka: " + msg})
+		gatewayError(ctx, w, a.log, "produce message", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, res)
@@ -458,12 +456,12 @@ func (a *clusterAPI) resetGroupOffsets(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
 			return
 		}
-		status := http.StatusBadGateway
 		msg := err.Error()
 		if strings.Contains(msg, "required") || strings.Contains(msg, "unknown strategy") || strings.Contains(msg, "not found") {
-			status = http.StatusBadRequest
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
+			return
 		}
-		writeJSON(w, status, map[string]string{"error": "kafka: " + msg})
+		gatewayError(ctx, w, a.log, "reset group offsets", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, res)
@@ -481,7 +479,7 @@ func (a *clusterAPI) deleteGroup(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
 			return
 		}
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kafka: " + err.Error()})
+		gatewayError(ctx, w, a.log, "delete group", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"deleted": group})
@@ -506,12 +504,12 @@ func (a *clusterAPI) createTopic(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
 			return
 		}
-		status := http.StatusBadGateway
 		msg := err.Error()
 		if strings.Contains(msg, "topic name required") {
-			status = http.StatusBadRequest
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
+			return
 		}
-		writeJSON(w, status, map[string]string{"error": "kafka: " + msg})
+		gatewayError(ctx, w, a.log, "create topic", err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"created": req.Name})
@@ -529,7 +527,7 @@ func (a *clusterAPI) deleteTopic(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
 			return
 		}
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kafka: " + err.Error()})
+		gatewayError(ctx, w, a.log, "delete topic", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"deleted": topic})
@@ -556,12 +554,12 @@ func (a *clusterAPI) deleteRecords(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
 			return
 		}
-		status := http.StatusBadGateway
 		msg := err.Error()
 		if strings.Contains(msg, "required") || strings.Contains(msg, "no resolvable") {
-			status = http.StatusBadRequest
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
+			return
 		}
-		writeJSON(w, status, map[string]string{"error": "kafka: " + msg})
+		gatewayError(ctx, w, a.log, "delete records", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": res})
@@ -569,7 +567,7 @@ func (a *clusterAPI) deleteRecords(w http.ResponseWriter, r *http.Request) {
 
 // --- Schema Registry handlers ---
 
-func (a *clusterAPI) srClient(w http.ResponseWriter, cluster string) *kafkapkg.SchemaRegistryClient {
+func (a *clusterAPI) srClient(w http.ResponseWriter, r *http.Request, cluster string) *kafkapkg.SchemaRegistryClient {
 	sr, err := a.reg.SchemaRegistry(cluster)
 	if err != nil {
 		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
@@ -580,7 +578,7 @@ func (a *clusterAPI) srClient(w http.ResponseWriter, cluster string) *kafkapkg.S
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "schema registry not configured for cluster: " + cluster})
 			return nil
 		}
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
+		gatewayError(r.Context(), w, a.log, "schema registry client", err)
 		return nil
 	}
 	return sr
@@ -588,7 +586,7 @@ func (a *clusterAPI) srClient(w http.ResponseWriter, cluster string) *kafkapkg.S
 
 func (a *clusterAPI) listSubjects(w http.ResponseWriter, r *http.Request) {
 	cluster := chi.URLParam(r, "cluster")
-	sr := a.srClient(w, cluster)
+	sr := a.srClient(w, r, cluster)
 	if sr == nil {
 		return
 	}
@@ -596,7 +594,7 @@ func (a *clusterAPI) listSubjects(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	subs, err := sr.ListSubjectsWithVersions(ctx)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
+		gatewayError(ctx, w, a.log, "list subjects", err)
 		return
 	}
 	sort.Slice(subs, func(i, j int) bool { return subs[i].Name < subs[j].Name })
@@ -609,7 +607,7 @@ func (a *clusterAPI) listSubjects(w http.ResponseWriter, r *http.Request) {
 func (a *clusterAPI) listVersions(w http.ResponseWriter, r *http.Request) {
 	cluster := chi.URLParam(r, "cluster")
 	subject := chi.URLParam(r, "subject")
-	sr := a.srClient(w, cluster)
+	sr := a.srClient(w, r, cluster)
 	if sr == nil {
 		return
 	}
@@ -617,7 +615,7 @@ func (a *clusterAPI) listVersions(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	vs, err := sr.ListVersions(ctx, subject)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
+		gatewayError(ctx, w, a.log, "list versions", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"subject": subject, "versions": vs})
@@ -627,7 +625,7 @@ func (a *clusterAPI) getSchemaVersion(w http.ResponseWriter, r *http.Request) {
 	cluster := chi.URLParam(r, "cluster")
 	subject := chi.URLParam(r, "subject")
 	version := chi.URLParam(r, "version")
-	sr := a.srClient(w, cluster)
+	sr := a.srClient(w, r, cluster)
 	if sr == nil {
 		return
 	}
@@ -635,7 +633,7 @@ func (a *clusterAPI) getSchemaVersion(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	v, err := sr.GetVersion(ctx, subject, version)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
+		gatewayError(ctx, w, a.log, "get schema version", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, v)
@@ -644,7 +642,7 @@ func (a *clusterAPI) getSchemaVersion(w http.ResponseWriter, r *http.Request) {
 func (a *clusterAPI) registerSchema(w http.ResponseWriter, r *http.Request) {
 	cluster := chi.URLParam(r, "cluster")
 	subject := chi.URLParam(r, "subject")
-	sr := a.srClient(w, cluster)
+	sr := a.srClient(w, r, cluster)
 	if sr == nil {
 		return
 	}
@@ -659,7 +657,7 @@ func (a *clusterAPI) registerSchema(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	res, err := sr.RegisterSchema(ctx, subject, req)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
+		gatewayError(ctx, w, a.log, "register schema", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, res)
@@ -668,7 +666,7 @@ func (a *clusterAPI) registerSchema(w http.ResponseWriter, r *http.Request) {
 func (a *clusterAPI) deleteSubject(w http.ResponseWriter, r *http.Request) {
 	cluster := chi.URLParam(r, "cluster")
 	subject := chi.URLParam(r, "subject")
-	sr := a.srClient(w, cluster)
+	sr := a.srClient(w, r, cluster)
 	if sr == nil {
 		return
 	}
@@ -677,7 +675,7 @@ func (a *clusterAPI) deleteSubject(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	versions, err := sr.DeleteSubject(ctx, subject, permanent)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
+		gatewayError(ctx, w, a.log, "delete subject", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"deleted": subject, "versions": versions, "permanent": permanent})
@@ -703,11 +701,11 @@ func (a *clusterAPI) alterTopicConfigs(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		msg := err.Error()
-		status := http.StatusBadGateway
 		if strings.Contains(msg, "required") || strings.Contains(msg, "no changes") {
-			status = http.StatusBadRequest
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
+			return
 		}
-		writeJSON(w, status, map[string]string{"error": "kafka: " + msg})
+		gatewayError(ctx, w, a.log, "alter topic configs", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": res})
@@ -724,7 +722,7 @@ func (a *clusterAPI) listACLs(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
 			return
 		}
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kafka: " + err.Error()})
+		gatewayError(ctx, w, a.log, "list ACLs", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"cluster": cluster, "acls": acls})
@@ -768,14 +766,14 @@ func (a *clusterAPI) searchMessages(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		msg := err.Error()
-		status := http.StatusBadGateway
 		if strings.Contains(msg, "jsonpath") || strings.Contains(msg, "xpath") ||
 			strings.Contains(msg, "regex") || strings.Contains(msg, "numeric op") ||
 			strings.Contains(msg, "unknown search mode") || strings.Contains(msg, "unknown operator") ||
 			strings.Contains(msg, "js filter") {
-			status = http.StatusBadRequest
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
+			return
 		}
-		writeJSON(w, status, map[string]string{"error": msg})
+		gatewayError(ctx, w, a.log, "search messages", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -802,13 +800,13 @@ func (a *clusterAPI) createACL(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		msg := err.Error()
-		status := http.StatusBadGateway
 		if strings.Contains(msg, "required") || strings.Contains(msg, "validate") ||
 			strings.Contains(msg, "resource_type") || strings.Contains(msg, "pattern_type") ||
 			strings.Contains(msg, "operation") || strings.Contains(msg, "permission_type") {
-			status = http.StatusBadRequest
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
+			return
 		}
-		writeJSON(w, status, map[string]string{"error": msg})
+		gatewayError(ctx, w, a.log, "create ACL", err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "acl": spec})
@@ -831,13 +829,13 @@ func (a *clusterAPI) deleteACL(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		msg := err.Error()
-		status := http.StatusBadGateway
 		if strings.Contains(msg, "required") || strings.Contains(msg, "validate") ||
 			strings.Contains(msg, "resource_type") || strings.Contains(msg, "pattern_type") ||
 			strings.Contains(msg, "operation") || strings.Contains(msg, "permission_type") {
-			status = http.StatusBadRequest
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
+			return
 		}
-		writeJSON(w, status, map[string]string{"error": msg})
+		gatewayError(ctx, w, a.log, "delete ACL", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "deleted": deleted})
@@ -854,7 +852,7 @@ func (a *clusterAPI) listSCRAMUsers(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
 			return
 		}
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kafka: " + err.Error()})
+		gatewayError(ctx, w, a.log, "list SCRAM users", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"cluster": cluster, "users": users})
@@ -883,12 +881,12 @@ func (a *clusterAPI) upsertSCRAMUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		msg := err.Error()
-		status := http.StatusBadGateway
 		if strings.Contains(msg, "required") || strings.Contains(msg, "mechanism") ||
 			strings.Contains(msg, "iterations") {
-			status = http.StatusBadRequest
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
+			return
 		}
-		writeJSON(w, status, map[string]string{"error": msg})
+		gatewayError(ctx, w, a.log, "upsert SCRAM user", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "user": req.User, "mechanism": req.Mechanism})
@@ -921,11 +919,11 @@ func (a *clusterAPI) deleteSCRAMUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		msg := lastErr.Error()
-		status := http.StatusBadGateway
 		if strings.Contains(msg, "required") || strings.Contains(msg, "mechanism") {
-			status = http.StatusBadRequest
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
+			return
 		}
-		writeJSON(w, status, map[string]string{"error": msg})
+		gatewayError(ctx, w, a.log, "delete SCRAM user", lastErr)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "user": user, "deleted": deleted})
