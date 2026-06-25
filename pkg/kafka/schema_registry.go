@@ -119,11 +119,20 @@ func newSchemaRegistryClient(cfg config.SchemaRegistryConfig, guarded bool) *Sch
 // rebinding. Operator-configured clusters are not guarded (they may
 // legitimately point SR at localhost, and the existing tests rely on this).
 func (r *Registry) SchemaRegistry(cluster string) (*SchemaRegistryClient, error) {
-	// Read r.clusters and r.adhocLastUsed with the same (unlocked) discipline
-	// this method already used for r.clusters. Acquiring r.mu here would invert
-	// the mu -> srMu order taken by sweepAdhocLocked (whose caller srDecoderFor
-	// already holds r.srMu before calling SchemaRegistry), creating an AB-BA
-	// deadlock the race detector cannot catch.
+	// r.clusters is written only at construction time (NewRegistry) or under
+	// r.mu (UseAdhoc). Reading it here without r.mu is safe for the same reason
+	// the rest of this method always has: there is no write path that races with
+	// a concurrent read of a fully-initialised clusters map.
+	//
+	// We must NOT read r.adhocLastUsed here even though it is documented
+	// "Protected by r.mu". Acquiring r.mu would invert the mu -> srMu lock order
+	// taken by sweepAdhocLocked (whose caller srDecoderFor already holds r.srMu
+	// before calling SchemaRegistry), creating an AB-BA deadlock.
+	//
+	// Instead, we derive ad-hoc status from the cluster name prefix via
+	// IsAdhoc. All ad-hoc names are assigned the AdhocPrefix by UseAdhoc and
+	// operator-configured names are validated to never start with that prefix,
+	// so the prefix check is a reliable, lock-free alternative to the map read.
 	cc, ok := r.clusters[cluster]
 	if !ok {
 		return nil, ErrUnknownCluster
@@ -131,7 +140,7 @@ func (r *Registry) SchemaRegistry(cluster string) (*SchemaRegistryClient, error)
 	if strings.TrimSpace(cc.SchemaRegistry.URL) == "" {
 		return nil, ErrNoSchemaRegistry
 	}
-	_, isAdhoc := r.adhocLastUsed[cluster]
+	isAdhoc := IsAdhoc(cluster)
 	return newSchemaRegistryClient(cc.SchemaRegistry, isAdhoc), nil
 }
 
