@@ -52,6 +52,11 @@ deploy/local/
 # Claude Code config — local only, not part of the OSS repo.
 .claude/
 NEXT_STEPS.md
+.superpowers/
+.followups-ledger.md
 
 # Local git worktrees
 .worktrees/
+
+# Generated contrast report (output of frontend/scripts/check-contrast.mjs)
+frontend/scripts/contrast-report.html
