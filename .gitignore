@@ -49,9 +49,8 @@ deploy/local/
 .golangci-cache/
 /tmp/
 
-# Personal Claude Code overrides (hooks, permissions). Team settings live
-# in .claude/settings.json (committed).
-.claude/settings.local.json
+# Claude Code config — local only, not part of the OSS repo.
+.claude/
 NEXT_STEPS.md
 
 # Local git worktrees
