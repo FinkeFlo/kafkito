@@ -51,7 +51,7 @@ export function CreateGroupModal({
   const groupIdValid = groupId.trim() !== "";
   const offsetValid =
     strategy !== "offset" ||
-    (offset.trim() !== "" && Number.isFinite(Number(offset)));
+    (offset.trim() !== "" && Number.isInteger(Number(offset)));
   const timestampValid =
     strategy !== "timestamp" ||
     (timestampMs.trim() !== "" && Number.isFinite(Number(timestampMs)));

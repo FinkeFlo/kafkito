@@ -154,6 +154,31 @@ describe("CreateGroupModal", () => {
     expect(body.timestamp_ms).toBe(new Date("2026-06-15T14:45:00").getTime());
   });
 
+  it("disables Preview/Create for a non-integer offset under the offset strategy", async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await user.type(screen.getByLabelText(/group name/i), "g1");
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: /strategy/i }),
+      "offset",
+    );
+
+    const offsetInput = screen.getByLabelText(/offset/i);
+    await user.clear(offsetInput);
+    await user.type(offsetInput, "1.5");
+
+    expect(screen.getByRole("button", { name: /preview/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^create$/i })).toBeDisabled();
+
+    // A valid integer re-enables the actions.
+    await user.clear(offsetInput);
+    await user.type(offsetInput, "10");
+
+    expect(screen.getByRole("button", { name: /preview/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^create$/i })).toBeEnabled();
+  });
+
   it("surfaces an error notice when the group already exists", async () => {
     const user = userEvent.setup();
     createGroup.mockRejectedValueOnce(new Error("HTTP 409: group already exists"));
