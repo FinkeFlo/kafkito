@@ -10,6 +10,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Input } from "@/components/Input";
 import { Modal } from "@/components/Modal";
 import { Notice } from "@/components/Notice";
+import { localInputToMs, msToLocalInput } from "@/lib/datetime";
 
 export function CreateGroupModal({
   cluster,
@@ -175,12 +176,12 @@ export function CreateGroupModal({
               type="datetime-local"
               step="1"
               value={
-                Number.isFinite(Number(timestampMs))
-                  ? new Date(Number(timestampMs)).toISOString().slice(0, 19)
+                timestampMs.trim() !== "" && Number.isFinite(Number(timestampMs))
+                  ? msToLocalInput(Number(timestampMs))
                   : ""
               }
               onChange={(e) => {
-                const ms = new Date(e.target.value).getTime();
+                const ms = localInputToMs(e.target.value);
                 setTimestampMs(Number.isFinite(ms) ? String(ms) : "");
                 setPreview(null);
               }}
