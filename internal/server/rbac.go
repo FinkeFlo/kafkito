@@ -54,27 +54,32 @@ func rbacMiddleware(policy *rbac.Policy) func(http.Handler) http.Handler {
 				return
 			}
 
-			resType, resName, action, readBody := resolvePermission(r)
+			resType, resName, action, bodyField := resolvePermission(r)
 			if resType == "" {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			if readBody {
+			if bodyField != "" {
 				bodyBytes, err := io.ReadAll(r.Body)
 				_ = r.Body.Close()
 				if err != nil {
 					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "failed to read request body"})
 					return
 				}
-				var tmp struct {
-					Name string `json:"name"`
+				var fields map[string]json.RawMessage
+				var name string
+				if err := json.Unmarshal(bodyBytes, &fields); err == nil {
+					if raw, ok := fields[bodyField]; ok {
+						_ = json.Unmarshal(raw, &name)
+					}
 				}
-				if err := json.Unmarshal(bodyBytes, &tmp); err != nil || tmp.Name == "" {
-					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing or invalid 'name' in request body"})
+				name = strings.TrimSpace(name)
+				if name == "" {
+					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing or invalid '" + bodyField + "' in request body"})
 					return
 				}
-				resName = tmp.Name
+				resName = name
 				r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 			}
 
@@ -100,10 +105,12 @@ func rbacMiddleware(policy *rbac.Policy) func(http.Handler) http.Handler {
 }
 
 // resolvePermission maps the current request to (resourceType, resourceName,
-// action, readBody). readBody=true indicates that the request body must be
-// inspected to derive the resource name (e.g. POST /topics with {"name":...}).
-// A return of ("", "", "", false) means no permission check is required.
-func resolvePermission(r *http.Request) (resType, resName, action string, readBody bool) {
+// action, bodyField). A non-empty bodyField names the JSON request-body field
+// that holds the resource name; the middleware reads it to derive resName
+// (e.g. POST /topics uses "name", POST /groups uses "group_id"). An empty
+// bodyField means resName is already final. A return of ("", "", "", "")
+// means no permission check is required.
+func resolvePermission(r *http.Request) (resType, resName, action, bodyField string) {
 	rctx := chi.RouteContext(r.Context())
 	if rctx == nil {
 		return
@@ -120,75 +127,75 @@ func resolvePermission(r *http.Request) (resType, resName, action string, readBo
 	switch {
 	// Clusters
 	case strings.HasSuffix(pattern, "/clusters") && method == http.MethodGet:
-		return "cluster", "*", "view", false
+		return "cluster", "*", "view", ""
 	case strings.HasSuffix(pattern, "/capabilities") && method == http.MethodGet:
-		return "cluster", cluster, "view", false
+		return "cluster", cluster, "view", ""
 	case strings.HasSuffix(pattern, "/capabilities/refresh") && method == http.MethodPost:
-		return "cluster", cluster, "view", false
+		return "cluster", cluster, "view", ""
 
 	// Topics
 	case strings.HasSuffix(pattern, "/topics") && method == http.MethodGet:
-		return "topic", "", "view", false
+		return "topic", "", "view", ""
 	case strings.HasSuffix(pattern, "/topics") && method == http.MethodPost:
-		return "topic", "", "edit", true
+		return "topic", "", "edit", "name"
 	case strings.HasSuffix(pattern, "/topics/{topic}") && method == http.MethodGet:
-		return "topic", topic, "view", false
+		return "topic", topic, "view", ""
 	case strings.HasSuffix(pattern, "/topics/{topic}") && method == http.MethodDelete:
-		return "topic", topic, "delete", false
+		return "topic", topic, "delete", ""
 	case strings.HasSuffix(pattern, "/topics/{topic}/configs") && method == http.MethodPatch:
-		return "topic", topic, "edit", false
+		return "topic", topic, "edit", ""
 	case strings.HasSuffix(pattern, "/topics/{topic}/records") && method == http.MethodDelete:
-		return "topic", topic, "delete", false
+		return "topic", topic, "delete", ""
 	case strings.HasSuffix(pattern, "/topics/{topic}/sample") && method == http.MethodGet:
-		return "topic", topic, "consume", false
+		return "topic", topic, "consume", ""
 	case strings.HasSuffix(pattern, "/topics/{topic}/messages") && method == http.MethodGet:
-		return "topic", topic, "consume", false
+		return "topic", topic, "consume", ""
 	case strings.HasSuffix(pattern, "/topics/{topic}/messages") && method == http.MethodPost:
-		return "topic", topic, "produce", false
+		return "topic", topic, "produce", ""
 	case strings.HasSuffix(pattern, "/topics/{topic}/messages/search") && method == http.MethodPost:
-		return "topic", topic, "consume", false
+		return "topic", topic, "consume", ""
 
 	// Groups
 	case strings.HasSuffix(pattern, "/groups") && method == http.MethodGet:
-		return "group", "", "view", false
+		return "group", "", "view", ""
 	case strings.HasSuffix(pattern, "/groups") && method == http.MethodPost:
-		return "group", "", "edit", false
+		return "group", "", "edit", "group_id"
 	case strings.HasSuffix(pattern, "/groups/{group}") && method == http.MethodGet:
-		return "group", group, "view", false
+		return "group", group, "view", ""
 	case strings.HasSuffix(pattern, "/groups/{group}") && method == http.MethodDelete:
-		return "group", group, "delete", false
+		return "group", group, "delete", ""
 	case strings.HasSuffix(pattern, "/groups/{group}/reset-offsets") && method == http.MethodPost:
-		return "group", group, "edit", false
+		return "group", group, "edit", ""
 
 	// Schemas
 	case strings.HasSuffix(pattern, "/schemas/subjects") && method == http.MethodGet:
-		return "schema", "", "view", false
+		return "schema", "", "view", ""
 	case strings.HasSuffix(pattern, "/schemas/subjects/{subject}/versions") && method == http.MethodGet:
-		return "schema", subject, "view", false
+		return "schema", subject, "view", ""
 	case strings.HasSuffix(pattern, "/schemas/subjects/{subject}/versions/{version}") && method == http.MethodGet:
-		return "schema", subject, "view", false
+		return "schema", subject, "view", ""
 	case strings.HasSuffix(pattern, "/schemas/subjects/{subject}/versions") && method == http.MethodPost:
-		return "schema", subject, "edit", false
+		return "schema", subject, "edit", ""
 	case strings.HasSuffix(pattern, "/schemas/subjects/{subject}") && method == http.MethodDelete:
-		return "schema", subject, "delete", false
+		return "schema", subject, "delete", ""
 
 	// ACLs
 	case strings.HasSuffix(pattern, "/acls") && method == http.MethodGet:
-		return "acl", "*", "view", false
+		return "acl", "*", "view", ""
 	case strings.HasSuffix(pattern, "/acls") && method == http.MethodPost:
-		return "acl", "*", "edit", false
+		return "acl", "*", "edit", ""
 	case strings.HasSuffix(pattern, "/acls") && method == http.MethodDelete:
-		return "acl", "*", "delete", false
+		return "acl", "*", "delete", ""
 
 	// Users
 	case strings.HasSuffix(pattern, "/users") && method == http.MethodGet:
-		return "user", "", "view", false
+		return "user", "", "view", ""
 	case strings.HasSuffix(pattern, "/users") && method == http.MethodPost:
-		return "user", "", "edit", false
+		return "user", "", "edit", ""
 	case strings.HasSuffix(pattern, "/users/{user}") && method == http.MethodDelete:
-		return "user", user, "delete", false
+		return "user", user, "delete", ""
 	}
-	return "", "", "", false
+	return "", "", "", ""
 }
 
 // handleMe returns the current principal, roles and materialized permissions.

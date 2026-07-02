@@ -274,6 +274,11 @@ func (r *Registry) CreateGroup(ctx context.Context, cluster string, req CreateGr
 	default:
 		return nil, fmt.Errorf("create group: unknown strategy %q", req.Strategy)
 	}
+	// Pre-validate timestamp so the error is prefixed for the create flow rather
+	// than bubbling the shared "reset offsets: ..." message from resolveAndCommit.
+	if req.Strategy == ResetTimestamp && req.TimestampMs <= 0 {
+		return nil, errors.New("create group: timestamp_ms required for timestamp strategy")
+	}
 
 	adm, err := r.Admin(cluster)
 	if err != nil {

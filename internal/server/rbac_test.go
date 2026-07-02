@@ -62,6 +62,26 @@ func policyDeny() *rbac.Policy {
 	})
 }
 
+// policyGroupGrant grants userMallory the single permission resource:actions.
+// e.g. policyGroupGrant("group:billing-*", "edit").
+func policyGroupGrant(resource string, actions ...string) *rbac.Policy {
+	return rbac.Compile(config.RBACConfig{
+		Enabled:  true,
+		Identity: config.IdentityConfig{Header: rbacTestHeader},
+		Roles: []config.RoleConfig{
+			{
+				Name: "scoped",
+				Permissions: []config.PermissionConfig{
+					{Resource: resource, Actions: actions},
+				},
+			},
+		},
+		Subjects: []config.SubjectConfig{
+			{User: userMallory, Roles: []string{"scoped"}},
+		},
+	})
+}
+
 // errReader fails on Read so the rbacMiddleware body-read branch fires.
 type errReader struct{}
 
@@ -202,6 +222,69 @@ func TestRBACMiddleware_DispatchBranches(t *testing.T) {
 			wantStatus:     http.StatusNoContent,
 			wantNextCalled: true,
 		},
+		{
+			// group:billing-*:edit must NOT authorize creating a group outside
+			// the prefix; the resource name comes from the group_id body field.
+			name:           "create_group_prefix_grant_denies_out_of_scope_group_id",
+			policy:         policyGroupGrant("group:billing-*", "edit"),
+			method:         http.MethodPost,
+			pattern:        "/api/v1/clusters/{cluster}/groups",
+			urlPath:        "/api/v1/clusters/" + clusterShared + "/groups",
+			body:           strings.NewReader(`{"group_id":"payments-prod"}`),
+			headerUser:     userMallory,
+			wantStatus:     http.StatusForbidden,
+			wantNextCalled: false,
+			wantBody: map[string]any{
+				"error":    "forbidden",
+				"resource": "group:payments-prod",
+				"action":   "edit",
+			},
+		},
+		{
+			name:           "create_group_prefix_grant_allows_in_scope_group_id",
+			policy:         policyGroupGrant("group:billing-*", "edit"),
+			method:         http.MethodPost,
+			pattern:        "/api/v1/clusters/{cluster}/groups",
+			urlPath:        "/api/v1/clusters/" + clusterShared + "/groups",
+			body:           strings.NewReader(`{"group_id":"billing-x"}`),
+			headerUser:     userMallory,
+			wantStatus:     http.StatusNoContent,
+			wantNextCalled: true,
+		},
+		{
+			name:           "create_group_wildcard_grant_allows_any_group_id",
+			policy:         policyGroupGrant("group:*", "edit"),
+			method:         http.MethodPost,
+			pattern:        "/api/v1/clusters/{cluster}/groups",
+			urlPath:        "/api/v1/clusters/" + clusterShared + "/groups",
+			body:           strings.NewReader(`{"group_id":"payments-prod"}`),
+			headerUser:     userMallory,
+			wantStatus:     http.StatusNoContent,
+			wantNextCalled: true,
+		},
+		{
+			name:           "create_group_no_group_edit_denied",
+			policy:         policyGroupGrant("topic:*", "edit"),
+			method:         http.MethodPost,
+			pattern:        "/api/v1/clusters/{cluster}/groups",
+			urlPath:        "/api/v1/clusters/" + clusterShared + "/groups",
+			body:           strings.NewReader(`{"group_id":"billing-x"}`),
+			headerUser:     userMallory,
+			wantStatus:     http.StatusForbidden,
+			wantNextCalled: false,
+		},
+		{
+			name:           "create_group_missing_group_id_returns_400",
+			policy:         policyGroupGrant("group:*", "edit"),
+			method:         http.MethodPost,
+			pattern:        "/api/v1/clusters/{cluster}/groups",
+			urlPath:        "/api/v1/clusters/" + clusterShared + "/groups",
+			body:           strings.NewReader(`{"topic":"orders"}`),
+			headerUser:     userMallory,
+			wantStatus:     http.StatusBadRequest,
+			wantNextCalled: false,
+			wantErrSubstr:  "missing or invalid 'group_id' in request body",
+		},
 	}
 
 	for _, tc := range cases {
@@ -268,10 +351,10 @@ func TestResolvePermission_RepresentativeEntries(t *testing.T) {
 	t.Parallel()
 
 	type want struct {
-		resType  string
-		resName  string
-		action   string
-		readBody bool
+		resType   string
+		resName   string
+		action    string
+		bodyField string
 	}
 	cases := []struct {
 		name    string
@@ -281,39 +364,39 @@ func TestResolvePermission_RepresentativeEntries(t *testing.T) {
 		want    want
 	}{
 		{
-			name:    "topics_post_marks_readBody_with_empty_name",
+			name:    "topics_post_derives_resName_from_name_body_field",
 			method:  http.MethodPost,
 			pattern: "/api/v1/clusters/{cluster}/topics",
 			urlPath: "/api/v1/clusters/" + clusterShared + "/topics",
-			want:    want{resType: "topic", resName: "", action: "edit", readBody: true},
+			want:    want{resType: "topic", resName: "", action: "edit", bodyField: "name"},
 		},
 		{
-			name:    "groups_post_uses_empty_resName_no_readBody",
+			name:    "groups_post_derives_resName_from_group_id_body_field",
 			method:  http.MethodPost,
 			pattern: "/api/v1/clusters/{cluster}/groups",
 			urlPath: "/api/v1/clusters/" + clusterShared + "/groups",
-			want:    want{resType: "group", resName: "", action: "edit", readBody: false},
+			want:    want{resType: "group", resName: "", action: "edit", bodyField: "group_id"},
 		},
 		{
 			name:    "groups_delete_uses_url_param_for_resName",
 			method:  http.MethodDelete,
 			pattern: "/api/v1/clusters/{cluster}/groups/{group}",
 			urlPath: "/api/v1/clusters/" + clusterShared + "/groups/billing",
-			want:    want{resType: "group", resName: "billing", action: "delete", readBody: false},
+			want:    want{resType: "group", resName: "billing", action: "delete", bodyField: ""},
 		},
 		{
 			name:    "schemas_subjects_versions_post_uses_subject_url_param",
 			method:  http.MethodPost,
 			pattern: "/api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions",
 			urlPath: "/api/v1/clusters/" + clusterShared + "/schemas/subjects/orders-value/versions",
-			want:    want{resType: "schema", resName: "orders-value", action: "edit", readBody: false},
+			want:    want{resType: "schema", resName: "orders-value", action: "edit", bodyField: ""},
 		},
 		{
 			name:    "acls_post_uses_wildcard_resName",
 			method:  http.MethodPost,
 			pattern: "/api/v1/clusters/{cluster}/acls",
 			urlPath: "/api/v1/clusters/" + clusterShared + "/acls",
-			want:    want{resType: "acl", resName: "*", action: "edit", readBody: false},
+			want:    want{resType: "acl", resName: "*", action: "edit", bodyField: ""},
 		},
 	}
 
@@ -324,8 +407,8 @@ func TestResolvePermission_RepresentativeEntries(t *testing.T) {
 
 			var got want
 			capture := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-				rt, rn, a, rb := resolvePermission(r)
-				got = want{resType: rt, resName: rn, action: a, readBody: rb}
+				rt, rn, a, bf := resolvePermission(r)
+				got = want{resType: rt, resName: rn, action: a, bodyField: bf}
 			})
 			r := chi.NewRouter()
 			r.Method(tc.method, tc.pattern, capture)
@@ -344,12 +427,12 @@ func TestResolvePermission_ReturnsEmpty_WhenNoChiRouteContext(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/anywhere", nil)
 
-	rt, rn, a, rb := resolvePermission(req)
+	rt, rn, a, bf := resolvePermission(req)
 
 	assert.Empty(t, rt)
 	assert.Empty(t, rn)
 	assert.Empty(t, a)
-	assert.False(t, rb)
+	assert.Empty(t, bf)
 }
 
 func TestRBACSubject_VerifiedPrincipalOverridesHeader(t *testing.T) {
