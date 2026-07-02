@@ -151,6 +151,8 @@ func resolvePermission(r *http.Request) (resType, resName, action string, readBo
 	// Groups
 	case strings.HasSuffix(pattern, "/groups") && method == http.MethodGet:
 		return "group", "", "view", false
+	case strings.HasSuffix(pattern, "/groups") && method == http.MethodPost:
+		return "group", "", "edit", false
 	case strings.HasSuffix(pattern, "/groups/{group}") && method == http.MethodGet:
 		return "group", group, "view", false
 	case strings.HasSuffix(pattern, "/groups/{group}") && method == http.MethodDelete:
