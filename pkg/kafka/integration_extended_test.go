@@ -158,7 +158,7 @@ func TestIntegration_ResetOffsets(t *testing.T) {
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	require.NoError(t, err, "reset earliest")
+	require.NoError(t, lastErr, "reset earliest")
 	require.NotNil(t, res)
 	require.Len(t, res.Results, 1)
 	require.EqualValues(t, 0, res.Results[0].NewOffset)
@@ -181,6 +181,98 @@ func TestIntegration_ResetOffsets(t *testing.T) {
 	})
 	require.NoError(t, err, "reset to specific")
 	require.EqualValues(t, 2, res.Results[0].NewOffset)
+}
+
+// TestIntegration_CreateGroup creates a brand-new group bound to a topic at
+// latest, verifies the offsets were committed, then asserts a second create of
+// the same name is rejected and that shift-by is refused.
+func TestIntegration_CreateGroup(t *testing.T) {
+	broker := startBroker(t)
+	reg := newRegistry(t, broker)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	topic := "it-create-group"
+	require.NoError(t, reg.CreateTopic(ctx, "it", CreateTopicRequest{
+		Name:              topic,
+		Partitions:        1,
+		ReplicationFactor: 1,
+	}))
+	for i := 0; i < 5; i++ {
+		_, err := reg.Produce(ctx, "it", topic, ProduceRequest{Value: "x"})
+		require.NoError(t, err)
+	}
+
+	group := "it-created-group"
+
+	// Coordinator may take a moment on a fresh broker; retry the first call.
+	var (
+		res     *ResetOffsetsResult
+		lastErr error
+	)
+	for i := 0; i < 10; i++ {
+		res, lastErr = reg.CreateGroup(ctx, "it", CreateGroupRequest{
+			GroupID:  group,
+			Topic:    topic,
+			Strategy: ResetLatest,
+		})
+		if lastErr == nil ||
+			(!strings.Contains(lastErr.Error(), "COORDINATOR_NOT_AVAILABLE") &&
+				!strings.Contains(lastErr.Error(), "NOT_COORDINATOR")) {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	require.NoError(t, lastErr, "create group latest")
+	require.NotNil(t, res)
+	require.Len(t, res.Results, 1)
+	require.EqualValues(t, 5, res.Results[0].NewOffset)
+
+	// Group now exists and is listed.
+	groups, err := reg.ListGroups(ctx, "it")
+	require.NoError(t, err)
+	found := false
+	for _, g := range groups {
+		if g.GroupID == group {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "created group should be listed")
+
+	// Second create of the same name is rejected.
+	_, err = reg.CreateGroup(ctx, "it", CreateGroupRequest{
+		GroupID:  group,
+		Topic:    topic,
+		Strategy: ResetLatest,
+	})
+	require.ErrorIs(t, err, ErrGroupExists)
+
+	// shift-by is refused for creation.
+	_, err = reg.CreateGroup(ctx, "it", CreateGroupRequest{
+		GroupID:  "it-created-group-2",
+		Topic:    topic,
+		Strategy: ResetShiftBy,
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "shift-by")
+
+	// Dry-run does not create a group.
+	dry, err := reg.CreateGroup(ctx, "it", CreateGroupRequest{
+		GroupID:  "it-created-group-dry",
+		Topic:    topic,
+		Strategy: ResetEarliest,
+		DryRun:   true,
+	})
+	require.NoError(t, err)
+	require.True(t, dry.DryRun)
+	require.EqualValues(t, 0, dry.Results[0].NewOffset)
+	groups, err = reg.ListGroups(ctx, "it")
+	require.NoError(t, err)
+	for _, g := range groups {
+		require.NotEqual(t, "it-created-group-dry", g.GroupID, "dry-run must not create a group")
+	}
 }
 
 // TestIntegration_SearchMessages produces JSON records and exercises the
