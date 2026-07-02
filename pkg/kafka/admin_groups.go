@@ -65,6 +65,19 @@ type ResetOffsetsResult struct {
 // refused by the broker (GROUP_IS_NOT_EMPTY). We still pass the request through
 // so the broker-side error bubbles up cleanly.
 func (r *Registry) ResetOffsets(ctx context.Context, cluster, group string, req ResetOffsetsRequest) (*ResetOffsetsResult, error) {
+	adm, err := r.Admin(cluster)
+	if err != nil {
+		return nil, err
+	}
+	return r.resolveAndCommit(ctx, adm, group, req)
+}
+
+// resolveAndCommit is the shared core behind ResetOffsets and CreateGroup: it
+// selects target partitions, resolves the new offsets per strategy (with
+// clamping), and commits them (unless DryRun) for the given group. The caller
+// supplies an already-acquired admin client and is responsible for any
+// group-state preconditions.
+func (r *Registry) resolveAndCommit(ctx context.Context, adm *kadm.Client, group string, req ResetOffsetsRequest) (*ResetOffsetsResult, error) {
 	if strings.TrimSpace(req.Topic) == "" {
 		return nil, errors.New("reset offsets: topic required")
 	}
@@ -72,11 +85,6 @@ func (r *Registry) ResetOffsets(ctx context.Context, cluster, group string, req 
 	case ResetEarliest, ResetLatest, ResetToOffset, ResetTimestamp, ResetShiftBy:
 	default:
 		return nil, fmt.Errorf("reset offsets: unknown strategy %q", req.Strategy)
-	}
-
-	adm, err := r.Admin(cluster)
-	if err != nil {
-		return nil, err
 	}
 
 	// 1) Determine the target partitions — either user-supplied or "all partitions of topic".
@@ -110,6 +118,7 @@ func (r *Registry) ResetOffsets(ctx context.Context, cluster, group string, req 
 
 	// 2) Resolve new offsets per partition.
 	var newOffsets kadm.ListedOffsets
+	var err error
 	switch req.Strategy {
 	case ResetEarliest:
 		newOffsets, err = adm.ListStartOffsets(ctx, req.Topic)
