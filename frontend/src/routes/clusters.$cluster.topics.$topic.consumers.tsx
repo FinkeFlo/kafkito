@@ -143,7 +143,6 @@ function ConsumersPanel({ cluster, topic }: { cluster: string; topic: string }) 
           cluster={cluster}
           topic={topic}
           onClose={() => setCreateOpen(false)}
-          onCreated={() => query.refetch()}
         />
       )}
     </Section>
