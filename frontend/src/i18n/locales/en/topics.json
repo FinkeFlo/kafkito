@@ -94,6 +94,7 @@
       "description": "No consumer group is currently reading from this topic."
     },
     "errorTimeout": "Listing consumers for this topic took too long. Try again in a moment.",
-    "errorGeneric": "Failed to load consumers: {{detail}}"
+    "errorGeneric": "Failed to load consumers: {{detail}}",
+    "createGroup": "Create consumer group"
   }
 }

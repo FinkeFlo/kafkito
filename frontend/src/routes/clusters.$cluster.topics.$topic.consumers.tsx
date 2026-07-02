@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -9,7 +10,9 @@ import {
 import { Section } from "@/components/section";
 import { DataTable, type DataTableColumn } from "@/components/DataTable";
 import { Badge, type BadgeVariant } from "@/components/badge";
+import { Button } from "@/components/button";
 import { LagBadge } from "@/components/lag-badge";
+import { CreateGroupModal } from "@/components/create-group-modal";
 import { EmptyState } from "@/components/EmptyState";
 import { Notice } from "@/components/Notice";
 import { useFormatters } from "@/lib/use-formatters";
@@ -26,6 +29,7 @@ function ConsumersTab() {
 function ConsumersPanel({ cluster, topic }: { cluster: string; topic: string }) {
   const { t } = useTranslation("topics");
   const fmt = useFormatters();
+  const [createOpen, setCreateOpen] = useState(false);
   const query = useQuery({
     queryKey: ["topic-consumers", cluster, topic],
     queryFn: () => fetchTopicConsumers(cluster, topic),
@@ -107,7 +111,15 @@ function ConsumersPanel({ cluster, topic }: { cluster: string; topic: string }) 
   }
 
   return (
-    <Section title={t("consumers.title")} description={t("consumers.description")}>
+    <Section
+      title={t("consumers.title")}
+      description={t("consumers.description")}
+      actions={
+        <Button variant="secondary" onClick={() => setCreateOpen(true)}>
+          {t("consumers.createGroup")}
+        </Button>
+      }
+    >
       {errorBanner ? (
         <Notice intent="danger">{errorBanner}</Notice>
       ) : (
@@ -124,6 +136,14 @@ function ConsumersPanel({ cluster, topic }: { cluster: string; topic: string }) 
               description={t("consumers.empty.description")}
             />
           }
+        />
+      )}
+      {createOpen && (
+        <CreateGroupModal
+          cluster={cluster}
+          topic={topic}
+          onClose={() => setCreateOpen(false)}
+          onCreated={() => query.refetch()}
         />
       )}
     </Section>
