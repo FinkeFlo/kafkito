@@ -288,6 +288,13 @@ func TestResolvePermission_RepresentativeEntries(t *testing.T) {
 			want:    want{resType: "topic", resName: "", action: "edit", readBody: true},
 		},
 		{
+			name:    "groups_post_uses_empty_resName_no_readBody",
+			method:  http.MethodPost,
+			pattern: "/api/v1/clusters/{cluster}/groups",
+			urlPath: "/api/v1/clusters/" + clusterShared + "/groups",
+			want:    want{resType: "group", resName: "", action: "edit", readBody: false},
+		},
+		{
 			name:    "groups_delete_uses_url_param_for_resName",
 			method:  http.MethodDelete,
 			pattern: "/api/v1/clusters/{cluster}/groups/{group}",

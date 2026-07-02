@@ -333,6 +333,39 @@ paths:
                   groups:
                     type: array
                     items: { $ref: "#/components/schemas/GroupInfo" }
+    post:
+      tags: [groups]
+      summary: Create a consumer group bound to a topic.
+      description: |
+        Creates a new consumer group by committing initial offsets for all
+        partitions of `topic` under the chosen strategy. Fails with 409 if the
+        group already exists. `shift-by` is not accepted. Set `dry_run=true` to
+        preview the resulting offsets without creating the group.
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [group_id, topic, strategy]
+              properties:
+                group_id: { type: string }
+                topic: { type: string }
+                strategy:
+                  type: string
+                  enum: [earliest, latest, offset, timestamp]
+                offset: { type: integer, format: int64 }
+                timestamp_ms: { type: integer, format: int64 }
+                dry_run: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResetOffsetsResponse" }
+        "409": { description: Group already exists }
   /api/v1/clusters/{cluster}/groups/{group}:
     get:
       tags: [groups]

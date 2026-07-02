@@ -63,6 +63,7 @@ func (a *clusterAPI) mount(r chi.Router) {
 	r.Post("/clusters/{cluster}/topics/{topic}/messages/search", a.searchMessages)
 	r.Post("/clusters/{cluster}/topics/{topic}/messages", a.produceMessage)
 	r.Get("/clusters/{cluster}/groups", a.listGroups)
+	r.Post("/clusters/{cluster}/groups", a.createGroup)
 	r.Get("/clusters/{cluster}/groups/{group}", a.describeGroup)
 	r.Delete("/clusters/{cluster}/groups/{group}", a.deleteGroup)
 	r.Post("/clusters/{cluster}/groups/{group}/reset-offsets", a.resetGroupOffsets)
@@ -498,6 +499,42 @@ func (a *clusterAPI) resetGroupOffsets(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		gatewayError(ctx, w, a.log, "reset group offsets", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+// createGroup creates a new consumer group bound to a single topic.
+func (a *clusterAPI) createGroup(w http.ResponseWriter, r *http.Request) {
+	cluster := chi.URLParam(r, "cluster")
+
+	var req kafkapkg.CreateGroupRequest
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body: " + err.Error()})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	res, err := a.reg.CreateGroup(ctx, cluster, req)
+	if err != nil {
+		switch {
+		case errors.Is(err, kafkapkg.ErrUnknownCluster):
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
+			return
+		case errors.Is(err, kafkapkg.ErrGroupExists):
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "kafka: " + err.Error()})
+			return
+		}
+		status := http.StatusBadGateway
+		msg := err.Error()
+		if strings.Contains(msg, "required") || strings.Contains(msg, "unknown strategy") ||
+			strings.Contains(msg, "not found") || strings.Contains(msg, "shift-by") {
+			status = http.StatusBadRequest
+		}
+		writeJSON(w, status, map[string]string{"error": "kafka: " + msg})
 		return
 	}
 	writeJSON(w, http.StatusOK, res)
