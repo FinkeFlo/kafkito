@@ -441,6 +441,27 @@ export function resetGroupOffsets(
   );
 }
 
+export type CreateGroupStrategy = "earliest" | "latest" | "offset" | "timestamp";
+
+export interface CreateGroupRequest {
+  group_id: string;
+  topic: string;
+  strategy: CreateGroupStrategy;
+  offset?: number;
+  timestamp_ms?: number;
+  dry_run?: boolean;
+}
+
+export function createGroup(
+  cluster: string,
+  req: CreateGroupRequest,
+): Promise<ResetOffsetsResult> {
+  return sendJSONForCluster<ResetOffsetsResult>(cluster, clusterPath(cluster, `/groups`),
+    "POST",
+    req,
+  );
+}
+
 export function deleteGroup(cluster: string, group: string): Promise<void> {
   return sendJSONForCluster<void>(cluster, clusterPath(cluster, `/groups/${encodeURIComponent(group)}`),
     "DELETE",
