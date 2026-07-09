@@ -38,22 +38,22 @@ function EntryBlock({
         <span className="text-xs text-subtle-text">{entry.date}</span>
       </button>
       {open && (
-        <ul className="mt-2 space-y-2">
+        <ul className="mt-2 grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-2 text-sm">
           {entry.items.map((it, i) => (
-            <li key={i} className="flex gap-2 text-sm">
+            <li key={i} className="contents">
               <span
-                className={`mt-0.5 h-fit rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${BADGE[it.type].cls}`}
+                className={`mt-0.5 justify-self-start rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${BADGE[it.type].cls}`}
               >
                 {BADGE[it.type].label}
               </span>
-              <span>
+              <div>
                 <span className="font-medium text-text">{it.title}</span>
                 {it.description ? (
                   <span className="mt-0.5 block text-muted">
                     {it.description}
                   </span>
                 ) : null}
-              </span>
+              </div>
             </li>
           ))}
         </ul>
