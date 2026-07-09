@@ -21,6 +21,18 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.0.1",
+    date: "2026-07-09",
+    items: [
+      {
+        type: "fix",
+        title: "Clearer errors when a consumer-group name isn't allowed",
+        description:
+          "If the cluster's ACLs don't permit a group name, kafkito now says so directly instead of a generic gateway error, and shows the allowed group prefixes when your key can read ACLs.",
+      },
+    ],
+  },
+  {
     version: "1.0.0",
     date: "2026-07-09",
     items: [
