@@ -14,6 +14,7 @@ import { ClusterPill } from "./ClusterPill";
 import { openCommandPalette } from "./CommandPalette";
 import { Tooltip } from "./tooltip";
 import { UserMenu } from "./UserMenu";
+import { WhatsNewButton } from "./whats-new-button";
 import { useTheme } from "@/lib/theme";
 import { fetchInfo } from "@/lib/api";
 import { useCluster } from "@/lib/use-cluster";
@@ -110,6 +111,7 @@ export function Shell() {
             <ClusterPill />
             <SearchButton />
             <div className="hidden h-5 w-px bg-border md:block" />
+            <WhatsNewButton />
             <ThemeButton />
             <UserMenu />
           </div>

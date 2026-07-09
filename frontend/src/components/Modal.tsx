@@ -59,6 +59,15 @@ type ModalStackEntry = { id: number };
 const modalStack: ModalStackEntry[] = [];
 
 /**
+ * True when at least one Modal is currently open. Used by non-modal
+ * callers (e.g. the What's-new auto-open) to avoid stacking on top of an
+ * already-open modal.
+ */
+export function anyModalOpen(): boolean {
+  return modalStack.length > 0;
+}
+
+/**
  * Centered modal panel with backdrop, focus-trap, Escape-to-close, and
  * focus-restore. Implemented inline (no `react-focus-lock` /
  * `focus-trap-react` dependency). Body scroll is locked while open.
