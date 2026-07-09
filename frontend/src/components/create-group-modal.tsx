@@ -6,7 +6,6 @@ import {
   type ResetOffsetResult,
 } from "@/lib/api";
 import { Button } from "@/components/button";
-import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Input } from "@/components/Input";
 import { Modal } from "@/components/Modal";
 import { Notice } from "@/components/Notice";
@@ -30,7 +29,6 @@ export function CreateGroupModal({
   const [timestampMs, setTimestampMs] = useState(String(Date.now() - 3600_000));
   const [preview, setPreview] = useState<ResetOffsetResult[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
 
   function buildReq(dryRun: boolean) {
     return {
@@ -69,7 +67,12 @@ export function CreateGroupModal({
 
   async function onCreate() {
     setErr(null);
-    await mutation.mutateAsync(false);
+    try {
+      await mutation.mutateAsync(false);
+    } catch {
+      // error already surfaced via onError; keep the modal open
+      return;
+    }
     await qc.invalidateQueries({ queryKey: ["topic-consumers", cluster, topic] });
     onCreated?.();
     onClose();
@@ -95,25 +98,19 @@ export function CreateGroupModal({
             disabled={!ready || mutation.isPending}
             onClick={onPreview}
           >
-            {mutation.isPending ? "Working…" : "Preview"}
+            {mutation.isPending && mutation.variables === true
+              ? "Working…"
+              : "Preview"}
           </Button>
           <Button
             variant="primary"
             size="sm"
             disabled={!ready || mutation.isPending}
-            onClick={() => setConfirmOpen(true)}
+            loading={mutation.isPending && mutation.variables === false}
+            onClick={onCreate}
           >
             Create
           </Button>
-          <ConfirmDialog
-            open={confirmOpen}
-            onOpenChange={setConfirmOpen}
-            variant="primary"
-            title="Create consumer group?"
-            description={`This will create group "${groupId.trim()}" on topic "${topic}" starting at "${strategy}".`}
-            confirmLabel="Create consumer group"
-            onConfirm={onCreate}
-          />
         </>
       }
     >

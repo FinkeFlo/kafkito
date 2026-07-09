@@ -73,7 +73,7 @@ describe("CreateGroupModal", () => {
     expect(await screen.findByText("42")).toBeInTheDocument();
   });
 
-  it("confirming create calls createGroup with dry_run false, invalidates the topic-consumers query, then calls onCreated and onClose", async () => {
+  it("clicking Create calls createGroup with dry_run false, invalidates the topic-consumers query, then calls onCreated and onClose", async () => {
     const user = userEvent.setup();
     const onCreated = vi.fn();
     const onClose = vi.fn();
@@ -89,9 +89,6 @@ describe("CreateGroupModal", () => {
 
     await user.type(screen.getByLabelText(/group name/i), "g1");
     await user.click(screen.getByRole("button", { name: /^create$/i }));
-    await user.click(
-      screen.getByRole("button", { name: /create consumer group/i }),
-    );
 
     await waitFor(() =>
       expect(createGroup).toHaveBeenCalledWith("C", {
@@ -186,9 +183,6 @@ describe("CreateGroupModal", () => {
 
     await user.type(screen.getByLabelText(/group name/i), "g1");
     await user.click(screen.getByRole("button", { name: /^create$/i }));
-    await user.click(
-      screen.getByRole("button", { name: /create consumer group/i }),
-    );
 
     expect(await screen.findByText(/already exists/i)).toBeInTheDocument();
   });
