@@ -1,0 +1,47 @@
+export type ChangelogItemType = "feature" | "fix" | "security";
+
+export interface ChangelogItem {
+  type: ChangelogItemType;
+  title: string;
+  description?: string;
+}
+
+export interface ChangelogEntry {
+  /** Normalized version key, e.g. "0.0.0-rc17" (no leading v, no -btp/-local/-dev). */
+  version: string;
+  /** ISO date "YYYY-MM-DD". */
+  date: string;
+  items: ChangelogItem[];
+}
+
+/**
+ * Curated release notes, newest first. Add a new entry as part of the
+ * release checklist BEFORE tagging; `version` must equal the normalized
+ * runtime version (see lib/whats-new.ts `normalizeVersion`).
+ */
+export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.0.0-rc17",
+    date: "2026-07-09",
+    items: [
+      {
+        type: "feature",
+        title: "Create consumer groups bound to a topic",
+        description:
+          "Pre-create a consumer group on a topic with a chosen start position (earliest, latest, timestamp, or a specific offset), with a dry-run preview before committing.",
+      },
+      {
+        type: "security",
+        title: "Backend security hardening",
+        description:
+          "SSRF guards on private-cluster broker and schema-registry dials, RBAC subject derived from the verified JWT principal, and schema-registry basic auth refused over plaintext HTTP.",
+      },
+      {
+        type: "fix",
+        title: "Frontend correctness fixes",
+        description:
+          "Message de-duplication, load-more paging on filter changes, and consumer-group polling cleanup.",
+      },
+    ],
+  },
+];
