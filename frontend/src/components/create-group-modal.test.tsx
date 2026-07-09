@@ -5,10 +5,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { CreateGroupModal } from "./create-group-modal";
 
 const createGroup = vi.hoisted(() => vi.fn());
+const listACLs = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api", async (importActual) => {
   const actual = await importActual<typeof import("@/lib/api")>();
-  return { ...actual, createGroup };
+  return { ...actual, createGroup, listACLs };
 });
 
 function renderModal(onCreated?: () => void, onClose: () => void = () => {}) {
@@ -35,6 +36,8 @@ function renderModal(onCreated?: () => void, onClose: () => void = () => {}) {
 describe("CreateGroupModal", () => {
   beforeEach(() => {
     createGroup.mockReset();
+    listACLs.mockReset();
+    listACLs.mockResolvedValue([]);
   });
 
   it("renders with strategy defaulting to latest", () => {
@@ -43,6 +46,23 @@ describe("CreateGroupModal", () => {
     expect(
       screen.getByRole("combobox", { name: /strategy/i }),
     ).toHaveValue("latest");
+  });
+
+  it("shows allowed group prefixes from ACLs when the key can read them", async () => {
+    listACLs.mockResolvedValue([
+      {
+        principal: "User:sa-1",
+        host: "*",
+        resource_type: "GROUP",
+        resource_name: "orders-",
+        pattern_type: "PREFIXED",
+        operation: "READ",
+        permission_type: "ALLOW",
+      },
+    ]);
+    renderModal();
+
+    expect(await screen.findByText("orders-*")).toBeInTheDocument();
   });
 
   it("previews with dry_run true and shows the returned per-partition new offset", async () => {
