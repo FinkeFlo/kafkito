@@ -21,9 +21,15 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "0.0.0-rc17",
+    version: "1.0.0",
     date: "2026-07-09",
     items: [
+      {
+        type: "feature",
+        title: "kafkito 1.0.0 — first stable release",
+        description:
+          "kafkito is now used in production. This is the first stable release; versions from here follow semantic versioning.",
+      },
       {
         type: "feature",
         title: "Create consumer groups bound to a topic",

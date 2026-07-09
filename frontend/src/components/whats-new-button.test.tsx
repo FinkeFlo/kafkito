@@ -23,7 +23,7 @@ describe("WhatsNewButton", () => {
   beforeEach(() => {
     window.localStorage.clear();
     fetchInfo.mockReset();
-    fetchInfo.mockResolvedValue({ name: "kafkito", version: "0.0.0-rc17-btp" });
+    fetchInfo.mockResolvedValue({ name: "kafkito", version: "1.0.0-btp" });
   });
 
   it("auto-opens once for an unseen version and marks it seen", async () => {
@@ -31,13 +31,13 @@ describe("WhatsNewButton", () => {
     expect(await screen.findByText("What's new")).toBeInTheDocument();
     await waitFor(() =>
       expect(window.localStorage.getItem("kafkito.whatsnew.lastSeen.v1")).toBe(
-        "0.0.0-rc17",
+        "1.0.0",
       ),
     );
   });
 
   it("does not auto-open and shows no dot once the version is seen", async () => {
-    window.localStorage.setItem("kafkito.whatsnew.lastSeen.v1", "0.0.0-rc17");
+    window.localStorage.setItem("kafkito.whatsnew.lastSeen.v1", "1.0.0");
     renderButton();
     await screen.findByRole("button", { name: /what's new/i });
     expect(screen.queryByText("What's new")).not.toBeInTheDocument();
@@ -51,7 +51,7 @@ describe("WhatsNewButton", () => {
   });
 
   it("opens on click", async () => {
-    window.localStorage.setItem("kafkito.whatsnew.lastSeen.v1", "0.0.0-rc17");
+    window.localStorage.setItem("kafkito.whatsnew.lastSeen.v1", "1.0.0");
     const user = userEvent.setup();
     renderButton();
     await user.click(screen.getByRole("button", { name: /what's new/i }));
