@@ -527,6 +527,9 @@ func (a *clusterAPI) createGroup(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, kafkapkg.ErrGroupExists):
 			writeJSON(w, http.StatusConflict, map[string]string{"error": "kafka: " + err.Error()})
 			return
+		case errors.Is(err, kafkapkg.ErrNotAuthorized):
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+			return
 		}
 		status := http.StatusBadGateway
 		msg := err.Error()

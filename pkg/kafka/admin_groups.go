@@ -241,6 +241,12 @@ func clampToBounds(off int64, starts, ends kadm.ListedOffsets, topic string, p i
 // exists (has active members or committed offsets). Callers map this to 409.
 var ErrGroupExists = errors.New("consumer group already exists")
 
+// ErrNotAuthorized is returned by CreateGroup when the broker rejects the
+// offset commit (or the topic offset lookup) because the cluster's ACLs do not
+// permit the group or topic — e.g. GROUP_AUTHORIZATION_FAILED. Callers map this
+// to 403. It is an authorization problem, not a credentials one.
+var ErrNotAuthorized = errors.New("not authorized: the cluster's ACLs do not permit this consumer group (check the allowed GROUP prefixes)")
+
 // CreateGroupRequest describes a new consumer group to bind to a single topic.
 // The group is created by committing initial offsets for every partition of
 // Topic under the chosen strategy. shift-by is not accepted: a brand-new group
@@ -297,13 +303,37 @@ func (r *Registry) CreateGroup(ctx context.Context, cluster string, req CreateGr
 		}
 	}
 
-	return r.resolveAndCommit(ctx, adm, group, ResetOffsetsRequest{
+	res, err := r.resolveAndCommit(ctx, adm, group, ResetOffsetsRequest{
 		Topic:       req.Topic,
 		Strategy:    req.Strategy,
 		Offset:      req.Offset,
 		TimestampMs: req.TimestampMs,
 		DryRun:      req.DryRun,
 	})
+	if err != nil {
+		if isAuthorizationFailure(err.Error()) {
+			return nil, fmt.Errorf("%w: %v", ErrNotAuthorized, err)
+		}
+		return nil, err
+	}
+	// A commit denied by ACLs surfaces as a per-partition authorization error,
+	// so the group was NOT created. Fail clearly instead of reporting success.
+	for _, pr := range res.Results {
+		if isAuthorizationFailure(pr.Error) {
+			return nil, fmt.Errorf("%w: group %q", ErrNotAuthorized, group)
+		}
+	}
+	return res, nil
+}
+
+// isAuthorizationFailure reports whether msg carries a Kafka authorization
+// failure. Kafka error codes are stable uppercase tokens
+// (GROUP_AUTHORIZATION_FAILED, TOPIC_AUTHORIZATION_FAILED,
+// CLUSTER_AUTHORIZATION_FAILED), so matching the shared "AUTHORIZATION_FAILED"
+// token classifies all three. It inspects the Kafka error-code token, not a
+// free-form human message.
+func isAuthorizationFailure(msg string) bool {
+	return strings.Contains(msg, "AUTHORIZATION_FAILED")
 }
 
 // DeleteGroup removes an empty/dead consumer group.

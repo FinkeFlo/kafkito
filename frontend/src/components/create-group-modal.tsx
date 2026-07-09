@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createGroup,
+  listACLs,
+  type ACLEntry,
   type CreateGroupStrategy,
   type ResetOffsetResult,
 } from "@/lib/api";
@@ -10,6 +12,22 @@ import { Input } from "@/components/Input";
 import { Modal } from "@/components/Modal";
 import { Notice } from "@/components/Notice";
 import { localInputToMs, msToLocalInput } from "@/lib/datetime";
+
+// allowedGroupHints extracts the consumer-group name patterns the current
+// principal is allowed to use, from the cluster's ACLs (ALLOW on the GROUP
+// resource). PREFIXED patterns are shown with a trailing "*". Empty when the
+// key cannot read ACLs (DescribeAcls needs cluster DESCRIBE) — the modal then
+// simply shows no hint.
+function allowedGroupHints(acls: ACLEntry[]): string[] {
+  const seen = new Set<string>();
+  for (const a of acls) {
+    if (a.resource_type.toUpperCase() !== "GROUP") continue;
+    if (a.permission_type.toUpperCase() !== "ALLOW") continue;
+    const prefixed = a.pattern_type.toUpperCase().includes("PREFIX");
+    seen.add(a.resource_name + (prefixed ? "*" : ""));
+  }
+  return Array.from(seen);
+}
 
 export function CreateGroupModal({
   cluster,
@@ -29,6 +47,14 @@ export function CreateGroupModal({
   const [timestampMs, setTimestampMs] = useState(String(Date.now() - 3600_000));
   const [preview, setPreview] = useState<ResetOffsetResult[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
+  const aclsQuery = useQuery({
+    queryKey: ["acls", cluster],
+    queryFn: () => listACLs(cluster),
+    retry: false,
+    staleTime: 60_000,
+  });
+  const groupHints = allowedGroupHints(aclsQuery.data ?? []);
 
   function buildReq(dryRun: boolean) {
     return {
@@ -68,7 +94,13 @@ export function CreateGroupModal({
   async function onCreate() {
     setErr(null);
     try {
-      await mutation.mutateAsync(false);
+      const res = await mutation.mutateAsync(false);
+      const failed = res.results.filter((r) => r.error);
+      if (failed.length > 0) {
+        // Commit reported per-partition errors — the group was NOT created.
+        setErr(`Group not created: ${failed[0].error}`);
+        return;
+      }
     } catch {
       // error already surfaced via onError; keep the modal open
       return;
@@ -126,6 +158,14 @@ export function CreateGroupModal({
               className="mt-1 font-mono"
               placeholder="my-consumer-group"
             />
+            {groupHints.length > 0 ? (
+              <span className="mt-1 block text-xs text-muted">
+                Allowed by ACLs:{" "}
+                <span className="font-mono text-subtle-text">
+                  {groupHints.join(", ")}
+                </span>
+              </span>
+            ) : null}
           </label>
           <label className="block">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted">
