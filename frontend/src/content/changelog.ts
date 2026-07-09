@@ -28,7 +28,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         type: "feature",
         title: "Create consumer groups bound to a topic",
         description:
-          "Pre-create a consumer group on a topic with a chosen start position (earliest, latest, timestamp, or a specific offset), with a dry-run preview before committing.",
+          "Pre-create a consumer group on a topic with a chosen start position (earliest, latest, timestamp, or a specific offset).",
       },
       {
         type: "security",
