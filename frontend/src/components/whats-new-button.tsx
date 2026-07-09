@@ -4,6 +4,7 @@ import { Sparkles } from "lucide-react";
 import { fetchInfo } from "@/lib/api";
 import { anyModalOpen } from "@/components/Modal";
 import { WhatsNewModal } from "@/components/whats-new-modal";
+import { CHANGELOG } from "@/content/changelog";
 import {
   getLastSeen,
   hasUnseen,
@@ -27,7 +28,12 @@ export function WhatsNewButton() {
     getLastSeen,
     () => null,
   );
-  const unseen = hasUnseen(current, lastSeen);
+  // Only surface the indicator when the running version actually has notes.
+  // Unknown versions (dev builds, the e2e harness, or a missing changelog
+  // entry) show no dot and never auto-open — so automation is not blocked
+  // by the modal backdrop.
+  const hasNotes = !!current && CHANGELOG.some((e) => e.version === current);
+  const unseen = hasNotes && hasUnseen(current, lastSeen);
 
   const [open, setOpen] = useState(false);
   const [autoOpened, setAutoOpened] = useState(false);

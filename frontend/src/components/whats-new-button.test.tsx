@@ -43,6 +43,13 @@ describe("WhatsNewButton", () => {
     expect(screen.queryByText("What's new")).not.toBeInTheDocument();
   });
 
+  it("does not auto-open for a version without changelog notes (dev/e2e)", async () => {
+    fetchInfo.mockResolvedValue({ name: "kafkito", version: "e2e-dev" });
+    renderButton();
+    await screen.findByRole("button", { name: /what's new/i });
+    expect(screen.queryByText("What's new")).not.toBeInTheDocument();
+  });
+
   it("opens on click", async () => {
     window.localStorage.setItem("kafkito.whatsnew.lastSeen.v1", "0.0.0-rc17");
     const user = userEvent.setup();
