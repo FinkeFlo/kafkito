@@ -113,8 +113,9 @@ func fairShare(limit, partitions int) int {
 // pageWindow is the per-partition [begin, stop) offset range a single
 // page of ConsumeMessages will scan.
 type pageWindow struct {
-	begin int64 // inclusive
-	stop  int64 // exclusive
+	begin     int64 // inclusive fetch begin for this page
+	stop      int64 // exclusive fetch stop for this page
+	trueBegin int64 // inclusive lower bound of the full query range
 }
 
 // ConsumeMessages pulls up to opts.Limit messages from the named topic
@@ -407,7 +408,7 @@ func buildWindows(
 			if e <= b {
 				continue
 			}
-			windows[p] = pageWindow{begin: b, stop: e}
+			windows[p] = pageWindow{begin: b, stop: e, trueBegin: b}
 		}
 	case FromOffset:
 		switch {
@@ -424,7 +425,7 @@ func buildWindows(
 				if !ok || e <= b {
 					continue
 				}
-				windows[p] = pageWindow{begin: b, stop: e}
+				windows[p] = pageWindow{begin: b, stop: e, trueBegin: b}
 			}
 		case len(parts) == 1:
 			p := parts[0]
@@ -433,7 +434,7 @@ func buildWindows(
 				b = s
 			}
 			if e, ok := endMap[p]; ok && e > b {
-				windows[p] = pageWindow{begin: b, stop: e}
+				windows[p] = pageWindow{begin: b, stop: e, trueBegin: b}
 			}
 		default:
 			return nil, fmt.Errorf("from=offset with partition=-1 requires partition_offsets")
@@ -449,7 +450,7 @@ func buildWindows(
 				e = o
 			}
 			if e > s {
-				windows[p] = pageWindow{begin: s, stop: e}
+				windows[p] = pageWindow{begin: s, stop: e, trueBegin: s}
 			}
 		}
 	default: // FromEnd
@@ -492,7 +493,7 @@ func buildWindows(
 			if b < s {
 				b = s
 			}
-			windows[p] = pageWindow{begin: b, stop: e}
+			windows[p] = pageWindow{begin: b, stop: e, trueBegin: s}
 		}
 	}
 
@@ -512,9 +513,11 @@ func containsPartition(parts []int32, p int32) bool {
 // buildNextCursor returns the cursor pointing at the next page boundary,
 // or (nil, false) when no further records remain in the given direction.
 //
-// "More" is judged against the clamped window (w.begin / w.stop), not the
-// partition's raw start/end — otherwise a time-windowed query reports
-// "next page available" after fully draining its own filter window.
+// For backward paging, "more" is judged against the full query lower bound
+// (w.trueBegin), not the page-local fetch begin. This lets from=end continue
+// paging older history after draining a fair-share tail, while still stopping
+// at the true start of the query range (including time-window clamps).
+// Forward paging continues to compare against the clamped page stop.
 func buildNextCursor(
 	direction CursorDirection,
 	windows map[int32]pageWindow,
@@ -544,7 +547,7 @@ func buildNextCursor(
 			if !ok {
 				lo = w.begin
 			}
-			if lo > w.begin {
+			if lo > w.trueBegin {
 				hasMore = true
 			}
 			c.Partitions[p] = lo

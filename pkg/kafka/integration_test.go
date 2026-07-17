@@ -15,6 +15,7 @@ package kafka
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"testing"
@@ -142,4 +143,54 @@ func TestIntegration_ProduceConsume(t *testing.T) {
 		require.Equal(t, "k", m.Key)
 		require.Equal(t, "v", m.Value)
 	}
+}
+
+func TestIntegration_ConsumeMessagesFromEndPaginatesToStart(t *testing.T) {
+	broker := startBroker(t)
+	reg := newRegistry(t, broker)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	topic := "it-consume-from-end-pagination"
+	require.NoError(t, reg.CreateTopic(ctx, "it", CreateTopicRequest{
+		Name:              topic,
+		Partitions:        1,
+		ReplicationFactor: 1,
+	}))
+
+	const total = 10
+	for i := 0; i < total; i++ {
+		res, err := reg.Produce(ctx, "it", topic, ProduceRequest{
+			Key:   "k",
+			Value: fmt.Sprintf("v-%02d", i),
+		})
+		require.NoError(t, err)
+		require.Equal(t, int64(i), res.Offset)
+	}
+
+	opts := ConsumeOptions{
+		Partition: -1,
+		Limit:     3,
+		From:      FromEnd,
+		Timeout:   8 * time.Second,
+	}
+
+	var seen []int64
+	for {
+		page, err := reg.ConsumeMessages(ctx, "it", topic, opts)
+		require.NoError(t, err)
+		require.NotEmpty(t, page.Messages)
+		for _, m := range page.Messages {
+			seen = append(seen, m.Offset)
+		}
+		if !page.HasMore {
+			require.Nil(t, page.NextCursor)
+			break
+		}
+		require.NotNil(t, page.NextCursor)
+		opts.CursorUpperBounds = page.NextCursor.Partitions
+	}
+
+	require.Equal(t, []int64{9, 8, 7, 6, 5, 4, 3, 2, 1, 0}, seen)
 }

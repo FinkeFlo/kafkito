@@ -9,6 +9,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func backwardPageOffsets(w pageWindow) []Message {
+	page := make([]Message, 0, int(w.stop-w.begin))
+	for off := w.stop - 1; off >= w.begin; off-- {
+		page = append(page, Message{Partition: 0, Offset: off})
+	}
+	return page
+}
+
 // TestBuildWindowsFromEndTimeBounds verifies that a from=end browse honors
 // from_ts_ms / to_ts_ms by clamping the per-partition [begin, stop) range
 // before fairShare and the e-tail tail computation. This is the core
@@ -122,32 +130,31 @@ func TestBuildWindowsFromStartTimeBounds(t *testing.T) {
 	require.Equal(t, int64(700), windows[1].stop)
 }
 
-// TestBuildNextCursorBackwardWithClampedWindow verifies that "more pages"
-// is judged against the clamped window's begin, not the partition's raw
-// start offset. Without this fix, a fully-drained time window would still
-// claim a next page exists.
-func TestBuildNextCursorBackwardWithClampedWindow(t *testing.T) {
+// TestBuildNextCursorBackwardUsesQueryLowerBound verifies the backward path
+// compares against the full query lower bound, not the narrowed per-page
+// fetch begin.
+func TestBuildNextCursorBackwardUsesQueryLowerBound(t *testing.T) {
 	t.Parallel()
-	t.Run("page reaches clamped begin: no next page", func(t *testing.T) {
+	t.Run("page reaches query lower bound: no next page", func(t *testing.T) {
 		t.Parallel()
 		windows := map[int32]pageWindow{
-			0: {begin: 100, stop: 200},
+			0: {begin: 100, stop: 200, trueBegin: 100},
 		}
 		page := []Message{{Partition: 0, Offset: 100}, {Partition: 0, Offset: 150}}
 		cursor, hasMore := buildNextCursor(CursorBackward, windows, page)
 		require.False(t, hasMore)
 		require.Nil(t, cursor)
 	})
-	t.Run("page does not reach clamped begin: next page", func(t *testing.T) {
+	t.Run("page reaches narrowed begin but not query lower bound: next page", func(t *testing.T) {
 		t.Parallel()
 		windows := map[int32]pageWindow{
-			0: {begin: 100, stop: 200},
+			0: {begin: 100, stop: 200, trueBegin: 0},
 		}
-		page := []Message{{Partition: 0, Offset: 150}}
+		page := []Message{{Partition: 0, Offset: 100}, {Partition: 0, Offset: 150}}
 		cursor, hasMore := buildNextCursor(CursorBackward, windows, page)
 		require.True(t, hasMore)
 		require.NotNil(t, cursor)
-		require.Equal(t, int64(150), cursor.Partitions[0])
+		require.Equal(t, int64(100), cursor.Partitions[0])
 	})
 }
 
@@ -159,7 +166,7 @@ func TestBuildNextCursorForwardWithClampedWindow(t *testing.T) {
 	t.Run("page reaches clamped stop: no next page", func(t *testing.T) {
 		t.Parallel()
 		windows := map[int32]pageWindow{
-			0: {begin: 100, stop: 200},
+			0: {begin: 100, stop: 200, trueBegin: 100},
 		}
 		page := []Message{{Partition: 0, Offset: 199}}
 		cursor, hasMore := buildNextCursor(CursorForward, windows, page)
@@ -169,7 +176,7 @@ func TestBuildNextCursorForwardWithClampedWindow(t *testing.T) {
 	t.Run("page does not reach clamped stop: next page", func(t *testing.T) {
 		t.Parallel()
 		windows := map[int32]pageWindow{
-			0: {begin: 100, stop: 500},
+			0: {begin: 100, stop: 500, trueBegin: 100},
 		}
 		page := []Message{{Partition: 0, Offset: 150}}
 		cursor, hasMore := buildNextCursor(CursorForward, windows, page)
@@ -177,4 +184,39 @@ func TestBuildNextCursorForwardWithClampedWindow(t *testing.T) {
 		require.NotNil(t, cursor)
 		require.Equal(t, int64(151), cursor.Partitions[0])
 	})
+}
+
+func TestBuildWindowsFromEndPaginatesToTrueStart(t *testing.T) {
+	t.Parallel()
+	parts := []int32{0}
+	startMap := map[int32]int64{0: 0}
+	endMap := map[int32]int64{0: 10}
+	opts := ConsumeOptions{
+		From:  FromEnd,
+		Limit: 3,
+	}
+
+	var seen []int64
+	for {
+		windows, err := buildWindows(parts, opts, startMap, endMap, nil, nil)
+		require.NoError(t, err)
+		require.Len(t, windows, 1)
+
+		w := windows[0]
+		page := backwardPageOffsets(w)
+		require.NotEmpty(t, page)
+		for _, m := range page {
+			seen = append(seen, m.Offset)
+		}
+
+		cursor, hasMore := buildNextCursor(CursorBackward, windows, page)
+		if !hasMore {
+			require.Nil(t, cursor)
+			break
+		}
+		require.NotNil(t, cursor)
+		opts.CursorUpperBounds = cursor.Partitions
+	}
+
+	require.Equal(t, []int64{9, 8, 7, 6, 5, 4, 3, 2, 1, 0}, seen)
 }
