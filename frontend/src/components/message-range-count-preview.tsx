@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { fetchMessageCount } from "@/lib/api";
 import { formatNumber } from "@/lib/format";
@@ -21,6 +21,7 @@ export function MessageRangeCountPreview({
   live: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const request = useMemo(
     () => ({
       partition,
@@ -39,6 +40,17 @@ export function MessageRangeCountPreview({
     return () => clearTimeout(timer);
   }, [request]);
 
+  useEffect(() => {
+    if (!expanded) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setExpanded(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [expanded]);
+
   const query = useQuery({
     queryKey: ["message-count", cluster, topic, debouncedRequest],
     queryFn: () => fetchMessageCount(cluster, topic, debouncedRequest),
@@ -50,83 +62,95 @@ export function MessageRangeCountPreview({
 
   const total = query.data?.total_approx_count ?? null;
   const rows = query.data?.partitions ?? [];
-  const hasBreakdown = rows.length > 0;
+  // Only offer the per-partition breakdown when it adds information,
+  // i.e. when the range spans more than one partition.
+  const hasBreakdown = rows.length > 1;
+
+  let label: string;
+  let labelClass = "font-semibold text-text";
+  if (query.isError) {
+    label = "count failed";
+    labelClass = "font-semibold text-danger";
+  } else if (live) {
+    label =
+      total !== null ? `≈ ${formatNumber(total)} messages` : "snapshot paused";
+  } else if (total === null) {
+    label = "≈ … messages";
+  } else {
+    label = `≈ ${formatNumber(total)} messages`;
+  }
+
+  const tooltip = query.isError
+    ? (query.error as Error).message
+    : live
+      ? "Snapshot paused while Live is on. Turn Live off to refresh the range count."
+      : "Approximate message count for the selected range. Live traffic may shift this slightly.";
 
   return (
-    <div className="min-w-[15rem] rounded-md border border-border bg-subtle p-2 text-xs">
-      <div className="flex items-center gap-2">
-        <span className="font-semibold text-text">
-          {total !== null
-            ? `≈ ${formatNumber(total)} messages`
-            : live
-              ? "Range snapshot paused"
-              : "Calculating range…"}
+    <div
+      ref={wrapRef}
+      className="relative flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]"
+    >
+      <span className={labelClass} title={tooltip}>
+        {label}
+      </span>
+      {live && (
+        <span className="rounded-sm bg-panel px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted">
+          snap
         </span>
-        {live && (
-          <span className="rounded-sm bg-panel px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
-            snapshot
-          </span>
-        )}
-        {!live && query.isFetching && (
-          <span className="ml-auto text-[10px] text-subtle-text">updating…</span>
-        )}
-      </div>
+      )}
+      {!live && query.isFetching && (
+        <span aria-label="updating" title="updating" className="text-[10px] text-subtle-text">
+          …
+        </span>
+      )}
+      {!live && hasBreakdown && (
+        <button
+          type="button"
+          onClick={() => setExpanded((open) => !open)}
+          aria-expanded={expanded}
+          aria-label="Per partition"
+          className="text-muted transition-colors hover:text-text"
+          title="Per-partition breakdown"
+        >
+          {expanded ? "▾" : "▸"}
+        </button>
+      )}
 
-      {query.isError ? (
-        <p className="mt-1 text-danger">{(query.error as Error).message}</p>
-      ) : live ? (
-        <p className="mt-1 text-subtle-text">
-          Paused while Live is on. Refresh the snapshot by turning Live off.
-        </p>
-      ) : total === null ? (
-        <p className="mt-1 text-subtle-text">
-          Resolving start and end offsets for this range.
-        </p>
-      ) : (
-        <>
-          {hasBreakdown && (
-            <button
-              type="button"
-              onClick={() => setExpanded((open) => !open)}
-              className="mt-1 text-muted transition-colors hover:text-text"
-            >
-              {expanded ? "Hide partitions ▾" : "Per partition ▸"}
-            </button>
-          )}
-          {expanded && (
-            <div className="mt-2 overflow-x-auto">
-              <table className="w-full font-mono">
-                <thead className="text-[10px] uppercase tracking-wider text-subtle-text">
-                  <tr>
-                    <th className="text-left">partition</th>
-                    <th className="text-right">from</th>
-                    <th className="text-right pl-3">to</th>
-                    <th className="text-right pl-3">≈ count</th>
+      {expanded && hasBreakdown && (
+        <div className="absolute left-0 top-full z-20 mt-1 min-w-[15rem] rounded-md border border-border bg-subtle p-2 shadow-lg">
+          <div className="overflow-x-auto">
+            <table className="w-full font-mono text-xs">
+              <thead className="text-[10px] uppercase tracking-wider text-subtle-text">
+                <tr>
+                  <th className="text-left">partition</th>
+                  <th className="text-right">from</th>
+                  <th className="pl-3 text-right">to</th>
+                  <th className="pl-3 text-right">≈ count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.partition}>
+                    <td className="text-accent">p{row.partition}</td>
+                    <td className="text-right text-muted">
+                      {formatNumber(row.from_offset)}
+                    </td>
+                    <td className="pl-3 text-right text-muted">
+                      {formatNumber(row.to_offset)}
+                    </td>
+                    <td className="pl-3 text-right">
+                      {formatNumber(row.approx_count)}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.partition}>
-                      <td className="text-accent">p{row.partition}</td>
-                      <td className="text-right text-muted">
-                        {formatNumber(row.from_offset)}
-                      </td>
-                      <td className="pl-3 text-right text-muted">
-                        {formatNumber(row.to_offset)}
-                      </td>
-                      <td className="pl-3 text-right">
-                        {formatNumber(row.approx_count)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                ))}
+              </tbody>
+            </table>
+          </div>
           <p className="mt-1 text-[10px] text-subtle-text">
             Approximate at preview time. Live traffic may shift this slightly.
           </p>
-        </>
+        </div>
       )}
     </div>
   );
