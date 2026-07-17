@@ -366,7 +366,11 @@ func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, o
 		merged = merged[:opts.Limit]
 	}
 
-	nextCursor, hasMore := buildNextCursor(direction, windows, merged)
+	prev := opts.CursorUpperBounds
+	if direction == CursorForward {
+		prev = opts.PartitionOffsets
+	}
+	nextCursor, hasMore := buildNextCursor(direction, windows, merged, collected, prev)
 
 	return &ConsumeResult{
 		Messages:   merged,
@@ -518,10 +522,26 @@ func containsPartition(parts []int32, p int32) bool {
 // paging older history after draining a fair-share tail, while still stopping
 // at the true start of the query range (including time-window clamps).
 // Forward paging continues to compare against the clamped page stop.
+//
+// collected holds the pre-truncation records fetched per partition for this
+// page. Backward paging needs it to tell "this partition's records were
+// dropped by the limit truncation" (boundary must stay at the window stop so
+// the next page re-fetches them) apart from "this partition's window was
+// empty" (boundary advances toward trueBegin). Without that distinction a
+// fully-truncated partition would advance its boundary past its own fetched
+// window and silently skip those records.
+//
+// prev holds the incoming per-partition boundaries (CursorUpperBounds for
+// backward, PartitionOffsets for forward). Boundaries for partitions that have
+// dropped out of the active window set (exhausted or excluded by a time clamp)
+// are carried forward unchanged so a later page — driven by another partition
+// still paging — cannot resurrect them and re-deliver their records.
 func buildNextCursor(
 	direction CursorDirection,
 	windows map[int32]pageWindow,
 	page []Message,
+	collected map[int32][]Message,
+	prev map[int32]int64,
 ) (*Cursor, bool) {
 	if len(page) == 0 {
 		return nil, false
@@ -543,14 +563,29 @@ func buildNextCursor(
 			}
 		}
 		for p, w := range windows {
-			lo, ok := lowest[p]
-			if !ok {
-				lo = w.begin
+			if lo, ok := lowest[p]; ok {
+				// Partition contributed to this page: the next page reads
+				// strictly below the lowest delivered offset.
+				if lo > w.trueBegin {
+					hasMore = true
+				}
+				c.Partitions[p] = lo
+				continue
 			}
-			if lo > w.trueBegin {
+			if len(collected[p]) > 0 {
+				// Records were fetched for this partition but dropped by the
+				// limit truncation. Hold the boundary at the window stop so the
+				// next page re-fetches [.., stop) instead of skipping them.
+				c.Partitions[p] = w.stop
+				hasMore = true
+				continue
+			}
+			// Empty window (e.g. compacted away): page further back toward the
+			// true query lower bound.
+			c.Partitions[p] = w.begin
+			if w.begin > w.trueBegin {
 				hasMore = true
 			}
-			c.Partitions[p] = lo
 		}
 	default: // CursorForward
 		highest := make(map[int32]int64, len(windows))
@@ -570,6 +605,15 @@ func buildNextCursor(
 				hasMore = true
 			}
 			c.Partitions[p] = next
+		}
+	}
+	// Carry forward boundaries for partitions no longer in the active window
+	// set so a later page cannot re-fetch them from scratch.
+	for p, off := range prev {
+		if _, active := windows[p]; !active {
+			if _, set := c.Partitions[p]; !set {
+				c.Partitions[p] = off
+			}
 		}
 	}
 	if !hasMore {
