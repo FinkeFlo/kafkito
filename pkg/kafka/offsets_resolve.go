@@ -10,6 +10,10 @@ import (
 	"github.com/twmb/franz-go/pkg/kadm"
 )
 
+type timestampOffsetLister interface {
+	ListOffsetsAfterMilli(ctx context.Context, millis int64, topics ...string) (kadm.ListedOffsets, error)
+}
+
 // resolveTimestampOffsets resolves a timestamp-millis lower-bound and
 // upper-bound to per-partition offsets via kadm.ListOffsetsAfterMilli.
 // Either bound may be 0 (unset). Returns maps keyed by partition; absent
@@ -20,7 +24,7 @@ import (
 // and SearchMessages (for the same predicate-search feature).
 func resolveTimestampOffsets(
 	ctx context.Context,
-	adm *kadm.Client,
+	adm timestampOffsetLister,
 	topic string,
 	partitions []int32,
 	fromTSMs, toTSMs int64,

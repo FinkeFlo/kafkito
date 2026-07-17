@@ -23,6 +23,7 @@ import { ArrayScopePopover } from "@/components/array-scope-popover";
 import { JsonInteractive } from "@/components/json-interactive";
 import { Button } from "@/components/button";
 import { Timestamp } from "@/components/timestamp";
+import { MessageRangeCountPreview } from "@/components/message-range-count-preview";
 
 interface MessagesSearch {
   partition: number;
@@ -683,6 +684,14 @@ function MessagesPanel({
             disabled={!!searchResult}
           />
         </div>
+        <MessageRangeCountPreview
+          cluster={cluster}
+          topic={topic}
+          partition={partition}
+          from_ts_ms={browseRange.from_ts_ms}
+          to_ts_ms={browseRange.to_ts_ms}
+          live={live}
+        />
         <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
           <label>Sort</label>
           <select

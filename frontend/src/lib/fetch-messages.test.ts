@@ -9,7 +9,7 @@ vi.mock("./api-http", () => ({
   fetchAPI: (...args: unknown[]) => fetchAPI(...args),
 }));
 
-import { fetchMessages } from "./api";
+import { fetchMessageCount, fetchMessages } from "./api";
 
 function okResponse() {
   return {
@@ -59,5 +59,23 @@ describe("fetchMessages query serialization", () => {
     fetchAPI.mockResolvedValue(okResponse());
     await fetchMessages("c1", "t1", { from: "offset", partitionOffsets: {} });
     expect(lastPath()).not.toContain("partition_offsets");
+  });
+});
+
+describe("fetchMessageCount query serialization", () => {
+  it("omits partition for all-partitions requests", async () => {
+    fetchAPI.mockResolvedValue(okResponse());
+    await fetchMessageCount("c1", "t1", { from_ts_ms: 100, to_ts_ms: 200 });
+    const params = new URLSearchParams((lastPath().split("?")[1] ?? ""));
+    expect(params.has("partition")).toBe(false);
+    expect(params.get("from_ts_ms")).toBe("100");
+    expect(params.get("to_ts_ms")).toBe("200");
+  });
+
+  it("serializes a concrete partition when selected", async () => {
+    fetchAPI.mockResolvedValue(okResponse());
+    await fetchMessageCount("c1", "t1", { partition: 3 });
+    const params = new URLSearchParams((lastPath().split("?")[1] ?? ""));
+    expect(params.get("partition")).toBe("3");
   });
 });

@@ -247,6 +247,34 @@ paths:
                   additionalProperties: { type: string }
       responses:
         "200": { description: Produced }
+  /api/v1/clusters/{cluster}/topics/{topic}/messages/count:
+    get:
+      tags: [topics]
+      summary: Approximate message volume for a topic range.
+      description: |
+        Resolves the selected timestamp window to per-partition offset deltas
+        and returns an approximate count without consuming any records.
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { $ref: "#/components/parameters/Topic" }
+        - in: query
+          name: partition
+          schema: { type: integer, default: -1 }
+          description: "-1 = all partitions."
+        - in: query
+          name: from_ts_ms
+          schema: { type: integer, format: int64 }
+          description: Optional lower timestamp bound in Unix milliseconds.
+        - in: query
+          name: to_ts_ms
+          schema: { type: integer, format: int64 }
+          description: Optional exclusive upper timestamp bound in Unix milliseconds.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageCountResponse" }
   /api/v1/clusters/{cluster}/topics/{topic}/sample:
     get:
       tags: [topics]
@@ -635,6 +663,24 @@ components:
         masked: { type: boolean }
         value_sr: { $ref: "#/components/schemas/SRDecodedMeta" }
         key_sr: { $ref: "#/components/schemas/SRDecodedMeta" }
+    MessageCountPartition:
+      type: object
+      properties:
+        partition: { type: integer }
+        from_offset: { type: integer, format: int64 }
+        to_offset: { type: integer, format: int64 }
+        approx_count: { type: integer, format: int64 }
+    MessageCountResponse:
+      type: object
+      properties:
+        cluster: { type: string }
+        topic: { type: string }
+        from_ts_ms: { type: integer, format: int64 }
+        to_ts_ms: { type: integer, format: int64 }
+        total_approx_count: { type: integer, format: int64 }
+        partitions:
+          type: array
+          items: { $ref: "#/components/schemas/MessageCountPartition" }
     SRDecodedMeta:
       type: object
       properties:

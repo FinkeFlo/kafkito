@@ -59,6 +59,7 @@ func (a *clusterAPI) mount(r chi.Router) {
 	r.Delete("/clusters/{cluster}/topics/{topic}", a.deleteTopic)
 	r.Delete("/clusters/{cluster}/topics/{topic}/records", a.deleteRecords)
 	r.Get("/clusters/{cluster}/topics/{topic}/messages", a.consumeMessages)
+	r.Get("/clusters/{cluster}/topics/{topic}/messages/count", a.countMessages)
 	r.Get("/clusters/{cluster}/topics/{topic}/sample", a.sampleMessages)
 	r.Post("/clusters/{cluster}/topics/{topic}/messages/search", a.searchMessages)
 	r.Post("/clusters/{cluster}/topics/{topic}/messages", a.produceMessage)
@@ -277,6 +278,51 @@ func (a *clusterAPI) consumeMessages(w http.ResponseWriter, r *http.Request) {
 		if s, encErr := kafkapkg.EncodeCursor(*res.NextCursor); encErr == nil {
 			resp["next_cursor"] = s
 		}
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// countMessages resolves the selected range to per-partition offset deltas and
+// returns the approximate number of messages inside that window.
+//
+// Query params:
+//
+//	partition:  int32 or -1 for all (default: -1)
+//	from_ts_ms: UNIX millis lower bound (optional)
+//	to_ts_ms:   UNIX millis upper bound (exclusive, optional)
+func (a *clusterAPI) countMessages(w http.ResponseWriter, r *http.Request) {
+	cluster := chi.URLParam(r, "cluster")
+	topic := chi.URLParam(r, "topic")
+
+	opts, err := parseCountQuery(r.URL.Query())
+	if err != nil {
+		writeParamError(w, err)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	res, err := a.reg.CountMessages(ctx, cluster, topic, opts)
+	if err != nil {
+		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
+			return
+		}
+		gatewayError(ctx, w, a.log, "count messages", err)
+		return
+	}
+	resp := map[string]any{
+		"cluster":            cluster,
+		"topic":              topic,
+		"total_approx_count": res.TotalApproxCount,
+		"partitions":         res.Partitions,
+	}
+	if res.FromTSMs != nil {
+		resp["from_ts_ms"] = *res.FromTSMs
+	}
+	if res.ToTSMs != nil {
+		resp["to_ts_ms"] = *res.ToTSMs
 	}
 	writeJSON(w, http.StatusOK, resp)
 }

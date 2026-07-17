@@ -134,6 +134,22 @@ export interface MessagesPage {
   next_cursor?: string;
 }
 
+export interface MessageCountPartition {
+  partition: number;
+  from_offset: number;
+  to_offset: number;
+  approx_count: number;
+}
+
+export interface MessageCountResponse {
+  cluster: string;
+  topic: string;
+  from_ts_ms?: number;
+  to_ts_ms?: number;
+  total_approx_count: number;
+  partitions: MessageCountPartition[];
+}
+
 async function getJSON<T>(path: string): Promise<T> {
   const res = await apiFetch(path, { headers: { Accept: "application/json" } });
   if (!res.ok) {
@@ -249,6 +265,24 @@ export async function fetchMessages(
   return await getJSONForCluster<MessagesPage>(
     cluster,
     clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/messages${q ? "?" + q : ""}`),
+  );
+}
+
+export async function fetchMessageCount(
+  cluster: string,
+  topic: string,
+  params: Pick<ConsumeParams, "partition" | "from_ts_ms" | "to_ts_ms"> = {},
+): Promise<MessageCountResponse> {
+  const qs = new URLSearchParams();
+  if (params.partition !== undefined && params.partition >= 0)
+    qs.set("partition", String(params.partition));
+  if (params.from_ts_ms !== undefined)
+    qs.set("from_ts_ms", String(params.from_ts_ms));
+  if (params.to_ts_ms !== undefined) qs.set("to_ts_ms", String(params.to_ts_ms));
+  const q = qs.toString();
+  return await getJSONForCluster<MessageCountResponse>(
+    cluster,
+    clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/messages/count${q ? "?" + q : ""}`),
   );
 }
 
