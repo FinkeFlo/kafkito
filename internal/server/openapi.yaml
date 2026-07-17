@@ -278,10 +278,10 @@ paths:
   /api/v1/clusters/{cluster}/topics/{topic}/messages/timeline:
     get:
       tags: [topics]
-      summary: Bucketed message volume over a time range for a topic.
+      summary: Time-sliced message volume over a time range for a topic.
       description: |
-        Resolves the selected timestamp window into fixed-width buckets and
-        returns an approximate message count per bucket, without consuming
+        Resolves the selected timestamp window into fixed-width time slots and
+        returns an approximate message count per slot, without consuming
         any records. Used by the Timeline view to render a daily/hourly
         message-volume trend.
       parameters:
@@ -302,10 +302,10 @@ paths:
           schema: { type: integer, format: int64 }
           description: Exclusive upper timestamp bound in Unix milliseconds.
         - in: query
-          name: bucket_ms
+          name: slot_ms
           required: true
           schema: { type: integer, format: int64 }
-          description: Bucket width in milliseconds (e.g. 3600000 for hourly, 86400000 for daily).
+          description: Time-slot width in milliseconds (e.g. 3600000 for hourly, 86400000 for daily).
       responses:
         "200":
           description: OK
@@ -313,7 +313,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/MessageTimelineResponse" }
         "400":
-          description: Bad request (invalid range/bucket or too many buckets).
+          description: Bad request (invalid range/slot or too many slots).
         "404":
           description: Unknown cluster.
         "403":
@@ -731,11 +731,11 @@ components:
         topic: { type: string }
         from_ts_ms: { type: integer, format: int64 }
         to_ts_ms: { type: integer, format: int64 }
-        bucket_ms: { type: integer, format: int64 }
-        buckets:
+        slot_ms: { type: integer, format: int64 }
+        slots:
           type: array
-          items: { $ref: "#/components/schemas/MessageTimelineBucket" }
-    MessageTimelineBucket:
+          items: { $ref: "#/components/schemas/MessageTimelineSlot" }
+    MessageTimelineSlot:
       type: object
       properties:
         from_ts_ms: { type: integer, format: int64 }

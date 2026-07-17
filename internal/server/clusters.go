@@ -328,15 +328,15 @@ func (a *clusterAPI) countMessages(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// messageTimeline resolves the selected range into fixed-width buckets and
-// returns the approximate number of messages produced inside each bucket.
+// messageTimeline resolves the selected range into fixed-width time slots and
+// returns the approximate number of messages produced inside each slot.
 //
 // Query params:
 //
 //	partition:  int32 or -1 for all (default: -1)
 //	from_ts_ms: UNIX millis lower bound (required)
 //	to_ts_ms:   UNIX millis upper bound, exclusive (required)
-//	bucket_ms:  bucket width in milliseconds (required)
+//	slot_ms:    time-slot width in milliseconds (required)
 func (a *clusterAPI) messageTimeline(w http.ResponseWriter, r *http.Request) {
 	cluster := chi.URLParam(r, "cluster")
 	topic := chi.URLParam(r, "topic")
@@ -364,8 +364,8 @@ func (a *clusterAPI) messageTimeline(w http.ResponseWriter, r *http.Request) {
 		"topic":      topic,
 		"from_ts_ms": res.FromTSMs,
 		"to_ts_ms":   res.ToTSMs,
-		"bucket_ms":  res.BucketMs,
-		"buckets":    res.Buckets,
+		"slot_ms":    res.SlotMs,
+		"slots":      res.Slots,
 	})
 }
 

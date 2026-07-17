@@ -286,7 +286,7 @@ export async function fetchMessageCount(
   );
 }
 
-export interface MessageTimelineBucket {
+export interface MessageTimelineSlot {
   from_ts_ms: number;
   to_ts_ms: number;
   approx_count: number;
@@ -297,21 +297,21 @@ export interface MessageTimelineResponse {
   topic: string;
   from_ts_ms: number;
   to_ts_ms: number;
-  bucket_ms: number;
-  buckets: MessageTimelineBucket[];
+  slot_ms: number;
+  slots: MessageTimelineSlot[];
 }
 
 export async function fetchMessageTimeline(
   cluster: string,
   topic: string,
-  params: { partition?: number; from_ts_ms: number; to_ts_ms: number; bucket_ms: number },
+  params: { partition?: number; from_ts_ms: number; to_ts_ms: number; slot_ms: number },
 ): Promise<MessageTimelineResponse> {
   const qs = new URLSearchParams();
   if (params.partition !== undefined && params.partition >= 0)
     qs.set("partition", String(params.partition));
   qs.set("from_ts_ms", String(params.from_ts_ms));
   qs.set("to_ts_ms", String(params.to_ts_ms));
-  qs.set("bucket_ms", String(params.bucket_ms));
+  qs.set("slot_ms", String(params.slot_ms));
   return await getJSONForCluster<MessageTimelineResponse>(
     cluster,
     clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/messages/timeline?${qs.toString()}`),

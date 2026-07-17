@@ -26,30 +26,24 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.1.1",
-    date: "2026-07-17",
-    items: [
-      {
-        type: "feature",
-        title: "New Timeline tab: message volume over time",
-        description:
-          "Every topic now has a Timeline tab showing an approximate message count per bucket (hourly or daily) for the last 24 hours, 7 days, or 30 days — a quick way to spot trends, spikes, or quiet periods without picking a custom range. For fully custom time ranges, the range picker on the Messages tab is still the way to go.",
-        screenshot: {
-          src: "/whats-new/1.1.1-timeline.png",
-          alt: "Timeline tab showing a bar chart of message counts per day over the last 30 days",
-        },
-      },
-    ],
-  },
-  {
-    version: "1.1.0",
+    version: "1.1.2",
     date: "2026-07-17",
     items: [
       {
         type: "feature",
         title: "Preview how many messages a range holds before loading",
         description:
-          "The Messages view now shows an approximate message count for the range you've selected (time or offset), so you know roughly how much you're about to page through. Open the optional per-partition breakdown to see how those messages are spread across partitions, and keep using \"load more\" to walk through the range.",
+          "The Messages view now shows an estimated message count for the range you've selected (time or offset), so you know how much you're about to page through. Open the optional per-partition breakdown to see how those messages are spread across partitions, and keep using \"load more\" to walk through the range.",
+      },
+      {
+        type: "feature",
+        title: "New Timeline tab: message volume over time",
+        description:
+          "Every topic now has a Timeline tab showing an estimated message count per time slot (hourly or daily) for the last 24 hours, 7 days, or 30 days — a quick way to spot trends, spikes, or quiet periods without picking a custom range. For fully custom time ranges, the range picker on the Messages tab is still the way to go.",
+        screenshot: {
+          src: "/whats-new/1.1.1-timeline.png",
+          alt: "Timeline tab showing a bar chart of message counts per day over the last 30 days",
+        },
       },
     ],
   },

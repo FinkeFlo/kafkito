@@ -12,7 +12,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kadm"
 )
 
-func TestMessageTimelineWithAdmin_BucketsSinglePartition(t *testing.T) {
+func TestMessageTimelineWithAdmin_SlotsSinglePartition(t *testing.T) {
 	t.Parallel()
 
 	adm := &fakeMessageCountAdmin{
@@ -24,7 +24,7 @@ func TestMessageTimelineWithAdmin_BucketsSinglePartition(t *testing.T) {
 			"orders": {0: {Topic: "orders", Partition: 0, Offset: 1000}},
 		},
 		offsetsAfterMS: map[int64]kadm.ListedOffsets{
-			// 3 buckets of width 100, edges at 0,100,200,300.
+			// 3 slots of width 100, edges at 0,100,200,300.
 			0:   {"orders": {0: {Topic: "orders", Partition: 0, Offset: 0}}},
 			100: {"orders": {0: {Topic: "orders", Partition: 0, Offset: 40}}},
 			200: {"orders": {0: {Topic: "orders", Partition: 0, Offset: 90}}},
@@ -36,18 +36,18 @@ func TestMessageTimelineWithAdmin_BucketsSinglePartition(t *testing.T) {
 		Partition: -1,
 		FromTSMs:  0,
 		ToTSMs:    300,
-		BucketMs:  100,
+		SlotMs:    100,
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), got.FromTSMs)
 	assert.Equal(t, int64(300), got.ToTSMs)
-	assert.Equal(t, int64(100), got.BucketMs)
-	assert.Equal(t, []TimelineBucket{
+	assert.Equal(t, int64(100), got.SlotMs)
+	assert.Equal(t, []TimelineSlot{
 		{FromTSMs: 0, ToTSMs: 100, ApproxCount: 40},
 		{FromTSMs: 100, ToTSMs: 200, ApproxCount: 50},
 		{FromTSMs: 200, ToTSMs: 300, ApproxCount: 0},
-	}, got.Buckets)
+	}, got.Slots)
 }
 
 func TestMessageTimelineWithAdmin_SumsAcrossPartitions(t *testing.T) {
@@ -83,20 +83,20 @@ func TestMessageTimelineWithAdmin_SumsAcrossPartitions(t *testing.T) {
 		Partition: -1,
 		FromTSMs:  0,
 		ToTSMs:    100,
-		BucketMs:  100,
+		SlotMs:    100,
 	})
 
 	require.NoError(t, err)
-	require.Len(t, got.Buckets, 1)
-	assert.Equal(t, int64(30), got.Buckets[0].ApproxCount)
+	require.Len(t, got.Slots, 1)
+	assert.Equal(t, int64(30), got.Slots[0].ApproxCount)
 }
 
 func TestMessageTimelineWithAdmin_MissingEdgeOffsetFallsBackToEndOffset(t *testing.T) {
 	t.Parallel()
 
 	// ts=200 is past the high-watermark, so ListOffsetsAfterMilli returns no
-	// entry for that partition; the bucket should fall back to the end
-	// offset (nothing produced after the last bucket).
+	// entry for that partition; the slot should fall back to the end
+	// offset (nothing produced after the last slot).
 	adm := &fakeMessageCountAdmin{
 		md: testTopicMetadata("orders", 0),
 		starts: kadm.ListedOffsets{
@@ -116,13 +116,13 @@ func TestMessageTimelineWithAdmin_MissingEdgeOffsetFallsBackToEndOffset(t *testi
 		Partition: -1,
 		FromTSMs:  0,
 		ToTSMs:    200,
-		BucketMs:  100,
+		SlotMs:    100,
 	})
 
 	require.NoError(t, err)
-	require.Len(t, got.Buckets, 2)
-	assert.Equal(t, int64(50), got.Buckets[0].ApproxCount)
-	assert.Equal(t, int64(0), got.Buckets[1].ApproxCount)
+	require.Len(t, got.Slots, 2)
+	assert.Equal(t, int64(50), got.Slots[0].ApproxCount)
+	assert.Equal(t, int64(0), got.Slots[1].ApproxCount)
 }
 
 func TestMessageTimelineWithAdmin_RejectsInvalidRange(t *testing.T) {
@@ -133,21 +133,21 @@ func TestMessageTimelineWithAdmin_RejectsInvalidRange(t *testing.T) {
 	_, err := messageTimelineWithAdmin(context.Background(), adm, "c1", "orders", MessageTimelineOptions{
 		FromTSMs: 100,
 		ToTSMs:   50,
-		BucketMs: 10,
+		SlotMs:   10,
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid time range")
 }
 
-func TestMessageTimelineWithAdmin_RejectsTooManyBuckets(t *testing.T) {
+func TestMessageTimelineWithAdmin_RejectsTooManySlots(t *testing.T) {
 	t.Parallel()
 
 	adm := &fakeMessageCountAdmin{md: testTopicMetadata("orders", 0)}
 
 	_, err := messageTimelineWithAdmin(context.Background(), adm, "c1", "orders", MessageTimelineOptions{
 		FromTSMs: 0,
-		ToTSMs:   int64(MaxTimelineBuckets+1) * 10,
-		BucketMs: 10,
+		ToTSMs:   int64(MaxTimelineSlots+1) * 10,
+		SlotMs:   10,
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exceeding the limit")
@@ -162,7 +162,7 @@ func TestMessageTimelineWithAdmin_RequestedPartitionMustExist(t *testing.T) {
 		Partition: 3,
 		FromTSMs:  0,
 		ToTSMs:    100,
-		BucketMs:  10,
+		SlotMs:    10,
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "partition 3 not found")

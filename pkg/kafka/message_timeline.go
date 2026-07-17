@@ -10,13 +10,13 @@ import (
 	"time"
 )
 
-// MaxTimelineBuckets caps the number of buckets returned by MessageTimeline
+// MaxTimelineSlots caps the number of time slots returned by MessageTimeline
 // to bound the number of admin round-trips (one ListOffsetsAfterMilli call
-// per bucket edge).
-const MaxTimelineBuckets = 400
+// per time-slot edge).
+const MaxTimelineSlots = 400
 
-// TimelineBucket is the approximate message count for one time bucket.
-type TimelineBucket struct {
+// TimelineSlot is the approximate message count for one time slot.
+type TimelineSlot struct {
 	FromTSMs    int64 `json:"from_ts_ms"`
 	ToTSMs      int64 `json:"to_ts_ms"`
 	ApproxCount int64 `json:"approx_count"`
@@ -27,23 +27,23 @@ type MessageTimelineOptions struct {
 	Partition int32         // -1 = all partitions
 	FromTSMs  int64         // required, inclusive lower bound
 	ToTSMs    int64         // required, exclusive upper bound
-	BucketMs  int64         // required, bucket width in milliseconds
+	SlotMs    int64         // required, slot width in milliseconds
 	Timeout   time.Duration // admin-call budget
 }
 
-// MessageTimelineResult is the bucketed message-count series returned by
+// MessageTimelineResult is the time-sliced message-count series returned by
 // MessageTimeline.
 type MessageTimelineResult struct {
-	FromTSMs int64            `json:"from_ts_ms"`
-	ToTSMs   int64            `json:"to_ts_ms"`
-	BucketMs int64            `json:"bucket_ms"`
-	Buckets  []TimelineBucket `json:"buckets"`
+	FromTSMs int64          `json:"from_ts_ms"`
+	ToTSMs   int64          `json:"to_ts_ms"`
+	SlotMs   int64          `json:"slot_ms"`
+	Slots    []TimelineSlot `json:"slots"`
 }
 
-// MessageTimeline resolves a time range into fixed-width buckets and returns
-// the approximate number of messages produced inside each bucket, without
+// MessageTimeline resolves a time range into fixed-width time slots and returns
+// the approximate number of messages produced inside each slot, without
 // consuming any records. It works like CountMessages but samples offsets at
-// every bucket edge instead of just the two range bounds.
+// every time-slot edge instead of just the two range bounds.
 func (r *Registry) MessageTimeline(ctx context.Context, cluster, topic string, opts MessageTimelineOptions) (*MessageTimelineResult, error) {
 	adm, err := r.Admin(cluster)
 	if err != nil {
@@ -61,16 +61,16 @@ func messageTimelineWithAdmin(
 	if opts.FromTSMs < 0 || opts.ToTSMs <= 0 || opts.ToTSMs <= opts.FromTSMs {
 		return nil, fmt.Errorf("invalid time range: from_ts_ms must be non-negative and less than to_ts_ms")
 	}
-	if opts.BucketMs <= 0 {
-		return nil, fmt.Errorf("bucket_ms must be greater than 0")
+	if opts.SlotMs <= 0 {
+		return nil, fmt.Errorf("slot_ms must be greater than 0")
 	}
 
-	numBuckets := int((opts.ToTSMs - opts.FromTSMs + opts.BucketMs - 1) / opts.BucketMs)
-	if numBuckets < 1 {
-		numBuckets = 1
+	numSlots := int((opts.ToTSMs - opts.FromTSMs + opts.SlotMs - 1) / opts.SlotMs)
+	if numSlots < 1 {
+		numSlots = 1
 	}
-	if numBuckets > MaxTimelineBuckets {
-		return nil, fmt.Errorf("requested range/bucket combination yields %d buckets, exceeding the limit of %d; choose a wider bucket or a narrower range", numBuckets, MaxTimelineBuckets)
+	if numSlots > MaxTimelineSlots {
+		return nil, fmt.Errorf("requested range/slot combination yields %d slots, exceeding the limit of %d; choose a wider slot or a narrower range", numSlots, MaxTimelineSlots)
 	}
 
 	if opts.Timeout <= 0 {
@@ -122,9 +122,9 @@ func messageTimelineWithAdmin(
 		}
 	}
 
-	edges := make([]int64, numBuckets+1)
-	for i := 0; i <= numBuckets; i++ {
-		ts := opts.FromTSMs + int64(i)*opts.BucketMs
+	edges := make([]int64, numSlots+1)
+	for i := 0; i <= numSlots; i++ {
+		ts := opts.FromTSMs + int64(i)*opts.SlotMs
 		if ts > opts.ToTSMs {
 			ts = opts.ToTSMs
 		}
@@ -156,10 +156,10 @@ func messageTimelineWithAdmin(
 	out := &MessageTimelineResult{
 		FromTSMs: opts.FromTSMs,
 		ToTSMs:   opts.ToTSMs,
-		BucketMs: opts.BucketMs,
-		Buckets:  make([]TimelineBucket, 0, numBuckets),
+		SlotMs:   opts.SlotMs,
+		Slots:    make([]TimelineSlot, 0, numSlots),
 	}
-	for i := 0; i < numBuckets; i++ {
+	for i := 0; i < numSlots; i++ {
 		var total int64
 		for _, p := range parts {
 			delta := offsetAt[i+1][p] - offsetAt[i][p]
@@ -167,7 +167,7 @@ func messageTimelineWithAdmin(
 				total += delta
 			}
 		}
-		out.Buckets = append(out.Buckets, TimelineBucket{
+		out.Slots = append(out.Slots, TimelineSlot{
 			FromTSMs:    edges[i],
 			ToTSMs:      edges[i+1],
 			ApproxCount: total,

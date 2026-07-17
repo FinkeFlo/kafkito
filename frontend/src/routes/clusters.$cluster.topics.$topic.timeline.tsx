@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchMessageTimeline, fetchTopicDetail, type MessageTimelineBucket } from "@/lib/api";
+import { fetchMessageTimeline, fetchTopicDetail, type MessageTimelineSlot } from "@/lib/api";
 import { useFormatters } from "@/lib/use-formatters";
 import { Timestamp } from "@/components/timestamp";
 import { useTimeZone } from "@/lib/use-timezone";
@@ -23,8 +23,8 @@ function presetToMs(preset: Preset): number {
   }
 }
 
-/** 24h range buckets by hour, everything else buckets by day. */
-function presetToBucketMs(preset: Preset): number {
+/** 24h range slots by hour, everything else slots by day. */
+function presetToSlotMs(preset: Preset): number {
   return preset === "24h" ? HOUR_MS : DAY_MS;
 }
 
@@ -53,11 +53,11 @@ function TopicTimelinePage() {
 
   const range = useMemo(() => {
     const to_ts_ms = Date.now();
-    const bucket_ms = presetToBucketMs(preset);
+    const slot_ms = presetToSlotMs(preset);
     return {
       from_ts_ms: to_ts_ms - presetToMs(preset),
       to_ts_ms,
-      bucket_ms,
+      slot_ms,
     };
   }, [preset]);
 
@@ -75,15 +75,15 @@ function TopicTimelinePage() {
         partition,
         from_ts_ms: range.from_ts_ms,
         to_ts_ms: range.to_ts_ms,
-        bucket_ms: range.bucket_ms,
+        slot_ms: range.slot_ms,
       }),
     enabled: !!cluster,
     staleTime: 10_000,
   });
 
-  const buckets = timelineQuery.data?.buckets ?? [];
-  const total = buckets.reduce((sum, b) => sum + b.approx_count, 0);
-  const max = Math.max(1, ...buckets.map((b) => b.approx_count));
+  const slots = timelineQuery.data?.slots ?? [];
+  const total = slots.reduce((sum, b) => sum + b.approx_count, 0);
+  const max = Math.max(1, ...slots.map((b) => b.approx_count));
 
   return (
     <div className="space-y-4">
@@ -101,7 +101,7 @@ function TopicTimelinePage() {
                     setSelected(null);
                   }}
                   aria-pressed={preset === p.key}
-                  title={`Buckets: ${p.key === "24h" ? "hourly" : "daily"}`}
+                  title={`Time slots: ${p.key === "24h" ? "hourly" : "daily"}`}
                   className={`px-2 py-1 text-xs ${i > 0 ? "border-l border-[var(--color-border)]" : ""} ${
                     preset === p.key
                       ? "bg-accent-subtle text-accent"
@@ -157,14 +157,14 @@ function TopicTimelinePage() {
               Loading timeline…
             </div>
           )}
-          {!timelineQuery.isLoading && buckets.length === 0 && !timelineQuery.isError && (
+          {!timelineQuery.isLoading && slots.length === 0 && !timelineQuery.isError && (
             <div className="py-8 text-center text-sm text-[var(--color-text-muted)]">
               No data in the selected range.
             </div>
           )}
-          {buckets.length > 0 && (
+          {slots.length > 0 && (
             <TimelineBarChart
-              buckets={buckets}
+              slots={slots}
               max={max}
               selected={selected}
               onSelect={setSelected}
@@ -173,9 +173,9 @@ function TopicTimelinePage() {
           )}
         </div>
 
-        {buckets.length > 0 && (
+        {slots.length > 0 && (
           <TimelineDetailTable
-            buckets={buckets}
+            slots={slots}
             highlighted={selected}
             onSelect={setSelected}
           />
@@ -185,7 +185,7 @@ function TopicTimelinePage() {
   );
 }
 
-function bucketLabel(b: MessageTimelineBucket, preset: Preset, zone: "utc" | "local"): string {
+function slotLabel(b: MessageTimelineSlot, preset: Preset, zone: "utc" | "local"): string {
   const d = new Date(b.from_ts_ms);
   if (preset === "24h") {
     return zone === "utc"
@@ -199,13 +199,13 @@ function bucketLabel(b: MessageTimelineBucket, preset: Preset, zone: "utc" | "lo
 }
 
 function TimelineBarChart({
-  buckets,
+  slots,
   max,
   selected,
   onSelect,
   preset,
 }: {
-  buckets: MessageTimelineBucket[];
+  slots: MessageTimelineSlot[];
   max: number;
   selected: number | null;
   onSelect: (i: number | null) => void;
@@ -232,11 +232,11 @@ function TimelineBarChart({
   const chartH = 140;
   const barGap = 2;
   const available = containerWidth || 600;
-  const barW = Math.max(2, available / buckets.length - barGap);
-  const chartW = Math.max(available, buckets.length * (barW + barGap));
+  const barW = Math.max(2, available / slots.length - barGap);
+  const chartW = Math.max(available, slots.length * (barW + barGap));
   // Show at most ~10 x-axis labels; skip the rest to avoid overlap on
-  // ranges with many buckets (e.g. 30 daily buckets).
-  const labelStep = Math.max(1, Math.ceil(buckets.length / 15));
+  // ranges with many slots (e.g. 30 daily slots).
+  const labelStep = Math.max(1, Math.ceil(slots.length / 15));
 
   return (
     <div ref={containerRef} className="relative w-full overflow-x-auto">
@@ -244,9 +244,9 @@ function TimelineBarChart({
         width={chartW}
         height={chartH + 26}
         role="img"
-        aria-label="Message count per bucket"
+        aria-label="Message count per time slot"
       >
-        {buckets.map((b, i) => {
+        {slots.map((b, i) => {
           const h = Math.round((b.approx_count / max) * (chartH - 8));
           const x = i * (barW + barGap);
           const y = chartH - h;
@@ -278,7 +278,7 @@ function TimelineBarChart({
                   fontSize={9}
                   fill="var(--color-text-muted)"
                 >
-                  {bucketLabel(b, preset, zone).slice(-5)}
+                  {slotLabel(b, preset, zone).slice(-5)}
                 </text>
               )}
             </g>
@@ -287,14 +287,14 @@ function TimelineBarChart({
       </svg>
       {hovered !== null &&
         (() => {
-          const b = buckets[hovered];
+          const b = slots[hovered];
           const x = hovered * (barW + barGap) + barW / 2;
           return (
             <div
               className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1 text-xs text-[var(--color-text)] shadow-md"
               style={{ left: x, top: chartH / 2 }}
             >
-              <div className="font-medium">{bucketLabel(b, preset, zone)}</div>
+              <div className="font-medium">{slotLabel(b, preset, zone)}</div>
               <div className="text-[var(--color-text-muted)]">
                 {fmt.number(b.approx_count)} messages
               </div>
@@ -306,11 +306,11 @@ function TimelineBarChart({
 }
 
 function TimelineDetailTable({
-  buckets,
+  slots,
   highlighted,
   onSelect,
 }: {
-  buckets: MessageTimelineBucket[];
+  slots: MessageTimelineSlot[];
   highlighted: number | null;
   onSelect: (i: number | null) => void;
 }) {
@@ -329,7 +329,7 @@ function TimelineDetailTable({
             </tr>
           </thead>
           <tbody>
-            {buckets.map((b, i) => (
+            {slots.map((b, i) => (
               <tr
                 key={b.from_ts_ms}
                 onClick={() => onSelect(highlighted === i ? null : i)}

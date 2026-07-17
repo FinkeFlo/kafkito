@@ -21,7 +21,7 @@ func TestMessageTimeline_RouteIsRegistered_AndReturnsJSON(t *testing.T) {
 	t.Parallel()
 
 	h := newSampleTestHandler(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/test/topics/orders/messages/timeline?from_ts_ms=1000&to_ts_ms=2000&bucket_ms=500", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/test/topics/orders/messages/timeline?from_ts_ms=1000&to_ts_ms=2000&slot_ms=500", nil)
 	rec := httptest.NewRecorder()
 
 	h.ServeHTTP(rec, req)
@@ -43,7 +43,7 @@ func TestMessageTimeline_ReturnsNotFound_WhenClusterMissing(t *testing.T) {
 		Registry: reg,
 		Config:   config.Config{},
 	})
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/does-not-exist/topics/orders/messages/timeline?from_ts_ms=1000&to_ts_ms=2000&bucket_ms=500", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/does-not-exist/topics/orders/messages/timeline?from_ts_ms=1000&to_ts_ms=2000&slot_ms=500", nil)
 	rec := httptest.NewRecorder()
 
 	h.ServeHTTP(rec, req)
@@ -67,7 +67,7 @@ func TestMessageTimeline_ReturnsBadRequest_WhenPartitionIsNonNumeric(t *testing.
 	t.Parallel()
 
 	h := newSampleTestHandler(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/test/topics/orders/messages/timeline?partition=abc&from_ts_ms=1000&to_ts_ms=2000&bucket_ms=500", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/test/topics/orders/messages/timeline?partition=abc&from_ts_ms=1000&to_ts_ms=2000&slot_ms=500", nil)
 	rec := httptest.NewRecorder()
 
 	h.ServeHTTP(rec, req)
@@ -75,11 +75,11 @@ func TestMessageTimeline_ReturnsBadRequest_WhenPartitionIsNonNumeric(t *testing.
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
-func TestMessageTimeline_ReturnsBadRequest_WhenTooManyBuckets(t *testing.T) {
+func TestMessageTimeline_ReturnsBadRequest_WhenTooManySlots(t *testing.T) {
 	t.Parallel()
 
 	h := newSampleTestHandler(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/test/topics/orders/messages/timeline?from_ts_ms=0&to_ts_ms=100000&bucket_ms=1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/test/topics/orders/messages/timeline?from_ts_ms=0&to_ts_ms=100000&slot_ms=1", nil)
 	rec := httptest.NewRecorder()
 
 	h.ServeHTTP(rec, req)

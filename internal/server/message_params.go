@@ -217,19 +217,19 @@ func parseTimelineQuery(q url.Values) (kafkapkg.MessageTimelineOptions, error) {
 	opts.FromTSMs = from
 	opts.ToTSMs = to
 
-	bucketRaw := q.Get("bucket_ms")
-	if bucketRaw == "" {
-		return opts, badParam("bucket_ms is required")
+	slotRaw := q.Get("slot_ms")
+	if slotRaw == "" {
+		return opts, badParam("slot_ms is required")
 	}
-	bucket, err := strconv.ParseInt(bucketRaw, 10, 64)
-	if err != nil || bucket <= 0 {
-		return opts, badParam("invalid bucket_ms")
+	slot, err := strconv.ParseInt(slotRaw, 10, 64)
+	if err != nil || slot <= 0 {
+		return opts, badParam("invalid slot_ms")
 	}
-	opts.BucketMs = bucket
+	opts.SlotMs = slot
 
-	numBuckets := (to - from + bucket - 1) / bucket
-	if numBuckets > kafkapkg.MaxTimelineBuckets {
-		return opts, badParam(fmt.Sprintf("range/bucket combination yields %d buckets, exceeding the limit of %d", numBuckets, kafkapkg.MaxTimelineBuckets))
+	numSlots := (to - from + slot - 1) / slot
+	if numSlots > kafkapkg.MaxTimelineSlots {
+		return opts, badParam(fmt.Sprintf("range/slot combination yields %d slots, exceeding the limit of %d", numSlots, kafkapkg.MaxTimelineSlots))
 	}
 
 	return opts, nil
