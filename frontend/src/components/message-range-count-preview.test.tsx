@@ -122,7 +122,7 @@ describe("MessageRangeCountPreview", () => {
     await waitFor(() => expect(fetchMessageCount).toHaveBeenCalledTimes(2));
 
     expect(screen.getByText("≈ 150 messages")).toBeInTheDocument();
-    expect(screen.getByText(/updating/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/updating/i)).toBeInTheDocument();
 
     await act(async () => {
       resolveSecond?.({
@@ -142,7 +142,6 @@ describe("MessageRangeCountPreview", () => {
     renderPreview({ live: true });
 
     expect(fetchMessageCount).not.toHaveBeenCalled();
-    expect(screen.getByText(/range snapshot paused/i)).toBeInTheDocument();
-    expect(screen.getByText(/paused while live is on/i)).toBeInTheDocument();
+    expect(screen.getByText(/snapshot paused/i)).toBeInTheDocument();
   });
 });

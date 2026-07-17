@@ -21,6 +21,18 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.1.0",
+    date: "2026-07-17",
+    items: [
+      {
+        type: "feature",
+        title: "Preview how many messages a range holds before loading",
+        description:
+          "The Messages view now shows an approximate message count for the range you've selected (time or offset), so you know roughly how much you're about to page through. Open the optional per-partition breakdown to see how those messages are spread across partitions, and keep using \"load more\" to walk through the range.",
+      },
+    ],
+  },
+  {
     version: "1.0.1",
     date: "2026-07-09",
     items: [
