@@ -4,6 +4,7 @@
 package kafka
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,6 +16,16 @@ func backwardPageOffsets(w pageWindow) []Message {
 		page = append(page, Message{Partition: 0, Offset: off})
 	}
 	return page
+}
+
+// collectedByPartition groups a slice of messages by partition, mirroring the
+// pre-truncation `collected` map that ConsumeMessages passes to buildNextCursor.
+func collectedByPartition(msgs []Message) map[int32][]Message {
+	out := make(map[int32][]Message)
+	for _, m := range msgs {
+		out[m.Partition] = append(out[m.Partition], m)
+	}
+	return out
 }
 
 // TestBuildWindowsFromEndTimeBounds verifies that a from=end browse honors
@@ -141,7 +152,7 @@ func TestBuildNextCursorBackwardUsesQueryLowerBound(t *testing.T) {
 			0: {begin: 100, stop: 200, trueBegin: 100},
 		}
 		page := []Message{{Partition: 0, Offset: 100}, {Partition: 0, Offset: 150}}
-		cursor, hasMore := buildNextCursor(CursorBackward, windows, page)
+		cursor, hasMore := buildNextCursor(CursorBackward, windows, page, collectedByPartition(page), nil)
 		require.False(t, hasMore)
 		require.Nil(t, cursor)
 	})
@@ -151,7 +162,7 @@ func TestBuildNextCursorBackwardUsesQueryLowerBound(t *testing.T) {
 			0: {begin: 100, stop: 200, trueBegin: 0},
 		}
 		page := []Message{{Partition: 0, Offset: 100}, {Partition: 0, Offset: 150}}
-		cursor, hasMore := buildNextCursor(CursorBackward, windows, page)
+		cursor, hasMore := buildNextCursor(CursorBackward, windows, page, collectedByPartition(page), nil)
 		require.True(t, hasMore)
 		require.NotNil(t, cursor)
 		require.Equal(t, int64(100), cursor.Partitions[0])
@@ -169,7 +180,7 @@ func TestBuildNextCursorForwardWithClampedWindow(t *testing.T) {
 			0: {begin: 100, stop: 200, trueBegin: 100},
 		}
 		page := []Message{{Partition: 0, Offset: 199}}
-		cursor, hasMore := buildNextCursor(CursorForward, windows, page)
+		cursor, hasMore := buildNextCursor(CursorForward, windows, page, nil, nil)
 		require.False(t, hasMore)
 		require.Nil(t, cursor)
 	})
@@ -179,7 +190,7 @@ func TestBuildNextCursorForwardWithClampedWindow(t *testing.T) {
 			0: {begin: 100, stop: 500, trueBegin: 100},
 		}
 		page := []Message{{Partition: 0, Offset: 150}}
-		cursor, hasMore := buildNextCursor(CursorForward, windows, page)
+		cursor, hasMore := buildNextCursor(CursorForward, windows, page, nil, nil)
 		require.True(t, hasMore)
 		require.NotNil(t, cursor)
 		require.Equal(t, int64(151), cursor.Partitions[0])
@@ -209,7 +220,7 @@ func TestBuildWindowsFromEndPaginatesToTrueStart(t *testing.T) {
 			seen = append(seen, m.Offset)
 		}
 
-		cursor, hasMore := buildNextCursor(CursorBackward, windows, page)
+		cursor, hasMore := buildNextCursor(CursorBackward, windows, page, collectedByPartition(page), nil)
 		if !hasMore {
 			require.Nil(t, cursor)
 			break
@@ -219,4 +230,78 @@ func TestBuildWindowsFromEndPaginatesToTrueStart(t *testing.T) {
 	}
 
 	require.Equal(t, []int64{9, 8, 7, 6, 5, 4, 3, 2, 1, 0}, seen)
+}
+
+// TestBuildNextCursorBackwardMultiPartitionNoLoss reproduces the from=end,
+// partition=-1 "load more" data-loss case: when one partition's records are
+// all dropped by the per-page limit truncation (because a busier partition
+// carries newer timestamps), the older partition must keep its window boundary
+// so a later page still fetches it, instead of skipping the dropped window.
+func TestBuildNextCursorBackwardMultiPartitionNoLoss(t *testing.T) {
+	t.Parallel()
+
+	parts := []int32{0, 1}
+	startMap := map[int32]int64{0: 0, 1: 0}
+	endMap := map[int32]int64{0: 10, 1: 10}
+
+	// Partition 0 carries newer timestamps than partition 1, so early pages
+	// fill entirely from partition 0 and truncate partition 1 away.
+	ts := func(p int32, off int64) int64 {
+		if p == 0 {
+			return 100_000 + off
+		}
+		return off
+	}
+
+	opts := ConsumeOptions{From: FromEnd, Limit: 3}
+	seen := map[int32]map[int64]int{0: {}, 1: {}}
+
+	for page := 0; page < 100; page++ {
+		windows, err := buildWindows(parts, opts, startMap, endMap, nil, nil)
+		require.NoError(t, err)
+		if len(windows) == 0 {
+			break
+		}
+
+		// Simulate the fetch/merge/truncate pipeline of ConsumeMessages.
+		collected := make(map[int32][]Message, len(windows))
+		var merged []Message
+		for p, w := range windows {
+			for off := w.begin; off < w.stop; off++ {
+				m := Message{Partition: p, Offset: off, Timestamp: ts(p, off)}
+				collected[p] = append(collected[p], m)
+				merged = append(merged, m)
+			}
+		}
+		sort.Slice(merged, func(i, j int) bool {
+			if merged[i].Timestamp != merged[j].Timestamp {
+				return merged[i].Timestamp > merged[j].Timestamp
+			}
+			if merged[i].Partition != merged[j].Partition {
+				return merged[i].Partition < merged[j].Partition
+			}
+			return merged[i].Offset > merged[j].Offset
+		})
+		if len(merged) > opts.Limit {
+			merged = merged[:opts.Limit]
+		}
+		for _, m := range merged {
+			seen[m.Partition][m.Offset]++
+		}
+
+		cursor, hasMore := buildNextCursor(CursorBackward, windows, merged, collected, opts.CursorUpperBounds)
+		if !hasMore {
+			require.Nil(t, cursor)
+			break
+		}
+		require.NotNil(t, cursor)
+		opts.CursorUpperBounds = cursor.Partitions
+	}
+
+	for p := int32(0); p <= 1; p++ {
+		for off := startMap[p]; off < endMap[p]; off++ {
+			require.Equal(t, 1, seen[p][off],
+				"partition %d offset %d should be delivered exactly once", p, off)
+		}
+	}
 }

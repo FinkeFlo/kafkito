@@ -194,3 +194,75 @@ func TestIntegration_ConsumeMessagesFromEndPaginatesToStart(t *testing.T) {
 
 	require.Equal(t, []int64{9, 8, 7, 6, 5, 4, 3, 2, 1, 0}, seen)
 }
+
+// TestIntegration_ConsumeMessagesFromEndMultiPartitionNoLoss guards the
+// partition=-1 "load more" path against silent message loss when one partition
+// carries systematically older timestamps than another: its records get
+// dropped by the per-page limit truncation and must still be delivered on a
+// later page, exactly once, rather than skipped.
+func TestIntegration_ConsumeMessagesFromEndMultiPartitionNoLoss(t *testing.T) {
+	broker := startBroker(t)
+	reg := newRegistry(t, broker)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	topic := "it-consume-from-end-multipart"
+	require.NoError(t, reg.CreateTopic(ctx, "it", CreateTopicRequest{
+		Name:              topic,
+		Partitions:        2,
+		ReplicationFactor: 1,
+	}))
+
+	const perPartition = 10
+	produce := func(part int32, i int) {
+		p := part
+		res, err := reg.Produce(ctx, "it", topic, ProduceRequest{
+			Partition: &p,
+			Key:       fmt.Sprintf("p%d", part),
+			Value:     fmt.Sprintf("v-%d-%02d", part, i),
+		})
+		require.NoError(t, err)
+		require.Equal(t, int64(i), res.Offset)
+	}
+
+	// Partition 1 first so its records carry older timestamps; partition 0
+	// after a short gap so it dominates the newest-first truncation.
+	for i := 0; i < perPartition; i++ {
+		produce(1, i)
+	}
+	time.Sleep(50 * time.Millisecond)
+	for i := 0; i < perPartition; i++ {
+		produce(0, i)
+	}
+
+	opts := ConsumeOptions{
+		Partition: -1,
+		Limit:     3,
+		From:      FromEnd,
+		Timeout:   8 * time.Second,
+	}
+
+	seen := map[int32]map[int64]int{0: {}, 1: {}}
+	for pages := 0; pages < 200; pages++ {
+		page, err := reg.ConsumeMessages(ctx, "it", topic, opts)
+		require.NoError(t, err)
+		require.NotEmpty(t, page.Messages)
+		for _, m := range page.Messages {
+			seen[m.Partition][m.Offset]++
+		}
+		if !page.HasMore {
+			require.Nil(t, page.NextCursor)
+			break
+		}
+		require.NotNil(t, page.NextCursor)
+		opts.CursorUpperBounds = page.NextCursor.Partitions
+	}
+
+	for p := int32(0); p <= 1; p++ {
+		for off := int64(0); off < perPartition; off++ {
+			require.Equal(t, 1, seen[p][off],
+				"partition %d offset %d should be delivered exactly once", p, off)
+		}
+	}
+}
