@@ -45,6 +45,7 @@ async function sleep(ms: number) {
 
 describe("MessageRangeCountPreview", () => {
   beforeEach(() => {
+    window.localStorage.setItem("kafkito.numberFormat", "en");
     fetchMessageCount.mockReset();
   });
 
@@ -143,5 +144,21 @@ describe("MessageRangeCountPreview", () => {
 
     expect(fetchMessageCount).not.toHaveBeenCalled();
     expect(screen.getByText(/snapshot paused/i)).toBeInTheDocument();
+  });
+
+  it("honors the DE number format preference", async () => {
+    window.localStorage.setItem("kafkito.numberFormat", "de");
+    fetchMessageCount.mockResolvedValue({
+      cluster: "c1",
+      topic: "orders",
+      total_approx_count: 3504776,
+      partitions: [
+        { partition: 0, from_offset: 1000, to_offset: 3505776, approx_count: 3504776 },
+      ],
+    });
+
+    renderPreview();
+
+    expect(await screen.findByText("≈ 3.504.776 messages")).toBeInTheDocument();
   });
 });

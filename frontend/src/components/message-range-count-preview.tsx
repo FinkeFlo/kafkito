@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { fetchMessageCount } from "@/lib/api";
-import { formatNumber } from "@/lib/format";
+import { useFormatters } from "@/lib/use-formatters";
 
 export const MESSAGE_RANGE_COUNT_DEBOUNCE_MS = 400;
 
@@ -20,6 +20,7 @@ export function MessageRangeCountPreview({
   to_ts_ms?: number;
   live: boolean;
 }) {
+  const fmt = useFormatters();
   const [expanded, setExpanded] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const request = useMemo(
@@ -72,12 +73,11 @@ export function MessageRangeCountPreview({
     label = "count failed";
     labelClass = "font-semibold text-danger";
   } else if (live) {
-    label =
-      total !== null ? `≈ ${formatNumber(total)} messages` : "snapshot paused";
+    label = total !== null ? `≈ ${fmt.number(total)} messages` : "snapshot paused";
   } else if (total === null) {
     label = "≈ … messages";
   } else {
-    label = `≈ ${formatNumber(total)} messages`;
+    label = `≈ ${fmt.number(total)} messages`;
   }
 
   const tooltip = query.isError
@@ -134,13 +134,13 @@ export function MessageRangeCountPreview({
                   <tr key={row.partition}>
                     <td className="text-accent">p{row.partition}</td>
                     <td className="text-right text-muted">
-                      {formatNumber(row.from_offset)}
+                      {fmt.number(row.from_offset)}
                     </td>
                     <td className="pl-3 text-right text-muted">
-                      {formatNumber(row.to_offset)}
+                      {fmt.number(row.to_offset)}
                     </td>
                     <td className="pl-3 text-right">
-                      {formatNumber(row.approx_count)}
+                      {fmt.number(row.approx_count)}
                     </td>
                   </tr>
                 ))}

@@ -53,6 +53,14 @@ function EntryBlock({
                     {it.description}
                   </span>
                 ) : null}
+                {it.screenshot ? (
+                  <img
+                    src={it.screenshot.src}
+                    alt={it.screenshot.alt}
+                    loading="lazy"
+                    className="mt-2 max-h-44 w-auto rounded border border-border"
+                  />
+                ) : null}
               </div>
             </li>
           ))}

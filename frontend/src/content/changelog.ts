@@ -4,6 +4,11 @@ export interface ChangelogItem {
   type: ChangelogItemType;
   title: string;
   description?: string;
+  screenshot?: {
+    /** Public asset URL, e.g. "/whats-new/1.1.0-range-count.png". */
+    src: string;
+    alt: string;
+  };
 }
 
 export interface ChangelogEntry {
@@ -28,7 +33,11 @@ export const CHANGELOG: ChangelogEntry[] = [
         type: "feature",
         title: "Preview how many messages a range holds before loading",
         description:
-          "The Messages view now shows an approximate message count for the range you've selected (time or offset), so you know roughly how much you're about to page through. Open the optional per-partition breakdown to see how those messages are spread across partitions, and keep using \"load more\" to walk through the range.",
+          "The Messages toolbar now shows an approximate message count for the selected time range, so you can quickly check how many messages were sent to the topic in that period.",
+        screenshot: {
+          src: "/whats-new/1.1.0-range-count-preview.png",
+          alt: "Messages toolbar with range picker and approximate message count preview",
+        },
       },
     ],
   },

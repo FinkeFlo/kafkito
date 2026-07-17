@@ -24,6 +24,7 @@ import { JsonInteractive } from "@/components/json-interactive";
 import { Button } from "@/components/button";
 import { Timestamp } from "@/components/timestamp";
 import { MessageRangeCountPreview } from "@/components/message-range-count-preview";
+import { useFormatters } from "@/lib/use-formatters";
 
 interface MessagesSearch {
   partition: number;
@@ -152,6 +153,7 @@ function MessagesPanel({
   topic: string;
   partitions: PartitionInfo[];
 }) {
+  const fmt = useFormatters();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const { partition, limit, from, msgOffset } = search;
@@ -636,15 +638,15 @@ function MessagesPanel({
                 title={
                   offsetBounds
                     ? partition < 0
-                      ? `Seeks every partition to this offset (valid ${offsetBounds.min}–${offsetBounds.max}). Press Enter to apply.`
-                      : `Valid ${offsetBounds.min}–${offsetBounds.max}. Press Enter to apply.`
+                      ? `Seeks every partition to this offset (valid ${fmt.number(offsetBounds.min)}–${fmt.number(offsetBounds.max)}). Press Enter to apply.`
+                      : `Valid ${fmt.number(offsetBounds.min)}–${fmt.number(offsetBounds.max)}. Press Enter to apply.`
                     : "Press Enter to apply."
                 }
               />
               {offsetBounds && (
                 <span className="text-[var(--color-text-subtle)]">
                   {partition < 0 ? "all · " : ""}
-                  {offsetBounds.min}–{offsetBounds.max}
+                  {fmt.number(offsetBounds.min)}–{fmt.number(offsetBounds.max)}
                 </span>
               )}
             </>
@@ -732,10 +734,12 @@ function MessagesPanel({
           Refresh
         </button>
         <span className="text-xs text-[var(--color-text-muted)]">
-          {inSearchMode ? (searchResult?.stats.matched ?? 0) : displayMessages.length}
+          {inSearchMode
+            ? fmt.number(searchResult?.stats.matched ?? 0)
+            : fmt.number(displayMessages.length)}
           {!inSearchMode && msgsQuery.isFetching && " · fetching…"}
           {searching &&
-            ` · ${searchResult?.stats.scanned ?? 0} scanned · searching…`}
+            ` · ${fmt.number(searchResult?.stats.scanned ?? 0)} scanned · searching…`}
         </span>
       </div>
 
@@ -972,7 +976,7 @@ function MessagesPanel({
                 onChange={(e) => setStopOnLimit(e.target.checked)}
                 className="h-3.5 w-3.5"
               />
-              Stop after Limit matches ({limit})
+              Stop after Limit matches ({fmt.number(limit)})
             </label>
             <label className="flex items-center gap-1.5">
               <input
@@ -1045,15 +1049,15 @@ function MessagesPanel({
           {searchResult && (
             <div className="flex flex-wrap items-center gap-3 rounded border border-accent/30 bg-accent-subtle p-2 text-xs">
               <span className="font-semibold text-accent">
-                {searchResult.stats.matched} matches
+                {fmt.number(searchResult.stats.matched)} matches
               </span>
               <span className="text-[var(--color-text-muted)]">
-                · {searchResult.stats.scanned} scanned
+                · {fmt.number(searchResult.stats.scanned)} scanned
                 {searching && " …"}
               </span>
               {searchResult.stats.parse_errors > 0 && (
                 <span className="text-[var(--color-warning)]">
-                  · {searchResult.stats.parse_errors} parse errors skipped
+                  · {fmt.number(searchResult.stats.parse_errors)} parse errors skipped
                 </span>
               )}
               {!searching && searchStopReason === "budget" && (
@@ -1103,7 +1107,7 @@ function MessagesPanel({
 
       {displayMessages.length === 0 && searching && (
         <div className="p-8 text-center text-sm text-[var(--color-text-subtle)]">
-          Searching… {searchResult?.stats.scanned ?? 0} scanned, no match yet.
+          Searching… {fmt.number(searchResult?.stats.scanned ?? 0)} scanned, no match yet.
         </div>
       )}
 
@@ -1200,6 +1204,7 @@ function MessageRow({
     arrayLengths: number[],
   ) => void;
 }) {
+  const fmt = useFormatters();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const preview =
@@ -1245,7 +1250,7 @@ function MessageRow({
           p{m.partition}
         </span>
         <span className="rounded bg-[var(--color-surface-subtle)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--color-text-muted)]">
-          #{m.offset}
+          #{fmt.number(m.offset)}
         </span>
         <EncodingBadge enc={m.value_encoding} />
         {m.value_sr && <SRBadge meta={m.value_sr} />}
@@ -1275,7 +1280,7 @@ function MessageRow({
               empty={m.key === undefined}
             />
             <DetailSection
-              label={`headers${m.headers ? ` · ${Object.keys(m.headers).length}` : ""}`}
+              label={`headers${m.headers ? ` · ${fmt.number(Object.keys(m.headers).length)}` : ""}`}
               body={
                 m.headers && Object.keys(m.headers).length > 0
                   ? Object.entries(m.headers)
