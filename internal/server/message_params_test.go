@@ -172,6 +172,62 @@ func TestParseConsumeQuery(t *testing.T) {
 	}
 }
 
+func TestParseCountQuery(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		raw     string
+		wantErr string
+		check   func(t *testing.T, opts kafkapkg.CountMessagesOptions)
+	}{
+		{
+			name: "defaults",
+			raw:  "",
+			check: func(t *testing.T, o kafkapkg.CountMessagesOptions) {
+				assert.Equal(t, int32(-1), o.Partition)
+				assert.Zero(t, o.FromTSMs)
+				assert.Zero(t, o.ToTSMs)
+			},
+		},
+		{
+			name: "partition and bounds",
+			raw:  "partition=2&from_ts_ms=1000&to_ts_ms=2000",
+			check: func(t *testing.T, o kafkapkg.CountMessagesOptions) {
+				assert.Equal(t, int32(2), o.Partition)
+				assert.Equal(t, int64(1000), o.FromTSMs)
+				assert.Equal(t, int64(2000), o.ToTSMs)
+			},
+		},
+		{name: "invalid partition", raw: "partition=abc", wantErr: "invalid partition"},
+		{name: "negative from_ts_ms", raw: "from_ts_ms=-1", wantErr: "invalid from_ts_ms"},
+		{name: "negative to_ts_ms", raw: "to_ts_ms=-2", wantErr: "invalid to_ts_ms"},
+		{name: "to before from", raw: "from_ts_ms=2000&to_ts_ms=1000", wantErr: "to_ts_ms must be >= from_ts_ms"},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			vals, err := url.ParseQuery(tc.raw)
+			require.NoError(t, err, "ParseQuery setup")
+
+			opts, err := parseCountQuery(vals)
+
+			if tc.wantErr != "" {
+				var pe *paramError
+				require.ErrorAs(t, err, &pe)
+				assert.Contains(t, pe.Error(), tc.wantErr)
+				assert.Equal(t, 400, pe.status)
+				return
+			}
+			require.NoError(t, err)
+			tc.check(t, opts)
+		})
+	}
+}
+
 func TestParseSearchBody(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

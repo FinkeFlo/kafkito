@@ -150,6 +150,40 @@ func parseConsumeQuery(q url.Values) (kafkapkg.ConsumeOptions, error) {
 	return opts, nil
 }
 
+// parseCountQuery maps URL query to CountMessagesOptions.
+// Returns a *paramError on bad input.
+func parseCountQuery(q url.Values) (kafkapkg.CountMessagesOptions, error) {
+	opts := kafkapkg.CountMessagesOptions{
+		Partition: -1,
+		Timeout:   6 * time.Second,
+	}
+	if s := q.Get("partition"); s != "" {
+		v, err := strconv.ParseInt(s, 10, 32)
+		if err != nil {
+			return opts, badParam("invalid partition")
+		}
+		opts.Partition = int32(v)
+	}
+	if s := q.Get("from_ts_ms"); s != "" {
+		v, err := strconv.ParseInt(s, 10, 64)
+		if err != nil || v < 0 {
+			return opts, badParam("invalid from_ts_ms")
+		}
+		opts.FromTSMs = v
+	}
+	if s := q.Get("to_ts_ms"); s != "" {
+		v, err := strconv.ParseInt(s, 10, 64)
+		if err != nil || v < 0 {
+			return opts, badParam("invalid to_ts_ms")
+		}
+		opts.ToTSMs = v
+	}
+	if opts.FromTSMs > 0 && opts.ToTSMs > 0 && opts.ToTSMs < opts.FromTSMs {
+		return opts, badParam("to_ts_ms must be >= from_ts_ms")
+	}
+	return opts, nil
+}
+
 // parsePartitionOffsets parses a "p:o,p:o,…" list of per-partition seek
 // offsets. Used by the GET /messages endpoint when the caller supplies
 // from=offset across all partitions without a continuation cursor.
