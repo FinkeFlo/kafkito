@@ -275,6 +275,49 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MessageCountResponse" }
+  /api/v1/clusters/{cluster}/topics/{topic}/messages/timeline:
+    get:
+      tags: [topics]
+      summary: Bucketed message volume over a time range for a topic.
+      description: |
+        Resolves the selected timestamp window into fixed-width buckets and
+        returns an approximate message count per bucket, without consuming
+        any records. Used by the Timeline view to render a daily/hourly
+        message-volume trend.
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { $ref: "#/components/parameters/Topic" }
+        - in: query
+          name: partition
+          schema: { type: integer, default: -1 }
+          description: "-1 = all partitions."
+        - in: query
+          name: from_ts_ms
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Inclusive lower timestamp bound in Unix milliseconds.
+        - in: query
+          name: to_ts_ms
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Exclusive upper timestamp bound in Unix milliseconds.
+        - in: query
+          name: bucket_ms
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Bucket width in milliseconds (e.g. 3600000 for hourly, 86400000 for daily).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageTimelineResponse" }
+        "400":
+          description: Bad request (invalid range/bucket or too many buckets).
+        "404":
+          description: Unknown cluster.
+        "403":
+          description: Forbidden.
   /api/v1/clusters/{cluster}/topics/{topic}/sample:
     get:
       tags: [topics]
@@ -681,6 +724,23 @@ components:
         partitions:
           type: array
           items: { $ref: "#/components/schemas/MessageCountPartition" }
+    MessageTimelineResponse:
+      type: object
+      properties:
+        cluster: { type: string }
+        topic: { type: string }
+        from_ts_ms: { type: integer, format: int64 }
+        to_ts_ms: { type: integer, format: int64 }
+        bucket_ms: { type: integer, format: int64 }
+        buckets:
+          type: array
+          items: { $ref: "#/components/schemas/MessageTimelineBucket" }
+    MessageTimelineBucket:
+      type: object
+      properties:
+        from_ts_ms: { type: integer, format: int64 }
+        to_ts_ms: { type: integer, format: int64 }
+        approx_count: { type: integer, format: int64 }
     SRDecodedMeta:
       type: object
       properties:

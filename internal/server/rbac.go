@@ -150,6 +150,8 @@ func resolvePermission(r *http.Request) (resType, resName, action, bodyField str
 		return "topic", topic, "consume", ""
 	case strings.HasSuffix(pattern, "/topics/{topic}/messages/count") && method == http.MethodGet:
 		return "topic", topic, "consume", ""
+	case strings.HasSuffix(pattern, "/topics/{topic}/messages/timeline") && method == http.MethodGet:
+		return "topic", topic, "consume", ""
 	case strings.HasSuffix(pattern, "/topics/{topic}/messages") && method == http.MethodGet:
 		return "topic", topic, "consume", ""
 	case strings.HasSuffix(pattern, "/topics/{topic}/messages") && method == http.MethodPost:

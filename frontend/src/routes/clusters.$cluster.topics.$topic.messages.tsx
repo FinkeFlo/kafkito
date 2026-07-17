@@ -591,7 +591,6 @@ function MessagesPanel({
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm">
       <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] p-3">
-        <div className="text-sm font-semibold">Messages</div>
         <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
           <label>Partition</label>
           <select

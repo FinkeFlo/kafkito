@@ -286,6 +286,38 @@ export async function fetchMessageCount(
   );
 }
 
+export interface MessageTimelineBucket {
+  from_ts_ms: number;
+  to_ts_ms: number;
+  approx_count: number;
+}
+
+export interface MessageTimelineResponse {
+  cluster: string;
+  topic: string;
+  from_ts_ms: number;
+  to_ts_ms: number;
+  bucket_ms: number;
+  buckets: MessageTimelineBucket[];
+}
+
+export async function fetchMessageTimeline(
+  cluster: string,
+  topic: string,
+  params: { partition?: number; from_ts_ms: number; to_ts_ms: number; bucket_ms: number },
+): Promise<MessageTimelineResponse> {
+  const qs = new URLSearchParams();
+  if (params.partition !== undefined && params.partition >= 0)
+    qs.set("partition", String(params.partition));
+  qs.set("from_ts_ms", String(params.from_ts_ms));
+  qs.set("to_ts_ms", String(params.to_ts_ms));
+  qs.set("bucket_ms", String(params.bucket_ms));
+  return await getJSONForCluster<MessageTimelineResponse>(
+    cluster,
+    clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/messages/timeline?${qs.toString()}`),
+  );
+}
+
 export interface SampleResponse {
   cluster: string;
   topic: string;

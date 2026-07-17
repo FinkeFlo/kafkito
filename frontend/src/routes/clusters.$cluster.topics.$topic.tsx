@@ -17,6 +17,7 @@ export const Route = createFileRoute("/clusters/$cluster/topics/$topic")({
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "messages", label: "Messages" },
+  { id: "timeline", label: "Timeline" },
   { id: "produce", label: "Produce" },
   { id: "configs", label: "Configs" },
   { id: "consumers", label: "Consumers" },
@@ -26,6 +27,7 @@ const TABS = [
 type TabPath =
   | "/clusters/$cluster/topics/$topic"
   | "/clusters/$cluster/topics/$topic/messages"
+  | "/clusters/$cluster/topics/$topic/timeline"
   | "/clusters/$cluster/topics/$topic/produce"
   | "/clusters/$cluster/topics/$topic/configs"
   | "/clusters/$cluster/topics/$topic/consumers"

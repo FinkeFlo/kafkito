@@ -184,6 +184,57 @@ func parseCountQuery(q url.Values) (kafkapkg.CountMessagesOptions, error) {
 	return opts, nil
 }
 
+// parseTimelineQuery maps URL query to MessageTimelineOptions.
+// Returns a *paramError on bad input.
+func parseTimelineQuery(q url.Values) (kafkapkg.MessageTimelineOptions, error) {
+	opts := kafkapkg.MessageTimelineOptions{
+		Partition: -1,
+		Timeout:   20 * time.Second,
+	}
+	if s := q.Get("partition"); s != "" {
+		v, err := strconv.ParseInt(s, 10, 32)
+		if err != nil {
+			return opts, badParam("invalid partition")
+		}
+		opts.Partition = int32(v)
+	}
+	fromRaw := q.Get("from_ts_ms")
+	toRaw := q.Get("to_ts_ms")
+	if fromRaw == "" || toRaw == "" {
+		return opts, badParam("from_ts_ms and to_ts_ms are required")
+	}
+	from, err := strconv.ParseInt(fromRaw, 10, 64)
+	if err != nil || from <= 0 {
+		return opts, badParam("invalid from_ts_ms")
+	}
+	to, err := strconv.ParseInt(toRaw, 10, 64)
+	if err != nil || to <= 0 {
+		return opts, badParam("invalid to_ts_ms")
+	}
+	if to <= from {
+		return opts, badParam("to_ts_ms must be > from_ts_ms")
+	}
+	opts.FromTSMs = from
+	opts.ToTSMs = to
+
+	bucketRaw := q.Get("bucket_ms")
+	if bucketRaw == "" {
+		return opts, badParam("bucket_ms is required")
+	}
+	bucket, err := strconv.ParseInt(bucketRaw, 10, 64)
+	if err != nil || bucket <= 0 {
+		return opts, badParam("invalid bucket_ms")
+	}
+	opts.BucketMs = bucket
+
+	numBuckets := (to - from + bucket - 1) / bucket
+	if numBuckets > kafkapkg.MaxTimelineBuckets {
+		return opts, badParam(fmt.Sprintf("range/bucket combination yields %d buckets, exceeding the limit of %d", numBuckets, kafkapkg.MaxTimelineBuckets))
+	}
+
+	return opts, nil
+}
+
 // parsePartitionOffsets parses a "p:o,p:o,…" list of per-partition seek
 // offsets. Used by the GET /messages endpoint when the caller supplies
 // from=offset across all partitions without a continuation cursor.

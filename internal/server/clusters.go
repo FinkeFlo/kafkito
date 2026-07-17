@@ -60,6 +60,7 @@ func (a *clusterAPI) mount(r chi.Router) {
 	r.Delete("/clusters/{cluster}/topics/{topic}/records", a.deleteRecords)
 	r.Get("/clusters/{cluster}/topics/{topic}/messages", a.consumeMessages)
 	r.Get("/clusters/{cluster}/topics/{topic}/messages/count", a.countMessages)
+	r.Get("/clusters/{cluster}/topics/{topic}/messages/timeline", a.messageTimeline)
 	r.Get("/clusters/{cluster}/topics/{topic}/sample", a.sampleMessages)
 	r.Post("/clusters/{cluster}/topics/{topic}/messages/search", a.searchMessages)
 	r.Post("/clusters/{cluster}/topics/{topic}/messages", a.produceMessage)
@@ -325,6 +326,47 @@ func (a *clusterAPI) countMessages(w http.ResponseWriter, r *http.Request) {
 		resp["to_ts_ms"] = *res.ToTSMs
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// messageTimeline resolves the selected range into fixed-width buckets and
+// returns the approximate number of messages produced inside each bucket.
+//
+// Query params:
+//
+//	partition:  int32 or -1 for all (default: -1)
+//	from_ts_ms: UNIX millis lower bound (required)
+//	to_ts_ms:   UNIX millis upper bound, exclusive (required)
+//	bucket_ms:  bucket width in milliseconds (required)
+func (a *clusterAPI) messageTimeline(w http.ResponseWriter, r *http.Request) {
+	cluster := chi.URLParam(r, "cluster")
+	topic := chi.URLParam(r, "topic")
+
+	opts, err := parseTimelineQuery(r.URL.Query())
+	if err != nil {
+		writeParamError(w, err)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+	defer cancel()
+
+	res, err := a.reg.MessageTimeline(ctx, cluster, topic, opts)
+	if err != nil {
+		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
+			return
+		}
+		gatewayError(ctx, w, a.log, "message timeline", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"cluster":    cluster,
+		"topic":      topic,
+		"from_ts_ms": res.FromTSMs,
+		"to_ts_ms":   res.ToTSMs,
+		"bucket_ms":  res.BucketMs,
+		"buckets":    res.Buckets,
+	})
 }
 
 // sampleMessages returns the last n decoded messages for use as a structural
