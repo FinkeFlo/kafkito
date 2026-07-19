@@ -272,6 +272,21 @@ function TimelineBarChart({
                 opacity={isSelected || isHovered ? 1 : 0.65}
                 className="transition-opacity"
               />
+              {/* Count label: only on the same cadence as the x-axis date
+                  labels (so dense 24h/30d ranges don't get cluttered), and
+                  only for slots that actually have messages. */}
+              {i % labelStep === 0 && b.approx_count > 0 && (
+                <text
+                  data-testid="timeline-bar-count"
+                  x={x + barW / 2}
+                  y={Math.max(10, y - 4)}
+                  textAnchor="middle"
+                  fontSize={9}
+                  fill="var(--color-text)"
+                >
+                  {fmt.count(b.approx_count)}
+                </text>
+              )}
               {i % labelStep === 0 && (
                 <text
                   x={x + barW / 2}
