@@ -245,6 +245,7 @@ function TimelineBarChart({
         height={chartH + 26}
         role="img"
         aria-label="Message count per time slot"
+        data-testid="timeline-chart"
       >
         {slots.map((b, i) => {
           const h = Math.round((b.approx_count / max) * (chartH - 8));
@@ -261,6 +262,7 @@ function TimelineBarChart({
               className="cursor-pointer"
             >
               <rect
+                data-testid="timeline-bar"
                 x={x}
                 y={y}
                 width={barW}
