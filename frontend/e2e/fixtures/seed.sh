@@ -39,13 +39,25 @@ wait_for_broker() {
 recreate_topic() {
   local name="$1"
   local partitions="$2"
+  # Optional extra --config KEY=VALUE (e.g. a topic-level retention.ms
+  # override for fixtures that backdate messages beyond the broker's
+  # default KAFKA_LOG_RETENTION_HOURS).
+  local extra_config="${3:-}"
   run_in_kafka /opt/kafka/bin/kafka-topics.sh \
     --bootstrap-server "${BROKER_INTERNAL}" --delete --topic "${name}" \
     >/dev/null 2>&1 || true
-  run_in_kafka /opt/kafka/bin/kafka-topics.sh \
-    --bootstrap-server "${BROKER_INTERNAL}" --create --if-not-exists \
-    --topic "${name}" --partitions "${partitions}" --replication-factor 1 \
-    >/dev/null
+  if [ -n "${extra_config}" ]; then
+    run_in_kafka /opt/kafka/bin/kafka-topics.sh \
+      --bootstrap-server "${BROKER_INTERNAL}" --create --if-not-exists \
+      --topic "${name}" --partitions "${partitions}" --replication-factor 1 \
+      --config "${extra_config}" \
+      >/dev/null
+  else
+    run_in_kafka /opt/kafka/bin/kafka-topics.sh \
+      --bootstrap-server "${BROKER_INTERNAL}" --create --if-not-exists \
+      --topic "${name}" --partitions "${partitions}" --replication-factor 1 \
+      >/dev/null
+  fi
 }
 
 produce_lines() {
@@ -146,7 +158,12 @@ main() {
   wait_for_broker
 
   echo "seed: recreating fixture topics"
-  recreate_topic "e2e-walk-target" 4
+  # 10 days of retention: comfortably beyond the -6d backdated message
+  # produce_spread_lines writes below, well past the broker's default
+  # 24h KAFKA_LOG_RETENTION_HOURS, so the fixture isn't racing the
+  # broker's retention-check cycle for messages that are already
+  # "old" the moment they're produced.
+  recreate_topic "e2e-walk-target" 4 "retention.ms=864000000"
   recreate_topic "e2e-walk-large" 1
 
   echo "seed: producing fixture messages"
