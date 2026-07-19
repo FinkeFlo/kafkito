@@ -1,0 +1,57 @@
+site_name: kafkito
+site_description: Public documentation for kafkito
+repo_url: https://github.com/FinkeFlo/kafkito
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  logo: assets/branding/icon.svg
+  favicon: assets/branding/icon.svg
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - UI Guide:
+      - Getting Started: ui/getting-started-ui.md
+      - Add Cluster: ui/add-cluster.md
+      - Features Overview: ui/features-overview.md
+      - Workflows: ui/workflows.md
+  - API: API.md
+  - Architecture Decisions:
+      - ADR-0001: adr/0001-greenfield-apache2.md
+      - ADR-0002: adr/0002-tech-stack.md
+      - ADR-0003: adr/0003-cloud-foundry-readiness.md
+      - ADR-0004: adr/0004-xsuaa-build-tag.md

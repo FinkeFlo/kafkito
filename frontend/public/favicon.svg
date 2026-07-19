@@ -1,1 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0f172a"/><text x="16" y="22" font-family="monospace" font-size="18" font-weight="bold" text-anchor="middle" fill="#38bdf8">k</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="fav-cyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00E5FF" />
+      <stop offset="100%" stop-color="#007BFF" />
+    </linearGradient>
+    <linearGradient id="fav-orange" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF9100" />
+      <stop offset="100%" stop-color="#FF3D00" />
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="6" fill="#ffffff" />
+  <line x1="8.5" y1="6.5" x2="8.5" y2="25.5" stroke="url(#fav-cyan)" stroke-width="4.2" stroke-linecap="round" />
+  <line x1="10.8" y1="15.8" x2="21.5" y2="6.8" stroke="url(#fav-orange)" stroke-width="4.2" stroke-linecap="round" />
+  <line x1="12" y1="14.8" x2="22.8" y2="25.2" stroke="url(#fav-cyan)" stroke-width="4.2" stroke-linecap="round" />
+  <circle cx="11.2" cy="16" r="3.5" fill="#1E293B" />
+  <circle cx="11.2" cy="16" r="1.3" fill="#FFFFFF" />
+</svg>
