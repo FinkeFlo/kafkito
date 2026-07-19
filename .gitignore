@@ -48,6 +48,8 @@ deploy/local/
 # Tool caches
 .golangci-cache/
 /tmp/
+.playwright-mcp/
+.venv/
 
 # Claude Code config — local only, not part of the OSS repo.
 .claude/
