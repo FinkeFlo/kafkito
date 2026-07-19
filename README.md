@@ -1,5 +1,9 @@
 # kafkito
 
+<p align="left">
+  <img src="./docs/assets/branding/logo.svg" alt="kafkito logo" width="520" />
+</p>
+
 > Manage and observe Apache Kafka clusters from a single Go binary — topics, messages, consumer groups, schemas and ACLs in one web UI.
 
 **Status:** Stable — v1.0, in production use.

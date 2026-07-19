@@ -22,11 +22,22 @@ import { useCluster } from "@/lib/use-cluster";
 function Logo() {
   return (
     <svg width="32" height="32" viewBox="0 0 48 48" aria-hidden>
-      <rect width="48" height="48" rx="10" fill="var(--color-text)" />
-      <rect x="11" y="10" width="5" height="28" rx="1.5" fill="var(--color-panel)" />
-      <rect x="19" y="15" width="18" height="3" rx="1.5" fill="var(--color-panel)" />
-      <rect x="19" y="22.5" width="14" height="3" rx="1.5" fill="var(--color-panel)" />
-      <rect x="19" y="30" width="18" height="3" rx="1.5" fill="var(--color-accent)" />
+      <defs>
+        <linearGradient id="app-k-cyan" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#00E5FF" />
+          <stop offset="100%" stopColor="#007BFF" />
+        </linearGradient>
+        <linearGradient id="app-k-orange" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#FF9100" />
+          <stop offset="100%" stopColor="#FF3D00" />
+        </linearGradient>
+      </defs>
+      <rect width="48" height="48" rx="10" fill="#ffffff" />
+      <line x1="13" y1="9" x2="13" y2="39" stroke="url(#app-k-cyan)" strokeWidth="6.5" strokeLinecap="round" />
+      <line x1="16.5" y1="24" x2="33" y2="9" stroke="url(#app-k-orange)" strokeWidth="6.5" strokeLinecap="round" />
+      <line x1="18.5" y1="22.5" x2="34.5" y2="38.5" stroke="url(#app-k-cyan)" strokeWidth="6.5" strokeLinecap="round" />
+      <circle cx="17" cy="24" r="5.5" fill="#1E293B" />
+      <circle cx="17" cy="24" r="2" fill="#FFFFFF" />
     </svg>
   );
 }
