@@ -56,6 +56,7 @@ type ClusterInfo struct {
 	Name           string        `json:"name"`
 	Reachable      bool          `json:"reachable"`
 	Error          string        `json:"error,omitempty"`
+	IsProd         bool          `json:"is_prod"`
 	AuthType       string        `json:"auth_type"`
 	TLS            bool          `json:"tls"`
 	SchemaRegistry bool          `json:"schema_registry"`
@@ -556,6 +557,7 @@ func (r *Registry) Describe(ctx context.Context, probeTimeout time.Duration) []C
 		info := ClusterInfo{
 			Name:           c.Name,
 			Reachable:      err == nil,
+			IsProd:         c.IsProd,
 			AuthType:       authType,
 			TLS:            c.TLS.Enabled,
 			SchemaRegistry: strings.TrimSpace(c.SchemaRegistry.URL) != "",

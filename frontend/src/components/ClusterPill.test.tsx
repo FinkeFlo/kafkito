@@ -21,6 +21,7 @@ const loadedCluster: ClusterListItem = {
   name: "local",
   source: "shared",
   reachable: true,
+  is_prod: false,
   tls: false,
   auth_type: "none",
   schema_registry: false,

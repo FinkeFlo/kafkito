@@ -12,14 +12,17 @@ Under **Settings → Private clusters**, you get a table of browser-local cluste
 2. Enter `Name` and `Brokers (comma-separated)`.  
 3. Choose `Auth type` (`none`, `SASL/PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`).  
 4. For auth types other than `none`, provide username/password.  
-5. Optionally configure `TLS` and `Skip verify`.  
-6. Optionally configure **Schema Registry** (URL + optional credentials/TLS).  
-7. Run **Test connection**, then **Save**.
+5. Optionally mark the cluster as **Production**.  
+6. Optionally configure `TLS` and `Skip verify`.  
+7. Optionally configure **Schema Registry** (URL + optional credentials/TLS).  
+8. Run **Test connection**, then **Save**.
 
 **When should I use this?**  
 Use this when your cluster is not configured server-side or when you want to work with your own credentials.
 
 ![Add private cluster modal](../assets/screenshots/ui-add-cluster-modal.png)
+
+![Production flag in add cluster form](../assets/screenshots/ui-add-cluster-prod-flag.png)
 
 ## Expected result after save
 
@@ -43,8 +46,11 @@ Connection test/save errors or missing availability in certain tabs (for example
 1. **First test is slow/timeout**: on cold DNS, first probe can be slow; retry is often much faster.  
 2. **Schemas unavailable**: without Schema Registry URL, Schemas cannot be used. Configure SR in cluster settings.  
 3. **Auth failure**: verify `Auth type` matches broker setup and credentials are complete.  
-4. **Name conflicts**: if a private cluster has the same name as a shared cluster, shared cluster wins in selector. Use distinct names.  
-5. **Delete is local**: deleting removes the entry only from the current browser. Export before deleting if needed.
+4. **Produce warning on prod**: if a cluster is marked as Production, producing a message requires an extra confirmation step.  
+5. **Name conflicts**: if a private cluster has the same name as a shared cluster, shared cluster wins in selector. Use distinct names.  
+6. **Delete is local**: deleting removes the entry only from the current browser. Export before deleting if needed.
+
+![Production warning before produce](../assets/screenshots/ui-produce-prod-warning.png)
 
 **When should I use this?**  
 Use this when connectivity behaves unexpectedly or a newly added cluster is not usable as expected.

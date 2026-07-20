@@ -616,6 +616,7 @@ components:
         name: { type: string }
         reachable: { type: boolean }
         error: { type: string }
+        is_prod: { type: boolean }
         auth_type: { type: string }
         tls: { type: boolean }
         schema_registry: { type: boolean }

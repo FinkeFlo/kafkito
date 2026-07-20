@@ -17,6 +17,8 @@ import { IconButton } from "@/components/icon-button";
 import { Card } from "@/components/card";
 import { Input } from "@/components/Input";
 import { Timestamp } from "@/components/timestamp";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useCluster } from "@/lib/use-cluster";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic/produce")({
   component: ProduceTab,
@@ -64,7 +66,10 @@ function ProduceSection({
   const [templateError, setTemplateError] = useState<string | null>(null);
   const [result, setResult] = useState<ProduceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmProdOpen, setConfirmProdOpen] = useState(false);
   const qc = useQueryClient();
+  const { clusters } = useCluster();
+  const isProdCluster = !!clusters?.find((c) => c.name === cluster)?.is_prod;
 
   const addHeader = () => setHeaders((h) => [...h, { k: "", v: "" }]);
   const removeHeader = (i: number) =>
@@ -163,7 +168,7 @@ function ProduceSection({
     }
   };
 
-  const submit = async () => {
+  const runProduce = async () => {
     setBusy(true);
     setError(null);
     setResult(null);
@@ -193,6 +198,14 @@ function ProduceSection({
     } finally {
       setBusy(false);
     }
+  };
+
+  const submit = async () => {
+    if (isProdCluster) {
+      setConfirmProdOpen(true);
+      return;
+    }
+    await runProduce();
   };
 
   const reset = () => {
@@ -393,6 +406,16 @@ function ProduceSection({
           ) : null}
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmProdOpen}
+        onOpenChange={setConfirmProdOpen}
+        title="Production cluster warning"
+        description="You are about to produce a message to a production cluster. This can impact live systems."
+        confirmLabel="Produce anyway"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={runProduce}
+      />
     </Card>
   );
 }

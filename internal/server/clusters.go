@@ -133,6 +133,7 @@ func (a *clusterAPI) testCluster(w http.ResponseWriter, r *http.Request) {
 	defer pingCancel()
 	info := kafkapkg.ClusterInfo{
 		Name:           "",
+		IsProd:         cfg.IsProd,
 		AuthType:       strings.ToLower(strings.TrimSpace(cfg.Auth.Type)),
 		TLS:            cfg.TLS.Enabled,
 		SchemaRegistry: strings.TrimSpace(cfg.SchemaRegistry.URL) != "",

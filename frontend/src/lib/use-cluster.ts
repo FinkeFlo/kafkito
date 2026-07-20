@@ -25,6 +25,7 @@ function privateToListItem(p: PrivateCluster): ClusterListItem {
     id: p.id,
     name: p.name,
     reachable: true, // optimistic; settings page probes on demand
+    is_prod: !!p.is_prod,
     auth_type: p.auth.type,
     tls: !!p.tls.enabled,
     schema_registry: !!p.schema_registry?.url,

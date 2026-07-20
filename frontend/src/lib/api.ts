@@ -26,6 +26,7 @@ export interface ClusterInfo {
   name: string;
   reachable: boolean;
   error?: string;
+  is_prod?: boolean;
   auth_type: string;
   tls: boolean;
   schema_registry: boolean;
