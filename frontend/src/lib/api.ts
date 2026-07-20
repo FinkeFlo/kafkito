@@ -357,15 +357,26 @@ export interface ProduceResult {
   timestamp_ms: number;
 }
 
+// PROD_CONFIRM_HEADER must match internal/server/clusters.go's
+// ProdConfirmHeader. Sent only after the user confirms the production
+// warning dialog; the backend is the actual enforcement point — it rejects
+// mutating calls against is_prod clusters that omit this header, regardless
+// of what this client's local cluster list believes.
+const PROD_CONFIRM_HEADER = "X-Kafkito-Confirm-Prod";
+
 export async function produceMessage(
   cluster: string,
   topic: string,
   req: ProduceRequest,
+  confirmProd = false,
 ): Promise<ProduceResult> {
   const res = await fetchAPI(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/messages`),
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(confirmProd ? { [PROD_CONFIRM_HEADER]: "true" } : {}),
+      },
       body: JSON.stringify(req),
     },
   );
@@ -444,10 +455,14 @@ async function sendJSONForCluster<T>(
   path: string,
   method: string,
   body?: unknown,
+  confirmProd = false,
 ): Promise<T> {
   const init: RequestInit = {
     method,
-    headers: body ? { "Content-Type": "application/json" } : {},
+    headers: {
+      ...(body ? { "Content-Type": "application/json" } : {}),
+      ...(confirmProd ? { [PROD_CONFIRM_HEADER]: "true" } : {}),
+    },
   };
   if (body !== undefined) init.body = JSON.stringify(body);
   const res = await fetchAPI(cluster, path, init);
@@ -501,10 +516,12 @@ export function resetGroupOffsets(
   cluster: string,
   group: string,
   req: ResetOffsetsRequest,
+  confirmProd = false,
 ): Promise<ResetOffsetsResult> {
   return sendJSONForCluster<ResetOffsetsResult>(cluster, clusterPath(cluster, `/groups/${encodeURIComponent(group)}/reset-offsets`),
     "POST",
     req,
+    confirmProd,
   );
 }
 
@@ -552,9 +569,11 @@ export function createTopic(
   );
 }
 
-export function deleteTopic(cluster: string, topic: string): Promise<void> {
+export function deleteTopic(cluster: string, topic: string, confirmProd = false): Promise<void> {
   return sendJSONForCluster<void>(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}`),
     "DELETE",
+    undefined,
+    confirmProd,
   );
 }
 
@@ -569,10 +588,12 @@ export function deleteRecords(
   cluster: string,
   topic: string,
   partitions: Record<number, number>,
+  confirmProd = false,
 ): Promise<{ results: DeleteRecordsResult[] }> {
   return sendJSONForCluster<{ results: DeleteRecordsResult[] }>(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/records`),
     "DELETE",
     { partitions },
+    confirmProd,
   );
 }
 

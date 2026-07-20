@@ -172,6 +172,16 @@ func (r *Registry) ConfigsOrdered() []config.ClusterConfig {
 	return out
 }
 
+// ConfigFor returns the ClusterConfig registered under the given internal
+// name (static or ad-hoc/private). Used by the HTTP layer to check
+// cluster-level flags (e.g. IsProd) before performing a mutating operation.
+func (r *Registry) ConfigFor(name string) (config.ClusterConfig, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	cfg, ok := r.clusters[name]
+	return cfg, ok
+}
+
 // Client returns (or creates) a kgo.Client for the given cluster name.
 func (r *Registry) Client(name string) (*kgo.Client, error) {
 	r.mu.Lock()

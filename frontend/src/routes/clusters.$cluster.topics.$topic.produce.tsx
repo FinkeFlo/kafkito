@@ -168,7 +168,7 @@ function ProduceSection({
     }
   };
 
-  const runProduce = async () => {
+  const runProduce = async (confirmProd = false) => {
     setBusy(true);
     setError(null);
     setResult(null);
@@ -182,14 +182,19 @@ function ProduceSection({
       }
       const partNum =
         partition === "auto" ? undefined : Number.parseInt(partition, 10);
-      const res = await produceMessage(cluster, topic, {
-        key,
-        value,
-        key_encoding: "text",
-        value_encoding: "text",
-        partition: partNum,
-        headers: Object.keys(hdrMap).length > 0 ? hdrMap : undefined,
-      });
+      const res = await produceMessage(
+        cluster,
+        topic,
+        {
+          key,
+          value,
+          key_encoding: "text",
+          value_encoding: "text",
+          partition: partNum,
+          headers: Object.keys(hdrMap).length > 0 ? hdrMap : undefined,
+        },
+        confirmProd,
+      );
       setResult(res);
       await qc.invalidateQueries({ queryKey: ["messages", cluster, topic] });
       await qc.invalidateQueries({ queryKey: ["topic", cluster, topic] });
@@ -414,7 +419,7 @@ function ProduceSection({
         confirmLabel="Produce anyway"
         cancelLabel="Cancel"
         variant="danger"
-        onConfirm={runProduce}
+        onConfirm={() => runProduce(true)}
       />
     </Card>
   );
