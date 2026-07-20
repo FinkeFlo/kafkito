@@ -40,7 +40,6 @@ type Options struct {
 func New(opts Options) http.Handler {
 	r := chi.NewRouter()
 
-	r.Use(middleware.RealIP)
 	r.Use(middleware.CleanPath)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(30 * time.Second))
