@@ -22,6 +22,35 @@ import (
 
 const defaultTestConnectionTimeout = 15 * time.Second
 
+// ProdConfirmHeader is the request header the frontend must set to "true"
+// to perform a mutating/dangerous operation (produce, delete topic, delete
+// records, reset offsets) against a cluster marked is_prod. This is the
+// server-side enforcement point: the frontend's confirmation dialog is a UX
+// nicety, not a security boundary — a direct API call without this header
+// against a production cluster is always rejected, regardless of what the
+// caller's local cluster list says.
+const ProdConfirmHeader = "X-Kafkito-Confirm-Prod"
+
+// requireProdConfirmation returns true if the request may proceed. If the
+// named cluster is marked is_prod and the caller did not set
+// ProdConfirmHeader: true, it writes a 428 Precondition Required and
+// returns false. Unknown clusters are allowed through here; the caller's
+// own lookup (Client/Admin/etc.) will report ErrUnknownCluster as usual.
+func (a *clusterAPI) requireProdConfirmation(w http.ResponseWriter, r *http.Request, cluster string) bool {
+	cfg, ok := a.reg.ConfigFor(cluster)
+	if !ok || !cfg.IsProd {
+		return true
+	}
+	if strings.EqualFold(r.Header.Get(ProdConfirmHeader), "true") {
+		return true
+	}
+	writeJSON(w, http.StatusPreconditionRequired, map[string]string{
+		"error": "production cluster: resend with " + ProdConfirmHeader + ": true after user confirmation",
+		"code":  "production_confirmation_required",
+	})
+	return false
+}
+
 // testConnectionTimeout returns the budget for the user-driven Test
 // connection probe. Defaults to 15s; set KAFKITO_TEST_CONNECTION_TIMEOUT
 // (e.g. "30s", "2m") to override for slow corporate networks where cold
@@ -499,6 +528,10 @@ func (a *clusterAPI) produceMessage(w http.ResponseWriter, r *http.Request) {
 	cluster := chi.URLParam(r, "cluster")
 	topic := chi.URLParam(r, "topic")
 
+	if !a.requireProdConfirmation(w, r, cluster) {
+		return
+	}
+
 	var req kafkapkg.ProduceRequest
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<20))
 	dec.DisallowUnknownFields()
@@ -565,6 +598,10 @@ func isSearchClientErr(msg string) bool {
 func (a *clusterAPI) resetGroupOffsets(w http.ResponseWriter, r *http.Request) {
 	cluster := chi.URLParam(r, "cluster")
 	group := chi.URLParam(r, "group")
+
+	if !a.requireProdConfirmation(w, r, cluster) {
+		return
+	}
 
 	var req kafkapkg.ResetOffsetsRequest
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
@@ -685,6 +722,10 @@ func (a *clusterAPI) deleteTopic(w http.ResponseWriter, r *http.Request) {
 	cluster := chi.URLParam(r, "cluster")
 	topic := chi.URLParam(r, "topic")
 
+	if !a.requireProdConfirmation(w, r, cluster) {
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 	if err := a.reg.DeleteTopic(ctx, cluster, topic); err != nil {
@@ -702,6 +743,10 @@ func (a *clusterAPI) deleteTopic(w http.ResponseWriter, r *http.Request) {
 func (a *clusterAPI) deleteRecords(w http.ResponseWriter, r *http.Request) {
 	cluster := chi.URLParam(r, "cluster")
 	topic := chi.URLParam(r, "topic")
+
+	if !a.requireProdConfirmation(w, r, cluster) {
+		return
+	}
 
 	var req kafkapkg.DeleteRecordsRequest
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
