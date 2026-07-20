@@ -100,7 +100,7 @@ From an IDE, running `air` directly works too — `.air.toml` loads
 
 See [docs/adr/](./docs/adr/) for Architecture Decision Records.
 
-- [x] ADR-0001: Greenfield Apache-2.0 (not a fork of redpanda-data/console)
+- [x] ADR-0001: Greenfield Apache-2.0
 - [x] ADR-0002: Tech Stack
 - [x] ADR-0003: Cloud Foundry Readiness
 - [x] ADR-0004: XSUAA as a build-tagged plugin
@@ -119,4 +119,3 @@ Apache License 2.0 — see [LICENSE](./LICENSE) and [NOTICE](./NOTICE).
 
 - [`provectus/kafka-ui`](https://github.com/provectus/kafka-ui) — original Apache-2.0 reference for features (RBAC, masking, graceful degradation). Unmaintained since 2024. We may port code from there with attribution.
 - [`kafbat/kafka-ui`](https://github.com/kafbat/kafka-ui) — community-maintained continuation of `provectus/kafka-ui` (Apache-2.0, Java/Spring). Different stack, shared goals. Worth a look if you want a maintained fork of the original codebase.
-- [`redpanda-data/console`](https://github.com/redpanda-data/console) — BSL-1.1 architectural inspiration only. **No source code copied.**

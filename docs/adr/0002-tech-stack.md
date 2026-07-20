@@ -50,7 +50,6 @@ kafkito is a single-binary Kafka management UI (see ADR-0001). We need a stack t
 
 - One deployment artifact. No JVM, no sidecar node_modules.
 - Protobuf-first API ensures end-to-end type safety and easy contract evolution.
-- Stack aligns with Redpanda Console's architectural choices, which are battle-tested — but we implement clean-room (see ADR-0001).
 
 **Negative**
 

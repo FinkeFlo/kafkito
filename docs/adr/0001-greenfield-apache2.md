@@ -5,27 +5,20 @@
 
 ## Context
 
-We set out to build a modern alternative in the lineage of [`provectus/kafka-ui`](https://github.com/provectus/kafka-ui), which has been stagnating since 2024. The community-maintained continuation of that codebase is [`kafbat/kafka-ui`](https://github.com/kafbat/kafka-ui) (Apache-2.0, Java/Spring). For a Go single-binary stack, two candidate starting points were considered:
+We set out to build a modern Kafka management UI in the lineage of
+[`provectus/kafka-ui`](https://github.com/provectus/kafka-ui), which has
+been stagnating since 2024. The community-maintained continuation of
+that codebase is [`kafbat/kafka-ui`](https://github.com/kafbat/kafka-ui)
+(Apache-2.0, Java/Spring). For a Go single-binary stack, two candidate
+starting points were considered:
 
-1. **Hard-fork of [`redpanda-data/console`](https://github.com/redpanda-data/console)** — a mature Go codebase covering ~80 % of the feature scope, with an active upstream.
-2. **Greenfield Go implementation** — clean-room, same architectural stack, Apache-2.0 from day one.
+1. **Forking an existing BSL-licensed Go codebase** — lower initial
+   implementation effort.
+2. **Greenfield Go implementation** — clean-room, Apache-2.0 from day one.
 
-### License analysis of redpanda-data/console
+### License analysis of the fork option
 
-An audit of the repository (master, commit `534690f`) showed that the entire first-party codebase — ~840 Go and TypeScript files — is licensed under the **Business Source License 1.1 (BSL-1.1)**:
-
-```
-// Copyright 2022 Redpanda Data, Inc.
-//
-// Use of this software is governed by the Business Source License
-// included in the file https://github.com/redpanda-data/redpanda/blob/dev/licenses/bsl.md
-//
-// As of the Change Date specified in that file, in accordance with
-// the Business Source License, use of this software will be governed
-// by the Apache License, Version 2.0
-```
-
-Key implications of the BSL-1.1 (from `redpanda-data/redpanda/licenses/bsl.md`):
+Key implications of BSL-1.1:
 
 - Self-hosting (including commercial) is allowed.
 - **Offering the software as a managed Streaming/Queueing service to third parties is prohibited.**
@@ -35,15 +28,15 @@ Key implications of the BSL-1.1 (from `redpanda-data/redpanda/licenses/bsl.md`):
 
 Mixing or rewriting files does not "dilute" the BSL — the entire distribution remains BSL-bound as long as a single BSL file is present.
 
-The only Apache-2.0 files in `redpanda-data/console` are generated Google protobuf stubs (`frontend/src/protogen/google/api/*`), which are third-party code retaining their upstream license.
-
 ## Decision
 
-We will build kafkito as a **Greenfield Go implementation, licensed under Apache License 2.0**. We will **not** fork or copy source code from `redpanda-data/console`.
+We will build kafkito as a **Greenfield Go implementation, licensed
+under Apache License 2.0**. We will **not** fork or copy source code
+from BSL-licensed codebases.
 
-- Architectural inspiration from Redpanda Console is permitted (ideas and APIs are not copyrightable; specific expression is).
-- Feature and code portability from [`provectus/kafka-ui`](https://github.com/provectus/kafka-ui) (Apache-2.0) is explicitly allowed with attribution.
-- The technology stack deliberately mirrors Redpanda Console's choices (Chi, Connect-RPC, franz-go, goja, React + Bun) because these are independent, well-known open-source libraries — using them does not make our code derivative.
+- Feature and code portability from
+  [`provectus/kafka-ui`](https://github.com/provectus/kafka-ui)
+  (Apache-2.0) is explicitly allowed with attribution.
 
 ## Consequences
 
@@ -56,9 +49,11 @@ We will build kafkito as a **Greenfield Go implementation, licensed under Apache
 
 **Negative**
 
-- Significantly larger initial implementation effort — estimated 12–18 months to feature parity with Redpanda Console.
-- We give up ~80 % of ready-to-ship code that the fork approach would have provided.
-- Risk of re-inventing subtle details (e.g. Avro/Protobuf deserialization edge cases) that Redpanda Console already handles well.
+- Significantly larger initial implementation effort than a direct fork.
+- We give up substantial ready-to-ship code that a fork approach would
+  have provided.
+- Risk of re-inventing subtle details (for example Avro/Protobuf
+  deserialization edge cases) that mature UIs already handle well.
 
 **Mitigation**
 
@@ -68,7 +63,11 @@ We will build kafkito as a **Greenfield Go implementation, licensed under Apache
 
 ## Alternatives considered
 
-- **Fork pre-BSL "Kowl" history (pre-2022 Apache-2.0).** Rejected: the pre-BSL codebase is ~4 years stale; nearly all valuable features were added under BSL.
+- **Fork pre-BSL "Kowl" history (pre-2022 Apache-2.0).** Rejected:
+  the pre-BSL codebase is ~4 years stale; nearly all valuable features
+  were added under BSL.
 - **Fork [`kafbat/kafka-ui`](https://github.com/kafbat/kafka-ui) (Apache-2.0, community continuation of provectus/kafka-ui).** Rejected: Java/Spring stack conflicts with the goal of a Go single-binary distribution.
 - **Fork AKHQ (Apache-2.0, Java/Micronaut).** Rejected: we want a Go single-binary stack.
-- **Accept BSL and fork `redpanda-data/console`.** Rejected: conflicts with stated goal of OSI-approved, managed-service-friendly licensing.
+- **Accept BSL and fork a BSL-licensed Go UI codebase.** Rejected:
+  conflicts with stated goal of OSI-approved, managed-service-friendly
+  licensing.
