@@ -40,6 +40,7 @@ server:
   addr: ":9999"
 clusters:
   - name: dev
+    is_prod: true
     brokers:
       - localhost:39092
   - name: staging
@@ -52,7 +53,9 @@ clusters:
 	assert.Equal(t, ":9999", cfg.Server.Addr)
 	require.Len(t, cfg.Clusters, 2)
 	assert.Equal(t, "dev", cfg.Clusters[0].Name)
+	assert.True(t, cfg.Clusters[0].IsProd)
 	assert.Equal(t, "staging", cfg.Clusters[1].Name)
+	assert.False(t, cfg.Clusters[1].IsProd)
 }
 
 func TestEnvOverridesYAML(t *testing.T) {

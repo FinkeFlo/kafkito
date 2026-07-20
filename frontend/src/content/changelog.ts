@@ -26,6 +26,32 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.1.3",
+    date: "2026-07-20",
+    items: [
+      {
+        type: "feature",
+        title: "Mark clusters as production in cluster management",
+        description:
+          "Clusters can now be marked as Production in Manage Clusters. The marker is persisted and shown in cluster overviews so operators can clearly identify high-impact environments.",
+        screenshot: {
+          src: "/whats-new/1.1.3-prod-flag-toggle.png",
+          alt: "Add cluster form with Environment section and Mark as Production checkbox enabled",
+        },
+      },
+      {
+        type: "security",
+        title: "Safety confirmation before producing to production clusters",
+        description:
+          "Producing to a production-marked cluster now requires explicit confirmation. You can cancel safely, or continue with Produce anyway when intended.",
+        screenshot: {
+          src: "/whats-new/1.1.3-prod-produce-warning.png",
+          alt: "Produce tab showing a production warning confirmation dialog with Cancel and Produce anyway actions",
+        },
+      },
+    ],
+  },
+  {
     version: "1.1.2",
     date: "2026-07-17",
     items: [

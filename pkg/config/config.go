@@ -104,6 +104,7 @@ type ServerConfig struct {
 // ClusterConfig describes one Kafka cluster kafkito can connect to.
 type ClusterConfig struct {
 	Name           string               `koanf:"name"`
+	IsProd         bool                 `koanf:"is_prod"`
 	Brokers        []string             `koanf:"brokers"`
 	Auth           AuthConfig           `koanf:"auth"`
 	TLS            TLSConfig            `koanf:"tls"`

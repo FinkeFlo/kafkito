@@ -35,6 +35,7 @@ function privateClusterToRow(c: PrivateCluster): ClusterRowInfo {
     auth_type: c.auth.type,
     tls: !!c.tls?.enabled,
     schema_registry: !!c.schema_registry,
+    is_prod: !!c.is_prod,
     is_private: true,
   };
 }
@@ -305,6 +306,7 @@ function ClusterRow({ cluster }: { cluster: ClusterRowInfo }) {
               {cluster.name}
             </span>
             {cluster.is_private && <Tag variant="info">PRIVATE</Tag>}
+            {cluster.is_prod && <Tag variant="danger">PROD</Tag>}
             {limited && <Tag variant="warn">LIMITED</Tag>}
             {!cluster.reachable && <Tag variant="danger">UNREACHABLE</Tag>}
           </div>

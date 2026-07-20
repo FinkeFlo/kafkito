@@ -33,6 +33,7 @@ export interface PrivateClusterSchemaRegistry {
 export interface PrivateCluster {
   id: string;
   name: string;
+  is_prod?: boolean;
   brokers: string[];
   auth: PrivateClusterAuth;
   tls: PrivateClusterTLS;
@@ -70,6 +71,7 @@ function isPrivateCluster(v: unknown): v is PrivateCluster {
   return (
     typeof o.id === "string" &&
     typeof o.name === "string" &&
+    (o.is_prod === undefined || typeof o.is_prod === "boolean") &&
     Array.isArray(o.brokers) &&
     o.brokers.every((b) => typeof b === "string") &&
     typeof o.auth === "object" &&
@@ -203,6 +205,7 @@ export function importBundle(raw: string): ImportResult {
 
 interface BackendClusterConfig {
   name: string;
+  is_prod?: boolean;
   brokers: string[];
   auth: { type: string; username?: string; password?: string };
   tls: { enabled: boolean; insecure_skip_verify?: boolean };
@@ -217,6 +220,7 @@ interface BackendClusterConfig {
 function toBackendConfig(c: PrivateCluster): BackendClusterConfig {
   return {
     name: c.name,
+    is_prod: c.is_prod,
     brokers: c.brokers,
     auth: {
       type: c.auth.type,

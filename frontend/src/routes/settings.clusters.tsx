@@ -34,6 +34,7 @@ export const Route = createFileRoute("/settings/clusters")({
 interface FormState {
   id?: string;
   name: string;
+  isProd: boolean;
   brokersCSV: string;
   tlsEnabled: boolean;
   tlsInsecure: boolean;
@@ -48,6 +49,7 @@ interface FormState {
 
 const emptyForm: FormState = {
   name: "",
+  isProd: false,
   brokersCSV: "",
   tlsEnabled: false,
   tlsInsecure: false,
@@ -76,6 +78,7 @@ function toPrivateCluster(f: FormState): Omit<PrivateCluster, "id" | "created_at
   return {
     id: f.id,
     name: f.name.trim(),
+    is_prod: f.isProd,
     brokers,
     auth: {
       type: f.authType,
@@ -98,6 +101,7 @@ function fromPrivateCluster(c: PrivateCluster): FormState {
   return {
     id: c.id,
     name: c.name,
+    isProd: !!c.is_prod,
     brokersCSV: c.brokers.join(", "),
     tlsEnabled: !!c.tls?.enabled,
     tlsInsecure: !!c.tls?.insecure_skip_verify,
@@ -272,6 +276,7 @@ function ClusterSettingsPage() {
                   />
                 </th>
                 <th className="px-4 py-2">Name</th>
+                <th className="px-4 py-2">Prod</th>
                 <th className="px-4 py-2">Brokers</th>
                 <th className="px-4 py-2">Auth</th>
                 <th className="px-4 py-2">TLS</th>
@@ -295,6 +300,9 @@ function ClusterSettingsPage() {
                     />
                   </td>
                   <td className="px-4 py-2 font-mono text-[13px] tabular-nums font-medium">{c.name}</td>
+                  <td className="px-4 py-2">
+                    {c.is_prod ? <Badge variant="danger">PROD</Badge> : <span className="text-muted">—</span>}
+                  </td>
                   <td className="px-4 py-2 text-muted">
                     {c.brokers.join(", ")}
                   </td>
@@ -486,6 +494,18 @@ function ClusterForm({
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Environment">
+            <div className="flex items-center gap-3 pt-2">
+              <label className="inline-flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={f.isProd}
+                  onChange={(e) => set("isProd", e.target.checked)}
+                />
+                Mark as Production
+              </label>
+            </div>
+          </Field>
           <Field label="Auth type">
             <select
               className={selectCls}

@@ -17,6 +17,7 @@ import {
 function sample(name = "local"): Omit<PrivateCluster, "id" | "created_at" | "updated_at"> {
   return {
     name,
+    is_prod: false,
     brokers: ["localhost:9092"],
     auth: { type: "plain", username: "u", password: "p" },
     tls: { enabled: false },
@@ -150,11 +151,12 @@ describe("private-clusters", () => {
   });
 
   it("encodePrivateClusterHeader produces base64 JSON with backend shape", () => {
-    const c = upsertPrivateCluster(sample("enc"));
+    const c = upsertPrivateCluster({ ...sample("enc"), is_prod: true });
     const header = encodePrivateClusterHeader(c);
     expect(header).toMatch(/^[A-Za-z0-9+/=]+$/);
     const decoded = JSON.parse(decodeURIComponent(escape(atob(header))));
     expect(decoded.name).toBe("enc");
+    expect(decoded.is_prod).toBe(true);
     expect(decoded.brokers).toEqual(["localhost:9092"]);
     expect(decoded.auth.type).toBe("plain");
     expect(decoded.tls.enabled).toBe(false);
