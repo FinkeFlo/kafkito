@@ -15,10 +15,9 @@ updates:
       prefix: "deps"
       include: "scope"
     groups:
-      gomod-minor-patch:
-        update-types:
-          - "minor"
-          - "patch"
+      gomod-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: "npm"
     directory: "/frontend"
@@ -35,10 +34,9 @@ updates:
       prefix: "deps"
       include: "scope"
     groups:
-      npm-minor-patch:
-        update-types:
-          - "minor"
-          - "patch"
+      npm-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -55,10 +53,9 @@ updates:
       prefix: "ci"
       include: "scope"
     groups:
-      github-actions-minor-patch:
-        update-types:
-          - "minor"
-          - "patch"
+      github-actions-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: "docker"
     directory: "/"
@@ -74,6 +71,10 @@ updates:
     commit-message:
       prefix: "build"
       include: "scope"
+    groups:
+      docker-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: "pip"
     directory: "/"
@@ -89,3 +90,7 @@ updates:
     commit-message:
       prefix: "docs"
       include: "scope"
+    groups:
+      pip-all:
+        patterns:
+          - "*"

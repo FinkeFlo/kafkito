@@ -2,12 +2,37 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>kafkito — frontend not built</title>
+    <title>kafkito</title>
+    <script>
+      // Synchronous theme bootstrap to avoid FOUC.
+      // Mirror of frontend/src/lib/use-theme.ts (intentional duplication: must run before module bundle loads).
+      (function () {
+        try {
+          var pref = localStorage.getItem("kafkito.theme") || "system";
+          if (pref !== "light" && pref !== "dark") {
+            pref = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          }
+          document.documentElement.classList.toggle("dark", pref === "dark");
+        } catch (_) {
+          /* default light */
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-t7E_VTXo.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/useStore-DEpQqAJJ.js">
+    <link rel="modulepreload" crossorigin href="/assets/react-dom-C9VA5AE0.js">
+    <link rel="modulepreload" crossorigin href="/assets/ClientOnly-Cxp054vn.js">
+    <link rel="modulepreload" crossorigin href="/assets/redirect-D3L17tzd.js">
+    <link rel="modulepreload" crossorigin href="/assets/matchContext-CJrQOudI.js">
+    <link rel="modulepreload" crossorigin href="/assets/Match-BKV3MCcI.js">
+    <link rel="modulepreload" crossorigin href="/assets/link-BCRiEMbz.js">
+    <link rel="modulepreload" crossorigin href="/assets/useNavigate-CzXGxHZ7.js">
+    <link rel="modulepreload" crossorigin href="/assets/api-CmRBCgFw.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-DL92eAiL.css">
   </head>
   <body>
-    <h1>kafkito</h1>
-    <p>The single-page app has not been built yet.</p>
-    <p>Run <code>make build</code> (or <code>cd frontend &amp;&amp; bun install &amp;&amp; bun run build</code>) to populate this directory; this placeholder will be overwritten with the real bundle.</p>
+    <div id="root"></div>
   </body>
 </html>
