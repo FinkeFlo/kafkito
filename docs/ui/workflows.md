@@ -6,12 +6,48 @@
 In the topic **Messages** tab: partition, start-point, limit, range controls, and the **Search** panel.
 
 **What can I do?**  
-1. Open **Topics → \<topic\> → Messages**.  
+1. Open **Topics → Topic-Name → Messages**.  
 2. Optionally scope partition, set `From` (`latest`, `oldest`, `offset`), and choose a range.  
 3. Open **Search**.  
 4. Use `Mode = Text contains` for quick searches, or switch to `JSONPath`, `XPath`, or `JavaScript`.  
 5. Enter search value and run **Search**.  
 6. Use **Search more →** when scanning larger ranges.
+
+**Examples: searching on two fields (UI)**
+
+Use the UI controls (Mode / Path / Operator / Value) — no API calls needed for everyday use. Steps:
+
+1. Open Topics → select topic → Messages → Search.
+2. Set Mode to either `JavaScript` (recommended) or `JSONPath` (alternative).
+3. Paste the expression below into the **Search value** field and click **Search**.
+
+JavaScript (recommended — easiest for object checks):
+
+- Mode: JavaScript
+- Search value (paste exactly):
+
+```js
+// find unpaid invoices for CUST-123
+parsed.type === 'invoice' && parsed.customerId === 'CUST-123' && parsed.status === 'UNPAID' && parsed.totalAmount > 1000 && parsed.currency === 'USD'
+```
+
+Why JS: the UI passes the parsed JSON object as `parsed`, so field access and boolean logic are straightforward. The UI will show matched records when the expression evaluates to true.
+
+JSONPath (alternative — when you prefer path expressions):
+
+- Mode: JSONPath
+- Operator: exists
+- Path (paste into Path field):
+
+```text
+$..[?(@.type=='invoice' && @.customerId=='CUST-123' && @.status=='UNPAID' && @.totalAmount>1000 && @.currency=='USD')]
+```
+
+Notes:
+- JSONPath filters select nodes; use `exists` to match messages where the expression finds at least one node.
+- JavaScript mode is more robust for complex predicates and has access to: `key`, `value` (raw string), `parsed` (JSON object or `null`), `headers`, `partition`, `offset`, `timestampMs`.
+- For scripting and automation, the API endpoint is documented under the API reference: /API/#search — use that when you need curl/snippets or to integrate searches into scripts.
+
 
 **When should I use this?**  
 Use it to find specific IDs, header patterns, or payload fields in live or historical streams.
@@ -95,7 +131,7 @@ Committed offsets change for selected partitions and group lag is recalculated.
 In topic detail **Timeline**, you get a bar chart and time grid with approximate message counts per time slot.
 
 **What can I do?**  
-1. Open **Topics → \<topic\> → Timeline**.  
+1. Open **Topics → Topic-Name → Timeline**.  
 2. Select range preset (`Last 24 hours`, `Last 7 days`, `Last 30 days`).  
 3. Optionally scope a specific partition.  
 4. Inspect bars and the time grid to see when traffic peaked.

@@ -81,7 +81,9 @@ curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages?partition=0&from=
 
 `POST /api/v1/clusters/{cluster}/topics/{topic}/messages/search`
 
-Bounded content search with a scan budget.
+Bounded content search with a scan budget. Request body is a JSON object describing the scan (mode, path/value, zones, limit, budget). Common fields: `mode` (contains|jsonpath|xpath|js), `path` (for path modes), `op` (exists|eq|contains|regex|...), `value`, `zones` (array, e.g. ["value","headers","key"]).
+
+Quick example — simple contains across message value:
 
 ```bash
 curl -s -X POST "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/search" \
@@ -89,6 +91,29 @@ curl -s -X POST "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/search" \
   -d '{"query":"customerNumber","zones":["value"],"mode":"contains","direction":"backward","limit":20,"max_scan":5000}' \
   | jq '.stats, (.messages[] | {p:.partition, off:.offset})'
 ```
+
+Advanced: JSONPath example (match messages where isAvailable==true AND language=='English')
+
+```bash
+curl -sS -X POST "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/search" \
+  -H 'content-type: application/json' \
+  -d "{\"mode\":\"jsonpath\",\"op\":\"exists\",\"path\":\"$..[?(@.isAvailable==true && @.language=='English')]\",\"zones\":[\"value\"],\"limit\":20}" \
+  | jq '.stats, (.messages[] | {p:.partition, off:.offset})'
+```
+
+Advanced: JavaScript predicate example (same logic, runs the predicate per message)
+
+```bash
+curl -sS -X POST "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/search" \
+  -H 'content-type: application/json' \
+  -d "{\"mode\":\"js\",\"value\":\"parsed.isAvailable === true && parsed.language === 'English'\",\"zones\":[\"value\"],\"limit\":20}" \
+  | jq '.stats, (.messages[] | {p:.partition, off:.offset})'
+```
+
+Notes:
+- JSONPath filters return nodes; use `op=exists` to treat any match as a hit.
+- JS mode receives a parsed JSON object as `parsed` and can express arbitrarily complex predicates. The server enforces a short per-message timeout for JS filters.
+- Use `zones` to control where the scanner looks (`value`, `headers`, `key`).
 
 ### Produce
 
