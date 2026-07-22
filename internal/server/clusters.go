@@ -542,6 +542,15 @@ func (a *clusterAPI) produceMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user := rbacSubject(r, a.policy)
+	if req.Headers == nil {
+		req.Headers = make(map[string]string)
+	}
+	req.Headers["X-Kafkito-Source"] = "true"
+	if user != "" {
+		req.Headers["X-Kafkito-User"] = user
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	res, err := a.reg.Produce(ctx, cluster, topic, req)
