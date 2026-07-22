@@ -546,6 +546,13 @@ func (a *clusterAPI) produceMessage(w http.ResponseWriter, r *http.Request) {
 	if req.Headers == nil {
 		req.Headers = make(map[string]string)
 	}
+	// Prevent spoofing by scrubbing any client-supplied Kafkito metadata headers
+	for k := range req.Headers {
+		if strings.HasPrefix(strings.ToLower(k), "x-kafkito-") {
+			delete(req.Headers, k)
+		}
+	}
+	
 	req.Headers["X-Kafkito-Source"] = "true"
 	if user != "" {
 		req.Headers["X-Kafkito-User"] = user
