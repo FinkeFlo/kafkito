@@ -84,6 +84,12 @@ type Registry struct {
 	// entries so they can be idle-evicted. Nil for registries without any
 	// ad-hoc activity. Protected by r.mu.
 	adhocLastUsed map[string]time.Time
+	// adhocFPKeyOnce/adhocFPKeyVal hold the process-local secret used to key
+	// the ad-hoc cluster fingerprint HMAC (see adhoc.go Fingerprint). Lazily
+	// generated on first use so registries that never see a private-cluster
+	// request pay no cost.
+	adhocFPKeyOnce sync.Once
+	adhocFPKeyVal  []byte
 
 	srMu       sync.Mutex
 	srDecoders map[string]*SRDecoder

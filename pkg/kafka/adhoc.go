@@ -4,6 +4,8 @@
 package kafka
 
 import (
+	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -32,16 +34,46 @@ func IsAdhoc(name string) bool {
 	return len(name) > len(AdhocPrefix) && name[:len(AdhocPrefix)] == AdhocPrefix
 }
 
-// Fingerprint returns a stable short hash identifying a cluster config's
-// connection parameters. Two configs with the same fingerprint reuse the
-// same kgo.Client. The Name field is intentionally NOT part of the
-// fingerprint — two identical configs with different display names still
-// share a client.
-func Fingerprint(cfg config.ClusterConfig) string {
-	h := sha256.New()
+// adhocFPKey returns the process-local secret used to key the ad-hoc
+// fingerprint HMAC, generating it on first use. The key never leaves the
+// process (not persisted, not logged, not part of any API response); its
+// only purpose is to prevent Fingerprint's HMAC output from being reduced
+// to an unkeyed hash of caller-supplied credentials.
+func (r *Registry) adhocFPKey() []byte {
+	r.adhocFPKeyOnce.Do(func() {
+		key := make([]byte, 32)
+		if _, err := rand.Read(key); err != nil {
+			// crypto/rand.Read failing indicates a broken OS entropy source;
+			// this is effectively unreachable on any supported platform, but
+			// fall back to a fixed key rather than panicking the registry —
+			// worst case, ad-hoc client dedup degrades to per-process-boot
+			// determinism instead of true randomness.
+			copy(key, []byte("kafkito-adhoc-fingerprint-fallback-key-00000"))
+		}
+		r.adhocFPKeyVal = key
+	})
+	return r.adhocFPKeyVal
+}
+
+// Fingerprint returns a stable short digest identifying a cluster config's
+// connection parameters, keyed by a process-local secret. Two configs with
+// the same fingerprint reuse the same kgo.Client. The Name field is
+// intentionally NOT part of the fingerprint — two identical configs with
+// different display names still share a client.
+//
+// The digest is computed with HMAC-SHA256 rather than a bare hash: the
+// input includes SASL/Schema-Registry passwords, and hashing sensitive
+// credentials with an unkeyed fast hash is flagged as weak (CodeQL
+// go/weak-sensitive-data-hashing) because the output could otherwise be
+// brute-forced offline if it ever leaked (e.g. via logs). Keying the digest
+// with a random, process-local secret (never persisted or transmitted)
+// removes that risk while preserving the property this cache key actually
+// needs: same input -> same output for the lifetime of the process.
+func Fingerprint(cfg config.ClusterConfig, key []byte) string {
+	h := hmac.New(sha256.New, key)
 	brokers := append([]string{}, cfg.Brokers...)
 	sort.Strings(brokers)
-	// sha256.Hash.Write never errors; assign to _ to satisfy errcheck.
+	// hmac.Hash.Write never errors; assign to _ to satisfy errcheck.
 	_, _ = fmt.Fprintf(h, "brokers=%v\n", brokers)
 	_, _ = fmt.Fprintf(h, "auth.type=%s\nauth.user=%s\nauth.pass=%s\n",
 		cfg.Auth.Type, cfg.Auth.Username, cfg.Auth.Password)
@@ -72,7 +104,7 @@ func (r *Registry) UseAdhoc(cfg config.ClusterConfig) (string, error) {
 			return "", errors.New("adhoc cluster: empty broker address")
 		}
 	}
-	fp := Fingerprint(cfg)
+	fp := Fingerprint(cfg, r.adhocFPKey())
 	name := AdhocPrefix + fp
 
 	r.mu.Lock()

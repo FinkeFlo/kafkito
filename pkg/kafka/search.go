@@ -142,6 +142,13 @@ func (o SearchOptions) compile() (matcher, error) {
 		}
 		return newPathMatcher(jsonPathEval(expr), o.Op, o.Value)
 	case SearchModeXPath:
+		// o.Path is the caller-authored XPath query itself (like a grep
+		// pattern), not user data spliced into a privileged expression -
+		// there is no base query for it to escape, and the antchfx/xpath
+		// engine used here has no variable-binding API to parameterize
+		// against anyway. Length/complexity is bounded by the caller
+		// (see maxSearchPathLen in internal/server) to guard against
+		// pathological expressions.
 		expr, err := xpath.Compile(o.Path)
 		if err != nil {
 			return nil, fmt.Errorf("xpath %q: %w", o.Path, err)

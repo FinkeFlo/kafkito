@@ -27,6 +27,15 @@ const maxSearchBodyBytes = 1 << 20
 // in the kafka layer.
 const maxPartitionOffsetsEntries = 1024
 
+// maxSearchPathLen bounds jsonpath/xpath expressions supplied in a search
+// request. These modes intentionally let the caller author the full query
+// (like a grep pattern), so the string always reaches xpath.Compile /
+// jp.ParseString verbatim - that isn't the classic "user data spliced into
+// a privileged query" injection pattern, since there is no base query to
+// escape. The real risk here is a pathological expression driving excessive
+// CPU/memory in the parser or evaluator, which this length cap mitigates.
+const maxSearchPathLen = 2048
+
 // paramError is a client-visible parse failure carrying an HTTP status.
 type paramError struct {
 	status int
@@ -344,6 +353,9 @@ func parseSearchBody(w http.ResponseWriter, r *http.Request) (kafkapkg.SearchOpt
 	}
 	if body.Partition != nil {
 		opts.Partition = *body.Partition
+	}
+	if len(opts.Path) > maxSearchPathLen {
+		return kafkapkg.SearchOptions{}, badParam(fmt.Sprintf("path exceeds maximum length of %d", maxSearchPathLen))
 	}
 	opts.StopOnLimit = body.StopOnLimit == nil || *body.StopOnLimit
 	for _, z := range body.Zones {
