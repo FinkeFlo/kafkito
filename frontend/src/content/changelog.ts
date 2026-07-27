@@ -26,7 +26,25 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.1.3",
+    version: "1.1.5",
+    date: "2026-07-27",
+    items: [
+      {
+        type: "feature",
+        title: "Inject Kafkito metadata headers on produce",
+        description:
+          "Messages produced via Kafkito now include `X-Kafkito-Source: true` automatically. When a user identity is available, `X-Kafkito-User` is also attached to improve traceability and auditing.",
+      },
+      {
+        type: "fix",
+        title: "Regression coverage for produce metadata headers",
+        description:
+          "Added targeted backend tests to ensure metadata headers are injected consistently, custom headers are preserved, and spoofed Kafkito metadata headers are overwritten.",
+      },
+    ],
+  },
+  {
+    version: "1.1.4",
     date: "2026-07-20",
     items: [
       {
@@ -48,6 +66,24 @@ export const CHANGELOG: ChangelogEntry[] = [
           src: "/whats-new/1.1.3-prod-produce-warning.png",
           alt: "Produce tab showing a production warning confirmation dialog with Cancel and Produce anyway actions",
         },
+      },
+    ],
+  },
+  {
+    version: "1.1.3",
+    date: "2026-07-19",
+    items: [
+      {
+        type: "feature",
+        title: "Show message-count labels directly on Timeline bars",
+        description:
+          "The Timeline chart now displays message-count labels on bars to make volume changes easier to read at a glance.",
+      },
+      {
+        type: "fix",
+        title: "Timeline reliability improvements",
+        description:
+          "Improved timeline-related end-to-end stability and supporting test data handling to reduce flaky behavior.",
       },
     ],
   },
