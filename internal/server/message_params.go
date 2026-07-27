@@ -34,7 +34,7 @@ const maxPartitionOffsetsEntries = 1024
 // a privileged query" injection pattern, since there is no base query to
 // escape. The real risk here is a pathological expression driving excessive
 // CPU/memory in the parser or evaluator, which this length cap mitigates.
-const maxSearchPathLen = 2048
+const maxSearchPathLen = 512
 
 // paramError is a client-visible parse failure carrying an HTTP status.
 type paramError struct {
