@@ -128,10 +128,17 @@ export function deletePrivateCluster(id: string): void {
 }
 
 function newId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
+  const c = typeof globalThis !== "undefined" ? globalThis.crypto : undefined;
+  if (c?.randomUUID) {
+    return c.randomUUID();
   }
-  return "pc_" + Math.random().toString(36).slice(2, 12);
+  if (c?.getRandomValues) {
+    const bytes = new Uint8Array(8);
+    c.getRandomValues(bytes);
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    return "pc_" + hex;
+  }
+  return "pc_" + Date.now().toString(36);
 }
 
 // --- Export / Import ---------------------------------------------------
