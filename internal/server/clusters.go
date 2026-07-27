@@ -543,13 +543,7 @@ func (a *clusterAPI) produceMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := rbacSubject(r, a.policy)
-	if req.Headers == nil {
-		req.Headers = make(map[string]string)
-	}
-	req.Headers["X-Kafkito-Source"] = "true"
-	if user != "" {
-		req.Headers["X-Kafkito-User"] = user
-	}
+	injectKafkitoProduceHeaders(&req, user)
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
@@ -569,6 +563,16 @@ func (a *clusterAPI) produceMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, res)
+}
+
+func injectKafkitoProduceHeaders(req *kafkapkg.ProduceRequest, user string) {
+	if req.Headers == nil {
+		req.Headers = make(map[string]string)
+	}
+	req.Headers["X-Kafkito-Source"] = "true"
+	if user != "" {
+		req.Headers["X-Kafkito-User"] = user
+	}
 }
 
 func isClientProduceErr(msg string) bool {
