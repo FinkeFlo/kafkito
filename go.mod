@@ -5,7 +5,7 @@ go 1.26
 require (
 	connectrpc.com/connect v1.20.0
 	github.com/antchfx/xmlquery v1.5.1
-	github.com/antchfx/xpath v1.3.7
+	github.com/antchfx/xpath v1.3.8
 	github.com/dop251/goja v0.0.0-20260719185829-0fc1d42c1dc9
 	github.com/go-chi/chi/v5 v5.3.1
 	github.com/hamba/avro/v2 v2.31.0
