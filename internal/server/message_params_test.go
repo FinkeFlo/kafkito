@@ -371,6 +371,35 @@ func TestParseSearchBody_AcceptsSmallValidBody(t *testing.T) {
 	assert.Equal(t, "hello", opts.Value)
 }
 
+func TestParseSearchBody_RejectsOversizedPath(t *testing.T) {
+	t.Parallel()
+
+	body := `{"mode":"xpath","path":"` + strings.Repeat("/a", maxSearchPathLen) + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/x/messages/search", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	_, err := parseSearchBody(rec, req)
+
+	require.Error(t, err, "a path longer than maxSearchPathLen must be rejected")
+	var pe *paramError
+	require.ErrorAs(t, err, &pe, "over-cap path must surface as a client paramError")
+	assert.Contains(t, pe.Error(), "path exceeds maximum length")
+}
+
+func TestParseSearchBody_AcceptsPathAtLimit(t *testing.T) {
+	t.Parallel()
+
+	path := strings.Repeat("a", maxSearchPathLen)
+	body := `{"mode":"jsonpath","path":"` + path + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/x/messages/search", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	opts, err := parseSearchBody(rec, req)
+
+	require.NoError(t, err)
+	assert.Equal(t, path, opts.Path)
+}
+
 func TestWriteParamError_HandlesNonParamErrorWithGeneric400(t *testing.T) {
 	t.Parallel()
 
