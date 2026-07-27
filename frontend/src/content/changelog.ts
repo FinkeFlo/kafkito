@@ -26,6 +26,24 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.1.6",
+    date: "2026-07-27",
+    items: [
+      {
+        type: "security",
+        title: "Hardened ad-hoc cluster fingerprinting",
+        description:
+          "The cache key used to reuse connections for private (browser-stored) clusters is now derived with a keyed HMAC instead of a plain hash, removing a theoretical offline brute-force risk if the key ever leaked (e.g. via logs).",
+      },
+      {
+        type: "security",
+        title: "Bounded search query length",
+        description:
+          "JSONPath/XPath search queries are now capped in length to prevent overly complex expressions from consuming excessive resources.",
+      },
+    ],
+  },
+  {
     version: "1.1.5",
     date: "2026-07-27",
     items: [
