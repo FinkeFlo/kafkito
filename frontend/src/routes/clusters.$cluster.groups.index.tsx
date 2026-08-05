@@ -106,6 +106,7 @@ function GroupsPage() {
         <GroupDetailPanel
           cluster={selected}
           group={group}
+          isProd={!!selectedInfo?.is_prod}
           onDeleted={() => setGroup(undefined)}
         />
       )}
@@ -288,10 +289,12 @@ function GroupsTable({
 function GroupDetailPanel({
   cluster,
   group,
+  isProd = false,
   onDeleted,
 }: {
   cluster: string;
   group: string;
+  isProd?: boolean;
   onDeleted?: () => void;
 }) {
   const q = useQuery({
@@ -314,16 +317,18 @@ function GroupDetailPanel({
     );
   }
   if (!q.data) return null;
-  return <GroupDetailBody cluster={cluster} detail={q.data} onDeleted={onDeleted} />;
+  return <GroupDetailBody cluster={cluster} detail={q.data} isProd={isProd} onDeleted={onDeleted} />;
 }
 
 function GroupDetailBody({
   cluster,
   detail,
+  isProd = false,
   onDeleted,
 }: {
   cluster: string;
   detail: GroupDetail;
+  isProd?: boolean;
   onDeleted?: () => void;
 }) {
   const fmt = useFormatters();
@@ -363,7 +368,7 @@ function GroupDetailBody({
             />
           </div>
         </div>
-        <GroupActions cluster={cluster} detail={detail} onDeleted={onDeleted} />
+        <GroupActions cluster={cluster} detail={detail} isProd={isProd} onDeleted={onDeleted} />
       </div>
 
       <div className="rounded-xl border border-border bg-panel">
@@ -554,10 +559,12 @@ function Metric({
 function GroupActions({
   cluster,
   detail,
+  isProd = false,
   onDeleted,
 }: {
   cluster: string;
   detail: GroupDetail;
+  isProd?: boolean;
   onDeleted?: () => void;
 }) {
   const qc = useQueryClient();
@@ -629,6 +636,7 @@ function GroupActions({
         <ResetOffsetsModal
           cluster={cluster}
           detail={detail}
+          isProd={isProd}
           onClose={() => setResetOpen(false)}
         />
       )}
