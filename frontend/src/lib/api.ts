@@ -108,6 +108,12 @@ export interface Message {
   value_encoding: string;
   value_b64?: string;
   headers?: Record<string, string>;
+  /**
+   * Raw (standard-base64) bytes for header values that were not valid UTF-8.
+   * Populated only for those keys; they keep their "0x…" hex rendering in
+   * `headers` for display. Mirrors kafkapkg.Message.HeadersB64.
+   */
+  headers_b64?: Record<string, string>;
   masked?: boolean;
   key_sr?: SRDecodedMeta;
   value_sr?: SRDecodedMeta;
@@ -345,9 +351,20 @@ export interface ProduceRequest {
   partition?: number;
   key: string;
   value: string;
-  key_encoding?: "text" | "base64";
-  value_encoding?: "text" | "base64";
+  /**
+   * "text" (UTF-8 pass-through; an empty value produces a nil payload, i.e. a
+   * tombstone), "base64" (standard or URL-safe raw bytes) or "empty" (a
+   * non-nil zero-length payload). Defaults to "text" server-side.
+   */
+  key_encoding?: "text" | "base64" | "empty";
+  value_encoding?: "text" | "base64" | "empty";
   headers?: Record<string, string>;
+  /**
+   * Raw (standard-base64) bytes for header values that are not valid UTF-8.
+   * A key present in both `headers` and `headers_b64` is taken from
+   * `headers_b64` and emitted once. Mirrors kafkapkg.ProduceRequest.HeadersB64.
+   */
+  headers_b64?: Record<string, string>;
 }
 
 export interface ProduceResult {
@@ -408,9 +425,13 @@ export interface CopyRequest {
   dest_topic: string;
   /** Source partition to copy from; absent = all partitions. */
   partition?: number;
-  /** UNIX ms lower bound on source message timestamps. */
+  /** Inclusive UNIX ms lower bound on source message timestamps. */
   from_ts_ms?: number;
-  /** UNIX ms upper bound on source message timestamps. */
+  /**
+   * Exclusive UNIX ms upper bound on source message timestamps. When absent
+   * the server substitutes the moment the copy starts, so copying a live
+   * topic terminates instead of tailing newly produced records.
+   */
   to_ts_ms?: number;
   /** Max messages to copy; absent = no limit. */
   limit?: number;
@@ -420,7 +441,12 @@ export interface CopyRequest {
 
 export interface CopyProgressEvent {
   copied: number;
-  /** Records left out because they couldn't be reproduced verbatim (e.g. schema-registry-decoded payloads). */
+  /**
+   * Records left out because they cannot be reproduced byte-for-byte:
+   * schema-registry-decoded payloads (the original wire-format bytes are
+   * gone) and records the source cluster's data-masking rules redacted
+   * (copying would write the redaction).
+   */
   skipped?: number;
   done?: boolean;
   error?: string;

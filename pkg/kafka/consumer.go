@@ -29,7 +29,14 @@ type Message struct {
 	ValueEncoding string            `json:"value_encoding"`
 	ValueB64      string            `json:"value_b64,omitempty"`
 	Headers       map[string]string `json:"headers,omitempty"`
-	Masked        bool              `json:"masked,omitempty"`
+
+	// HeadersB64 carries the standard-base64 raw bytes of header values that are
+	// not valid UTF-8. Those keys still appear in Headers with a "0x…" hex
+	// rendering for display; HeadersB64 is what a byte-for-byte reproduction
+	// (see Registry.Produce) must use instead.
+	HeadersB64 map[string]string `json:"headers_b64,omitempty"`
+
+	Masked bool `json:"masked,omitempty"`
 
 	// KeySR / ValueSR are populated when the key/value carries the Confluent
 	// Schema-Registry wire-format magic byte and a decoder for the cluster
@@ -636,7 +643,13 @@ func recordToMessage(rec *kgo.Record) Message {
 			if utf8.Valid(h.Value) {
 				m.Headers[h.Key] = string(h.Value)
 			} else {
+				// Keep the hex rendering for display, but also carry the raw
+				// bytes so a verbatim re-produce (topic copy) stays lossless.
 				m.Headers[h.Key] = "0x" + hex.EncodeToString(h.Value)
+				if m.HeadersB64 == nil {
+					m.HeadersB64 = make(map[string]string, 1)
+				}
+				m.HeadersB64[h.Key] = base64.StdEncoding.EncodeToString(h.Value)
 			}
 		}
 	}

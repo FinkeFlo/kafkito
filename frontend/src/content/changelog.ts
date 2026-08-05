@@ -26,6 +26,30 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.1.7",
+    date: "2026-08-05",
+    items: [
+      {
+        type: "feature",
+        title: "Copy messages between topics and clusters",
+        description:
+          "Copy a topic's messages into another topic — on the same cluster or across clusters — with an optional time range, message limit, single source partition, and the option to keep each message on its original partition number. Progress is shown live while the copy runs, and the destination topic has to exist beforehand. Messages whose original bytes are not available (decoded through the Schema Registry, or redacted by data masking) are left out and counted as skipped rather than written in a changed form.",
+      },
+      {
+        type: "feature",
+        title: "Replay a single message to any topic",
+        description:
+          "Every message now has a Replay action that re-sends just that record to a topic you pick, on any cluster, so you can reproduce one case without copying a whole range.",
+      },
+      {
+        type: "fix",
+        title: "Private clusters can use a Schema Registry again",
+        description:
+          "Browser-stored cluster settings lost every multi-word field on the way to the server, so a private cluster's Schema Registry was never contacted, \"skip TLS verification\" had no effect, and clusters marked as production skipped the production confirmation prompt.",
+      },
+    ],
+  },
+  {
     version: "1.1.6",
     date: "2026-07-27",
     items: [

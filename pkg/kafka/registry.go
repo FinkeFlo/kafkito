@@ -227,6 +227,9 @@ func clientOpts(cfg config.ClusterConfig, log *slog.Logger) []kgo.Opt {
 		kgo.WithLogger(kgoSlogAdapter{log: log}),
 		kgo.MetadataMaxAge(30 * time.Second),
 		kgo.RequestTimeoutOverhead(5 * time.Second),
+		// Honour a caller-chosen Record.Partition; kgo's default partitioner
+		// overwrites it (see explicitOrKeyPartitioner).
+		kgo.RecordPartitioner(explicitOrKeyPartitioner()),
 	}
 
 	if cfg.TLS.Enabled && cfg.TLS.InsecureSkipVerify {

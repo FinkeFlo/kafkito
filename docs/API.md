@@ -69,6 +69,11 @@ as `value_b64` with `value_encoding=binary`. Schema-Registry encoded records
 are decoded transparently when an SR is configured for the cluster and carry a
 `value_sr` meta block (`schema_id`, `subject`, `version`, `format`).
 
+`headers` holds header values as text. A header value that is not valid UTF-8
+is rendered there as `0x…` hex — display only — and its raw bytes are also
+returned in the optional `headers_b64` map (standard base64, only the affected
+keys). Use `headers_b64` when you need to reproduce a header byte-for-byte.
+
 ```bash
 # Most recent 20 records across all partitions
 curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages?limit=20&from=latest" | jq '.messages[] | {p:.partition, off:.offset, ts:.timestamp_ms, enc:.value_encoding}'
@@ -125,6 +130,155 @@ curl -s -X POST "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages" \
   -d '{"key":"order-1","value":"{\"id\":1}","headers":{"source":"manual"}}' \
   | jq
 ```
+
+| Field                             | Notes                                                    |
+| --------------------------------- | -------------------------------------------------------- |
+| `partition`                       | Optional. Omit to let the partitioner choose.             |
+| `key` / `value`                   | Payloads, interpreted per the matching `*_encoding`.      |
+| `key_encoding` / `value_encoding` | `text` (default), `base64` or `empty`.                    |
+| `headers`                         | Header values as UTF-8 text.                              |
+| `headers_b64`                     | Header values as standard base64 raw bytes.               |
+
+Encodings:
+
+- `text` (default) — the string is sent as UTF-8 bytes. An **empty** `text`
+  value produces a **nil** payload, i.e. a tombstone. On a compacted topic that
+  deletes the key, so the distinction matters.
+- `base64` — the string is base64-decoded (standard, URL-safe and raw standard
+  are all accepted), for arbitrary binary payloads. An empty string produces a
+  nil payload here too.
+- `empty` — the string is ignored and a non-nil **zero-length** payload is
+  produced. This is the only way to express a zero-length value, since `text`
+  with an empty string means "tombstone".
+
+Header values that are not valid UTF-8 cannot round-trip through `headers`; pass
+them as base64 raw bytes in `headers_b64` instead. A key present in both maps
+wins in `headers_b64` and is emitted exactly once; an undecodable value fails the
+request with 400.
+
+kafkito always injects `X-Kafkito-Source: true` and, when an identity is
+available, `X-Kafkito-User: <subject>`, overwriting those keys if you supplied
+them.
+
+```bash
+# Zero-length value (not a tombstone) plus a binary header
+curl -s -X POST "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages" \
+  -H 'content-type: application/json' \
+  -d '{"key":"order-1","value_encoding":"empty","headers_b64":{"trace-id":"AAECAw=="}}' \
+  | jq
+
+# Tombstone: empty text value produces a nil payload
+curl -s -X POST "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages" \
+  -H 'content-type: application/json' \
+  -d '{"key":"order-1","value":""}' \
+  | jq
+```
+
+### Copy messages to another topic
+
+`POST /api/v1/clusters/{cluster}/topics/{topic}/copy`
+
+Server-side bulk copy. The `{cluster}`/`{topic}` in the URL are the **source**;
+the destination is named in the body. The destination topic must already exist —
+kafkito does not create it.
+
+The response is **not** JSON: it is a `text/event-stream` of progress events,
+because a copy can run far longer than a normal request.
+
+| Field                 | Type          | Notes                                                                                          |
+| --------------------- | ------------- | ---------------------------------------------------------------------------------------------- |
+| `dest_cluster`        | string        | Name of a server-configured destination cluster. Mutually exclusive with `dest_cluster_config`. |
+| `dest_cluster_config` | object        | Ad-hoc ("private") destination cluster, same shape the `X-Kafkito-Cluster` header carries.      |
+| `dest_topic`          | string        | **Required.** Destination topic.                                                                |
+| `partition`           | int32         | Single source partition. Absent = all partitions.                                               |
+| `from_ts_ms`          | int64         | Inclusive lower bound on source record timestamps.                                              |
+| `to_ts_ms`            | int64         | **Exclusive** upper bound. See below.                                                           |
+| `limit`               | int64         | Max records to copy. Absent = no limit.                                                         |
+| `preserve_partition`  | bool          | Produce each record to the partition number it came from.                                       |
+
+Exactly one of `dest_cluster` / `dest_cluster_config` must be set.
+
+When `to_ts_ms` is omitted the server substitutes the job's start time, so a
+copy of a live topic terminates instead of tailing it forever: records produced
+after the copy started are not included.
+
+`preserve_partition` requires the destination topic to have at least as many
+partitions as the highest source partition, otherwise the request is rejected.
+
+```bash
+# Copy the last hour of a topic into another topic on the same cluster
+curl -sN -X POST "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/copy" \
+  -H 'content-type: application/json' \
+  -d '{"dest_cluster":"'$CLUSTER'","dest_topic":"'$TOPIC'_replay","from_ts_ms":'$(( ($(date +%s) - 3600) * 1000 ))'}'
+```
+
+```
+data: {"copied":0}
+
+data: {"copied":500,"skipped":3}
+
+data: {"copied":812,"skipped":5,"done":true}
+```
+
+Each event is a `data: {json}` line pair with the fields:
+
+| Field     | Notes                                                                     |
+| --------- | ------------------------------------------------------------------------- |
+| `copied`  | Records produced to the destination so far.                               |
+| `skipped` | Records deliberately left out (see below). Omitted while 0.               |
+| `done`    | `true` on the final event only; omitted otherwise.                        |
+| `error`   | Set on the final event if the job aborted. Omitted when empty.            |
+
+Progress events arrive periodically — one right after the stream opens and at
+least one per fetched page. Because the SSE headers are sent before the copy
+starts, a failure *during* the copy surfaces as a `done` event carrying `error`
+**with HTTP status 200**: inspect the events, not just the status code.
+
+Watch the stream with `jq`:
+
+```bash
+curl -sN -X POST "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/copy" \
+  -H 'content-type: application/json' \
+  -d '{"dest_cluster":"other-cluster","dest_topic":"orders","limit":1000}' \
+  | sed -u 's/^data: //' | jq -c --unbuffered
+```
+
+`skipped` counts source records that cannot be reproduced byte-for-byte and are
+therefore left out rather than copied approximately:
+
+- **Schema-Registry-decoded payloads** (`avro`, `json_schema`, `protobuf`):
+  only the decoded JSON rendering is available, the original wire-format bytes
+  are gone.
+- **Masked records**: the source cluster's `data_masking` rules replaced the
+  value with a redacted rendering, so copying would write the redaction.
+
+Copied records carry the same provenance headers the produce endpoint injects —
+`X-Kafkito-Source: true` and `X-Kafkito-User: <subject>` — overwriting those
+keys if the source record already had them.
+
+Status codes returned **before** the stream starts:
+
+| Code | Meaning                                                                                                                                                                  |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 200  | Job started; body is `text/event-stream`.                                                                                                                                |
+| 400  | Invalid body, missing `dest_topic`, both or neither destination field, destination equal to the source cluster+topic (would never terminate), unknown `dest_cluster`, `dest_topic` does not exist (the destination is never auto-created), or `preserve_partition` with too few destination partitions. |
+| 403  | RBAC denied consume on the source or produce on the destination.                                                                                                          |
+| 428  | Destination cluster is marked `is_prod` and the `X-Kafkito-Confirm-Prod: true` header is missing.                                                                         |
+| 429  | Too many concurrent copy jobs server-wide; body carries `code: copy_concurrency_limit` and the response has a `Retry-After` header. Copies hold broker connections for their whole run, so the server sheds load instead of queueing. |
+
+**Authorization.** The source is checked as `topic:consume` by the RBAC
+middleware (from the URL); the destination is checked as `topic:produce` by the
+handler, against the cluster/topic named in the body.
+
+An ad-hoc `dest_cluster_config` destination **bypasses RBAC entirely** — the
+caller supplies their own broker credentials and only the destination broker's
+own ACLs apply. This is a deliberate, pre-existing property of private clusters,
+but it means a user holding nothing but `topic:consume` can stream a readable
+topic to a broker of their choosing. Operators who care about egress should
+disable private clusters rather than rely on the copy endpoint's RBAC checks.
+
+**Not transactional, not resumable.** An error leaves the records copied so far
+in the destination topic, and re-running the copy duplicates them.
 
 ## Consumer groups
 
@@ -225,6 +379,8 @@ Status codes used by the server:
 | 403  | RBAC denied the requested action on the resource.               |
 | 404  | Cluster/topic/group/subject not found.                          |
 | 409  | Conflict (topic already exists, group not empty, etc.).         |
+| 428  | Production cluster needs `X-Kafkito-Confirm-Prod: true`.        |
+| 429  | Too many concurrent long-running jobs (e.g. topic copies).      |
 | 502  | Kafka broker returned an error.                                 |
 | 504  | Request to Kafka/SR timed out.                                  |
 

@@ -1,9 +1,15 @@
 // ReplayModal — lets the user replay a single captured message to an arbitrary
 // cluster / topic (potentially different from where it was consumed).
 //
-// Key, value and all headers are preserved verbatim; the message is produced
-// with "text" encoding (raw string pass-through) so the payload isn't mangled
-// by a second base64 round-trip.
+// Key, value and all headers are reproduced byte-for-byte. The produce
+// encoding is derived per field by `produceEncodingFor` (shared fidelity rules
+// with internal/server/topic_copy.go), because the rendering the consumer
+// returns is not always the payload: "binary" fields carry only a truncated
+// hex preview and must be sent from their base64 form, and "empty" fields need
+// the "empty" encoding so a zero-length payload isn't turned into a tombstone.
+// Non-UTF-8 header values are sent via `headers_b64` for the same reason.
+// Messages whose original bytes are unrecoverable (Schema-Registry-decoded or
+// masked) are refused up front — see `replayBlocker`.
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -11,6 +17,7 @@ import {
   produceMessage,
   type Message,
 } from "@/lib/api";
+import { produceEncodingFor, replayBlocker } from "@/lib/produce-encoding";
 import { useCluster, type ClusterListItem } from "@/lib/use-cluster";
 import { Modal } from "./Modal";
 import { Button } from "./button";
@@ -46,8 +53,15 @@ export function ReplayModal({ open, onClose, message }: ReplayModalProps) {
 
   const isProdDest = !!clusterList.find((c) => c.name === effectiveCluster)?.is_prod;
 
+  // Fidelity check. Non-null means the original bytes cannot be reproduced, so
+  // nothing is sent at all; `keyPayload`/`valuePayload` are then unusable.
+  const blocker = replayBlocker(message);
+  const keyPayload = produceEncodingFor(message.key, message.key_b64, message.key_encoding);
+  const valuePayload = produceEncodingFor(message.value, message.value_b64, message.value_encoding);
+
   const doReplay = async (confirmedProd: boolean) => {
     if (!effectiveCluster || !destTopic.trim()) return;
+    if (blocker || !keyPayload || !valuePayload) return;
     setBusy(true);
     setError(null);
     setResult(null);
@@ -56,11 +70,12 @@ export function ReplayModal({ open, onClose, message }: ReplayModalProps) {
         effectiveCluster,
         destTopic.trim(),
         {
-          key: message.key ?? "",
-          value: message.value ?? "",
-          key_encoding: message.key_encoding === "base64" ? "base64" : "text",
-          value_encoding: message.value_encoding === "base64" ? "base64" : "text",
+          key: keyPayload.value,
+          value: valuePayload.value,
+          key_encoding: keyPayload.encoding,
+          value_encoding: valuePayload.encoding,
           headers: message.headers,
+          headers_b64: message.headers_b64,
         },
         confirmedProd,
       );
@@ -79,6 +94,7 @@ export function ReplayModal({ open, onClose, message }: ReplayModalProps) {
   };
 
   const handleReplay = () => {
+    if (blocker) return;
     if (isProdDest) {
       setConfirmProd(true);
     } else {
@@ -95,7 +111,7 @@ export function ReplayModal({ open, onClose, message }: ReplayModalProps) {
   };
 
   const labelCls = "text-[11px] font-semibold uppercase tracking-wider text-muted";
-  const canReplay = !!effectiveCluster && !!destTopic.trim() && !busy;
+  const canReplay = !!effectiveCluster && !!destTopic.trim() && !busy && !blocker;
 
   return (
     <>
@@ -126,6 +142,13 @@ export function ReplayModal({ open, onClose, message }: ReplayModalProps) {
             Reproduces this message (key&thinsp;+&thinsp;value&thinsp;+&thinsp;headers) to
             the selected destination cluster and topic.
           </p>
+
+          {blocker && (
+            <div className="rounded-md border border-danger/30 bg-danger-subtle p-2 text-xs text-danger">
+              <div className="font-semibold">Replay not possible</div>
+              <p className="mt-0.5">{blocker.reason}</p>
+            </div>
+          )}
 
           <div>
             <label className={`mb-1 block ${labelCls}`}>Destination cluster</label>

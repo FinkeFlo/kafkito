@@ -227,6 +227,27 @@ paths:
     post:
       tags: [topics]
       summary: Produce a single record.
+      description: |
+        `key_encoding` / `value_encoding` select how `key` / `value` are turned
+        into record bytes:
+        - `text` (default): the string is sent as UTF-8 bytes. An **empty**
+          `text` value produces a **nil** payload, i.e. a tombstone — which
+          deletes the key on a compacted topic.
+        - `base64`: the string is base64-decoded (standard, URL-safe or raw
+          standard are all accepted), for arbitrary binary payloads. An empty
+          string produces a nil payload here too.
+        - `empty`: the string is ignored and a non-nil **zero-length** payload
+          is produced. Needed because `text` cannot express a zero-length
+          payload (see the tombstone semantics above).
+
+        Header values that are not valid UTF-8 cannot round-trip through
+        `headers`; pass them as base64 raw bytes in `headers_b64` instead. A key
+        present in both maps wins in `headers_b64` and is emitted exactly once.
+        An undecodable `headers_b64` value fails the request with 400.
+
+        kafkito always injects the provenance headers `X-Kafkito-Source: true`
+        and, when an identity is available, `X-Kafkito-User: <subject>`,
+        overwriting those keys if the request supplied them.
       parameters:
         - { $ref: "#/components/parameters/Cluster" }
         - { $ref: "#/components/parameters/Topic" }
@@ -240,11 +261,19 @@ paths:
                 partition: { type: integer }
                 key: { type: string }
                 value: { type: string }
-                key_encoding: { type: string, enum: [text, base64] }
-                value_encoding: { type: string, enum: [text, base64] }
+                key_encoding: { type: string, enum: [text, base64, empty], default: text }
+                value_encoding: { type: string, enum: [text, base64, empty], default: text }
                 headers:
                   type: object
                   additionalProperties: { type: string }
+                  description: Header values as UTF-8 text.
+                headers_b64:
+                  type: object
+                  additionalProperties: { type: string }
+                  description: >
+                    Header values as standard-base64 raw bytes, for headers
+                    whose value is not valid UTF-8. Wins over `headers` for the
+                    same key.
       responses:
         "200": { description: Produced }
   /api/v1/clusters/{cluster}/topics/{topic}/messages/count:
@@ -388,6 +417,107 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SearchResponse" }
+  /api/v1/clusters/{cluster}/topics/{topic}/copy:
+    post:
+      tags: [topics]
+      summary: Bulk-copy messages into another topic (SSE progress stream).
+      description: |
+        Server-side copy: reads records from the source topic — the
+        `{cluster}`/`{topic}` in the URL — and re-produces them into
+        `dest_topic` on the destination cluster named in the request body.
+        The destination topic must already exist; kafkito never creates it.
+
+        Exactly one destination cluster field must be set: `dest_cluster` for a
+        server-configured cluster, or `dest_cluster_config` for an ad-hoc
+        ("private") cluster passed inline — the same payload the
+        `X-Kafkito-Cluster` header carries.
+
+        The response is **not** JSON: it is a `text/event-stream` of
+        `CopyProgressEvent` objects, because a copy can run far longer than a
+        normal request.
+
+        When `to_ts_ms` is omitted the server substitutes the job's start time,
+        so copying a live topic terminates instead of tailing it forever:
+        records produced after the copy started are not included.
+
+        Records that cannot be reproduced byte-for-byte are left out and
+        counted in `skipped` instead of being copied approximately:
+        Schema-Registry-decoded payloads (`avro` / `json_schema` /
+        `protobuf`), for which only the decoded JSON rendering is available and
+        the original wire-format bytes are gone, and masked records, whose
+        value the source cluster's `data_masking` rules replaced with a
+        redacted rendering.
+
+        Copied records carry the same provenance headers the produce endpoint
+        injects — `X-Kafkito-Source: true` and `X-Kafkito-User: <subject>` —
+        overwriting those keys if the source record already had them.
+
+        Authorization: the source needs `topic:consume` (checked by the RBAC
+        middleware from the URL) and the destination needs `topic:produce`
+        (checked by the handler against the cluster/topic named in the body).
+        An ad-hoc `dest_cluster_config` destination **bypasses RBAC** — the
+        caller supplies their own broker credentials and only that broker's own
+        ACLs apply, so a user holding nothing but `topic:consume` can stream a
+        readable topic to a broker of their choosing. This is a deliberate,
+        pre-existing property of private clusters.
+
+        The copy is neither transactional nor resumable: on error the records
+        copied so far stay in the destination topic, and re-running the copy
+        duplicates them.
+      parameters:
+        - { $ref: "#/components/parameters/Cluster" }
+        - { $ref: "#/components/parameters/Topic" }
+        - in: header
+          name: X-Kafkito-Confirm-Prod
+          schema: { type: string, enum: ["true"] }
+          description: >
+            Must be `true` when the destination cluster is marked `is_prod`;
+            the request is rejected with 428 otherwise.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CopyRequest" }
+      responses:
+        "200":
+          description: |
+            Copy job started; progress is streamed as Server-Sent Events. A
+            failure *during* the copy also arrives here with status 200 — the
+            SSE headers are already sent — as a final event carrying `error`.
+            Clients must inspect the events, not just the status code.
+          content:
+            text/event-stream:
+              schema: { $ref: "#/components/schemas/CopyProgressEvent" }
+              example: |
+                data: {"copied":0}
+
+                data: {"copied":500,"skipped":3}
+
+                data: {"copied":812,"skipped":5,"done":true}
+        "400":
+          description: >
+            Invalid body, missing `dest_topic`, both or neither destination
+            field set, destination equal to the source cluster+topic (the copy
+            would never terminate), unknown `dest_cluster`, `dest_topic` does
+            not exist on the destination (the destination is never
+            auto-created), or `preserve_partition` with too few partitions on
+            the destination topic.
+        "403":
+          description: RBAC denied consume on the source or produce on the destination.
+        "428":
+          description: >
+            Destination cluster is marked `is_prod` and the
+            `X-Kafkito-Confirm-Prod: true` header is missing.
+        "429":
+          description: >
+            Too many concurrent copy jobs server-wide. The body carries
+            `code: copy_concurrency_limit`. Copies are long-running and each
+            holds broker connections, so the server sheds load rather than
+            queueing.
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying.
+              schema: { type: integer }
   /api/v1/clusters/{cluster}/groups:
     get:
       tags: [groups]
@@ -699,11 +829,23 @@ components:
         key_encoding: { type: string, enum: [text, binary, base64, empty, null] }
         key_b64: { type: string }
         value: { type: string }
-        value_encoding: { type: string, enum: [json, text, binary, base64, empty, null, avro, protobuf, json_sr] }
+        value_encoding: { type: string, enum: [json, text, binary, base64, empty, null, avro, protobuf, json_schema] }
         value_b64: { type: string }
         headers:
           type: object
           additionalProperties: { type: string }
+          description: >
+            Header values as text. A value that is not valid UTF-8 is rendered
+            as `0x…` hex here for display only — its raw bytes are in
+            `headers_b64`.
+        headers_b64:
+          type: object
+          additionalProperties: { type: string }
+          description: >
+            Standard-base64 raw bytes of header values that are not valid
+            UTF-8. Only the affected keys appear; they also remain in `headers`
+            with the hex rendering. Use this map to reproduce a header
+            byte-for-byte (see the produce endpoint's `headers_b64`).
         masked: { type: boolean }
         value_sr: { $ref: "#/components/schemas/SRDecodedMeta" }
         key_sr: { $ref: "#/components/schemas/SRDecodedMeta" }
@@ -748,8 +890,111 @@ components:
         schema_id: { type: integer }
         subject: { type: string }
         version: { type: integer }
-        format: { type: string, enum: [avro, protobuf, json] }
+        format: { type: string, enum: [avro, protobuf, json_schema] }
         error: { type: string }
+    CopyRequest:
+      type: object
+      required: [dest_topic]
+      description: >
+        Body of the topic copy endpoint. Exactly one of `dest_cluster` /
+        `dest_cluster_config` must be set.
+      properties:
+        dest_cluster:
+          type: string
+          description: >
+            Name of a server-configured destination cluster. Mutually exclusive
+            with `dest_cluster_config`.
+        dest_cluster_config:
+          allOf: [ { $ref: "#/components/schemas/ClusterConfig" } ]
+          description: >
+            Ad-hoc ("private") destination cluster, same shape the
+            `X-Kafkito-Cluster` header carries. Mutually exclusive with
+            `dest_cluster`. Bypasses RBAC on the destination.
+        dest_topic:
+          type: string
+          description: Destination topic. Must already exist.
+        partition:
+          type: integer
+          format: int32
+          description: Single source partition. Absent = all partitions.
+        from_ts_ms:
+          type: integer
+          format: int64
+          description: Inclusive lower bound on source record timestamps.
+        to_ts_ms:
+          type: integer
+          format: int64
+          description: >
+            Exclusive upper bound on source record timestamps. When omitted the
+            server substitutes the job's start time, so a copy of a live topic
+            terminates instead of tailing it forever.
+        limit:
+          type: integer
+          format: int64
+          description: Maximum number of records to copy. Absent = no limit.
+        preserve_partition:
+          type: boolean
+          description: >
+            Produce each record to the same partition number it came from.
+            Requires the destination topic to have at least as many partitions
+            as the highest source partition, otherwise the request is rejected
+            with 400.
+    CopyProgressEvent:
+      type: object
+      description: >
+        One SSE event of the copy stream, sent as a `data: {json}` line pair.
+        Progress events arrive periodically — one right after the stream opens
+        and at least one per fetched page — and the final event has
+        `done: true`.
+      properties:
+        copied:
+          type: integer
+          format: int64
+          description: Records produced to the destination topic so far.
+        skipped:
+          type: integer
+          format: int64
+          description: >
+            Source records deliberately left out because they cannot be
+            reproduced byte-for-byte (Schema-Registry-decoded or masked
+            values). Omitted while 0.
+        done:
+          type: boolean
+          description: True on the final event only; omitted otherwise.
+        error:
+          type: string
+          description: >
+            Set on the final event when the job aborted. Omitted when empty.
+            Errors after the stream opened still carry HTTP status 200.
+    ClusterConfig:
+      type: object
+      required: [brokers]
+      description: >
+        Ad-hoc ("private") cluster definition supplied per request instead of
+        from the server config — the same JSON the `X-Kafkito-Cluster` header
+        carries (base64-encoded there).
+      properties:
+        name: { type: string }
+        is_prod: { type: boolean }
+        brokers: { type: array, items: { type: string } }
+        auth:
+          type: object
+          properties:
+            type: { type: string, enum: [none, plain, scram-sha-256, scram-sha-512] }
+            username: { type: string }
+            password: { type: string, format: password }
+        tls:
+          type: object
+          properties:
+            enabled: { type: boolean }
+            insecure_skip_verify: { type: boolean }
+        schema_registry:
+          type: object
+          properties:
+            url: { type: string }
+            username: { type: string }
+            password: { type: string, format: password }
+            insecure_skip_verify: { type: boolean }
     SearchResponse:
       type: object
       properties:
