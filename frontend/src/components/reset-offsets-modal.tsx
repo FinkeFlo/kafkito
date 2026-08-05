@@ -33,10 +33,12 @@ function selectAll(parts: number[]): Record<number, boolean> {
 export function ResetOffsetsModal({
   cluster,
   detail,
+  isProd = false,
   onClose,
 }: {
   cluster: string;
   detail: GroupDetail;
+  isProd?: boolean;
   onClose: () => void;
 }) {
   const qc = useQueryClient();
@@ -119,7 +121,7 @@ export function ResetOffsetsModal({
       resetGroupOffsets(cluster, detail.group_id, {
         ...debouncedBody,
         dry_run: true,
-      }),
+      }, isProd),
     enabled: !!topic && strategyReady,
     placeholderData: keepPreviousData,
     staleTime: 10_000,
@@ -138,7 +140,7 @@ export function ResetOffsetsModal({
   });
 
   const commitMut = useMutation({
-    mutationFn: () => resetGroupOffsets(cluster, detail.group_id, buildBody(false)),
+    mutationFn: () => resetGroupOffsets(cluster, detail.group_id, buildBody(false), isProd),
     onSuccess: (r) => {
       setResult(r.results);
       qc.invalidateQueries({ queryKey: ["group", cluster, detail.group_id] });
@@ -177,7 +179,7 @@ export function ResetOffsetsModal({
             onOpenChange={setCommitOpen}
             variant="primary"
             title="Commit new offsets?"
-            description={`This will overwrite committed offsets for group "${detail.group_id}" on topic "${topic}". Partitions: ${selectedParts.join(",")} (${selectedParts.length} of ${topicParts.length}).`}
+            description={`${isProd ? "⚠ Production cluster — " : ""}This will overwrite committed offsets for group "${detail.group_id}" on topic "${topic}". Partitions: ${selectedParts.join(",")} (${selectedParts.length} of ${topicParts.length}).`}
             confirmPhrase={detail.group_id}
             confirmLabel="Commit reset"
             onConfirm={async () => {
