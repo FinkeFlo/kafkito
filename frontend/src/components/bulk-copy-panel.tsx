@@ -292,6 +292,8 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
               : progress.done
                 ? `✓ Done — ${progress.copied.toLocaleString()} message${progress.copied === 1 ? "" : "s"} copied`
                 : `Copying… ${progress.copied.toLocaleString()} messages so far`}
+            {!!progress.skipped &&
+              ` (${progress.skipped.toLocaleString()} skipped — unsupported encoding)`}
           </div>
         )}
 

@@ -56,9 +56,12 @@ type copyRequest struct {
 
 // copyProgressEvent is the SSE payload emitted while copying.
 type copyProgressEvent struct {
-	Copied int64  `json:"copied"`
-	Done   bool   `json:"done,omitempty"`
-	Error  string `json:"error,omitempty"`
+	Copied int64 `json:"copied"`
+	// Skipped counts source records that could not be reproduced verbatim
+	// (see produceEncodingFor) and were left out of the destination topic.
+	Skipped int64  `json:"skipped,omitempty"`
+	Done    bool   `json:"done,omitempty"`
+	Error   string `json:"error,omitempty"`
 }
 
 // copyMessages reads records from the source topic and reproduces them on the
@@ -93,16 +96,49 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve destination cluster name.
+	// Resolve destination cluster name. For named clusters and for ad-hoc
+	// configs this is the same deterministic internal registry name used
+	// for the source (resolvePrivateClusterParam rewrites the source's
+	// {cluster} URL param the same way), so comparing the two below
+	// correctly detects "same actual cluster" even across differently
+	// labelled private-cluster configs that point at the same broker.
 	destCluster, err := a.resolveDestCluster(req)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
 
+	// Refuse to copy a topic into itself: with no upper time bound this
+	// would never terminate, since each produced record extends the
+	// source's own high-watermark for the next page of the same copy job.
+	if destCluster == srcCluster && req.DestTopic == srcTopic {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "dest_cluster/dest_topic must differ from the source"})
+		return
+	}
+
 	// Prod-cluster check for the DESTINATION.
 	if !a.requireProdConfirmation(w, r, destCluster) {
 		return
+	}
+
+	// RBAC for the DESTINATION: resolvePermission/rbacMiddleware only checks
+	// the source ({cluster}/{topic} from the URL) as "topic:consume"; the
+	// destination is an arbitrary cluster/topic named in the body, so it
+	// needs its own explicit "topic:produce" check here, mirroring what
+	// produceMessage gets from the middleware for its own {cluster}/{topic}.
+	// Ad-hoc/private destinations bypass RBAC entirely, same as elsewhere:
+	// the caller supplies their own credentials and the broker enforces its
+	// own ACLs.
+	if req.DestClusterConfig == nil && a.policy.Enabled() {
+		user := rbacSubject(r, a.policy)
+		if !a.policy.Allow(user, destCluster, "topic", req.DestTopic, "produce") {
+			writeJSON(w, http.StatusForbidden, map[string]any{
+				"error":    "forbidden",
+				"resource": "topic:" + req.DestTopic,
+				"action":   "produce",
+			})
+			return
+		}
 	}
 
 	// Set up a context that is decoupled from the upstream 30 s timeout
@@ -135,13 +171,28 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 		return werr == nil
 	}
 
+	// user is stable for the whole request; resolve it once rather than on
+	// every produced record.
+	user := rbacSubject(r, a.policy)
+
 	// Copy loop.
 	var (
-		copied      int64
-		cursor      *string
-		from        kafkapkg.ConsumeFrom
+		copied       int64
+		skipped      int64
+		cursor       *string
+		from         kafkapkg.ConsumeFrom
 		partitionOpt int32 = -1
+		// donePartitions tracks source partitions whose records have started
+		// exceeding req.ToTSMs. Kafka guarantees non-decreasing timestamps
+		// within a single partition, so once a partition crosses the bound
+		// none of its later records can be back in range — but pages
+		// interleave multiple partitions, so encountering one out-of-range
+		// record must not abort partitions that are still in range.
+		donePartitions map[int32]bool
 	)
+	if req.ToTSMs > 0 {
+		donePartitions = make(map[int32]bool)
+	}
 
 	if req.Partition != nil {
 		partitionOpt = *req.Partition
@@ -179,7 +230,7 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 		if cursor != nil {
 			c, decErr := kafkapkg.DecodeCursor(*cursor)
 			if decErr != nil {
-				sendEvent(copyProgressEvent{Copied: copied, Done: true, Error: "cursor decode: " + decErr.Error()})
+				sendEvent(copyProgressEvent{Copied: copied, Skipped: skipped, Done: true, Error: "cursor decode: " + decErr.Error()})
 				return
 			}
 			opts.From = kafkapkg.FromOffset
@@ -192,16 +243,18 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 				// Client disconnected or safety timeout hit.
 				return
 			}
-			sendEvent(copyProgressEvent{Copied: copied, Done: true, Error: "consume: " + consumeErr.Error()})
+			sendEvent(copyProgressEvent{Copied: copied, Skipped: skipped, Done: true, Error: "consume: " + consumeErr.Error()})
 			return
 		}
 
 		for _, msg := range page.Messages {
-			// Filter by ToTSMs when no cursor yet (first batch from FromTimestamp/FromStart
-			// doesn't enforce an upper bound at the kafka level for all cases).
+			// A record past the requested end timestamp means this
+			// partition is done; other partitions in the same page may
+			// still have in-range records, so only that partition is
+			// excluded going forward — the whole copy must not stop here.
 			if req.ToTSMs > 0 && msg.Timestamp > req.ToTSMs {
-				// We've passed the requested end timestamp; stop.
-				goto done
+				donePartitions[msg.Partition] = true
+				continue
 			}
 
 			destPartition := (*int32)(nil)
@@ -210,16 +263,26 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 				destPartition = &p
 			}
 
+			key, keyEncoding, keyOK := produceEncodingFor(msg.Key, msg.KeyB64, msg.KeyEncoding)
+			value, valueEncoding, valueOK := produceEncodingFor(msg.Value, msg.ValueB64, msg.ValueEncoding)
+			if !keyOK || !valueOK {
+				// Schema-Registry-decoded key/value: the API only exposes the
+				// decoded rendering, not the original wire-format bytes, so
+				// this record cannot be reproduced verbatim. Skip rather than
+				// silently corrupt it or abort the whole copy.
+				skipped++
+				continue
+			}
+
 			produceReq := kafkapkg.ProduceRequest{
 				Partition:     destPartition,
-				Key:           msg.Key,
-				Value:         msg.Value,
-				KeyEncoding:   msg.KeyEncoding,
-				ValueEncoding: msg.ValueEncoding,
+				Key:           key,
+				Value:         value,
+				KeyEncoding:   keyEncoding,
+				ValueEncoding: valueEncoding,
 				Headers:       msg.Headers,
 			}
 
-			user := rbacSubject(r, a.policy)
 			injectKafkitoProduceHeaders(&produceReq, user)
 
 			produceCtx, produceCancel := context.WithTimeout(opCtx, 10*time.Second)
@@ -230,7 +293,7 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 				if errors.Is(produceErr, context.Canceled) {
 					return
 				}
-				sendEvent(copyProgressEvent{Copied: copied, Done: true, Error: "produce: " + produceErr.Error()})
+				sendEvent(copyProgressEvent{Copied: copied, Skipped: skipped, Done: true, Error: "produce: " + produceErr.Error()})
 				return
 			}
 
@@ -238,7 +301,7 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 
 			// Emit a progress heartbeat every 100 records.
 			if copied%100 == 0 {
-				if !sendEvent(copyProgressEvent{Copied: copied}) {
+				if !sendEvent(copyProgressEvent{Copied: copied, Skipped: skipped}) {
 					return // client disconnected
 				}
 			}
@@ -252,10 +315,24 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
+		// Drop partitions that have already crossed req.ToTSMs so the next
+		// page doesn't keep re-fetching (and re-checking) them; once every
+		// partition in the cursor is done, the copy is complete.
+		if donePartitions != nil {
+			for p := range page.NextCursor.Partitions {
+				if donePartitions[p] {
+					delete(page.NextCursor.Partitions, p)
+				}
+			}
+			if len(page.NextCursor.Partitions) == 0 {
+				break
+			}
+		}
+
 		// Advance the cursor for the next iteration.
 		encoded, encErr := kafkapkg.EncodeCursor(*page.NextCursor)
 		if encErr != nil {
-			sendEvent(copyProgressEvent{Copied: copied, Done: true, Error: "cursor encode: " + encErr.Error()})
+			sendEvent(copyProgressEvent{Copied: copied, Skipped: skipped, Done: true, Error: "cursor encode: " + encErr.Error()})
 			return
 		}
 		cursor = &encoded
@@ -264,7 +341,30 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 done:
-	sendEvent(copyProgressEvent{Copied: copied, Done: true})
+	sendEvent(copyProgressEvent{Copied: copied, Skipped: skipped, Done: true})
+}
+
+// produceEncodingFor maps a consumed field's (rendered, base64, encoding)
+// triple — as returned by the consumer for Message.Key/Value — to the
+// (value, encoding) pair kafkapkg.ProduceRequest expects, so the record can
+// be reproduced byte-for-byte on the destination.
+//
+// "binary" payloads only retain their original bytes in the base64 form, so
+// those use ProduceRequest's "base64" encoding; everything else ("null",
+// "empty", "text", "json") round-trips exactly through the rendered string
+// as-is via "text". Schema-Registry-decoded fields ("avro", "json_schema",
+// "protobuf") are reported as not-ok: applySRDecoder overwrites the raw
+// bytes with the decoded JSON rendering and discards the base64 form, so the
+// original wire-format bytes are not recoverable from a Message at all.
+func produceEncodingFor(rendered, b64, encoding string) (value, produceEncoding string, ok bool) {
+	switch encoding {
+	case "avro", "json_schema", "protobuf":
+		return "", "", false
+	case "binary":
+		return b64, "base64", true
+	default: // "null", "empty", "json", "text"
+		return rendered, "text", true
+	}
 }
 
 // resolveDestCluster returns the internal cluster name to use for producing to

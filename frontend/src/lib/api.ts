@@ -420,6 +420,8 @@ export interface CopyRequest {
 
 export interface CopyProgressEvent {
   copied: number;
+  /** Records left out because they couldn't be reproduced verbatim (e.g. schema-registry-decoded payloads). */
+  skipped?: number;
   done?: boolean;
   error?: string;
 }
@@ -510,7 +512,7 @@ export function copyMessages(
   return () => ctrl.abort();
 }
 
-
+export interface GroupInfo {
   group_id: string;
   state: string;
   protocol_type: string;
