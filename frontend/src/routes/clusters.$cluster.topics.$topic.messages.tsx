@@ -25,6 +25,8 @@ import { Button } from "@/components/button";
 import { Timestamp } from "@/components/timestamp";
 import { MessageRangeCountPreview } from "@/components/message-range-count-preview";
 import { useFormatters } from "@/lib/use-formatters";
+import { ReplayModal } from "@/components/replay-modal";
+import { BulkCopyPanel } from "@/components/bulk-copy-panel";
 
 interface MessagesSearch {
   partition: number;
@@ -123,6 +125,7 @@ export const Route = createFileRoute("/clusters/$cluster/topics/$topic/messages"
 
 function MessagesTab() {
   const { cluster, topic } = Route.useParams();
+  const [copyOpen, setCopyOpen] = useState(false);
 
   const detailQuery = useQuery({
     queryKey: ["topic", cluster, topic],
@@ -135,12 +138,37 @@ function MessagesTab() {
     return <div className="text-sm text-[var(--color-text-muted)]">Loading…</div>;
   }
 
+  const partitionNumbers = detailQuery.data.partitions.map((p) => p.partition);
+
   return (
-    <MessagesPanel
-      cluster={cluster}
-      topic={topic}
-      partitions={detailQuery.data.partitions}
-    />
+    <div className="space-y-4">
+      <MessagesPanel
+        cluster={cluster}
+        topic={topic}
+        partitions={detailQuery.data.partitions}
+      />
+
+      {/* Bulk copy section */}
+      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm">
+        <button
+          type="button"
+          onClick={() => setCopyOpen((v) => !v)}
+          className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]"
+        >
+          <span>Copy messages to another cluster / topic</span>
+          <span className="text-[var(--color-text-subtle)]">{copyOpen ? "▾" : "▸"}</span>
+        </button>
+        {copyOpen && (
+          <div className="border-t border-[var(--color-border)] p-4">
+            <BulkCopyPanel
+              srcCluster={cluster}
+              srcTopic={topic}
+              partitions={partitionNumbers}
+            />
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -1206,6 +1234,7 @@ function MessageRow({
   const fmt = useFormatters();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [replayOpen, setReplayOpen] = useState(false);
   const preview =
     m.value_encoding === "null"
       ? "(null)"
@@ -1294,16 +1323,32 @@ function MessageRow({
             label={`value · ${m.value_encoding}${m.value_sr ? ` · sr id ${m.value_sr.schema_id ?? "?"}` : ""}`}
             body={<ValueBody m={m} onPick={onPick} />}
             action={
-              <button
-                onClick={copyValue}
-                className="rounded border border-[var(--color-border)] px-2 py-1 text-[11px] hover:border-[var(--color-border-strong)]"
-                title="Copy value to clipboard"
-              >
-                {copied ? "Copied!" : "Copy value"}
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setReplayOpen(true); }}
+                  className="rounded border border-[var(--color-border)] px-2 py-1 text-[11px] hover:border-[var(--color-border-strong)]"
+                  title="Replay to another cluster/topic"
+                >
+                  Replay to…
+                </button>
+                <button
+                  onClick={copyValue}
+                  className="rounded border border-[var(--color-border)] px-2 py-1 text-[11px] hover:border-[var(--color-border-strong)]"
+                  title="Copy value to clipboard"
+                >
+                  {copied ? "Copied!" : "Copy value"}
+                </button>
+              </div>
             }
           />
         </div>
+      )}
+      {replayOpen && (
+        <ReplayModal
+          open={replayOpen}
+          onClose={() => setReplayOpen(false)}
+          message={m}
+        />
       )}
     </div>
   );

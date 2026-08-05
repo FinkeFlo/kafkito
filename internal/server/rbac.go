@@ -158,6 +158,12 @@ func resolvePermission(r *http.Request) (resType, resName, action, bodyField str
 		return "topic", topic, "produce", ""
 	case strings.HasSuffix(pattern, "/topics/{topic}/messages/search") && method == http.MethodPost:
 		return "topic", topic, "consume", ""
+	// The destination side of a copy is an arbitrary cluster/topic named in
+	// the request body, not the URL; copyMessages checks it explicitly with
+	// its own "topic:produce" Allow() call, since resolvePermission only
+	// ever authorizes against this route's {cluster}/{topic} (the source).
+	case strings.HasSuffix(pattern, "/topics/{topic}/copy") && method == http.MethodPost:
+		return "topic", topic, "consume", ""
 
 	// Groups
 	case strings.HasSuffix(pattern, "/groups") && method == http.MethodGet:

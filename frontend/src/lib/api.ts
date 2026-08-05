@@ -108,6 +108,12 @@ export interface Message {
   value_encoding: string;
   value_b64?: string;
   headers?: Record<string, string>;
+  /**
+   * Raw (standard-base64) bytes for header values that were not valid UTF-8.
+   * Populated only for those keys; they keep their "0x…" hex rendering in
+   * `headers` for display. Mirrors kafkapkg.Message.HeadersB64.
+   */
+  headers_b64?: Record<string, string>;
   masked?: boolean;
   key_sr?: SRDecodedMeta;
   value_sr?: SRDecodedMeta;
@@ -345,9 +351,20 @@ export interface ProduceRequest {
   partition?: number;
   key: string;
   value: string;
-  key_encoding?: "text" | "base64";
-  value_encoding?: "text" | "base64";
+  /**
+   * "text" (UTF-8 pass-through; an empty value produces a nil payload, i.e. a
+   * tombstone), "base64" (standard or URL-safe raw bytes) or "empty" (a
+   * non-nil zero-length payload). Defaults to "text" server-side.
+   */
+  key_encoding?: "text" | "base64" | "empty";
+  value_encoding?: "text" | "base64" | "empty";
   headers?: Record<string, string>;
+  /**
+   * Raw (standard-base64) bytes for header values that are not valid UTF-8.
+   * A key present in both `headers` and `headers_b64` is taken from
+   * `headers_b64` and emitted once. Mirrors kafkapkg.ProduceRequest.HeadersB64.
+   */
+  headers_b64?: Record<string, string>;
 }
 
 export interface ProduceResult {
@@ -391,6 +408,134 @@ export async function produceMessage(
     throw new Error(`HTTP ${res.status}${detail}`);
   }
   return (await res.json()) as ProduceResult;
+}
+
+// ---------------------------------------------------------------------------
+// Bulk message copy
+// ---------------------------------------------------------------------------
+
+export interface CopyRequest {
+  /** Name of a server-configured destination cluster. */
+  dest_cluster?: string;
+  /**
+   * Ad-hoc (private) cluster config for browser-only clusters. Mutually
+   * exclusive with dest_cluster.
+   */
+  dest_cluster_config?: object;
+  dest_topic: string;
+  /** Source partition to copy from; absent = all partitions. */
+  partition?: number;
+  /** Inclusive UNIX ms lower bound on source message timestamps. */
+  from_ts_ms?: number;
+  /**
+   * Exclusive UNIX ms upper bound on source message timestamps. When absent
+   * the server substitutes the moment the copy starts, so copying a live
+   * topic terminates instead of tailing newly produced records.
+   */
+  to_ts_ms?: number;
+  /** Max messages to copy; absent = no limit. */
+  limit?: number;
+  /** When true each message is produced to the same partition it came from. */
+  preserve_partition?: boolean;
+}
+
+export interface CopyProgressEvent {
+  copied: number;
+  /**
+   * Records left out because they cannot be reproduced byte-for-byte:
+   * schema-registry-decoded payloads (the original wire-format bytes are
+   * gone) and records the source cluster's data-masking rules redacted
+   * (copying would write the redaction).
+   */
+  skipped?: number;
+  done?: boolean;
+  error?: string;
+}
+
+/**
+ * copyMessages starts a server-side copy from `cluster`/`topic` to the
+ * destination configured in `req`. Progress is reported via SSE; the returned
+ * function aborts the stream when called.
+ *
+ * @param onProgress callback invoked for each SSE event
+ * @returns abort function
+ */
+export function copyMessages(
+  cluster: string,
+  topic: string,
+  req: CopyRequest,
+  confirmProd: boolean,
+  onProgress: (ev: CopyProgressEvent) => void,
+): () => void {
+  const ctrl = new AbortController();
+
+  (async () => {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (confirmProd) headers[PROD_CONFIRM_HEADER] = "true";
+
+    let res: Response;
+    try {
+      res = await fetchAPI(
+        cluster,
+        clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/copy`),
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(req),
+          signal: ctrl.signal,
+        },
+      );
+    } catch (e) {
+      if (!(e instanceof DOMException && e.name === "AbortError")) {
+        onProgress({ copied: 0, done: true, error: (e as Error).message });
+      }
+      return;
+    }
+
+    if (!res.ok) {
+      let detail = "";
+      try {
+        const b = (await res.json()) as { error?: string };
+        detail = b.error ? `: ${b.error}` : "";
+      } catch { /* ignore */ }
+      onProgress({ copied: 0, done: true, error: `HTTP ${res.status}${detail}` });
+      return;
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) {
+      onProgress({ copied: 0, done: true, error: "no response body" });
+      return;
+    }
+
+    const decoder = new TextDecoder();
+    let buf = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const ev = JSON.parse(line.slice(6)) as CopyProgressEvent;
+              onProgress(ev);
+            } catch { /* skip malformed */ }
+          }
+        }
+      }
+    } catch (e) {
+      if (!(e instanceof DOMException && e.name === "AbortError")) {
+        onProgress({ copied: 0, done: true, error: (e as Error).message });
+      }
+    }
+  })();
+
+  return () => ctrl.abort();
 }
 
 export interface GroupInfo {

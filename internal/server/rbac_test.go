@@ -223,6 +223,31 @@ func TestRBACMiddleware_DispatchBranches(t *testing.T) {
 			wantNextCalled: true,
 		},
 		{
+			name:           "copy_route_checked_as_topic_consume_on_source",
+			policy:         policyDeny(),
+			method:         http.MethodPost,
+			pattern:        "/api/v1/clusters/{cluster}/topics/{topic}/copy",
+			urlPath:        "/api/v1/clusters/" + clusterShared + "/topics/orders/copy",
+			headerUser:     userMallory,
+			wantStatus:     http.StatusForbidden,
+			wantNextCalled: false,
+			wantBody: map[string]any{
+				"error":    "forbidden",
+				"resource": "topic:orders",
+				"action":   "consume",
+			},
+		},
+		{
+			name:           "copy_route_allowed_when_source_consume_granted",
+			policy:         policyAllowAll(),
+			method:         http.MethodPost,
+			pattern:        "/api/v1/clusters/{cluster}/topics/{topic}/copy",
+			urlPath:        "/api/v1/clusters/" + clusterShared + "/topics/orders/copy",
+			headerUser:     userAdmin,
+			wantStatus:     http.StatusNoContent,
+			wantNextCalled: true,
+		},
+		{
 			// group:billing-*:edit must NOT authorize creating a group outside
 			// the prefix; the resource name comes from the group_id body field.
 			name:           "create_group_prefix_grant_denies_out_of_scope_group_id",

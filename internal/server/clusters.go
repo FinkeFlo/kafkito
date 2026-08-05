@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -93,6 +94,7 @@ func (a *clusterAPI) mount(r chi.Router) {
 	r.Get("/clusters/{cluster}/topics/{topic}/sample", a.sampleMessages)
 	r.Post("/clusters/{cluster}/topics/{topic}/messages/search", a.searchMessages)
 	r.Post("/clusters/{cluster}/topics/{topic}/messages", a.produceMessage)
+	r.Post("/clusters/{cluster}/topics/{topic}/copy", a.copyMessages)
 	r.Get("/clusters/{cluster}/groups", a.listGroups)
 	r.Post("/clusters/{cluster}/groups", a.createGroup)
 	r.Get("/clusters/{cluster}/groups/{group}", a.describeGroup)
@@ -555,6 +557,17 @@ func (a *clusterAPI) produceMessage(w http.ResponseWriter, r *http.Request) {
 		}
 		// Encoding issues are client errors; everything else is 502.
 		msg := err.Error()
+		// A rejected partition choice means the caller named a partition the
+		// topic does not have. kgo phrases this in terms of the index the
+		// partitioner returned (kafkito's internal "reject" sentinel), which
+		// says nothing useful to the caller — report the partition they asked
+		// for instead. Producing without a partition cannot reach this branch.
+		if isInvalidPartitionErr(msg) && req.Partition != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error": fmt.Sprintf("partition %d does not exist on topic %q", *req.Partition, topic),
+			})
+			return
+		}
 		if isClientProduceErr(msg) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
 			return
@@ -578,6 +591,14 @@ func injectKafkitoProduceHeaders(req *kafkapkg.ProduceRequest, user string) {
 func isClientProduceErr(msg string) bool {
 	return strings.Contains(msg, "invalid base64") ||
 		strings.Contains(msg, "unsupported encoding")
+}
+
+// isInvalidPartitionErr reports whether a produce failed because the requested
+// partition does not exist on the topic. franz-go raises this from the
+// partitioner (see pkg/kafka's explicitOrKeyPartitioner), so the wording comes
+// from kgo rather than kafkito.
+func isInvalidPartitionErr(msg string) bool {
+	return strings.Contains(msg, "invalid record partitioning choice")
 }
 
 // isACLClientErr reports whether a Kafka ACL error originates from bad

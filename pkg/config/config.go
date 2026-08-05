@@ -102,14 +102,23 @@ type ServerConfig struct {
 }
 
 // ClusterConfig describes one Kafka cluster kafkito can connect to.
+//
+// The json tags are load-bearing, not decoration: ad-hoc ("private") clusters
+// arrive as JSON — base64 in the X-Kafkito-Cluster header, or inline as a
+// copy request's dest_cluster_config — and encoding/json's fallback
+// case-insensitive field matching does NOT ignore underscores. Without a json
+// tag every multi-word key (is_prod, schema_registry, insecure_skip_verify,
+// data_masking) is silently dropped, which previously left private clusters
+// unable to use a Schema Registry and made them invisible to the is_prod
+// production-confirmation gate.
 type ClusterConfig struct {
-	Name           string               `koanf:"name"`
-	IsProd         bool                 `koanf:"is_prod"`
-	Brokers        []string             `koanf:"brokers"`
-	Auth           AuthConfig           `koanf:"auth"`
-	TLS            TLSConfig            `koanf:"tls"`
-	SchemaRegistry SchemaRegistryConfig `koanf:"schema_registry"`
-	DataMasking    []MaskingRule        `koanf:"data_masking"`
+	Name           string               `koanf:"name" json:"name"`
+	IsProd         bool                 `koanf:"is_prod" json:"is_prod"`
+	Brokers        []string             `koanf:"brokers" json:"brokers"`
+	Auth           AuthConfig           `koanf:"auth" json:"auth"`
+	TLS            TLSConfig            `koanf:"tls" json:"tls"`
+	SchemaRegistry SchemaRegistryConfig `koanf:"schema_registry" json:"schema_registry"`
+	DataMasking    []MaskingRule        `koanf:"data_masking" json:"data_masking"`
 }
 
 // MaskingRule applies masking to a subset of topics on the cluster. At least
@@ -117,40 +126,40 @@ type ClusterConfig struct {
 // patterns (Go regex); the rule triggers when any pattern matches the topic.
 // If Topics is empty, the rule matches all topics.
 type MaskingRule struct {
-	Topics      []string    `koanf:"topics"`
-	Fields      []string    `koanf:"fields"`      // JSONPath expressions
-	Regex       []RegexMask `koanf:"regex"`       // regex-based replacements applied on the raw string
-	Replacement string      `koanf:"replacement"` // default replacement for Fields; empty = "***"
+	Topics      []string    `koanf:"topics" json:"topics"`
+	Fields      []string    `koanf:"fields" json:"fields"`           // JSONPath expressions
+	Regex       []RegexMask `koanf:"regex" json:"regex"`             // regex-based replacements applied on the raw string
+	Replacement string      `koanf:"replacement" json:"replacement"` // default replacement for Fields; empty = "***"
 }
 
 // RegexMask describes a single regex substitution.
 type RegexMask struct {
-	Match       string `koanf:"match"`
-	Replacement string `koanf:"replacement"`
+	Match       string `koanf:"match" json:"match"`
+	Replacement string `koanf:"replacement" json:"replacement"`
 }
 
 // SchemaRegistryConfig is an optional per-cluster Confluent-/Apicurio-compatible
 // Schema Registry endpoint. When URL is empty, SR features are disabled for that cluster.
 type SchemaRegistryConfig struct {
-	URL                string `koanf:"url"`
-	Username           string `koanf:"username"`
-	Password           string `koanf:"password"`
-	InsecureSkipVerify bool   `koanf:"insecure_skip_verify"`
+	URL                string `koanf:"url" json:"url"`
+	Username           string `koanf:"username" json:"username"`
+	Password           string `koanf:"password" json:"password"`
+	InsecureSkipVerify bool   `koanf:"insecure_skip_verify" json:"insecure_skip_verify"`
 }
 
 // AuthConfig is per-cluster authentication. Type "" or "none" disables SASL.
 // Valid types: "none", "plain", "scram-sha-256", "scram-sha-512".
 type AuthConfig struct {
-	Type     string `koanf:"type"`
-	Username string `koanf:"username"`
-	Password string `koanf:"password"`
+	Type     string `koanf:"type" json:"type"`
+	Username string `koanf:"username" json:"username"`
+	Password string `koanf:"password" json:"password"`
 }
 
 // TLSConfig enables TLS for the cluster connection. When Enabled is true,
 // franz-go uses the system trust store unless InsecureSkipVerify is set.
 type TLSConfig struct {
-	Enabled            bool `koanf:"enabled"`
-	InsecureSkipVerify bool `koanf:"insecure_skip_verify"`
+	Enabled            bool `koanf:"enabled" json:"enabled"`
+	InsecureSkipVerify bool `koanf:"insecure_skip_verify" json:"insecure_skip_verify"`
 }
 
 // Redacted returns a copy of the cluster config safe to log or expose via
