@@ -326,11 +326,7 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for {
-		// Respect an optional per-copy limit.
-		if req.Limit > 0 && copied >= req.Limit {
-			break
-		}
+	for req.Limit <= 0 || copied < req.Limit {
 
 		batchLimit := copyBatchSize
 		if req.Limit > 0 {
@@ -526,7 +522,7 @@ func (a *clusterAPI) validateCopyDestination(
 	// preserve_partition writes each record to its source partition index, so
 	// the destination must be at least as wide as the widest source partition
 	// being copied.
-	required := int32(-1)
+	var required int32
 	if req.Partition != nil && *req.Partition >= 0 {
 		required = *req.Partition
 	} else {
