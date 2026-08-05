@@ -93,6 +93,7 @@ func (a *clusterAPI) mount(r chi.Router) {
 	r.Get("/clusters/{cluster}/topics/{topic}/sample", a.sampleMessages)
 	r.Post("/clusters/{cluster}/topics/{topic}/messages/search", a.searchMessages)
 	r.Post("/clusters/{cluster}/topics/{topic}/messages", a.produceMessage)
+	r.Post("/clusters/{cluster}/topics/{topic}/copy", a.copyMessages)
 	r.Get("/clusters/{cluster}/groups", a.listGroups)
 	r.Post("/clusters/{cluster}/groups", a.createGroup)
 	r.Get("/clusters/{cluster}/groups/{group}", a.describeGroup)

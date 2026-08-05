@@ -393,7 +393,124 @@ export async function produceMessage(
   return (await res.json()) as ProduceResult;
 }
 
-export interface GroupInfo {
+// ---------------------------------------------------------------------------
+// Bulk message copy
+// ---------------------------------------------------------------------------
+
+export interface CopyRequest {
+  /** Name of a server-configured destination cluster. */
+  dest_cluster?: string;
+  /**
+   * Ad-hoc (private) cluster config for browser-only clusters. Mutually
+   * exclusive with dest_cluster.
+   */
+  dest_cluster_config?: object;
+  dest_topic: string;
+  /** Source partition to copy from; absent = all partitions. */
+  partition?: number;
+  /** UNIX ms lower bound on source message timestamps. */
+  from_ts_ms?: number;
+  /** UNIX ms upper bound on source message timestamps. */
+  to_ts_ms?: number;
+  /** Max messages to copy; absent = no limit. */
+  limit?: number;
+  /** When true each message is produced to the same partition it came from. */
+  preserve_partition?: boolean;
+}
+
+export interface CopyProgressEvent {
+  copied: number;
+  done?: boolean;
+  error?: string;
+}
+
+/**
+ * copyMessages starts a server-side copy from `cluster`/`topic` to the
+ * destination configured in `req`. Progress is reported via SSE; the returned
+ * function aborts the stream when called.
+ *
+ * @param onProgress callback invoked for each SSE event
+ * @returns abort function
+ */
+export function copyMessages(
+  cluster: string,
+  topic: string,
+  req: CopyRequest,
+  confirmProd: boolean,
+  onProgress: (ev: CopyProgressEvent) => void,
+): () => void {
+  const ctrl = new AbortController();
+
+  (async () => {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (confirmProd) headers[PROD_CONFIRM_HEADER] = "true";
+
+    let res: Response;
+    try {
+      res = await fetchAPI(
+        cluster,
+        clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/copy`),
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(req),
+          signal: ctrl.signal,
+        },
+      );
+    } catch (e) {
+      if (!(e instanceof DOMException && e.name === "AbortError")) {
+        onProgress({ copied: 0, done: true, error: (e as Error).message });
+      }
+      return;
+    }
+
+    if (!res.ok) {
+      let detail = "";
+      try {
+        const b = (await res.json()) as { error?: string };
+        detail = b.error ? `: ${b.error}` : "";
+      } catch { /* ignore */ }
+      onProgress({ copied: 0, done: true, error: `HTTP ${res.status}${detail}` });
+      return;
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) {
+      onProgress({ copied: 0, done: true, error: "no response body" });
+      return;
+    }
+
+    const decoder = new TextDecoder();
+    let buf = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const ev = JSON.parse(line.slice(6)) as CopyProgressEvent;
+              onProgress(ev);
+            } catch { /* skip malformed */ }
+          }
+        }
+      }
+    } catch (e) {
+      if (!(e instanceof DOMException && e.name === "AbortError")) {
+        onProgress({ copied: 0, done: true, error: (e as Error).message });
+      }
+    }
+  })();
+
+  return () => ctrl.abort();
+}
+
+
   group_id: string;
   state: string;
   protocol_type: string;
