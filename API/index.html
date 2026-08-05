@@ -1,0 +1,1763 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Public documentation for kafkito">
+      
+      
+      
+      
+        <link rel="prev" href="../ui/workflows/">
+      
+      
+        <link rel="next" href="../adr/0001-greenfield-apache2/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/branding/icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>API - kafkito</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#kafkito-rest-api" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="kafkito" class="md-header__button md-logo" aria-label="kafkito" data-md-component="logo">
+      
+  <img src="../assets/branding/icon.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            kafkito
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              API
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/FinkeFlo/kafkito" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../ui/getting-started-ui/" class="md-tabs__link">
+          
+  
+  
+  UI Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../adr/0001-greenfield-apache2/" class="md-tabs__link">
+          
+  
+  
+  Architecture Decisions
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="kafkito" class="md-nav__button md-logo" aria-label="kafkito" data-md-component="logo">
+      
+  <img src="../assets/branding/icon.svg" alt="logo">
+
+    </a>
+    kafkito
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/FinkeFlo/kafkito" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    UI Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ui/getting-started-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ui/add-cluster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Cluster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ui/features-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ui/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#base-url-and-auth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Base URL and auth
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#live-docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live docs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Meta
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#clusters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clusters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#topics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Topics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Topics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#consume-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consume messages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#search" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Search
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#produce" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Produce
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#copy-messages-to-another-topic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Copy messages to another topic
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consumer-groups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consumer groups
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Consumer groups">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reset-offsets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reset offsets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema Registry
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ACLs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scram-users" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCRAM users
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Errors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shell-setup-used-in-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shell setup used in examples
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Decisions
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture Decisions
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0001-greenfield-apache2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0001
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0002-tech-stack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0002
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0003-cloud-foundry-readiness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0003
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0004-xsuaa-build-tag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0004
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#base-url-and-auth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Base URL and auth
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#live-docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live docs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Meta
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#clusters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clusters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#topics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Topics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Topics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#consume-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consume messages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#search" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Search
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#produce" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Produce
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#copy-messages-to-another-topic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Copy messages to another topic
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consumer-groups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consumer groups
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Consumer groups">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reset-offsets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reset offsets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema Registry
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ACLs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scram-users" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCRAM users
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Errors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shell-setup-used-in-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shell setup used in examples
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/FinkeFlo/kafkito/edit/main/docs/API.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="kafkito-rest-api">kafkito REST API<a class="headerlink" href="#kafkito-rest-api" title="Permanent link">&para;</a></h1>
+<p>Developer reference for the HTTP/JSON surface exposed by <code>kafkito</code>. Same
+endpoints that back the web UI — stable, documented, scriptable.</p>
+<h2 id="base-url-and-auth">Base URL and auth<a class="headerlink" href="#base-url-and-auth" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Base URL defaults to wherever you point <code>kafkito</code>. When you run it locally
+  with <code>./bin/kafkito --config .local/kafkito.yaml</code>, that's typically
+  <code>http://localhost:37421</code>.</li>
+<li>No built-in login. If RBAC is configured, identity is read from the
+  <code>X-User</code> header (forwarded by your reverse proxy). With no RBAC configured,
+  the API is open.</li>
+<li>JSON everywhere. Request bodies: <code>Content-Type: application/json</code>. Response
+  bodies: list endpoints always return <code>{ "&lt;resource&gt;": [...] }</code>, not bare
+  arrays, so new fields can be added without breaking clients.</li>
+</ul>
+<h2 id="live-docs">Live docs<a class="headerlink" href="#live-docs" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Swagger UI</strong>: <code>GET /api/v1/docs</code> — interactive, try-it-out enabled.</li>
+<li><strong>Raw OpenAPI 3.1</strong>: <code>GET /api/v1/openapi.yaml</code>.</li>
+</ul>
+<h2 id="meta">Meta<a class="headerlink" href="#meta" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/healthz</code></td>
+<td>Liveness (always 200 while the process is up).</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/readyz</code></td>
+<td>Readiness. 503 if any configured cluster is down.</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/info</code></td>
+<td>Build name + version.</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/me</code></td>
+<td>Resolved caller identity + effective permissions.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="clusters">Clusters<a class="headerlink" href="#clusters" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># List configured clusters, reachability and capabilities</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$BASE</span>/api/v1/clusters<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.clusters[] | {name, reachable, tls, auth_type, schema_registry, caps: .capabilities}&#39;</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Re-probe capabilities (after granting permissions in the broker)</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>curl<span class="w"> </span>-sX<span class="w"> </span>POST<span class="w"> </span><span class="nv">$BASE</span>/api/v1/clusters/<span class="nv">$CLUSTER</span>/capabilities/refresh<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq
+</code></pre></div>
+<h2 id="topics">Topics<a class="headerlink" href="#topics" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># List</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$BASE</span>/api/v1/clusters/<span class="nv">$CLUSTER</span>/topics<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.topics[] | {name, partitions, replication_factor, is_internal}&#39;</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Describe one topic (partitions, leaders, ISR, low/high watermarks, configs)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$BASE</span>/api/v1/clusters/<span class="nv">$CLUSTER</span>/topics/<span class="nv">$TOPIC</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Which consumer groups are on this topic?</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$BASE</span>/api/v1/clusters/<span class="nv">$CLUSTER</span>/topics/<span class="nv">$TOPIC</span>/consumers<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq
+</code></pre></div>
+<h3 id="consume-messages">Consume messages<a class="headerlink" href="#consume-messages" title="Permanent link">&para;</a></h3>
+<p><code>GET /api/v1/clusters/{cluster}/topics/{topic}/messages</code></p>
+<table>
+<thead>
+<tr>
+<th>Query</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>partition</code></td>
+<td><code>-1</code></td>
+<td><code>-1</code> = all partitions.</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td><code>50</code></td>
+<td>Server caps at 500.</td>
+</tr>
+<tr>
+<td><code>from</code></td>
+<td><code>latest</code></td>
+<td><code>latest</code> / <code>oldest</code> / <code>offset</code>.</td>
+</tr>
+<tr>
+<td><code>offset</code></td>
+<td>—</td>
+<td>Required when <code>from=offset</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>{ "messages": [Message, ...] }</code>. Records are returned in per-partition
+offset order. <code>value</code> is populated when printable; binary payloads come through
+as <code>value_b64</code> with <code>value_encoding=binary</code>. Schema-Registry encoded records
+are decoded transparently when an SR is configured for the cluster and carry a
+<code>value_sr</code> meta block (<code>schema_id</code>, <code>subject</code>, <code>version</code>, <code>format</code>).</p>
+<p><code>headers</code> holds header values as text. A header value that is not valid UTF-8
+is rendered there as <code>0x…</code> hex — display only — and its raw bytes are also
+returned in the optional <code>headers_b64</code> map (standard base64, only the affected
+keys). Use <code>headers_b64</code> when you need to reproduce a header byte-for-byte.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Most recent 20 records across all partitions</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$BASE</span><span class="s2">/api/v1/clusters/</span><span class="nv">$CLUSTER</span><span class="s2">/topics/</span><span class="nv">$TOPIC</span><span class="s2">/messages?limit=20&amp;from=latest&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.messages[] | {p:.partition, off:.offset, ts:.timestamp_ms, enc:.value_encoding}&#39;</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Read from the beginning of partition 0</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$BASE</span><span class="s2">/api/v1/clusters/</span><span class="nv">$CLUSTER</span><span class="s2">/topics/</span><span class="nv">$TOPIC</span><span class="s2">/messages?partition=0&amp;from=oldest&amp;limit=100&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq
+</code></pre></div>
+<h3 id="search">Search<a class="headerlink" href="#search" title="Permanent link">&para;</a></h3>
+<p><code>POST /api/v1/clusters/{cluster}/topics/{topic}/messages/search</code></p>
+<p>Bounded content search with a scan budget. Request body is a JSON object describing the scan (mode, path/value, zones, limit, budget). Common fields: <code>mode</code> (contains|jsonpath|xpath|js), <code>path</code> (for path modes), <code>op</code> (exists|eq|contains|regex|...), <code>value</code>, <code>zones</code> (array, e.g. ["value","headers","key"]).</p>
+<p>Quick example — simple contains across message value:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$BASE</span><span class="s2">/api/v1/clusters/</span><span class="nv">$CLUSTER</span><span class="s2">/topics/</span><span class="nv">$TOPIC</span><span class="s2">/messages/search&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s1">&#39;content-type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;query&quot;:&quot;customerNumber&quot;,&quot;zones&quot;:[&quot;value&quot;],&quot;mode&quot;:&quot;contains&quot;,&quot;direction&quot;:&quot;backward&quot;,&quot;limit&quot;:20,&quot;max_scan&quot;:5000}&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.stats, (.messages[] | {p:.partition, off:.offset})&#39;</span>
+</code></pre></div>
+<p>Advanced: JSONPath example (match messages where isAvailable==true AND language=='English')</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>curl<span class="w"> </span>-sS<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$BASE</span><span class="s2">/api/v1/clusters/</span><span class="nv">$CLUSTER</span><span class="s2">/topics/</span><span class="nv">$TOPIC</span><span class="s2">/messages/search&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s1">&#39;content-type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s2">&quot;{\&quot;mode\&quot;:\&quot;jsonpath\&quot;,\&quot;op\&quot;:\&quot;exists\&quot;,\&quot;path\&quot;:\&quot;</span>$<span class="s2">..[?(@.isAvailable==true &amp;&amp; @.language==&#39;English&#39;)]\&quot;,\&quot;zones\&quot;:[\&quot;value\&quot;],\&quot;limit\&quot;:20}&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.stats, (.messages[] | {p:.partition, off:.offset})&#39;</span>
+</code></pre></div>
+<p>Advanced: JavaScript predicate example (same logic, runs the predicate per message)</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>curl<span class="w"> </span>-sS<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$BASE</span><span class="s2">/api/v1/clusters/</span><span class="nv">$CLUSTER</span><span class="s2">/topics/</span><span class="nv">$TOPIC</span><span class="s2">/messages/search&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s1">&#39;content-type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s2">&quot;{\&quot;mode\&quot;:\&quot;js\&quot;,\&quot;value\&quot;:\&quot;parsed.isAvailable === true &amp;&amp; parsed.language === &#39;English&#39;\&quot;,\&quot;zones\&quot;:[\&quot;value\&quot;],\&quot;limit\&quot;:20}&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.stats, (.messages[] | {p:.partition, off:.offset})&#39;</span>
+</code></pre></div>
+<p>Notes:
+- JSONPath filters return nodes; use <code>op=exists</code> to treat any match as a hit.
+- JS mode receives a parsed JSON object as <code>parsed</code> and can express arbitrarily complex predicates. The server enforces a short per-message timeout for JS filters.
+- Use <code>zones</code> to control where the scanner looks (<code>value</code>, <code>headers</code>, <code>key</code>).</p>
+<h3 id="produce">Produce<a class="headerlink" href="#produce" title="Permanent link">&para;</a></h3>
+<p><code>POST /api/v1/clusters/{cluster}/topics/{topic}/messages</code></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$BASE</span><span class="s2">/api/v1/clusters/</span><span class="nv">$CLUSTER</span><span class="s2">/topics/</span><span class="nv">$TOPIC</span><span class="s2">/messages&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s1">&#39;content-type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;key&quot;:&quot;order-1&quot;,&quot;value&quot;:&quot;{\&quot;id\&quot;:1}&quot;,&quot;headers&quot;:{&quot;source&quot;:&quot;manual&quot;}}&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>jq
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>partition</code></td>
+<td>Optional. Omit to let the partitioner choose.</td>
+</tr>
+<tr>
+<td><code>key</code> / <code>value</code></td>
+<td>Payloads, interpreted per the matching <code>*_encoding</code>.</td>
+</tr>
+<tr>
+<td><code>key_encoding</code> / <code>value_encoding</code></td>
+<td><code>text</code> (default), <code>base64</code> or <code>empty</code>.</td>
+</tr>
+<tr>
+<td><code>headers</code></td>
+<td>Header values as UTF-8 text.</td>
+</tr>
+<tr>
+<td><code>headers_b64</code></td>
+<td>Header values as standard base64 raw bytes.</td>
+</tr>
+</tbody>
+</table>
+<p>Encodings:</p>
+<ul>
+<li><code>text</code> (default) — the string is sent as UTF-8 bytes. An <strong>empty</strong> <code>text</code>
+  value produces a <strong>nil</strong> payload, i.e. a tombstone. On a compacted topic that
+  deletes the key, so the distinction matters.</li>
+<li><code>base64</code> — the string is base64-decoded (standard, URL-safe and raw standard
+  are all accepted), for arbitrary binary payloads. An empty string produces a
+  nil payload here too.</li>
+<li><code>empty</code> — the string is ignored and a non-nil <strong>zero-length</strong> payload is
+  produced. This is the only way to express a zero-length value, since <code>text</code>
+  with an empty string means "tombstone".</li>
+</ul>
+<p>Header values that are not valid UTF-8 cannot round-trip through <code>headers</code>; pass
+them as base64 raw bytes in <code>headers_b64</code> instead. A key present in both maps
+wins in <code>headers_b64</code> and is emitted exactly once; an undecodable value fails the
+request with 400.</p>
+<p>kafkito always injects <code>X-Kafkito-Source: true</code> and, when an identity is
+available, <code>X-Kafkito-User: &lt;subject&gt;</code>, overwriting those keys if you supplied
+them.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Zero-length value (not a tombstone) plus a binary header</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$BASE</span><span class="s2">/api/v1/clusters/</span><span class="nv">$CLUSTER</span><span class="s2">/topics/</span><span class="nv">$TOPIC</span><span class="s2">/messages&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s1">&#39;content-type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;key&quot;:&quot;order-1&quot;,&quot;value_encoding&quot;:&quot;empty&quot;,&quot;headers_b64&quot;:{&quot;trace-id&quot;:&quot;AAECAw==&quot;}}&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>jq
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="c1"># Tombstone: empty text value produces a nil payload</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$BASE</span><span class="s2">/api/v1/clusters/</span><span class="nv">$CLUSTER</span><span class="s2">/topics/</span><span class="nv">$TOPIC</span><span class="s2">/messages&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">  </span>-H<span class="w"> </span><span class="s1">&#39;content-type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;key&quot;:&quot;order-1&quot;,&quot;value&quot;:&quot;&quot;}&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>jq
+</code></pre></div>
+<h3 id="copy-messages-to-another-topic">Copy messages to another topic<a class="headerlink" href="#copy-messages-to-another-topic" title="Permanent link">&para;</a></h3>
+<p><code>POST /api/v1/clusters/{cluster}/topics/{topic}/copy</code></p>
+<p>Server-side bulk copy. The <code>{cluster}</code>/<code>{topic}</code> in the URL are the <strong>source</strong>;
+the destination is named in the body. The destination topic must already exist —
+kafkito does not create it.</p>
+<p>The response is <strong>not</strong> JSON: it is a <code>text/event-stream</code> of progress events,
+because a copy can run far longer than a normal request.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dest_cluster</code></td>
+<td>string</td>
+<td>Name of a server-configured destination cluster. Mutually exclusive with <code>dest_cluster_config</code>.</td>
+</tr>
+<tr>
+<td><code>dest_cluster_config</code></td>
+<td>object</td>
+<td>Ad-hoc ("private") destination cluster, same shape the <code>X-Kafkito-Cluster</code> header carries.</td>
+</tr>
+<tr>
+<td><code>dest_topic</code></td>
+<td>string</td>
+<td><strong>Required.</strong> Destination topic.</td>
+</tr>
+<tr>
+<td><code>partition</code></td>
+<td>int32</td>
+<td>Single source partition. Absent = all partitions.</td>
+</tr>
+<tr>
+<td><code>from_ts_ms</code></td>
+<td>int64</td>
+<td>Inclusive lower bound on source record timestamps.</td>
+</tr>
+<tr>
+<td><code>to_ts_ms</code></td>
+<td>int64</td>
+<td><strong>Exclusive</strong> upper bound. See below.</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td>int64</td>
+<td>Max records to copy. Absent = no limit.</td>
+</tr>
+<tr>
+<td><code>preserve_partition</code></td>
+<td>bool</td>
+<td>Produce each record to the partition number it came from.</td>
+</tr>
+</tbody>
+</table>
+<p>Exactly one of <code>dest_cluster</code> / <code>dest_cluster_config</code> must be set.</p>
+<p>When <code>to_ts_ms</code> is omitted the server substitutes the job's start time, so a
+copy of a live topic terminates instead of tailing it forever: records produced
+after the copy started are not included.</p>
+<p><code>preserve_partition</code> requires the destination topic to have at least as many
+partitions as the highest source partition, otherwise the request is rejected.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Copy the last hour of a topic into another topic on the same cluster</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>curl<span class="w"> </span>-sN<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$BASE</span><span class="s2">/api/v1/clusters/</span><span class="nv">$CLUSTER</span><span class="s2">/topics/</span><span class="nv">$TOPIC</span><span class="s2">/copy&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s1">&#39;content-type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;dest_cluster&quot;:&quot;&#39;</span><span class="nv">$CLUSTER</span><span class="s1">&#39;&quot;,&quot;dest_topic&quot;:&quot;&#39;</span><span class="nv">$TOPIC</span><span class="s1">&#39;_replay&quot;,&quot;from_ts_ms&quot;:&#39;</span><span class="k">$((</span><span class="w"> </span><span class="o">(</span><span class="k">$(</span>date<span class="w"> </span>+%s<span class="k">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="m">3600</span><span class="o">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="m">1000</span><span class="w"> </span><span class="k">))</span><span class="s1">&#39;}&#39;</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>data: {&quot;copied&quot;:0}
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>data: {&quot;copied&quot;:500,&quot;skipped&quot;:3}
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>data: {&quot;copied&quot;:812,&quot;skipped&quot;:5,&quot;done&quot;:true}
+</code></pre></div>
+<p>Each event is a <code>data: {json}</code> line pair with the fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>copied</code></td>
+<td>Records produced to the destination so far.</td>
+</tr>
+<tr>
+<td><code>skipped</code></td>
+<td>Records deliberately left out (see below). Omitted while 0.</td>
+</tr>
+<tr>
+<td><code>done</code></td>
+<td><code>true</code> on the final event only; omitted otherwise.</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td>Set on the final event if the job aborted. Omitted when empty.</td>
+</tr>
+</tbody>
+</table>
+<p>Progress events arrive periodically — one right after the stream opens and at
+least one per fetched page. Because the SSE headers are sent before the copy
+starts, a failure <em>during</em> the copy surfaces as a <code>done</code> event carrying <code>error</code>
+<strong>with HTTP status 200</strong>: inspect the events, not just the status code.</p>
+<p>Watch the stream with <code>jq</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>curl<span class="w"> </span>-sN<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$BASE</span><span class="s2">/api/v1/clusters/</span><span class="nv">$CLUSTER</span><span class="s2">/topics/</span><span class="nv">$TOPIC</span><span class="s2">/copy&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s1">&#39;content-type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;dest_cluster&quot;:&quot;other-cluster&quot;,&quot;dest_topic&quot;:&quot;orders&quot;,&quot;limit&quot;:1000}&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span>-u<span class="w"> </span><span class="s1">&#39;s/^data: //&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-c<span class="w"> </span>--unbuffered
+</code></pre></div>
+<p><code>skipped</code> counts source records that cannot be reproduced byte-for-byte and are
+therefore left out rather than copied approximately:</p>
+<ul>
+<li><strong>Schema-Registry-decoded payloads</strong> (<code>avro</code>, <code>json_schema</code>, <code>protobuf</code>):
+  only the decoded JSON rendering is available, the original wire-format bytes
+  are gone.</li>
+<li><strong>Masked records</strong>: the source cluster's <code>data_masking</code> rules replaced the
+  value with a redacted rendering, so copying would write the redaction.</li>
+</ul>
+<p>Copied records carry the same provenance headers the produce endpoint injects —
+<code>X-Kafkito-Source: true</code> and <code>X-Kafkito-User: &lt;subject&gt;</code> — overwriting those
+keys if the source record already had them.</p>
+<p>Status codes returned <strong>before</strong> the stream starts:</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200</td>
+<td>Job started; body is <code>text/event-stream</code>.</td>
+</tr>
+<tr>
+<td>400</td>
+<td>Invalid body, missing <code>dest_topic</code>, both or neither destination field, destination equal to the source cluster+topic (would never terminate), unknown <code>dest_cluster</code>, <code>dest_topic</code> does not exist (the destination is never auto-created), or <code>preserve_partition</code> with too few destination partitions.</td>
+</tr>
+<tr>
+<td>403</td>
+<td>RBAC denied consume on the source or produce on the destination.</td>
+</tr>
+<tr>
+<td>428</td>
+<td>Destination cluster is marked <code>is_prod</code> and the <code>X-Kafkito-Confirm-Prod: true</code> header is missing.</td>
+</tr>
+<tr>
+<td>429</td>
+<td>Too many concurrent copy jobs server-wide; body carries <code>code: copy_concurrency_limit</code> and the response has a <code>Retry-After</code> header. Copies hold broker connections for their whole run, so the server sheds load instead of queueing.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Authorization.</strong> The source is checked as <code>topic:consume</code> by the RBAC
+middleware (from the URL); the destination is checked as <code>topic:produce</code> by the
+handler, against the cluster/topic named in the body.</p>
+<p>An ad-hoc <code>dest_cluster_config</code> destination <strong>bypasses RBAC entirely</strong> — the
+caller supplies their own broker credentials and only the destination broker's
+own ACLs apply. This is a deliberate, pre-existing property of private clusters,
+but it means a user holding nothing but <code>topic:consume</code> can stream a readable
+topic to a broker of their choosing. Operators who care about egress should
+disable private clusters rather than rely on the copy endpoint's RBAC checks.</p>
+<p><strong>Not transactional, not resumable.</strong> An error leaves the records copied so far
+in the destination topic, and re-running the copy duplicates them.</p>
+<h2 id="consumer-groups">Consumer groups<a class="headerlink" href="#consumer-groups" title="Permanent link">&para;</a></h2>
+<p>The most useful endpoints when debugging rebalancing:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Overview</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$BASE</span>/api/v1/clusters/<span class="nv">$CLUSTER</span>/groups<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.groups[] | {group_id, state, members, topics, lag}&#39;</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># Full detail: members + offsets + coordinator + protocol</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$BASE</span>/api/v1/clusters/<span class="nv">$CLUSTER</span>/groups/<span class="nv">$GROUP</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="c1"># Per-member info (who is joined, from which host, with which assignments)</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$BASE</span>/api/v1/clusters/<span class="nv">$CLUSTER</span>/groups/<span class="nv">$GROUP</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.members[] | {client_id, client_host, member_id, instance_id, assignments}&#39;</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="c1"># Per-partition state (owner is client_id@host; empty during rebalance)</span>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$BASE</span>/api/v1/clusters/<span class="nv">$CLUSTER</span>/groups/<span class="nv">$GROUP</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.offsets[] | {topic, partition, offset, log_end, lag, owner:.assigned_to}&#39;</span>
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="c1"># Live polling: re-fetches every second. Great during rebalance storms.</span>
+<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a>watch<span class="w"> </span>-n1<span class="w"> </span><span class="s2">&quot;curl -s </span><span class="nv">$BASE</span><span class="s2">/api/v1/clusters/</span><span class="nv">$CLUSTER</span><span class="s2">/groups/</span><span class="nv">$GROUP</span><span class="s2"> \</span>
+<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="s2">  | jq &#39;{state, members:(.members|length), offsets:[.offsets[]|{p:.partition,off:.offset,lag,owner:.assigned_to}]}&#39;&quot;</span>
+</code></pre></div>
+<p>Signals to look for when a client keeps rebalancing:</p>
+<ul>
+<li><code>state</code> rapidly toggling between <code>Stable</code> and <code>PreparingRebalance</code> →
+  session/heartbeat timing issue or consumers dying and rejoining.</li>
+<li>Every tick a <strong>new</strong> <code>member_id</code> suffix (UUID portion) with the same
+  <code>client_id</code> → static membership is not configured. Set <code>group.instance.id</code>
+  in your consumer to keep a stable identity across restarts.</li>
+<li><code>protocol</code> is <code>range</code>/<code>roundrobin</code> instead of <code>cooperative-sticky</code> → plain
+  rebalancing moves all partitions every time; cooperative-sticky only moves
+  the deltas and is usually what you want.</li>
+</ul>
+<h3 id="reset-offsets">Reset offsets<a class="headerlink" href="#reset-offsets" title="Permanent link">&para;</a></h3>
+<p><code>POST /api/v1/clusters/{cluster}/groups/{group}/reset-offsets</code></p>
+<p>Group must be empty (no active members). Always try with <code>"dry_run": true</code>
+first and inspect <code>results[]</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$BASE</span><span class="s2">/api/v1/clusters/</span><span class="nv">$CLUSTER</span><span class="s2">/groups/</span><span class="nv">$GROUP</span><span class="s2">/reset-offsets&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s1">&#39;content-type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;topic&quot;:&quot;&#39;</span><span class="nv">$TOPIC</span><span class="s1">&#39;&quot;,&quot;strategy&quot;:&quot;earliest&quot;,&quot;dry_run&quot;:true}&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>jq
+</code></pre></div>
+<p>Strategies: <code>earliest</code>, <code>latest</code>, <code>offset</code> (+ <code>offset</code>), <code>timestamp</code>
+(+ <code>timestamp_ms</code>), <code>shift-by</code> (+ <code>shift</code>).</p>
+<h2 id="schema-registry">Schema Registry<a class="headerlink" href="#schema-registry" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$BASE</span>/api/v1/clusters/<span class="nv">$CLUSTER</span>/schemas/subjects<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$BASE</span>/api/v1/clusters/<span class="nv">$CLUSTER</span>/schemas/subjects/<span class="nv">$SUBJECT</span>/versions<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$BASE</span>/api/v1/clusters/<span class="nv">$CLUSTER</span>/schemas/subjects/<span class="nv">$SUBJECT</span>/versions/latest<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq
+</code></pre></div>
+<h2 id="acls">ACLs<a class="headerlink" href="#acls" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$BASE</span>/api/v1/clusters/<span class="nv">$CLUSTER</span>/acls<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$BASE</span><span class="s2">/api/v1/clusters/</span><span class="nv">$CLUSTER</span><span class="s2">/acls&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span>-H<span class="w"> </span><span class="s1">&#39;content-type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;principal&quot;:&quot;User:alice&quot;,&quot;host&quot;:&quot;*&quot;,&quot;resource_type&quot;:&quot;TOPIC&quot;,&quot;resource_name&quot;:&quot;orders&quot;,&quot;pattern_type&quot;:&quot;LITERAL&quot;,&quot;operation&quot;:&quot;READ&quot;,&quot;permission_type&quot;:&quot;ALLOW&quot;}&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>jq
+</code></pre></div>
+<h2 id="scram-users">SCRAM users<a class="headerlink" href="#scram-users" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$BASE</span>/api/v1/clusters/<span class="nv">$CLUSTER</span>/users<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$BASE</span><span class="s2">/api/v1/clusters/</span><span class="nv">$CLUSTER</span><span class="s2">/users&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">  </span>-H<span class="w"> </span><span class="s1">&#39;content-type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;user&quot;:&quot;alice&quot;,&quot;mechanism&quot;:&quot;SCRAM-SHA-512&quot;,&quot;password&quot;:&quot;s3cret&quot;,&quot;iterations&quot;:8192}&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>jq
+</code></pre></div>
+<h2 id="errors">Errors<a class="headerlink" href="#errors" title="Permanent link">&para;</a></h2>
+<p>All error responses look like:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;short machine-friendly description&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;detail&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;optional longer text&quot;</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<p>Status codes used by the server:</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>400</td>
+<td>Request body/query parameter is invalid.</td>
+</tr>
+<tr>
+<td>401</td>
+<td>Authentication required (proxy did not set <code>X-User</code>).</td>
+</tr>
+<tr>
+<td>403</td>
+<td>RBAC denied the requested action on the resource.</td>
+</tr>
+<tr>
+<td>404</td>
+<td>Cluster/topic/group/subject not found.</td>
+</tr>
+<tr>
+<td>409</td>
+<td>Conflict (topic already exists, group not empty, etc.).</td>
+</tr>
+<tr>
+<td>428</td>
+<td>Production cluster needs <code>X-Kafkito-Confirm-Prod: true</code>.</td>
+</tr>
+<tr>
+<td>429</td>
+<td>Too many concurrent long-running jobs (e.g. topic copies).</td>
+</tr>
+<tr>
+<td>502</td>
+<td>Kafka broker returned an error.</td>
+</tr>
+<tr>
+<td>504</td>
+<td>Request to Kafka/SR timed out.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="shell-setup-used-in-examples">Shell setup used in examples<a class="headerlink" href="#shell-setup-used-in-examples" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">BASE</span><span class="o">=</span>http://localhost:37421
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">CLUSTER</span><span class="o">=</span>spinedev-preview
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="nb">export</span><span class="w"> </span><span class="nv">TOPIC</span><span class="o">=</span>FRA_acme_eXtend_SalesPrices_DEV
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="nb">export</span><span class="w"> </span><span class="nv">GROUP</span><span class="o">=</span>FRA_acme_IF_H001_Acme_Post_Prices_Example
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

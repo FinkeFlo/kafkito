@@ -1,0 +1,2112 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Public documentation for kafkito">
+      
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/branding/icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Kafkito Frontend Design Guidelines - kafkito</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#kafkito-frontend-design-guidelines" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="kafkito" class="md-header__button md-logo" aria-label="kafkito" data-md-component="logo">
+      
+  <img src="../assets/branding/icon.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            kafkito
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Kafkito Frontend Design Guidelines
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/FinkeFlo/kafkito" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../ui/getting-started-ui/" class="md-tabs__link">
+          
+  
+  
+  UI Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../API/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../adr/0001-greenfield-apache2/" class="md-tabs__link">
+          
+  
+  
+  Architecture Decisions
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="kafkito" class="md-nav__button md-logo" aria-label="kafkito" data-md-component="logo">
+      
+  <img src="../assets/branding/icon.svg" alt="logo">
+
+    </a>
+    kafkito
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/FinkeFlo/kafkito" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    UI Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ui/getting-started-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ui/add-cluster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Cluster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ui/features-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ui/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../API/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Decisions
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture Decisions
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0001-greenfield-apache2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0001
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0002-tech-stack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0002
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0003-cloud-foundry-readiness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0003
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0004-xsuaa-build-tag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0004
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#0-tldr-for-agents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0 · TL;DR for agents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-stack-immutable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1 · Stack (immutable)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-design-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2 · Design tokens
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2 · Design tokens">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-color-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Color tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-using-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Using tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-dark-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Dark mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-adding-a-new-token" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 Adding a new token
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-typography" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3 · Typography
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-spacing-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4 · Spacing &amp; layout
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4 · Spacing &amp; layout">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-page-scaffold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Page scaffold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-grid-flex" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Grid &amp; flex
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-radii" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Radii
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-borders-surfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Borders &amp; surfaces
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-density" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Density
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-shell-navigation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5 · Shell / navigation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5 · Shell / navigation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-what-shell-provides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 What Shell provides
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-adding-a-top-level-route" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Adding a top-level route
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-cluster-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Cluster selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6 · Components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6 · Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-core-primitives-already-exist-use-them" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Core primitives (already exist — use them)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-buttons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Buttons
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Tables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-forms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 Forms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-status-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 Status conventions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#66-iconography" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.6 Iconography
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-data-state-and-side-effects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7 · Data, state, and side effects
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7 · Data, state, and side effects">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-fetching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Fetching
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-mutations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Mutations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-client-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Client state
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-missing-backend-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 Missing backend data
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-states-every-page-must-handle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8 · States every page must handle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-accessibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9 · Accessibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-code-hygiene" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10 · Code hygiene
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10 · Code hygiene">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#101-file-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.1 File layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102-naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2 Naming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#103-typescript" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.3 TypeScript
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#104-lint-build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.4 Lint &amp; build
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-checklist-for-a-new-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11 · Checklist for a new page
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-anti-patterns-dont-do-these" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12 · Anti-patterns (don't do these)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-when-this-file-and-the-code-disagree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13 · When this file and the code disagree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-changelog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14 · Changelog
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/FinkeFlo/kafkito/edit/main/docs/DESIGN_GUIDELINES.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="kafkito-frontend-design-guidelines">Kafkito Frontend Design Guidelines<a class="headerlink" href="#kafkito-frontend-design-guidelines" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> canonical · <strong>Owner:</strong> design · <strong>Applies to:</strong> <code>frontend/</code></p>
+<p>This document is the source of truth for the kafkito frontend UI.
+All new pages, components, and features must follow it.</p>
+<p>It is written to be read by <strong>both humans and coding agents</strong>
+(Claude Code, GitHub Copilot, Copilot CLI, Cursor, etc.). Agents: treat
+every rule below as a hard constraint unless a rule explicitly says
+"prefer" or "may".</p>
+<hr />
+<h2 id="0-tldr-for-agents">0 · TL;DR for agents<a class="headerlink" href="#0-tldr-for-agents" title="Permanent link">&para;</a></h2>
+<p>Before writing any frontend code, do these five things:</p>
+<ol>
+<li>Read this file end-to-end.</li>
+<li>Open <code>frontend/src/index.css</code> to confirm the active design tokens.</li>
+<li>Open the closest existing route under <code>frontend/src/routes/</code> and mimic
+   its structure (imports order, query setup, layout scaffold).</li>
+<li>Use Tailwind utilities generated from <code>@theme</code> tokens
+   (e.g. <code>bg-panel</code>, <code>text-muted</code>, <code>border-border</code>). Never hard-code hex
+   values, never use the default Tailwind palette classes (<code>bg-slate-50</code>,
+   <code>text-gray-700</code>, etc.) in new code.</li>
+<li>Never fabricate backend data. If a field does not exist on the API
+   type, render <code>"—"</code> and add a <code>// TODO(backend): …</code> comment.</li>
+</ol>
+<hr />
+<h2 id="1-stack-immutable">1 · Stack (immutable)<a class="headerlink" href="#1-stack-immutable" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Choice</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Framework</td>
+<td>React 19 + TypeScript 5.7</td>
+<td>function components, no class components</td>
+</tr>
+<tr>
+<td>Build</td>
+<td>Vite 6</td>
+<td></td>
+</tr>
+<tr>
+<td>Routing</td>
+<td>TanStack Router (file-based)</td>
+<td><code>src/routes/*.tsx</code> — never hand-edit <code>routeTree.gen.ts</code></td>
+</tr>
+<tr>
+<td>Data</td>
+<td>TanStack Query v5</td>
+<td>every server read goes through <code>useQuery</code>; every write through <code>useMutation</code></td>
+</tr>
+<tr>
+<td>Styles</td>
+<td>Tailwind v4 via <code>@tailwindcss/vite</code></td>
+<td>tokens in <code>src/index.css</code> under <code>@theme</code></td>
+</tr>
+<tr>
+<td>Icons</td>
+<td><code>lucide-react</code></td>
+<td>no other icon libraries</td>
+</tr>
+<tr>
+<td>Class merging</td>
+<td><code>clsx</code> + <code>tailwind-merge</code></td>
+<td>re-export as <code>cn()</code> in <code>src/lib/utils.ts</code></td>
+</tr>
+<tr>
+<td>Dark mode</td>
+<td>class-based (<code>html.dark</code>)</td>
+<td>never media-query-only</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Do not add</strong> shadcn, Headless UI, Mantine, Chakra, Material, CSS-in-JS,
+styled-components, emotion, a state library (Redux/Zustand/Jotai), or a
+charting library. If you think you need one, stop and open a discussion
+first.</p>
+<p><strong>Radix UI headless primitives</strong> (<code>@radix-ui/react-*</code> only, no shadcn) are allowed for behavioural complexity that is hard to get right by hand: focus trap, ARIA, collision-aware positioning. Each addition must be wrapped under <code>frontend/src/components/</code> with a canonical name and documented in § 6.1. We paint 100% of the visual layer ourselves; Radix provides no styling, only behaviour.</p>
+<hr />
+<h2 id="2-design-tokens">2 · Design tokens<a class="headerlink" href="#2-design-tokens" title="Permanent link">&para;</a></h2>
+<p>Tokens live in <code>frontend/src/index.css</code> under <code>@theme</code>. They are the only
+way to introduce color, font-family, or semantic intent.</p>
+<h3 id="21-color-tokens">2.1 Color tokens<a class="headerlink" href="#21-color-tokens" title="Permanent link">&para;</a></h3>
+<p>See <code>src/index.css</code> for the canonical values. Category summary:</p>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Tokens</th>
+<th>When to use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Surface</td>
+<td><code>bg</code>, <code>panel</code>, <code>subtle</code>, <code>hover</code></td>
+<td>page bg, card bg, striped row bg, hover bg</td>
+</tr>
+<tr>
+<td>Border</td>
+<td><code>border</code>, <code>border-hover</code>, <code>border-strong</code></td>
+<td><code>border</code> is the default hairline; <code>border-hover</code> is the hover affordance (e.g. inputs, secondary buttons); <code>border-strong</code> is reserved for the focused/selected state</td>
+</tr>
+<tr>
+<td>Text</td>
+<td><code>text</code>, <code>muted</code>, <code>subtle-text</code></td>
+<td>primary / secondary / tertiary</td>
+</tr>
+<tr>
+<td>Accent</td>
+<td><code>accent</code>, <code>accent-hover</code>, <code>accent-subtle</code>, <code>accent-foreground</code></td>
+<td>primary CTA, active nav, focused input; <code>accent-foreground</code> is the canonical foreground colour on saturated <code>bg-accent</code> / <code>bg-danger</code> fills</td>
+</tr>
+<tr>
+<td>Focus</td>
+<td><code>focus</code>, <code>focus-on-accent</code></td>
+<td>global focus-indicator colour (<code>focus</code>) and the override colour used by primitives that sit on saturated backgrounds (<code>focus-on-accent</code>)</td>
+</tr>
+<tr>
+<td>Semantic</td>
+<td><code>success</code>, <code>warning</code>, <code>danger</code></td>
+<td>status dots, validation, destructive actions</td>
+</tr>
+<tr>
+<td>Overlay</td>
+<td><code>overlay</code></td>
+<td>modal / dropdown scrim — defined for both modes</td>
+</tr>
+<tr>
+<td>Tint</td>
+<td><code>tint-{green,amber,red}-{bg,fg}</code></td>
+<td>table cell / badge highlights</td>
+</tr>
+</tbody>
+</table>
+<p>Notes:</p>
+<ul>
+<li><code>text-text-on-accent</code> is a transitional alias of <code>text-accent-foreground</code>. Treat <code>accent-foreground</code> as canonical; the alias may be removed in a future release.</li>
+<li><code>border-strong</code> is <strong>never</strong> used for hover affordances any more — that role belongs to <code>border-hover</code>. Custom <code>focus:border-…</code> rules on inputs are an anti-pattern (see § 9 — let the global <code>:focus-visible</code> rule handle it).</li>
+<li><code>focus-on-accent</code> is consumed by <code>&lt;Button variant="primary"&gt;</code> and <code>&lt;Button variant="danger"&gt;</code> to override <code>outline-color</code> so the focus indicator stays AA-legible against saturated fills.</li>
+<li><code>overlay</code> is markedly darker in light mode than the original Direction-A spec. The 2026-04 sweep moved the light value into the modern modal-dimmer range to fix a dark-mode invisible-scrim regression; the heavier scrim is intentional in both modes.</li>
+</ul>
+<h3 id="22-using-tokens">2.2 Using tokens<a class="headerlink" href="#22-using-tokens" title="Permanent link">&para;</a></h3>
+<p><strong>Do:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">&lt;</span><span class="nt">div</span><span class="w"> </span><span class="na">className</span><span class="o">=</span><span class="s">&quot;rounded-xl border border-border bg-panel p-4&quot;</span><span class="p">&gt;</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p">&lt;</span><span class="nt">p</span><span class="w"> </span><span class="na">className</span><span class="o">=</span><span class="s">&quot;text-sm text-muted&quot;</span><span class="p">&gt;</span><span class="nx">Last</span><span class="w"> </span><span class="nx">synced</span><span class="w"> </span><span class="mf">2</span><span class="nx">m</span><span class="w"> </span><span class="nx">ago</span><span class="p">&lt;/</span><span class="nt">p</span><span class="p">&gt;</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">&lt;/</span><span class="nt">div</span><span class="p">&gt;</span>
+</code></pre></div>
+<p><strong>Don't:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1">// ❌ default Tailwind palette</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="p">&lt;</span><span class="nt">div</span><span class="w"> </span><span class="na">className</span><span class="o">=</span><span class="s">&quot;rounded-xl border border-slate-200 bg-white p-4&quot;</span><span class="p">&gt;</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1">// ❌ inline style with hex</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="p">&lt;</span><span class="nt">div</span><span class="w"> </span><span class="na">style</span><span class="o">=</span><span class="p">{{</span><span class="w"> </span><span class="nx">background</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;#ffffff&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">borderColor</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;#e5e7eb&quot;</span><span class="w"> </span><span class="p">}}&gt;</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1">// ❌ inline style with var() when a utility exists</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="p">&lt;</span><span class="nt">div</span><span class="w"> </span><span class="na">style</span><span class="o">=</span><span class="p">{{</span><span class="w"> </span><span class="nx">background</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;var(--color-panel)&quot;</span><span class="w"> </span><span class="p">}}&gt;</span>
+</code></pre></div>
+<p>The only case where <code>style={{ color: "var(--color-xxx)" }}</code> is acceptable
+is when the value is <strong>data-driven</strong> (sparkline stroke color per series,
+gauge bar width, etc.) and no utility would work.</p>
+<h3 id="23-dark-mode">2.3 Dark mode<a class="headerlink" href="#23-dark-mode" title="Permanent link">&para;</a></h3>
+<p>Dark mode is a single class on <code>&lt;html&gt;</code>. Do not gate components on
+<code>useTheme()</code> state for styling — CSS custom properties under <code>html.dark</code>
+swap everything automatically.</p>
+<p>If you absolutely need a different element (different icon, different
+illustration), use the dark variant:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">&lt;</span><span class="nt">img</span><span class="w"> </span><span class="na">src</span><span class="o">=</span><span class="s">&quot;/logo-light.svg&quot;</span><span class="w"> </span><span class="na">className</span><span class="o">=</span><span class="s">&quot;block dark:hidden&quot;</span><span class="w"> </span><span class="p">/&gt;</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="p">&lt;</span><span class="nt">img</span><span class="w"> </span><span class="na">src</span><span class="o">=</span><span class="s">&quot;/logo-dark.svg&quot;</span><span class="w">  </span><span class="na">className</span><span class="o">=</span><span class="s">&quot;hidden dark:block&quot;</span><span class="w"> </span><span class="p">/&gt;</span>
+</code></pre></div>
+<h3 id="24-adding-a-new-token">2.4 Adding a new token<a class="headerlink" href="#24-adding-a-new-token" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Propose it in the PR description with justification.</li>
+<li>If accepted, add it to <code>@theme</code> in <code>src/index.css</code> for both light and
+   <code>html.dark</code>. Both modes must define it.</li>
+<li>Document it in this file under § 2.1.</li>
+</ol>
+<p>Do not ship one-off hex values. Every color must be a token.</p>
+<hr />
+<h2 id="3-typography">3 · Typography<a class="headerlink" href="#3-typography" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Class</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Page title (h1)</td>
+<td><code>text-2xl font-semibold tracking-tight</code></td>
+<td>once per page</td>
+</tr>
+<tr>
+<td>Section title (h2)</td>
+<td><code>text-sm font-semibold</code></td>
+<td>card headers</td>
+</tr>
+<tr>
+<td>Eyebrow</td>
+<td><code>text-[11px] font-semibold uppercase tracking-wider text-muted</code></td>
+<td>above h1 for breadcrumb/context</td>
+</tr>
+<tr>
+<td>Body</td>
+<td><code>text-sm</code></td>
+<td>default</td>
+</tr>
+<tr>
+<td>Body muted</td>
+<td><code>text-sm text-muted</code></td>
+<td>helper text</td>
+</tr>
+<tr>
+<td>Table cell (text)</td>
+<td><code>text-sm</code></td>
+<td></td>
+</tr>
+<tr>
+<td>Table cell (mono)</td>
+<td><code>font-mono text-[13px]</code></td>
+<td>IDs, names, offsets</td>
+</tr>
+<tr>
+<td>Table header</td>
+<td><code>text-[11px] uppercase tracking-wider text-muted</code></td>
+<td></td>
+</tr>
+<tr>
+<td>KPI value</td>
+<td><code>text-2xl font-semibold tabular-nums</code></td>
+<td></td>
+</tr>
+<tr>
+<td>Small mono label</td>
+<td><code>font-mono text-[11px] text-muted</code></td>
+<td>hostnames, IDs in captions</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rules:</strong></p>
+<ul>
+<li>Always pair numeric data with <code>tabular-nums</code>.</li>
+<li>Always use <code>font-mono</code> for Kafka identifiers (topics, groups, subjects, principals, broker IDs, offsets, partitions, hostnames).</li>
+<li>Never use font sizes not in the table above. If you think you need one, use one of the existing sizes.</li>
+<li>Line-height follows Tailwind defaults; override with <code>leading-relaxed</code> only for <code>&lt;pre&gt;</code> blocks of code/schema.</li>
+</ul>
+<hr />
+<h2 id="4-spacing-layout">4 · Spacing &amp; layout<a class="headerlink" href="#4-spacing-layout" title="Permanent link">&para;</a></h2>
+<h3 id="41-page-scaffold">4.1 Page scaffold<a class="headerlink" href="#41-page-scaffold" title="Permanent link">&para;</a></h3>
+<p>Every route renders as children of <code>&lt;Shell&gt;</code> (in <code>src/components/Shell.tsx</code>).
+The page body itself follows this pattern:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">export</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">Route</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">createFileRoute</span><span class="p">(</span><span class="s2">&quot;/my-page&quot;</span><span class="p">)({</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nx">component</span><span class="o">:</span><span class="w"> </span><span class="kt">MyPage</span><span class="p">,</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="p">});</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="kd">function</span><span class="w"> </span><span class="nx">MyPage</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">    </span><span class="p">&lt;</span><span class="nt">div</span><span class="w"> </span><span class="na">className</span><span class="o">=</span><span class="s">&quot;space-y-5 p-6&quot;</span><span class="p">&gt;</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">      </span><span class="p">&lt;</span><span class="nt">PageHeader</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">        </span><span class="na">eyebrow</span><span class="o">=</span><span class="p">{</span><span class="sb">`</span><span class="si">${</span><span class="nx">cluster</span><span class="si">}</span><span class="sb"> › My things`</span><span class="p">}</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">        </span><span class="na">title</span><span class="o">=</span><span class="s">&quot;My things&quot;</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">        </span><span class="na">subtitle</span><span class="o">=</span><span class="s">&quot;Count + brief context&quot;</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">        </span><span class="na">actions</span><span class="o">=</span><span class="p">{&lt;</span><span class="nt">Button</span><span class="p">&gt;</span><span class="o">+</span><span class="w"> </span><span class="nx">New</span><span class="p">&lt;/</span><span class="nt">Button</span><span class="p">&gt;}</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">      </span><span class="p">/&gt;</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">      </span><span class="p">&lt;</span><span class="nt">Toolbar</span><span class="w"> </span><span class="p">/&gt;</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">      </span><span class="p">&lt;</span><span class="nt">DataCard</span><span class="w"> </span><span class="p">/&gt;</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">    </span><span class="p">&lt;/</span><span class="nt">div</span><span class="p">&gt;</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">  </span><span class="p">);</span>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="p">}</span>
+</code></pre></div>
+<ul>
+<li>Page root: <code>space-y-5 p-6</code> (20 px vertical rhythm, 24 px gutter). The longer form <code>space-y-5 px-6 py-6</code> compiles to identical CSS and is acceptable in existing routes; new code should prefer the shorter <code>p-6</code>.</li>
+<li>Multi-section pages: wrap each section in <code>space-y-6</code> if you need more breathing room</li>
+<li><strong>Never</strong> cap width (<code>max-w-6xl</code>, <code>container</code>, etc.) on data-dense pages. Tables, toolbars, and KPI grids go edge-to-edge within the shell.</li>
+<li>Content-heavy pages (settings, empty states, forms) may cap: <code>max-w-3xl mx-auto</code> is the standard width.</li>
+</ul>
+<h3 id="42-grid-flex">4.2 Grid &amp; flex<a class="headerlink" href="#42-grid-flex" title="Permanent link">&para;</a></h3>
+<ul>
+<li>KPI strips: <code>grid grid-cols-4 gap-3</code> (4 cards); <code>grid-cols-2</code> on narrow viewports — add a simple breakpoint (<code>md:grid-cols-4</code>)</li>
+<li>Toolbars: <code>flex items-center gap-2</code></li>
+<li>Master/detail: <code>grid grid-cols-[420px_1fr] gap-4</code></li>
+<li>Form fields: <code>grid grid-cols-2 gap-3</code> for inline fields, stacked otherwise</li>
+</ul>
+<h3 id="43-radii">4.3 Radii<a class="headerlink" href="#43-radii" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Class</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Card / table / panel</td>
+<td><code>rounded-xl</code> (12 px)</td>
+</tr>
+<tr>
+<td>Button / input / dropdown</td>
+<td><code>rounded-md</code> (6 px)</td>
+</tr>
+<tr>
+<td>Pill / tag / tint cell</td>
+<td><code>rounded-sm</code> (2 px)</td>
+</tr>
+<tr>
+<td>Status dot / avatar</td>
+<td><code>rounded-full</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>rounded-md</code> is the canonical button radius — <code>&lt;Button&gt;</code>, <code>&lt;IconButton&gt;</code>, <code>&lt;Input&gt;</code>, and <code>&lt;Notice&gt;</code> all consume it. Do not introduce <code>rounded-lg</code> or <code>rounded-2xl</code> on these primitives.</p>
+<h3 id="44-borders-surfaces">4.4 Borders &amp; surfaces<a class="headerlink" href="#44-borders-surfaces" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Flat design: no <code>shadow-*</code> on cards or buttons; use <code>border border-border</code>. <code>&lt;Card&gt;</code> and <code>&lt;Button&gt;</code> no longer ship <code>shadow-sm</code>.</li>
+<li>Modals and dropdowns: the one exception — <code>shadow-xl</code> on floating surfaces over a <code>bg-overlay</code> backdrop.</li>
+<li>Focus indicator: the canonical pattern is the global <code>:focus-visible</code> rule
+  (<code>outline: 2px solid var(--color-focus); outline-offset: 2px;</code> declared in
+  <code>index.css</code>). Tailwind's <code>ring-*</code> utility is implemented via <code>box-shadow</code>,
+  which is clipped by <code>overflow:hidden</code> ancestors (tables, modals, tinted
+  panels) and silently fails WCAG 2.4.13 — so <code>outline + outline-offset</code> is
+  preferred over <code>ring-*</code> for focus, and primitives that sit on saturated
+  fills (<code>&lt;Button variant="primary"&gt;</code>, <code>&lt;Button variant="danger"&gt;</code>) override
+  <code>outline-color</code> to <code>var(--color-focus-on-accent)</code> for AA contrast.</li>
+<li><code>outline</code> is reserved for focus indicators — do not use <code>outline</code> as
+  decorative chrome on idle elements.</li>
+</ul>
+<h3 id="45-density">4.5 Density<a class="headerlink" href="#45-density" title="Permanent link">&para;</a></h3>
+<p>Kafkito is a data console. Err toward density, not whitespace.</p>
+<ul>
+<li>Table row padding: <code>px-4 py-2.5</code> (content), <code>px-4 py-2</code> (header)</li>
+<li>Card padding: <code>p-4</code> (standard), <code>p-5</code> (overview/hero)</li>
+<li>Form control height: <code>h-9</code> (36 px), inputs use <code>px-3</code></li>
+<li>Buttons: <code>px-3 py-1.5 text-xs font-semibold</code> for toolbar buttons; <code>px-3 py-1.5 text-sm font-semibold</code> for primary CTAs</li>
+</ul>
+<hr />
+<h2 id="5-shell-navigation">5 · Shell / navigation<a class="headerlink" href="#5-shell-navigation" title="Permanent link">&para;</a></h2>
+<p>Every route is wrapped by <code>&lt;Shell&gt;</code> in <code>src/components/Shell.tsx</code>. Do not
+bypass it.</p>
+<h3 id="51-what-shell-provides">5.1 What Shell provides<a class="headerlink" href="#51-what-shell-provides" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Header with logo, cluster pill, ⌘K search, timezone chip, theme toggle, user chip</li>
+<li>Underlined tab bar for primary nav</li>
+<li><code>&lt;Outlet /&gt;</code> for the active route</li>
+<li>Manages theme (light/dark) via <code>useTheme()</code> in <code>src/lib/theme.ts</code></li>
+<li>Manages global cluster selection via URL search param <code>?cluster=</code></li>
+</ul>
+<h3 id="52-adding-a-top-level-route">5.2 Adding a top-level route<a class="headerlink" href="#52-adding-a-top-level-route" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Add the file: <code>src/routes/my-page.tsx</code></li>
+<li>Add the nav entry in <code>Shell.tsx</code> <strong>only if</strong> the route should be
+   globally visible. Secondary routes (Settings, Brokers) stay out of the
+   primary tab bar and are reached via the cluster detail page or an
+   overflow menu.</li>
+<li>Run <code>npm run routes:generate</code> (or rely on <code>npm run build</code>).</li>
+<li>Commit <code>routeTree.gen.ts</code>.</li>
+</ol>
+<h3 id="53-cluster-selection">5.3 Cluster selection<a class="headerlink" href="#53-cluster-selection" title="Permanent link">&para;</a></h3>
+<p>All multi-cluster-aware routes accept <code>?cluster=&lt;name&gt;</code> as a search
+param. Schema:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">export</span><span class="w"> </span><span class="kd">const</span><span class="w"> </span><span class="nx">Route</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">createFileRoute</span><span class="p">(</span><span class="s2">&quot;/my-page&quot;</span><span class="p">)({</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nx">validateSearch</span><span class="o">:</span><span class="w"> </span><span class="p">(</span><span class="nx">s</span><span class="o">:</span><span class="w"> </span><span class="kt">Record</span><span class="p">&lt;</span><span class="nt">string</span><span class="err">,</span><span class="w"> </span><span class="na">unknown</span><span class="p">&gt;)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">({</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nx">cluster</span><span class="o">:</span><span class="w"> </span><span class="kt">typeof</span><span class="w"> </span><span class="nx">s</span><span class="p">.</span><span class="nx">cluster</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;string&quot;</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="nx">s.cluster</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">undefined</span><span class="p">,</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="p">}),</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="nx">component</span><span class="o">:</span><span class="w"> </span><span class="kt">MyPage</span><span class="p">,</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="p">});</span>
+</code></pre></div>
+<p>Read in the component:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">cluster</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">Route</span><span class="p">.</span><span class="nx">useSearch</span><span class="p">();</span>
+</code></pre></div>
+<p><strong>Never</strong> introduce a per-page cluster picker. The pill in the header is
+the only way to change the active cluster.</p>
+<hr />
+<h2 id="6-components">6 · Components<a class="headerlink" href="#6-components" title="Permanent link">&para;</a></h2>
+<p>Every reusable component lives under <code>frontend/src/components/</code> and is
+imported from there. Shared primitives must not be duplicated across
+routes.</p>
+<h3 id="61-core-primitives-already-exist-use-them">6.1 Core primitives (already exist — use them)<a class="headerlink" href="#61-core-primitives-already-exist-use-them" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&lt;Shell&gt;</code></td>
+<td>Header + nav + outlet</td>
+</tr>
+<tr>
+<td><code>&lt;PageHeader&gt;</code></td>
+<td><code>eyebrow?</code> + <code>title</code> + <code>subtitle?</code> + <code>actions?</code></td>
+</tr>
+<tr>
+<td><code>&lt;KpiCard&gt;</code></td>
+<td><code>label</code> + <code>value</code> + <code>unit?</code> + <code>delta?</code> (optional <code>trend</code> consumes <code>&lt;Sparkline&gt;</code>)</td>
+</tr>
+<tr>
+<td><code>&lt;Tag&gt;</code></td>
+<td>Small mono tag, <code>variant="neutral" \| "info"</code></td>
+</tr>
+<tr>
+<td><code>&lt;StatusDot&gt;</code></td>
+<td>2×2 colored circle</td>
+</tr>
+<tr>
+<td><code>&lt;StateBadge&gt;</code></td>
+<td>Consumer-group state pill</td>
+</tr>
+<tr>
+<td><code>&lt;Sparkline&gt;</code></td>
+<td>80×24 SVG sparkline (consumed by <code>&lt;KpiCard&gt;</code> via the <code>trend</code> prop; available for future dashboard work)</td>
+</tr>
+<tr>
+<td><code>&lt;Gauge&gt;</code></td>
+<td>Horizontal usage bar (available for future capacity/utilisation widgets)</td>
+</tr>
+<tr>
+<td><code>&lt;DataTable&gt;</code></td>
+<td>Styled <code>&lt;table&gt;</code> with built-in <code>&lt;thead&gt;</code> / row styles, sort headers, and skeleton/empty body states</td>
+</tr>
+<tr>
+<td><code>&lt;Toolbar&gt;</code></td>
+<td>Filter / action row: <code>search?</code> (left), <code>filters?</code> (centre), <code>actions?</code> (right, <code>ml-auto</code>). Replaces hand-rolled <code>flex flex-wrap items-center gap-2</code> blocks</td>
+</tr>
+<tr>
+<td><code>&lt;EmptyState&gt;</code></td>
+<td>Icon + heading + CTA</td>
+</tr>
+<tr>
+<td><code>&lt;ErrorState&gt;</code></td>
+<td>Icon + detail + retry</td>
+</tr>
+<tr>
+<td><code>&lt;Modal&gt;</code></td>
+<td><code>open</code> + <code>onClose</code> + <code>title</code> + <code>children</code> + <code>actions?</code> + <code>size?</code> (<code>sm \| md \| lg</code>) + <code>ariaDescribedBy?</code>; centered panel with backdrop, focus-trap, body-scroll lock, Escape-to-close, focus-restore</td>
+</tr>
+<tr>
+<td><code>&lt;Notice&gt;</code></td>
+<td><code>intent="info" \| "success" \| "warning" \| "danger"</code> + <code>title?</code> + <code>children</code> + <code>icon?</code> + <code>actions?</code>; tinted callout for degraded-capability banners and inline explanations. Always pairs colour with an icon</td>
+</tr>
+<tr>
+<td><code>&lt;Button&gt;</code></td>
+<td><code>variant="primary" \| "secondary" \| "danger" \| "ghost"</code> + <code>size="sm" \| "md"</code> + <code>leadingIcon?</code> / <code>trailingIcon?</code> + <code>loading?</code></td>
+</tr>
+<tr>
+<td><code>&lt;Input&gt;</code></td>
+<td><code>h-9</code> text input + <code>invalid?</code> (switches border to <code>border-danger</code>) + <code>leadingIcon?</code> / <code>trailingIcon?</code>. Does <strong>not</strong> set <code>outline-none</code>; the global <code>:focus-visible</code> rule is the focus indicator</td>
+</tr>
+</tbody>
+</table>
+<p>If it's not in the list and doesn't exist yet, <strong>write it first as a
+component</strong>, then use it. No inlined duplications of table chrome, modal
+scaffolding, button styles, etc.</p>
+<h3 id="62-buttons">6.2 Buttons<a class="headerlink" href="#62-buttons" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variant</th>
+<th>Visual</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>primary</code></td>
+<td><code>bg-accent text-accent-foreground hover:bg-accent-hover</code> (with <code>focus-visible:[outline-color:var(--color-focus-on-accent)]</code>)</td>
+<td>the one main action per screen</td>
+</tr>
+<tr>
+<td><code>secondary</code></td>
+<td><code>border border-border bg-panel text-text hover:bg-hover hover:border-border-hover</code></td>
+<td>everything else</td>
+</tr>
+<tr>
+<td><code>danger</code></td>
+<td><code>bg-danger text-accent-foreground hover:bg-danger/90</code> (with <code>focus-visible:[outline-color:var(--color-focus-on-accent)]</code>)</td>
+<td>destructive only</td>
+</tr>
+<tr>
+<td><code>ghost</code></td>
+<td><code>text-muted hover:text-text hover:bg-hover</code></td>
+<td>inline, icon-only, overflow menus</td>
+</tr>
+</tbody>
+</table>
+<p>The variant union is exactly <code>primary | secondary | danger | ghost</code>. The <code>destructive</code> alias was removed at the end of Phase 3 — do not reintroduce it.</p>
+<p>One primary button per page. Multiple primaries signal unclear hierarchy.</p>
+<h3 id="63-tables">6.3 Tables<a class="headerlink" href="#63-tables" title="Permanent link">&para;</a></h3>
+<p>All tables use <code>&lt;DataTable&gt;</code>. Rules:</p>
+<ul>
+<li>Numeric columns: <code>text-right tabular-nums</code>, <code>font-mono</code> if they are IDs/offsets</li>
+<li>Name columns: <code>font-mono text-[13px]</code></li>
+<li>Row hover: <code>hover:bg-hover</code></li>
+<li>Clickable rows: cursor-pointer, full-row <code>&lt;Link&gt;</code> or <code>onClick</code></li>
+<li>Empty result: show a single row spanning all columns with <code>text-center text-muted py-8</code> and a "No results" message</li>
+<li>Loading: replace <code>&lt;tbody&gt;</code> with 5 skeleton rows</li>
+<li>Error: render <code>&lt;ErrorState&gt;</code> instead of the table</li>
+</ul>
+<h3 id="64-forms">6.4 Forms<a class="headerlink" href="#64-forms" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Every input has a label above it (<code>text-xs font-semibold uppercase tracking-wider text-muted</code>).</li>
+<li>Validation errors: red text below the field, and a semantic border on the input (<code>border-danger</code>).</li>
+<li>Destructive actions require a <code>&lt;Modal&gt;</code> / <code>&lt;ConfirmDialog&gt;</code> — never a single click, never <code>window.confirm</code>.</li>
+<li>Disabled controls must convey <em>why</em> they are disabled via <code>aria-describedby</code> plus either a visible <code>&lt;Notice&gt;</code> or an <code>sr-only</code> <code>&lt;span&gt;</code>. Never rely on <code>title=</code> alone for load-bearing reason copy — the disabled-with-tooltip pattern is a Confluent anti-pattern (see § 12).</li>
+<li>After mutation, invalidate the matching TanStack Query keys. Never refetch manually.</li>
+</ul>
+<h3 id="65-status-conventions">6.5 Status conventions<a class="headerlink" href="#65-status-conventions" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Color</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reachable / stable / allow</td>
+<td><code>success</code> (or <code>tint-green</code>)</td>
+</tr>
+<tr>
+<td>Warning / rebalancing / lag 1–5k</td>
+<td><code>warning</code> (or <code>tint-amber</code>)</td>
+</tr>
+<tr>
+<td>Unreachable / dead / lag &gt; 5k / deny / destructive</td>
+<td><code>danger</code> (or <code>tint-red</code>)</td>
+</tr>
+<tr>
+<td>Unknown / empty / internal</td>
+<td><code>muted</code></td>
+</tr>
+</tbody>
+</table>
+<p>Thresholds (lag 5 000, CPU 70 %, disk 80 %) live in <code>src/lib/format.ts</code> as
+named constants — use them, never hard-code.</p>
+<h3 id="66-iconography">6.6 Iconography<a class="headerlink" href="#66-iconography" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Always import from <code>lucide-react</code>.</li>
+<li>Icon size: <code>h-4 w-4</code> inline with text, <code>h-5 w-5</code> standalone, never larger unless for empty-state illustrations.</li>
+<li>Strokes inherit <code>currentColor</code>; set color via the parent's <code>text-*</code> utility.</li>
+<li>Never mix emoji into UI chrome. Unicode glyphs (<code>›</code>, <code>·</code>, <code>⌕</code>) are fine for separators and inline hints.</li>
+</ul>
+<hr />
+<h2 id="7-data-state-and-side-effects">7 · Data, state, and side effects<a class="headerlink" href="#7-data-state-and-side-effects" title="Permanent link">&para;</a></h2>
+<h3 id="71-fetching">7.1 Fetching<a class="headerlink" href="#71-fetching" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">useQuery</span><span class="p">({</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nx">queryKey</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;topics&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">cluster</span><span class="p">],</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nx">queryFn</span><span class="o">:</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">fetchTopics</span><span class="p">(</span><span class="nx">cluster</span><span class="o">!</span><span class="p">),</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nx">enabled</span><span class="o">:</span><span class="w"> </span><span class="o">!!</span><span class="nx">cluster</span><span class="p">,</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="nx">refetchInterval</span><span class="o">:</span><span class="w"> </span><span class="kt">10_000</span><span class="p">,</span><span class="w"> </span><span class="c1">// only if the data is &quot;live&quot;</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="p">});</span>
+</code></pre></div>
+<ul>
+<li>Keys are arrays of <code>[&lt;resource&gt;, ...scopes]</code>.</li>
+<li>Never fetch in <code>useEffect</code>.</li>
+<li>Never store fetched data in component state.</li>
+<li><code>refetchInterval</code> is opt-in — only for data the user watches in real
+  time (cluster health, group lag, message tail). Static data does not
+  poll.</li>
+</ul>
+<h3 id="72-mutations">7.2 Mutations<a class="headerlink" href="#72-mutations" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">qc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">useQueryClient</span><span class="p">();</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">m</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">useMutation</span><span class="p">({</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nx">mutationFn</span><span class="o">:</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">createTopic</span><span class="p">(</span><span class="nx">cluster</span><span class="p">,</span><span class="w"> </span><span class="nx">req</span><span class="p">),</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nx">onSuccess</span><span class="o">:</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">qc</span><span class="p">.</span><span class="nx">invalidateQueries</span><span class="p">({</span><span class="w"> </span><span class="nx">queryKey</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;topics&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">cluster</span><span class="p">]</span><span class="w"> </span><span class="p">}),</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nx">onError</span><span class="o">:</span><span class="w"> </span><span class="p">(</span><span class="nx">e</span><span class="o">:</span><span class="w"> </span><span class="kt">Error</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">setErr</span><span class="p">(</span><span class="nx">e</span><span class="p">.</span><span class="nx">message</span><span class="p">),</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="p">});</span>
+</code></pre></div>
+<ul>
+<li>Always invalidate affected keys on success.</li>
+<li>Always surface errors in-page — never <code>alert()</code>.</li>
+<li>Optimistic updates are forbidden for destructive ops (delete topic,
+  reset offsets). User must see the real outcome.</li>
+</ul>
+<h3 id="73-client-state">7.3 Client state<a class="headerlink" href="#73-client-state" title="Permanent link">&para;</a></h3>
+<ul>
+<li>URL is the source of truth for view state that should survive reload:
+  active cluster, filters, selected row, open tab. Use search params.</li>
+<li>Ephemeral state (modal open, unsubmitted form values): <code>useState</code>.</li>
+<li>Cross-route state that doesn't belong in the URL: <code>localStorage</code>
+  under the namespace <code>kafkito.*</code> (e.g. <code>kafkito.theme</code>,
+  <code>kafkito.tailBuffer</code>). Never unnamespaced keys.</li>
+</ul>
+<h3 id="74-missing-backend-data">7.4 Missing backend data<a class="headerlink" href="#74-missing-backend-data" title="Permanent link">&para;</a></h3>
+<p>If the design shows a column the backend doesn't expose:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">&lt;</span><span class="nt">td</span><span class="w"> </span><span class="na">className</span><span class="o">=</span><span class="s">&quot;px-4 py-2.5 text-right font-mono tabular-nums&quot;</span><span class="p">&gt;</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="p">{</span><span class="cm">/* TODO(backend): expose per-topic msg rate on /api/v1/clusters/:cluster/topics */</span><span class="p">}</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="err">—</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="p">&lt;/</span><span class="nt">td</span><span class="p">&gt;</span>
+</code></pre></div>
+<ul>
+<li>Render <code>"—"</code> (em dash). Never <code>0</code>, never <code>"n/a"</code>, never blank.</li>
+<li>Always leave a comment in the form <code>// TODO(backend): &lt;endpoint&gt; &lt;field&gt;</code> (or <code>&lt;endpoint&gt;</code> and a short note on the missing field). Every em-dash that stands in for missing data needs a marker — em-dashes without a <code>TODO(backend):</code> next to them are bugs.</li>
+<li>Surface every such TODO in the PR body.</li>
+</ul>
+<hr />
+<h2 id="8-states-every-page-must-handle">8 · States every page must handle<a class="headerlink" href="#8-states-every-page-must-handle" title="Permanent link">&para;</a></h2>
+<p>Every data-driven view ships <strong>all five</strong> states. A page is not done
+unless each has been implemented and visually checked.</p>
+<ol>
+<li><strong>Loading.</strong> Skeleton rows for tables; skeleton cards for KPI strips.
+   No full-page spinners.</li>
+<li><strong>Empty</strong> (data loaded, zero rows). <code>&lt;EmptyState&gt;</code> with an icon, a
+   clear sentence explaining why it's empty, and a CTA where
+   appropriate.</li>
+<li><strong>Error</strong> (fetch failed). <code>&lt;ErrorState&gt;</code> with the error message and a
+   retry button. Never silent-fail.</li>
+<li><strong>Degraded</strong> (partial capability, e.g. missing ACLs in Kafka). Amber
+   <code>&lt;Notice&gt;</code> at the top of the view explaining which permission is
+   missing and how to fix it. This is a kafkito-specific pattern — see
+   existing <code>limited</code> code paths in <code>groups.tsx</code> and <code>topics.tsx</code> for
+   precedent.</li>
+<li><strong>Populated.</strong> The happy path.</li>
+</ol>
+<hr />
+<h2 id="9-accessibility">9 · Accessibility<a class="headerlink" href="#9-accessibility" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Every interactive element has a visible focus indicator from the global
+  <code>:focus-visible</code> rule in <code>index.css</code>
+  (<code>outline: 2px solid var(--color-focus); outline-offset: 2px;</code>).
+  Primitives that sit on saturated backgrounds (primary / danger Button)
+  override <code>outline-color</code> to <code>var(--color-focus-on-accent)</code> for AA
+  contrast. Custom <code>focus:border-…</code> rules on inputs are an
+  anti-pattern — let the global rule handle it; do not reach for
+  <code>focus-visible:ring-2</code> either (Tailwind's <code>ring-*</code> is a <code>box-shadow</code>
+  and is clipped by <code>overflow:hidden</code> ancestors — see § 4.4).</li>
+<li>Every icon-only button has <code>aria-label</code>.</li>
+<li>Every modal traps focus and closes on <code>Escape</code>.</li>
+<li>Every status color is paired with a text label or icon — never
+  color-alone signaling.</li>
+<li>Disabled controls must explain <em>why</em> they are disabled via
+  <code>aria-describedby</code> + a visible <code>&lt;Notice&gt;</code> or an <code>sr-only</code> <code>&lt;span&gt;</code>. Do
+  not rely on <code>title=</code> alone for load-bearing reason copy.</li>
+<li>Tables that can be sorted or filtered announce that through the column
+  header's <code>aria-sort</code> attribute.</li>
+<li>Contrast: all tokens are validated for WCAG AA at the token level.
+  Don't stack <code>muted</code> text on <code>subtle</code> background — it drops below AA.
+  (The <code>check:contrast</code> scanner does not currently model this specific
+  pair as a usage failure, so the rule remains a hand-enforced
+  contract — review it during PR.)</li>
+</ul>
+<hr />
+<h2 id="10-code-hygiene">10 · Code hygiene<a class="headerlink" href="#10-code-hygiene" title="Permanent link">&para;</a></h2>
+<h3 id="101-file-layout">10.1 File layout<a class="headerlink" href="#101-file-layout" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>src/
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>├── routes/                  ← one file per route; file-based routing
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>│   ├── __root.tsx
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>│   ├── index.tsx
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>│   ├── topics.tsx
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>│   └── topics_.$topic.tsx
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>├── components/              ← shared, reusable UI only
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>├── lib/
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>│   ├── api.ts               ← don&#39;t touch without a backend reason
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>│   ├── format.ts            ← formatters + thresholds
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>│   ├── theme.ts             ← useTheme hook
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>│   └── utils.ts             ← cn() and tiny helpers
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>└── index.css                ← tokens only; no component CSS
+</code></pre></div>
+<p><strong>Never</strong> create <code>styles/</code>, <code>hooks/</code> (put hooks in <code>lib/</code>), <code>types/</code>
+(types live next to the code that owns them or in <code>lib/api.ts</code>),
+<code>assets/</code> (put images in <code>public/</code>).</p>
+<h3 id="102-naming">10.2 Naming<a class="headerlink" href="#102-naming" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Components: <code>PascalCase</code> files and exports.</li>
+<li>Hooks: <code>useCamelCase</code>.</li>
+<li>Query keys: always arrays, lowercase strings.</li>
+<li>CSS custom properties: <code>--color-&lt;role&gt;</code> or <code>--font-&lt;role&gt;</code>; nothing
+  else.</li>
+</ul>
+<h3 id="103-typescript">10.3 TypeScript<a class="headerlink" href="#103-typescript" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>strict: true</code> is on; don't turn it off.</li>
+<li>No <code>any</code>. Use <code>unknown</code> + narrowing, or extend the type in <code>api.ts</code>.</li>
+<li>No non-null assertions (<code>x!</code>) except immediately after a TanStack
+  Query <code>enabled</code> guard or a <code>useMemo</code> that filters by existence.</li>
+<li>Prefer <code>type</code> aliases over <code>interface</code> unless you need declaration
+  merging.</li>
+</ul>
+<h3 id="104-lint-build">10.4 Lint &amp; build<a class="headerlink" href="#104-lint-build" title="Permanent link">&para;</a></h3>
+<p>Every commit must pass:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">cd</span><span class="w"> </span>frontend
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>npm<span class="w"> </span>run<span class="w"> </span>lint<span class="w">            </span><span class="c1"># tsc -b --noEmit</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>npm<span class="w"> </span>run<span class="w"> </span>build<span class="w">           </span><span class="c1"># tsr generate + tsc + vite build</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>npm<span class="w"> </span>run<span class="w"> </span>check:palette<span class="w">   </span><span class="c1"># fails on default Tailwind palette classes in the current diff</span>
+</code></pre></div>
+<p>If any of these fails, the commit is not done.</p>
+<p><code>check:palette</code> only looks at added lines in <code>git diff origin/main...HEAD</code>
+so pre-existing legacy usages (e.g. in <code>topics_.$topic.messages.tsx</code>)
+do not block you. To scan everything (e.g. after migrating a legacy
+route), run <code>bash frontend/scripts/check-palette.sh --all</code>.</p>
+<hr />
+<h2 id="11-checklist-for-a-new-page">11 · Checklist for a new page<a class="headerlink" href="#11-checklist-for-a-new-page" title="Permanent link">&para;</a></h2>
+<p>Copy this into the PR description and tick each box.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>- [ ] Route file under src/routes/
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>- [ ] Search param schema validates every URL-driven piece of state
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>- [ ] &lt;Shell&gt; wraps the page (automatic via __root)
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>- [ ] &lt;PageHeader&gt; at the top with eyebrow + title + subtitle + actions
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>- [ ] Uses tokens (bg-panel / text-muted / border-border / etc.) — no Slate/Gray classes
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>- [ ] All five states implemented: loading · empty · error · degraded · populated
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>- [ ] All mutations invalidate matching TanStack Query keys on success
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>- [ ] Every icon-only button has aria-label
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>- [ ] Focus rings visible on keyboard-only
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>- [ ] No color-only signaling (pair with text or icon)
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>- [ ] Works in light mode
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>- [ ] Works in dark mode
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>- [ ] npm run lint passes
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>- [ ] npm run build passes
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>- [ ] npm run check:palette passes
+<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a>- [ ] npm run check:strings passes
+<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a>- [ ] npm run check:tokens passes
+<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a>- [ ] npm run check:routes passes
+<a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a>- [ ] npm run check:dates passes
+<a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a>- [ ] npm run test passes
+<a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a>- [ ] routeTree.gen.ts regenerated and committed
+<a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a>- [ ] Every TODO(backend): comment is also listed in the PR body
+</code></pre></div>
+<p>The full hard-gate string is in <code>CLAUDE.md</code>. <code>make e2e</code> is <strong>opt-in</strong>
+(too slow for the per-commit gate) — run it before merging any PR
+that touches a destructive flow (Reset-Offsets, Delete-Records, ACL
+mutations, SCRAM rotate). Setup + scope: <code>frontend/e2e/README.md</code>.</p>
+<hr />
+<h2 id="12-anti-patterns-dont-do-these">12 · Anti-patterns (don't do these)<a class="headerlink" href="#12-anti-patterns-dont-do-these" title="Permanent link">&para;</a></h2>
+<ol>
+<li>❌ Hard-coded hex values, rgb(), or hsl() in component code.</li>
+<li>❌ Default Tailwind palette classes (<code>bg-slate-*</code>, <code>text-gray-*</code>,
+   <code>border-zinc-*</code>) in new code.</li>
+<li>❌ <code>max-w-6xl</code> on data-dense pages.</li>
+<li>❌ Per-page cluster picker.</li>
+<li>❌ Adding a dependency without discussion.</li>
+<li>❌ Inline <code>&lt;style&gt;</code> tags in TSX files.</li>
+<li>❌ Fabricating data to make a design look full.</li>
+<li>❌ <code>alert()</code>, <code>confirm()</code>, or <code>prompt()</code> — use <code>&lt;Modal&gt;</code> /
+   <code>&lt;ConfirmDialog&gt;</code> / <code>useToast()</code> instead.</li>
+<li>❌ <code>useEffect</code> for data fetching.</li>
+<li>❌ Full-page loading spinners.</li>
+<li>❌ Emoji in UI chrome.</li>
+<li>❌ Shadow-heavy card styling (we are flat + bordered).</li>
+<li>❌ Animation libraries. CSS transitions and <code>animate-*</code> utilities are
+    enough.</li>
+<li>❌ Modals that don't trap focus or don't close on Escape.</li>
+<li>❌ Copy that yells. No all-caps sentences; eyebrows and table headers
+    are the only exceptions.</li>
+</ol>
+<hr />
+<h2 id="13-when-this-file-and-the-code-disagree">13 · When this file and the code disagree<a class="headerlink" href="#13-when-this-file-and-the-code-disagree" title="Permanent link">&para;</a></h2>
+<p>When this file and the code disagree, follow the resolution recorded in
+the most recent design review or PR changelog (see § 14). Where no
+review or changelog covers the discrepancy, this file wins — but flag
+the gap in a follow-up PR so the next review can record the decision.</p>
+<p>Don't add new violations "to match the existing code". If an existing
+route deviates and the deviation is not recorded as a kept-deviation in
+a review, treat it as drift and bring it in line.</p>
+<hr />
+<h2 id="14-changelog">14 · Changelog<a class="headerlink" href="#14-changelog" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Change</th>
+<th>PR</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>initial</td>
+<td>Guidelines established alongside Direction A redesign</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2026-04-26</td>
+<td>Direction-A delivery: WCAG-AA token sweep (focus-on-accent, accent-foreground, border-hover, dark overlay); new primitives (Toolbar, Modal, Input, Notice); kebab/PascalCase consolidation; Button variant rename destructive→danger; PageHeader eyebrow; Incidents-(24h) → Unreachable now semantic fix; outline-based focus indicator</td>
+<td>(this PR — link added by author)</td>
+</tr>
+<tr>
+<td>2026-05-02</td>
+<td>Phase 1 hardening: German strings stripped (English-only), <code>confirmPhrase</code> parity on Reset-Offsets and Delete-Records, ErrorState retry migrated to canonical <code>&lt;Button&gt;</code>, focus-indicator escapes removed (TimezoneToggle/SearchInput/CommandPalette), Radix headless-primitive carve-out in § 1</td>
+<td>(this PR — link added by author)</td>
+</tr>
+</tbody>
+</table>
+<p>Add a row on every change. Small tweaks to tokens or primitives are
+fine; major shifts (new visual language, new nav model) require a design
+review.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
