@@ -1050,7 +1050,7 @@ export async function downloadMessageRaw(
   offset: number,
 ): Promise<void> {
   const path = clusterPath(cluster, `topics/${encodeURIComponent(topic)}/messages/${partition}/${offset}/raw`);
-  const res = await apiFetch(path);
+  const res = await fetchAPI(cluster, path);
   if (!res.ok) {
     let detail = "";
     try {
