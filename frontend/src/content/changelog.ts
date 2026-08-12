@@ -26,6 +26,18 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.1.12",
+    date: "2026-08-12",
+    items: [
+      {
+        type: "fix",
+        title: "Download full value now works for private clusters",
+        description:
+          "The Download full value button was returning HTTP 400 for private (browser-stored) clusters because the request was missing the required X-Kafkito-Cluster header. The header is now correctly injected, so downloads work for all cluster types.",
+      },
+    ],
+  },
+  {
     version: "1.1.11",
     date: "2026-08-12",
     items: [
