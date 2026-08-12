@@ -9,14 +9,14 @@ require (
 	github.com/dop251/goja v0.0.0-20260719185829-0fc1d42c1dc9
 	github.com/go-chi/chi/v5 v5.3.1
 	github.com/hamba/avro/v2 v2.31.0
-	github.com/knadh/koanf/parsers/yaml v1.1.0
+	github.com/knadh/koanf/parsers/yaml v1.1.1
 	github.com/knadh/koanf/providers/env v1.1.0
 	github.com/knadh/koanf/providers/file v1.2.1
-	github.com/knadh/koanf/providers/structs v1.0.0
-	github.com/knadh/koanf/v2 v2.3.5
+	github.com/knadh/koanf/providers/structs v1.0.1
+	github.com/knadh/koanf/v2 v2.3.6
 	github.com/lestrrat-go/httprc/v3 v3.0.6
-	github.com/lestrrat-go/jwx/v3 v3.1.1
-	github.com/ohler55/ojg v1.28.2
+	github.com/lestrrat-go/jwx/v3 v3.2.0
+	github.com/ohler55/ojg v1.28.3
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go/modules/kafka v0.43.0
 	github.com/twmb/franz-go v1.21.5
