@@ -38,15 +38,6 @@ type Message struct {
 
 	Masked bool `json:"masked,omitempty"`
 
-	// ValueSizeBytes is the untruncated byte length of the raw Kafka value.
-	// Populated whenever the value was read; zero means the record had no
-	// value (nil/empty).
-	ValueSizeBytes int64 `json:"value_size_bytes,omitempty"`
-	// ValueTruncated is true when Value (and ValueB64) were cut to
-	// maxMessageValueBytes. The full payload is on the broker; the UI should
-	// surface this so the user knows they are seeing a preview only.
-	ValueTruncated bool `json:"value_truncated,omitempty"`
-
 	// KeySR / ValueSR are populated when the key/value carries the Confluent
 	// Schema-Registry wire-format magic byte and a decoder for the cluster
 	// could resolve and decode the schema (avro/json_schema). When present,
@@ -103,13 +94,6 @@ type ConsumeResult struct {
 const (
 	maxConsumeLimit     = 500
 	defaultConsumeLimit = 50
-
-	// maxMessageValueBytes caps the rendered value string stored in Message.Value
-	// and the raw bytes passed to decodeBytes. Payloads larger than this are
-	// truncated before string allocation; Message.ValueTruncated is set to true
-	// and Message.ValueSizeBytes carries the original byte length so the UI can
-	// show a "preview only" indicator.
-	maxMessageValueBytes = 64 * 1024 // 64 KB
 
 	// balanceBuffer absorbs timestamp-interleaving wobble between partitions
 	// when merging "last N" results across multiple partitions. With it, the
@@ -647,22 +631,12 @@ func buildNextCursor(
 
 func recordToMessage(rec *kgo.Record) Message {
 	m := Message{
-		Partition:      rec.Partition,
-		Offset:         rec.Offset,
-		Timestamp:      rec.Timestamp.UnixMilli(),
-		ValueSizeBytes: int64(len(rec.Value)),
+		Partition: rec.Partition,
+		Offset:    rec.Offset,
+		Timestamp: rec.Timestamp.UnixMilli(),
 	}
 	m.Key, m.KeyEncoding, m.KeyB64 = decodeBytes(rec.Key)
-
-	// Truncate the raw value bytes before decoding to prevent large payloads
-	// from causing outsized string allocations. The full byte length is already
-	// stored in ValueSizeBytes so the UI can show the original size.
-	valBytes := rec.Value
-	if int64(len(valBytes)) > maxMessageValueBytes {
-		valBytes = valBytes[:maxMessageValueBytes]
-		m.ValueTruncated = true
-	}
-	m.Value, m.ValueEncoding, m.ValueB64 = decodeBytes(valBytes)
+	m.Value, m.ValueEncoding, m.ValueB64 = decodeBytes(rec.Value)
 	if len(rec.Headers) > 0 {
 		m.Headers = make(map[string]string, len(rec.Headers))
 		for _, h := range rec.Headers {
@@ -703,10 +677,6 @@ func (m *Message) applySRDecoder(ctx context.Context, dec *SRDecoder, rawKey, ra
 	if rendered, meta, ok, _ := dec.Decode(ctx, rawValue); meta.Format != "" {
 		if ok {
 			m.Value = rendered
-			if int64(len(m.Value)) > maxMessageValueBytes {
-				m.Value = m.Value[:maxMessageValueBytes]
-				m.ValueTruncated = true
-			}
 			m.ValueEncoding = meta.Format
 			m.ValueB64 = ""
 		}

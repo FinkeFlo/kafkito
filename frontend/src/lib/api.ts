@@ -115,8 +115,6 @@ export interface Message {
    */
   headers_b64?: Record<string, string>;
   masked?: boolean;
-  value_size_bytes?: number;
-  value_truncated?: boolean;
   key_sr?: SRDecodedMeta;
   value_sr?: SRDecodedMeta;
 }
