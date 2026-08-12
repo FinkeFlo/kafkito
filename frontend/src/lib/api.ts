@@ -115,6 +115,8 @@ export interface Message {
    */
   headers_b64?: Record<string, string>;
   masked?: boolean;
+  value_size_bytes?: number;
+  value_truncated?: boolean;
   key_sr?: SRDecodedMeta;
   value_sr?: SRDecodedMeta;
 }
@@ -1034,4 +1036,39 @@ export async function testCluster(cfg: PrivateCluster): Promise<ClusterInfo> {
     throw new Error(`HTTP ${res.status}${detail}`);
   }
   return (await res.json()) as ClusterInfo;
+}
+
+/**
+ * Downloads the full raw value of a single Kafka record identified by
+ * partition and offset. Triggers a browser file-save dialog.
+ * Throws on HTTP error (including 413 when the value exceeds the server cap).
+ */
+export async function downloadMessageRaw(
+  cluster: string,
+  topic: string,
+  partition: number,
+  offset: number,
+): Promise<void> {
+  const path = clusterPath(cluster, `topics/${encodeURIComponent(topic)}/messages/${partition}/${offset}/raw`);
+  const res = await apiFetch(path);
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const b = (await res.json()) as { error?: string };
+      detail = b.error ? `: ${b.error}` : "";
+    } catch { /* ignore */ }
+    throw new Error(`HTTP ${res.status}${detail}`);
+  }
+  const disposition = res.headers.get("content-disposition") ?? "";
+  const match = disposition.match(/filename="([^"]+)"/);
+  const filename = match ? match[1] : `${topic}-p${partition}-o${offset}.bin`;
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

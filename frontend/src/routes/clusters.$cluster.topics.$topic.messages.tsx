@@ -6,6 +6,7 @@ import {
   fetchMessages,
   fetchSample,
   searchMessages,
+  downloadMessageRaw,
   type Message,
   type PartitionInfo,
   type SampleResponse,
@@ -1232,8 +1233,11 @@ function MessageRow({
   ) => void;
 }) {
   const fmt = useFormatters();
+  const { cluster, topic } = Route.useParams();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const [replayOpen, setReplayOpen] = useState(false);
   const preview =
     m.value_encoding === "null"
@@ -1250,6 +1254,19 @@ function MessageRow({
       setTimeout(() => setCopied(false), 1500);
     } catch {
       // ignore clipboard errors (permissions, insecure context)
+    }
+  };
+
+  const downloadFull = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      await downloadMessageRaw(cluster, topic, m.partition, m.offset);
+    } catch (err) {
+      setDownloadError((err as Error).message);
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -1290,6 +1307,14 @@ function MessageRow({
             masked
           </span>
         )}
+        {m.value_truncated && (
+          <span
+            title={`Value truncated to 64 KB preview. Original size: ${m.value_size_bytes ? fmt.bytes(m.value_size_bytes) : "unknown"}`}
+            className="rounded bg-[var(--color-surface-subtle)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]"
+          >
+            preview
+          </span>
+        )}
         <Timestamp value={m.timestamp_ms} className="text-[10px] text-[var(--color-text-subtle)]" />
         {m.key && (
           <span className="font-mono text-[var(--color-text-muted)]">
@@ -1320,7 +1345,7 @@ function MessageRow({
             />
           </div>
           <DetailSection
-            label={`value · ${m.value_encoding}${m.value_sr ? ` · sr id ${m.value_sr.schema_id ?? "?"}` : ""}`}
+            label={`value · ${m.value_encoding}${m.value_sr ? ` · sr id ${m.value_sr.schema_id ?? "?"}` : ""}${m.value_truncated ? ` · preview only — full size ${m.value_size_bytes ? fmt.bytes(m.value_size_bytes) : "unknown"}` : ""}`}
             body={<ValueBody m={m} onPick={onPick} />}
             action={
               <div className="flex items-center gap-1.5">
@@ -1338,6 +1363,19 @@ function MessageRow({
                 >
                   {copied ? "Copied!" : "Copy value"}
                 </button>
+                {m.value_truncated && (
+                  <button
+                    onClick={downloadFull}
+                    disabled={downloading}
+                    className="rounded border border-[var(--color-border)] px-2 py-1 text-[11px] hover:border-[var(--color-border-strong)] disabled:opacity-50"
+                    title={`Download full value (${m.value_size_bytes ? fmt.bytes(m.value_size_bytes) : "unknown size"})`}
+                  >
+                    {downloading ? "Downloading…" : "Download full value"}
+                  </button>
+                )}
+                {downloadError && (
+                  <span className="text-[11px] text-[var(--color-danger)]">{downloadError}</span>
+                )}
               </div>
             }
           />

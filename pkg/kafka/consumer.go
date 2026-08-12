@@ -38,6 +38,15 @@ type Message struct {
 
 	Masked bool `json:"masked,omitempty"`
 
+	// ValueSizeBytes is the untruncated byte length of the raw Kafka value.
+	// Populated whenever the value was read; zero means the record had no
+	// value (nil/empty).
+	ValueSizeBytes int64 `json:"value_size_bytes,omitempty"`
+	// ValueTruncated is true when Value (and ValueB64) were cut to
+	// maxMessageValueBytes. The full payload is on the broker; the UI should
+	// surface this so the user knows they are seeing a preview only.
+	ValueTruncated bool `json:"value_truncated,omitempty"`
+
 	// KeySR / ValueSR are populated when the key/value carries the Confluent
 	// Schema-Registry wire-format magic byte and a decoder for the cluster
 	// could resolve and decode the schema (avro/json_schema). When present,
@@ -94,6 +103,13 @@ type ConsumeResult struct {
 const (
 	maxConsumeLimit     = 500
 	defaultConsumeLimit = 50
+
+	// maxMessageValueBytes caps the rendered value string stored in Message.Value
+	// and the raw bytes passed to decodeBytes. Payloads larger than this are
+	// truncated before string allocation; Message.ValueTruncated is set to true
+	// and Message.ValueSizeBytes carries the original byte length so the UI can
+	// show a "preview only" indicator.
+	maxMessageValueBytes = 64 * 1024 // 64 KB
 
 	// balanceBuffer absorbs timestamp-interleaving wobble between partitions
 	// when merging "last N" results across multiple partitions. With it, the
@@ -631,12 +647,22 @@ func buildNextCursor(
 
 func recordToMessage(rec *kgo.Record) Message {
 	m := Message{
-		Partition: rec.Partition,
-		Offset:    rec.Offset,
-		Timestamp: rec.Timestamp.UnixMilli(),
+		Partition:      rec.Partition,
+		Offset:         rec.Offset,
+		Timestamp:      rec.Timestamp.UnixMilli(),
+		ValueSizeBytes: int64(len(rec.Value)),
 	}
 	m.Key, m.KeyEncoding, m.KeyB64 = decodeBytes(rec.Key)
-	m.Value, m.ValueEncoding, m.ValueB64 = decodeBytes(rec.Value)
+
+	// Truncate the raw value bytes before decoding to prevent large payloads
+	// from causing outsized string allocations. The full byte length is already
+	// stored in ValueSizeBytes so the UI can show the original size.
+	valBytes := rec.Value
+	if int64(len(valBytes)) > maxMessageValueBytes {
+		valBytes = valBytes[:maxMessageValueBytes]
+		m.ValueTruncated = true
+	}
+	m.Value, m.ValueEncoding, m.ValueB64 = decodeBytes(valBytes)
 	if len(rec.Headers) > 0 {
 		m.Headers = make(map[string]string, len(rec.Headers))
 		for _, h := range rec.Headers {
@@ -677,6 +703,10 @@ func (m *Message) applySRDecoder(ctx context.Context, dec *SRDecoder, rawKey, ra
 	if rendered, meta, ok, _ := dec.Decode(ctx, rawValue); meta.Format != "" {
 		if ok {
 			m.Value = rendered
+			if int64(len(m.Value)) > maxMessageValueBytes {
+				m.Value = m.Value[:maxMessageValueBytes]
+				m.ValueTruncated = true
+			}
 			m.ValueEncoding = meta.Format
 			m.ValueB64 = ""
 		}
@@ -721,4 +751,92 @@ func bytesTrimSpace(b []byte) []byte {
 
 func isSpace(c byte) bool {
 	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
+}
+
+// MaxRawDownloadMB is the download cap in megabytes, exported so handlers can
+// include it in error messages.
+const MaxRawDownloadMB = 15
+
+// maxRawDownloadBytes is the per-request cap for the raw message value
+// download endpoint. Requests for values larger than this are rejected with
+// 413 so a single oversized record cannot exhaust process memory.
+const maxRawDownloadBytes = MaxRawDownloadMB * 1024 * 1024
+
+// RawMessageValue is the result of FetchRawMessageValue.
+type RawMessageValue struct {
+	Value       []byte
+	ContentType string // "application/json", "text/plain", or "application/octet-stream"
+	Extension   string // suggested file extension without leading dot
+}
+
+// FetchRawMessageValue fetches the raw value bytes of a single Kafka record
+// identified by cluster, topic, partition, and offset. It never builds a
+// Message struct or performs any string/base64 conversion, so it is safe to
+// call for records larger than maxMessageValueBytes as long as the payload
+// stays within maxRawDownloadBytes.
+//
+// Returns ErrValueTooLarge when the record's value exceeds maxRawDownloadBytes.
+func (r *Registry) FetchRawMessageValue(ctx context.Context, cluster, topic string, partition int32, offset int64) (*RawMessageValue, error) {
+	cfg, ok := r.clusters[cluster]
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, cluster)
+	}
+
+	consumeOpts := clientOpts(cfg, r.log.With("cluster", cluster, "role", "raw-download"))
+	consumeOpts = append(consumeOpts,
+		kgo.ConsumePartitions(map[string]map[int32]kgo.Offset{
+			topic: {partition: kgo.NewOffset().At(offset)},
+		}),
+		kgo.FetchMaxWait(3*time.Second),
+	)
+	cl, err := kgo.NewClient(consumeOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("create client: %w", err)
+	}
+	defer cl.Close()
+
+	fetches := cl.PollFetches(ctx)
+	if err := fetches.Err(); err != nil && !errors.Is(err, context.Canceled) {
+		return nil, fmt.Errorf("poll fetches: %w", err)
+	}
+
+	var rec *kgo.Record
+	fetches.EachRecord(func(r *kgo.Record) {
+		if rec == nil && r.Partition == partition && r.Offset == offset {
+			rec = r
+		}
+	})
+	if rec == nil {
+		return nil, fmt.Errorf("record not found: partition %d offset %d", partition, offset)
+	}
+
+	if int64(len(rec.Value)) > maxRawDownloadBytes {
+		return nil, ErrValueTooLarge
+	}
+
+	ct, ext := detectContentType(rec.Value)
+	return &RawMessageValue{
+		Value:       rec.Value,
+		ContentType: ct,
+		Extension:   ext,
+	}, nil
+}
+
+// ErrValueTooLarge is returned when a raw value exceeds maxRawDownloadBytes.
+var ErrValueTooLarge = errors.New("value exceeds download size limit")
+
+// detectContentType returns a MIME type and file extension for raw Kafka value
+// bytes. JSON and UTF-8 text are distinguished from binary payloads.
+func detectContentType(b []byte) (mimeType, ext string) {
+	if len(b) == 0 {
+		return "application/octet-stream", "bin"
+	}
+	if utf8.Valid(b) {
+		trimmed := bytesTrimSpace(b)
+		if len(trimmed) > 0 && (trimmed[0] == '{' || trimmed[0] == '[') && json.Valid(trimmed) {
+			return "application/json", "json"
+		}
+		return "text/plain; charset=utf-8", "txt"
+	}
+	return "application/octet-stream", "bin"
 }
