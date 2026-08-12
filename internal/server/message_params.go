@@ -21,6 +21,9 @@ import (
 // exhaustion, matching the cap used by the other JSON handlers.
 const maxSearchBodyBytes = 1 << 20
 
+// maxConsumeLimit caps the number of messages a single consume request may fetch.
+const maxConsumeLimit = 500
+
 // maxPartitionOffsetsEntries caps the comma-separated partition_offsets
 // query value. A topic with thousands of partitions is exotic; this guard
 // stops a malicious or malformed input from forcing quadratic admin work
@@ -80,6 +83,9 @@ func parseConsumeQuery(q url.Values) (kafkapkg.ConsumeOptions, error) {
 		v, err := strconv.Atoi(s)
 		if err != nil || v <= 0 {
 			return opts, badParam("invalid limit")
+		}
+		if v > maxConsumeLimit {
+			v = maxConsumeLimit
 		}
 		opts.Limit = v
 	}

@@ -6,6 +6,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -68,6 +69,13 @@ func TestParseConsumeQuery(t *testing.T) {
 		{name: "invalid limit (zero)", raw: "limit=0", wantErr: "invalid limit"},
 		{name: "invalid limit (negative)", raw: "limit=-3", wantErr: "invalid limit"},
 		{name: "invalid limit (text)", raw: "limit=foo", wantErr: "invalid limit"},
+		{
+			name: "limit above cap is clamped to maxConsumeLimit",
+			raw:  fmt.Sprintf("limit=%d", maxConsumeLimit+1),
+			check: func(t *testing.T, o kafkapkg.ConsumeOptions) {
+				assert.Equal(t, maxConsumeLimit, o.Limit)
+			},
+		},
 		{name: "invalid from", raw: "from=middle", wantErr: "invalid from"},
 		{name: "invalid offset value", raw: "from=offset&offset=xx", wantErr: "invalid offset"},
 		{
