@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -91,6 +92,7 @@ func (a *clusterAPI) mount(r chi.Router) {
 	r.Get("/clusters/{cluster}/topics/{topic}/messages", a.consumeMessages)
 	r.Get("/clusters/{cluster}/topics/{topic}/messages/count", a.countMessages)
 	r.Get("/clusters/{cluster}/topics/{topic}/messages/timeline", a.messageTimeline)
+	r.Get("/clusters/{cluster}/topics/{topic}/messages/{partition}/{offset}/raw", a.downloadMessageRaw)
 	r.Get("/clusters/{cluster}/topics/{topic}/sample", a.sampleMessages)
 	r.Post("/clusters/{cluster}/topics/{topic}/messages/search", a.searchMessages)
 	r.Post("/clusters/{cluster}/topics/{topic}/messages", a.produceMessage)
@@ -313,6 +315,57 @@ func (a *clusterAPI) consumeMessages(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// downloadMessageRaw streams the raw value bytes of a single Kafka record
+// identified by partition and offset directly to the response without any
+// string/base64 conversion. Values larger than 15 MB are rejected with 413
+// so a single oversized record cannot exhaust process memory.
+//
+// Path params: {partition} int32, {offset} int64
+func (a *clusterAPI) downloadMessageRaw(w http.ResponseWriter, r *http.Request) {
+	cluster := chi.URLParam(r, "cluster")
+	topic := chi.URLParam(r, "topic")
+
+	partRaw := chi.URLParam(r, "partition")
+	offRaw := chi.URLParam(r, "offset")
+
+	part, err := strconv.ParseInt(partRaw, 10, 32)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid partition"})
+		return
+	}
+	off, err := strconv.ParseInt(offRaw, 10, 64)
+	if err != nil || off < 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid offset"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+
+	raw, err := a.reg.FetchRawMessageValue(ctx, cluster, topic, int32(part), off)
+	if err != nil {
+		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
+			return
+		}
+		if errors.Is(err, kafkapkg.ErrValueTooLarge) {
+			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{
+				"error": fmt.Sprintf("value exceeds the %d MB download limit", kafkapkg.MaxRawDownloadMB),
+			})
+			return
+		}
+		gatewayError(ctx, w, a.log, "download message raw", err)
+		return
+	}
+
+	filename := fmt.Sprintf("%s-p%d-o%d.%s", topic, part, off, raw.Extension)
+	w.Header().Set("Content-Type", raw.ContentType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	w.Header().Set("Content-Length", strconv.Itoa(len(raw.Value)))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(raw.Value)
 }
 
 // countMessages resolves the selected range to per-partition offset deltas and
