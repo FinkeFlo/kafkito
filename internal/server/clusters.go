@@ -365,7 +365,7 @@ func (a *clusterAPI) downloadMessageRaw(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
 	w.Header().Set("Content-Length", strconv.Itoa(len(raw.Value)))
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(raw.Value)
+	_, _ = w.Write(raw.Value) //nolint:gosec // G705: value is served as attachment (Content-Disposition: attachment), not rendered as HTML.
 }
 
 // countMessages resolves the selected range to per-partition offset deltas and
