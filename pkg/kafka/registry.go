@@ -94,9 +94,34 @@ type Registry struct {
 	srMu       sync.Mutex
 	srDecoders map[string]*SRDecoder
 
+	// cfgCacheMu guards cfgCache.
+	cfgCacheMu sync.Mutex
+	// cfgCache holds recent DescribeTopicConfigs results keyed by
+	// "cluster\x00topic". Permanent errors (e.g. unauthorized) are cached
+	// for cfgCacheTTLPermanent; successful reads for cfgCacheTTLSuccess.
+	// This avoids a Kafka round-trip on every frontend poll interval.
+	cfgCache map[string]topicConfigsCacheEntry
+
 	// metrics is lazily started; nil until StartMetrics is called.
 	metrics *metricsCollector
 }
+
+// topicConfigsCacheEntry holds one cached DescribeTopicConfigs outcome.
+type topicConfigsCacheEntry struct {
+	configs    []TopicConfigEntry
+	configsErr string
+	expiry     time.Time
+}
+
+const (
+	// cfgCacheTTLPermanent is used for errors that are unlikely to resolve on
+	// their own (e.g. missing ACL). Long enough to suppress poll-driven spam
+	// without permanently hiding a fix by the cluster admin.
+	cfgCacheTTLPermanent = 60 * time.Second
+	// cfgCacheTTLSuccess is used for successful reads. Short enough that a
+	// config change is reflected quickly.
+	cfgCacheTTLSuccess = 10 * time.Second
+)
 
 // NewRegistry constructs a registry from the configured clusters.
 func NewRegistry(cfg []config.ClusterConfig, log *slog.Logger) *Registry {
@@ -130,6 +155,7 @@ func NewRegistry(cfg []config.ClusterConfig, log *slog.Logger) *Registry {
 		masking:    policies,
 		clients:    make(map[string]*kgo.Client),
 		srDecoders: make(map[string]*SRDecoder),
+		cfgCache:   make(map[string]topicConfigsCacheEntry),
 	}
 }
 
@@ -492,8 +518,57 @@ func (r *Registry) DescribeTopic(ctx context.Context, cluster, topic string) (*T
 		})
 	}
 
+	configs, configsErr := r.describeCachedTopicConfigs(ctx, cluster, topic, adm)
+
+	out := &TopicDetail{
+		Name:              topic,
+		IsInternal:        t.IsInternal,
+		Partitions:        parts,
+		ReplicationFactor: rf,
+		Messages:          total,
+		Configs:           configs,
+		ConfigsError:      configsErr,
+	}
+	if snap, ok := r.ClusterMetricsSnapshot(cluster); ok {
+		if m, ok := snap.PerTopic[topic]; ok && m.HaveSize {
+			out.SizeBytes = ptrInt64(m.SizeBytes)
+		}
+	}
+	return out, nil
+}
+
+// classifyConfigsErr maps a DescribeConfigs error to a short, UI-friendly
+// code stored in TopicDetail.ConfigsError. Empty means "not classifiable"
+// (caller should fall back to a generic code).
+func classifyConfigsErr(err error) string {
+	if err == nil {
+		return ""
+	}
+	if errors.Is(err, kerr.TopicAuthorizationFailed) ||
+		errors.Is(err, kerr.ClusterAuthorizationFailed) {
+		return "unauthorized"
+	}
+	return "unavailable"
+}
+
+// describeCachedTopicConfigs calls DescribeTopicConfigs and caches the result.
+// Permanent errors ("unauthorized") are held for cfgCacheTTLPermanent to
+// avoid a Kafka round-trip on every frontend poll. Successful reads are cached
+// for cfgCacheTTLSuccess so config changes are still reflected quickly.
+func (r *Registry) describeCachedTopicConfigs(ctx context.Context, cluster, topic string, adm *kadm.Client) ([]TopicConfigEntry, string) {
+	key := cluster + "\x00" + topic
+	now := time.Now()
+
+	r.cfgCacheMu.Lock()
+	if e, ok := r.cfgCache[key]; ok && now.Before(e.expiry) {
+		r.cfgCacheMu.Unlock()
+		return e.configs, e.configsErr
+	}
+	r.cfgCacheMu.Unlock()
+
 	configs := []TopicConfigEntry{}
 	var configsErr string
+
 	rcs, err := adm.DescribeTopicConfigs(ctx, topic)
 	if err == nil {
 		for _, rc := range rcs {
@@ -528,35 +603,20 @@ func (r *Registry) DescribeTopic(ctx context.Context, cluster, topic string) (*T
 		r.log.Warn("describe topic configs failed", "cluster", cluster, "topic", topic, "err", err)
 	}
 
-	out := &TopicDetail{
-		Name:              topic,
-		IsInternal:        t.IsInternal,
-		Partitions:        parts,
-		ReplicationFactor: rf,
-		Messages:          total,
-		Configs:           configs,
-		ConfigsError:      configsErr,
+	ttl := cfgCacheTTLSuccess
+	if configsErr == "unauthorized" {
+		ttl = cfgCacheTTLPermanent
 	}
-	if snap, ok := r.ClusterMetricsSnapshot(cluster); ok {
-		if m, ok := snap.PerTopic[topic]; ok && m.HaveSize {
-			out.SizeBytes = ptrInt64(m.SizeBytes)
-		}
-	}
-	return out, nil
-}
 
-// classifyConfigsErr maps a DescribeConfigs error to a short, UI-friendly
-// code stored in TopicDetail.ConfigsError. Empty means "not classifiable"
-// (caller should fall back to a generic code).
-func classifyConfigsErr(err error) string {
-	if err == nil {
-		return ""
+	r.cfgCacheMu.Lock()
+	r.cfgCache[key] = topicConfigsCacheEntry{
+		configs:    configs,
+		configsErr: configsErr,
+		expiry:     now.Add(ttl),
 	}
-	if errors.Is(err, kerr.TopicAuthorizationFailed) ||
-		errors.Is(err, kerr.ClusterAuthorizationFailed) {
-		return "unauthorized"
-	}
-	return "unavailable"
+	r.cfgCacheMu.Unlock()
+
+	return configs, configsErr
 }
 
 // Describe returns ClusterInfo for every configured cluster, each probed

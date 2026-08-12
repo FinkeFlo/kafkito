@@ -34,7 +34,8 @@ function ConfigsTab() {
     queryKey: ["topic", cluster, topic],
     queryFn: () => fetchTopicDetail(cluster, topic),
     enabled: !!cluster,
-    refetchInterval: 5_000,
+    refetchInterval: (query) =>
+      query.state.data?.configs_error === "unauthorized" ? false : 5_000,
   });
 
   if (detailQuery.isLoading && cluster) {

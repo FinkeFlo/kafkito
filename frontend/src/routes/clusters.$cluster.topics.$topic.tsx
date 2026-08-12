@@ -46,7 +46,8 @@ function TopicDetailLayout() {
     queryKey: ["topic", cluster, topic],
     queryFn: () => fetchTopicDetail(cluster, topic),
     enabled: !!cluster,
-    refetchInterval: 5_000,
+    refetchInterval: (query) =>
+      query.state.data?.configs_error === "unauthorized" ? false : 5_000,
   });
 
   const consumersQuery = useQuery({
@@ -85,6 +86,12 @@ function TopicDetailLayout() {
       )}
 
       <KpiStrip detail={detailQuery.data} consumers={consumersQuery.data} />
+
+      {configsError === "unauthorized" && (
+        <Notice intent="warning">
+          Topic configuration access is restricted. Config details and retention info are unavailable for this topic.
+        </Notice>
+      )}
 
       <nav className="flex items-center gap-1 border-b border-border">
         {TABS.map((tab) => (
