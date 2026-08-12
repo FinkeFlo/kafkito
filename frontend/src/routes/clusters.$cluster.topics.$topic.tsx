@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { X } from "lucide-react";
 import {
   fetchTopicConsumers,
   fetchTopicDetail,
@@ -41,6 +43,11 @@ function tabPath(id: string): TabPath {
 function TopicDetailLayout() {
   const { cluster, topic } = Route.useParams();
   const fmt = useFormatters();
+  const [configWarningDismissed, setConfigWarningDismissed] = useState(false);
+
+  useEffect(() => {
+    setConfigWarningDismissed(false);
+  }, [cluster, topic]);
 
   const detailQuery = useQuery({
     queryKey: ["topic", cluster, topic],
@@ -87,10 +94,20 @@ function TopicDetailLayout() {
 
       <KpiStrip detail={detailQuery.data} consumers={consumersQuery.data} />
 
-      {configsError === "unauthorized" && (
-        <Notice intent="warning">
-          Topic configuration access is restricted. Config details and retention info are unavailable for this topic.
-        </Notice>
+      {configsError === "unauthorized" && !configWarningDismissed && (
+        <div className="relative">
+          <Notice intent="warning">
+            Topic configuration access is restricted. Config details and retention info are unavailable for this topic.
+          </Notice>
+          <button
+            type="button"
+            aria-label="Dismiss"
+            className="absolute top-3 right-3 text-muted transition-colors hover:text-text"
+            onClick={() => setConfigWarningDismissed(true)}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       )}
 
       <nav className="flex items-center gap-1 border-b border-border">

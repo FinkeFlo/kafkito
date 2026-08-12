@@ -26,6 +26,18 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.1.13",
+    date: "2026-08-12",
+    items: [
+      {
+        type: "fix",
+        title: "Config-restricted warning can now be dismissed",
+        description:
+          "The topic-level warning shown when config access is restricted now includes a dismiss button, so it no longer permanently occupies screen space while you browse that topic.",
+      },
+    ],
+  },
+  {
     version: "1.1.12",
     date: "2026-08-12",
     items: [
