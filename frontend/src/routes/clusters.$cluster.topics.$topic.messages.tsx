@@ -1290,6 +1290,14 @@ function MessageRow({
             masked
           </span>
         )}
+        {m.value_truncated && (
+          <span
+            title={`Value truncated to 64 KB preview. Original size: ${m.value_size_bytes ? fmt.bytes(m.value_size_bytes) : "unknown"}`}
+            className="rounded bg-[var(--color-surface-subtle)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]"
+          >
+            preview
+          </span>
+        )}
         <Timestamp value={m.timestamp_ms} className="text-[10px] text-[var(--color-text-subtle)]" />
         {m.key && (
           <span className="font-mono text-[var(--color-text-muted)]">
@@ -1320,7 +1328,7 @@ function MessageRow({
             />
           </div>
           <DetailSection
-            label={`value · ${m.value_encoding}${m.value_sr ? ` · sr id ${m.value_sr.schema_id ?? "?"}` : ""}`}
+            label={`value · ${m.value_encoding}${m.value_sr ? ` · sr id ${m.value_sr.schema_id ?? "?"}` : ""}${m.value_truncated ? ` · preview only — full size ${m.value_size_bytes ? fmt.bytes(m.value_size_bytes) : "unknown"}` : ""}`}
             body={<ValueBody m={m} onPick={onPick} />}
             action={
               <div className="flex items-center gap-1.5">
