@@ -26,6 +26,54 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.1.11",
+    date: "2026-08-12",
+    items: [
+      {
+        type: "feature",
+        title: "Download full message value as a file",
+        description:
+          "When a message value is too large to show in full (truncated at 64 KB), a Download full value button now appears in the expanded row. Clicking it fetches the raw bytes directly from Kafka and saves them as a file — the Content-Type is auto-detected (JSON, plain text, or binary), and values larger than 15 MB are rejected to keep downloads practical.",
+      },
+    ],
+  },
+  {
+    version: "1.1.10",
+    date: "2026-08-12",
+    items: [
+      {
+        type: "fix",
+        title: "Large message values are now safely previewed",
+        description:
+          "Message values larger than 64 KB are truncated before decoding to avoid excessive memory use. The message row shows a 'preview' badge and the expanded view notes the original size, so it is always clear when you are seeing only the first 64 KB of a larger payload.",
+      },
+    ],
+  },
+  {
+    version: "1.1.9",
+    date: "2026-08-12",
+    items: [
+      {
+        type: "fix",
+        title: "Consume limit is now capped and config errors are cached",
+        description:
+          "Message fetch limits above 500 are silently clamped instead of rejected. Topic configuration reads are now cached (10 s for success, 60 s for permanent errors), so a missing DescribeConfigs ACL no longer causes repeated Kafka round-trips on every poll. The topic layout shows a notice when config access is restricted.",
+      },
+    ],
+  },
+  {
+    version: "1.1.8",
+    date: "2026-08-05",
+    items: [
+      {
+        type: "fix",
+        title: "Reset Offsets now respects the production-cluster confirmation",
+        description:
+          "The Reset Offsets modal was missing the production confirmation flag, causing a 428 error on production-marked clusters. The modal now surfaces the production warning and passes the flag correctly for both the preview and commit steps.",
+      },
+    ],
+  },
+  {
     version: "1.1.7",
     date: "2026-08-05",
     items: [
