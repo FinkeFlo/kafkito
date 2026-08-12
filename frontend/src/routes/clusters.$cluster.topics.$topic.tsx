@@ -96,7 +96,7 @@ function TopicDetailLayout() {
 
       {configsError === "unauthorized" && !configWarningDismissed && (
         <div className="relative">
-          <Notice intent="warning">
+          <Notice intent="info">
             Topic configuration access is restricted. Config details and retention info are unavailable for this topic.
           </Notice>
           <button
