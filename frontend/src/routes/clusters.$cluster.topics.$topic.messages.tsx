@@ -1084,7 +1084,17 @@ function MessagesPanel({
                 {searching && " …"}
               </span>
               {searchResult.stats.parse_errors > 0 && (
-                <span className="text-[var(--color-warning)]">
+                <span
+                  className="text-[var(--color-warning)] cursor-default"
+                  title={
+                    searchResult.stats.parse_error_offsets &&
+                    searchResult.stats.parse_error_offsets.length > 0
+                      ? searchResult.stats.parse_error_offsets
+                          .map((e) => `p${e.partition}@${e.offset}: ${e.error}`)
+                          .join("\n")
+                      : undefined
+                  }
+                >
                   · {fmt.number(searchResult.stats.parse_errors)} parse errors skipped
                 </span>
               )}

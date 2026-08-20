@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
@@ -92,6 +93,19 @@ type SearchOptions struct {
 	Timeout time.Duration
 }
 
+// ParseErrorOffset records the location and reason of a single message that
+// could not be parsed during a structured search (JSONPath, XPath, …).
+type ParseErrorOffset struct {
+	Partition int32  `json:"partition"`
+	Offset    int64  `json:"offset"`
+	Error     string `json:"error"`
+}
+
+// parseErrorOffsetsCap is the maximum number of parse error locations kept per
+// search response. It prevents unbounded memory growth on topics with many
+// malformed messages.
+const parseErrorOffsetsCap = 50
+
 // SearchStats is the per-response summary.
 type SearchStats struct {
 	Scanned         int  `json:"scanned"`
@@ -107,7 +121,10 @@ type SearchStats struct {
 	NextCursors   map[int32]int64          `json:"next_cursors,omitempty"`
 	ResolvedRange map[int32]PartitionRange `json:"resolved_range,omitempty"`
 	ParseErrors   int                      `json:"parse_errors"`
-	Durations     map[string]int64         `json:"durations_ms,omitempty"`
+	// ParseErrorOffsets lists up to 50 partition/offset pairs where a message
+	// could not be parsed. Use this to locate and inspect the raw messages.
+	ParseErrorOffsets []ParseErrorOffset `json:"parse_error_offsets,omitempty"`
+	Durations         map[string]int64   `json:"durations_ms,omitempty"`
 }
 
 // PartitionRange reports the offset window actually scanned on a partition.
@@ -346,6 +363,7 @@ func (r *Registry) SearchMessages(ctx context.Context, cluster, topic string, op
 	var matches []Message
 	scanned := 0
 	parseErrors := 0
+	var parseErrorOffsets []ParseErrorOffset
 	// highestOffset tracks the highest offset we've processed per partition
 	// (used for oldest-first next_cursor).
 	highestOffset := make(map[int32]int64, len(ranges))
@@ -442,6 +460,17 @@ scan:
 			hit, err := mt.match(&msg)
 			if err != nil {
 				parseErrors++
+				slog.WarnContext(ctx, "search: skipping message – parse error",
+					"partition", rec.Partition,
+					"offset", rec.Offset,
+					"error", err)
+				if len(parseErrorOffsets) < parseErrorOffsetsCap {
+					parseErrorOffsets = append(parseErrorOffsets, ParseErrorOffset{
+						Partition: rec.Partition,
+						Offset:    rec.Offset,
+						Error:     err.Error(),
+					})
+				}
 				return
 			}
 			if hit {
@@ -583,11 +612,12 @@ scan:
 		BudgetExhausted: budgetExhausted,
 		TimedOut:        timedOut,
 		MoreAvailable:   moreAvailable,
-		Direction:       opts.Direction,
-		NextCursors:     nextCursors,
-		ResolvedRange:   ranges,
-		ParseErrors:     parseErrors,
-		Durations:       map[string]int64{"total": time.Since(started).Milliseconds()},
+		Direction:         opts.Direction,
+		NextCursors:       nextCursors,
+		ResolvedRange:     ranges,
+		ParseErrors:       parseErrors,
+		ParseErrorOffsets: parseErrorOffsets,
+		Durations:         map[string]int64{"total": time.Since(started).Milliseconds()},
 	}
 	return &SearchResult{Messages: matches, Stats: stats}, nil
 }

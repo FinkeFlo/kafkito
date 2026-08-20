@@ -903,6 +903,7 @@ export interface SearchStats {
   next_cursors?: Record<string, number>;
   resolved_range?: Record<string, { start: number; end: number }>;
   parse_errors: number;
+  parse_error_offsets?: { partition: number; offset: number; error: string }[];
   durations_ms?: Record<string, number>;
 }
 
