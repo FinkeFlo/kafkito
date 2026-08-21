@@ -607,11 +607,11 @@ scan:
 	}
 
 	stats := SearchStats{
-		Scanned:         scanned,
-		Matched:         matched,
-		BudgetExhausted: budgetExhausted,
-		TimedOut:        timedOut,
-		MoreAvailable:   moreAvailable,
+		Scanned:           scanned,
+		Matched:           matched,
+		BudgetExhausted:   budgetExhausted,
+		TimedOut:          timedOut,
+		MoreAvailable:     moreAvailable,
 		Direction:         opts.Direction,
 		NextCursors:       nextCursors,
 		ResolvedRange:     ranges,
