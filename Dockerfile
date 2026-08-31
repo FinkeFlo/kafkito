@@ -6,7 +6,7 @@
 # Pin to BUILDPLATFORM (host arch) so Bun runs natively. The frontend
 # dist is platform-independent JS/CSS, so building on the build host
 # avoids the well-known Bun-under-QEMU hang during cross-builds.
-FROM --platform=$BUILDPLATFORM oven/bun:1.3-alpine AS frontend
+FROM --platform=$BUILDPLATFORM oven/bun:1.4-alpine AS frontend
 WORKDIR /app
 COPY frontend/package.json frontend/bun.lock* frontend/bun.lockb* ./
 RUN bun install --frozen-lockfile || bun install
@@ -19,7 +19,7 @@ RUN bun run build
 # Same trick for Go: build on the host, but Go's own cross-compile
 # (GOARCH=$TARGETARCH below) produces a real linux/$TARGETARCH static
 # binary much faster than emulating amd64 under QEMU.
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS build
 WORKDIR /src
 ARG TARGETARCH
 
