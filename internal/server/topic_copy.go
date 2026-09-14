@@ -587,7 +587,7 @@ func isTopicMissingErr(err error) bool {
 // that reproduces it on the destination, reporting false when the record must
 // be skipped instead.
 //
-// Records are skipped, never approximated, in two cases:
+// Records are skipped, never approximated, in three cases:
 //
 //   - Masked: the source cluster's data_masking policy redacted the value, so
 //     what we hold is a redaction, not the record. Copying it would write the
@@ -597,6 +597,17 @@ func isTopicMissingErr(err error) bool {
 //     destination that is allowed to see the raw data still cannot get it
 //     through this route.)
 //   - Schema-Registry-decoded key/value: see produceEncodingFor.
+//   - Truncated value: ConsumeMessages caps Value at 64 KB (maxMessageValueBytes
+//     in pkg/kafka/consumer.go) to bound per-record memory during the batch
+//     consume/produce loop this function feeds. What we hold for a larger
+//     record is only the first 64 KB, so copying it would silently write a
+//     truncated record instead of the original — the same "approximated
+//     instead of skipped" corruption the other two cases guard against.
+//     Unlike the single-message Replay dialog, a bulk copy has no per-record
+//     UI to ask the user whether to proceed anyway, and re-fetching the full
+//     value per truncated record here would reintroduce the unbounded
+//     memory/latency cost the 64 KB cap exists to prevent at this scale — so
+//     it is always skipped, reported like any other skip via `skipped`.
 //
 // Headers go into a fresh map: injectKafkitoProduceHeaders writes into
 // ProduceRequest.Headers, and handing it msg.Headers would mutate the consumed
@@ -604,7 +615,7 @@ func isTopicMissingErr(err error) bool {
 // without it they would arrive at the destination as the literal display text
 // "0x<hex>" that recordToMessage puts in Headers.
 func copyProduceRequest(msg kafkapkg.Message, preservePartition bool, user string) (kafkapkg.ProduceRequest, bool) {
-	if msg.Masked {
+	if msg.Masked || msg.ValueTruncated {
 		return kafkapkg.ProduceRequest{}, false
 	}
 

@@ -1396,6 +1396,8 @@ function MessageRow({
           open={replayOpen}
           onClose={() => setReplayOpen(false)}
           message={m}
+          sourceCluster={cluster}
+          sourceTopic={topic}
         />
       )}
     </div>

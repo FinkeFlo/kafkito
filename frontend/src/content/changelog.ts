@@ -26,6 +26,24 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.1.15",
+    date: "2026-09-15",
+    items: [
+      {
+        type: "fix",
+        title: "Replay no longer silently truncates large values",
+        description:
+          "Messages over 64 KB are only ever held as a truncated preview in the message list. Replaying such a message used to reproduce just that 64 KB preview as if it were the whole record — a silent data-corruption bug. Replay now automatically fetches the full value first (up to the existing 15 MB raw-download limit) and sends it byte-for-byte; if that isn't possible, you're shown a clear warning and must explicitly opt in to replay the truncated preview instead.",
+      },
+      {
+        type: "fix",
+        title: "Bulk topic copy now skips (instead of truncating) oversized values",
+        description:
+          "For the same reason, bulk \"Copy topic\" jobs now skip records whose value was truncated in the source list, counting them as skipped rather than silently writing a partial value to the destination. Per-record full-value fetches were deliberately not added to the bulk path, to avoid reintroducing the memory/latency risk the 64 KB cap exists to prevent at scale.",
+      },
+    ],
+  },
+  {
     version: "1.1.14",
     date: "2026-09-14",
     items: [
