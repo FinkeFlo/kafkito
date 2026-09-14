@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchTopicDetail,
   fetchMessages,
@@ -373,14 +373,14 @@ function MessagesPanel({
     }
   });
 
-  const dismissCoachmark = () => {
+  const dismissCoachmark = useCallback(() => {
     setShowCoachmark(false);
     try {
       localStorage.setItem("kafkito.coachmark.livejson.seen", "1");
     } catch {
       // ignore quota / privacy-mode failures
     }
-  };
+  }, []);
 
   const browseRange = useMemo(
     () =>
@@ -615,7 +615,7 @@ function MessagesPanel({
       clearTimeout(timer);
       window.removeEventListener("scroll", onScroll);
     };
-  }, [showCoachmark, firstJsonIdx]);
+  }, [showCoachmark, firstJsonIdx, dismissCoachmark]);
 
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm">

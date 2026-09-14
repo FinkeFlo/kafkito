@@ -85,6 +85,7 @@ export function ReplayModal({ open, onClose, message, sourceCluster, sourceTopic
   // Recover the untruncated value up front, whenever the modal opens on a
   // truncated message. Re-runs per message (offset/partition) so switching
   // which row is being replayed doesn't reuse a stale fetch.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deliberately keyed on message.partition/offset (not the whole message object) so the fetch re-triggers only on "which record" changes, not on every re-render's new message reference; fmt.bytes is included since useFormatters() is memoized and only changes with locale.
   useEffect(() => {
     if (!open || !message.value_truncated || replayBlocker(message)) {
       setFullValue({ status: "idle" });
@@ -121,8 +122,7 @@ export function ReplayModal({ open, onClose, message, sourceCluster, sourceTopic
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fmt is stable per render; re-fetch is keyed on the message identity + open.
-  }, [open, message.value_truncated, message.partition, message.offset, sourceCluster, sourceTopic]);
+  }, [open, message.value_truncated, message.partition, message.offset, sourceCluster, sourceTopic, fmt.bytes]);
 
   // Determine the effective cluster selection (default to first cluster).
   const clusterList: ClusterListItem[] = clusters ?? [];

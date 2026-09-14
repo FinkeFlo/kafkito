@@ -45,6 +45,7 @@ function TopicDetailLayout() {
   const fmt = useFormatters();
   const [configWarningDismissed, setConfigWarningDismissed] = useState(false);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: cluster/topic are intentionally trigger-only — must reset the dismissed warning on topic navigation even though the body doesn't read them.
   useEffect(() => {
     setConfigWarningDismissed(false);
   }, [cluster, topic]);
