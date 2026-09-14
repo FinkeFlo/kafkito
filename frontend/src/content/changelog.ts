@@ -26,6 +26,30 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.1.17",
+    date: "2026-09-14",
+    items: [
+      {
+        type: "fix",
+        title: "Larger, gzip-compressed produce requests for the Replay dialog",
+        description:
+          "Replaying a recovered value close to the new 10 MB producer limit could still fail because the produce request itself was capped at 4 MB. The request size limit is now 15 MB, and large payloads are gzip-compressed before sending to reduce transfer size.",
+      },
+      {
+        type: "fix",
+        title: "Clearer replay dialog behavior",
+        description:
+          "The destination-topic picker now uses a larger, styled dropdown instead of the plain browser autocomplete. The success message after loading a truncated value now says \"loaded\" instead of \"recovered\", and the dialog's close button is labeled \"Close\" instead of \"Cancel\" once a replay has succeeded.",
+      },
+      {
+        type: "fix",
+        title: "Warning when the newest messages may be missing from a page",
+        description:
+          "Loading the newest page of a topic could silently return an incomplete page if a very large record ahead of it slowed down the fetch. A warning now appears when this happens, so you know to retry.",
+      },
+    ],
+  },
+  {
     version: "1.1.16",
     date: "2026-09-14",
     items: [
