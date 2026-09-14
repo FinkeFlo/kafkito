@@ -24,8 +24,8 @@ func TestIsAuthorizationFailure(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if got := isAuthorizationFailure(tc.msg); got != tc.want {
-				t.Fatalf("isAuthorizationFailure(%q) = %v, want %v", tc.msg, got, tc.want)
+			if got := IsAuthorizationFailure(tc.msg); got != tc.want {
+				t.Fatalf("IsAuthorizationFailure(%q) = %v, want %v", tc.msg, got, tc.want)
 			}
 		})
 	}

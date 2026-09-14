@@ -11,6 +11,9 @@ import { Button } from "@/components/button";
 import { Input } from "@/components/Input";
 import { Modal } from "@/components/Modal";
 import { Notice } from "@/components/Notice";
+import { SearchInput } from "@/components/search-input";
+import { Toolbar } from "@/components/Toolbar";
+import { useFuzzy } from "@/lib/fuzzy";
 import {
   deletePrivateCluster,
   exportBundle,
@@ -128,6 +131,10 @@ function ClusterSettingsPage() {
     return unsub;
   }, []);
 
+  const [q, setQ] = useState("");
+  const fuzzy = useFuzzy(items, { keys: ["name", "brokers"], query: q });
+  const filtered = fuzzy.results;
+
   const [form, setForm] = useState<FormState | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<PrivateCluster | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -148,8 +155,10 @@ function ClusterSettingsPage() {
     });
   }, [items]);
 
-  const allSelected = items.length > 0 && items.every((c) => selected.has(c.id));
-  const someSelected = !allSelected && items.some((c) => selected.has(c.id));
+  // "Select all" only ever selects/reflects the currently filtered rows, so
+  // exporting after a search exports exactly what's visible.
+  const allSelected = filtered.length > 0 && filtered.every((c) => selected.has(c.id));
+  const someSelected = !allSelected && filtered.some((c) => selected.has(c.id));
 
   const headerCheckboxRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -159,7 +168,14 @@ function ClusterSettingsPage() {
   }, [someSelected]);
 
   const toggleAll = () =>
-    setSelected(allSelected ? new Set() : new Set(items.map((c) => c.id)));
+    setSelected((s) => {
+      const next = new Set(s);
+      for (const c of filtered) {
+        if (allSelected) next.delete(c.id);
+        else next.add(c.id);
+      }
+      return next;
+    });
   const toggleOne = (id: string) =>
     setSelected((s) => {
       const next = new Set(s);
@@ -251,11 +267,30 @@ function ClusterSettingsPage() {
         }
       />
 
+      {items.length > 0 && (
+        <Toolbar
+          search={
+            <SearchInput
+              value={q}
+              onChange={setQ}
+              placeholder="Filter clusters by name or broker…"
+              ariaLabel="Filter private clusters"
+              count={{ visible: filtered.length, total: items.length }}
+            />
+          }
+        />
+      )}
+
       <Card>
         {items.length === 0 ? (
           <EmptyState
             title="No private clusters yet"
             description="Add a cluster to connect with your own credentials. Shared clusters configured server-side always appear too."
+          />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            title="No clusters match your filter"
+            description="Try a different name or broker address."
           />
         ) : (
           <table className="w-full text-sm">
@@ -285,7 +320,7 @@ function ClusterSettingsPage() {
               </tr>
             </thead>
             <tbody>
-              {items.map((c) => (
+              {filtered.map((c) => (
                 <tr
                   key={c.id}
                   className="border-t border-border"
