@@ -4,10 +4,13 @@
 package server
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -25,10 +28,26 @@ import (
 
 const defaultTestConnectionTimeout = 15 * time.Second
 
-// maxProduceBodyBytes caps the JSON body of a single-record produce request.
-// Exported as a value (not just inline) so the 413 message and any client-side
-// pre-flight size check (the Replay dialog) can reference the same number.
-const maxProduceBodyBytes = 4 << 20 // 4 MiB
+// maxProduceBodyBytes caps the decompressed JSON body of a single-record
+// produce request. Exported as a value (not just inline) so the 413 message
+// and any client-side pre-flight size check (the Replay dialog) can reference
+// the same number.
+//
+// Sized to fit a base64-encoded value up to kafkapkg.ProducerBatchMaxBytes
+// (10 MiB raw): base64 inflates raw bytes by ~4/3 (~13.3 MiB), plus the key,
+// headers and JSON punctuation, so 15 MiB leaves comfortable headroom —
+// matching the existing 15 MB raw-download cap elsewhere in the app.
+const maxProduceBodyBytes = 15 << 20 // 15 MiB
+
+// maxProduceCompressedBodyBytes bounds the bytes read off the wire before
+// gzip decompression (Content-Encoding: gzip) when the client compresses a
+// large produce body. Gzip essentially never expands well-formed input by
+// more than a small constant, so this only needs modest headroom over
+// maxProduceBodyBytes; it exists purely as a safety net against a gzip bomb
+// (a tiny compressed stream that decompresses to something enormous) rather
+// than as a real-world limit — the decompressed size is what actually caps
+// what the caller can send, enforced separately below.
+const maxProduceCompressedBodyBytes = maxProduceBodyBytes + (1 << 20) // +1 MiB
 
 // ProdConfirmHeader is the request header the frontend must set to "true"
 // to perform a mutating/dangerous operation (produce, delete topic, delete
@@ -584,6 +603,46 @@ func (a *clusterAPI) describeGroup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, d)
 }
 
+// readProduceBody reads and returns the produceMessage request body,
+// transparently gzip-decompressing when the caller sends
+// "Content-Encoding: gzip" (the Replay dialog uses this to shrink large
+// recovered values before they cross the wire). The decompressed size is
+// still capped at maxProduceBodyBytes regardless of the encoding used, so
+// compression cannot be used to smuggle a larger-than-allowed value past the
+// limit — it only reduces bytes actually transferred for a given payload.
+//
+// On success ok is true and body holds the decompressed bytes. On failure ok
+// is false and status/msg carry the HTTP response to write (400 for a
+// malformed gzip stream, 413 once either the wire or decompressed size
+// exceeds its cap).
+func readProduceBody(w http.ResponseWriter, r *http.Request) (body []byte, status int, msg string, ok bool) {
+	src := io.Reader(http.MaxBytesReader(w, r.Body, maxProduceCompressedBodyBytes))
+	if strings.EqualFold(r.Header.Get("Content-Encoding"), "gzip") {
+		gz, err := gzip.NewReader(src)
+		if err != nil {
+			return nil, http.StatusBadRequest, "invalid gzip body: " + err.Error(), false
+		}
+		defer gz.Close() //nolint:errcheck // read-only reader; nothing actionable on close error
+		src = gz
+	}
+
+	// Read one byte past the cap so an exactly-at-the-limit body doesn't get
+	// mistaken for an oversized one, without ever buffering more than
+	// maxProduceBodyBytes+1 bytes regardless of what the client claims.
+	data, err := io.ReadAll(io.LimitReader(src, maxProduceBodyBytes+1))
+	if err != nil {
+		var mbe *http.MaxBytesError
+		if errors.As(err, &mbe) {
+			return nil, http.StatusRequestEntityTooLarge, fmt.Sprintf("request body exceeds the %d MB produce limit", maxProduceBodyBytes/(1<<20)), false
+		}
+		return nil, http.StatusBadRequest, "invalid body: " + err.Error(), false
+	}
+	if len(data) > maxProduceBodyBytes {
+		return nil, http.StatusRequestEntityTooLarge, fmt.Sprintf("request body exceeds the %d MB produce limit", maxProduceBodyBytes/(1<<20)), false
+	}
+	return data, 0, "", true
+}
+
 // produceMessage produces a single record to a topic.
 func (a *clusterAPI) produceMessage(w http.ResponseWriter, r *http.Request) {
 	cluster := chi.URLParam(r, "cluster")
@@ -594,20 +653,14 @@ func (a *clusterAPI) produceMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req kafkapkg.ProduceRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxProduceBodyBytes))
+	body, status, errMsg, ok := readProduceBody(w, r)
+	if !ok {
+		writeJSON(w, status, map[string]string{"error": errMsg})
+		return
+	}
+	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		// http.MaxBytesReader wraps an *http.MaxBytesError once the body
-		// exceeds the cap; surface that as a specific 413 (the Replay dialog
-		// relies on this to tell "value too big to produce" apart from a
-		// malformed request) instead of a generic 400.
-		var mbe *http.MaxBytesError
-		if errors.As(err, &mbe) {
-			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{
-				"error": fmt.Sprintf("request body exceeds the %d MB produce limit", maxProduceBodyBytes/(1<<20)),
-			})
-			return
-		}
 		writeJSON(w, http.StatusBadRequest, map[string]string{
 			"error": "invalid body: " + err.Error(),
 		})
