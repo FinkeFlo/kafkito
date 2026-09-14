@@ -113,6 +113,13 @@ describe("ReplayModal truncated value handling", () => {
     expect(screen.getByRole("button", { name: /^replay$/i })).toBeDisabled();
   });
 
+  it("does not auto-fetch when the message is already blocked (e.g. masked)", () => {
+    renderModal(truncatedMessage({ masked: true }));
+
+    expect(screen.getByText(/masked message/i)).toBeInTheDocument();
+    expect(fetchMessageRawBase64).not.toHaveBeenCalled();
+  });
+
   it("does not gate Replay on non-truncated messages", () => {
     renderModal({
       partition: 0,

@@ -83,7 +83,7 @@ export function ReplayModal({ open, onClose, message, sourceCluster, sourceTopic
   // truncated message. Re-runs per message (offset/partition) so switching
   // which row is being replayed doesn't reuse a stale fetch.
   useEffect(() => {
-    if (!open || !message.value_truncated) {
+    if (!open || !message.value_truncated || replayBlocker(message)) {
       setFullValue({ status: "idle" });
       setAllowTruncated(false);
       return;
