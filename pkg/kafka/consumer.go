@@ -98,6 +98,16 @@ type ConsumeResult struct {
 	Messages   []Message
 	NextCursor *Cursor // nil when there are no more records in the current direction
 	HasMore    bool
+
+	// Partial is true when a from=end page could not fully collect its
+	// intended tail window before ConsumeOptions.Timeout elapsed (e.g. a
+	// very large record ahead of it in offset order stalled the transfer).
+	// The window is exactly sized to the available records (see
+	// buildWindows), so this only fires on a genuine fetch problem, never
+	// on legitimately running out of history. Callers should surface this
+	// so "latest" pages don't silently pass off an incomplete tail as
+	// complete — see internal/server/clusters.go's "partial" response field.
+	Partial bool
 }
 
 const (
@@ -399,6 +409,7 @@ func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, o
 		Messages:   merged,
 		NextCursor: nextCursor,
 		HasMore:    hasMore,
+		Partial:    direction == CursorBackward && !enough(),
 	}, nil
 }
 

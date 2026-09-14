@@ -82,6 +82,7 @@ export function ClusterPill({ className }: { className?: string }) {
     });
   }, [open, sorted, cluster]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: query is intentionally trigger-only here — the reset must fire whenever the search text changes, even though the effect body doesn't read its value.
   useEffect(() => {
     setActiveIdx(0);
   }, [query]);

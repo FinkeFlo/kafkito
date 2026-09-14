@@ -141,6 +141,10 @@ export interface MessagesPage {
   messages: Message[];
   has_more?: boolean;
   next_cursor?: string;
+  /** True when this "latest" page could not fully collect its tail window
+   * before the server-side timeout (e.g. a very large record stalled the
+   * transfer) — the page may be missing the very newest record(s). */
+  partial?: boolean;
 }
 
 export interface MessageCountPartition {
@@ -383,20 +387,55 @@ export interface ProduceResult {
 // of what this client's local cluster list believes.
 const PROD_CONFIRM_HEADER = "X-Kafkito-Confirm-Prod";
 
+// Threshold above which produce bodies are gzip-compressed before being
+// sent. Kept well under maxProduceBodyBytes-scale payloads so compression
+// only kicks in where it actually pays off; small produce requests aren't
+// worth the CompressionStream round trip.
+const GZIP_PRODUCE_THRESHOLD_BYTES = 256 * 1024;
+
+/**
+ * Gzip-compresses a produce request body when the browser supports the
+ * (widely available) CompressionStream API and the payload is large enough
+ * to benefit — mainly the base64-encoded full value recovered for a
+ * truncated message replay. This only reduces bytes actually transferred;
+ * the server still enforces the same decompressed-size cap either way (see
+ * internal/server/clusters.go's maxProduceBodyBytes), so compression cannot
+ * be used to sneak a too-large value past the limit.
+ *
+ * Falls back to sending the body uncompressed — without Content-Encoding —
+ * whenever CompressionStream is unavailable or compression fails for any
+ * reason; correctness never depends on this succeeding.
+ */
+async function maybeGzipBody(json: string): Promise<{ body: BodyInit; headers: Record<string, string> }> {
+  if (json.length < GZIP_PRODUCE_THRESHOLD_BYTES || typeof CompressionStream === "undefined") {
+    return { body: json, headers: {} };
+  }
+  try {
+    const stream = new Blob([json]).stream().pipeThrough(new CompressionStream("gzip"));
+    const compressed = await new Response(stream).blob();
+    return { body: compressed, headers: { "Content-Encoding": "gzip" } };
+  } catch {
+    return { body: json, headers: {} };
+  }
+}
+
 export async function produceMessage(
   cluster: string,
   topic: string,
   req: ProduceRequest,
   confirmProd = false,
 ): Promise<ProduceResult> {
+  const json = JSON.stringify(req);
+  const { body, headers } = await maybeGzipBody(json);
   const res = await fetchAPI(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/messages`),
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...headers,
         ...(confirmProd ? { [PROD_CONFIRM_HEADER]: "true" } : {}),
       },
-      body: JSON.stringify(req),
+      body,
     },
   );
   if (!res.ok) {

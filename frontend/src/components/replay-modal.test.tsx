@@ -78,7 +78,7 @@ describe("ReplayModal truncated value handling", () => {
     renderModal(truncatedMessage());
 
     await waitFor(() =>
-      expect(screen.getByText(/full value .* recovered/i)).toBeInTheDocument(),
+      expect(screen.getByText(/full value .* loaded/i)).toBeInTheDocument(),
     );
     await user.type(screen.getByPlaceholderText("topic-name"), "dest-topic");
     expect(screen.getByRole("button", { name: /^replay$/i })).toBeEnabled();

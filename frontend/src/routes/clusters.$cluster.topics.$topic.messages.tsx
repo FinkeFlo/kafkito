@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchTopicDetail,
   fetchMessages,
@@ -373,14 +373,14 @@ function MessagesPanel({
     }
   });
 
-  const dismissCoachmark = () => {
+  const dismissCoachmark = useCallback(() => {
     setShowCoachmark(false);
     try {
       localStorage.setItem("kafkito.coachmark.livejson.seen", "1");
     } catch {
       // ignore quota / privacy-mode failures
     }
-  };
+  }, []);
 
   const browseRange = useMemo(
     () =>
@@ -615,7 +615,7 @@ function MessagesPanel({
       clearTimeout(timer);
       window.removeEventListener("scroll", onScroll);
     };
-  }, [showCoachmark, firstJsonIdx]);
+  }, [showCoachmark, firstJsonIdx, dismissCoachmark]);
 
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm">
@@ -1140,6 +1140,13 @@ function MessagesPanel({
       {msgsQuery.error && !searchResult && (
         <div className="m-3 rounded-md border border-[var(--color-danger)]/30 bg-[var(--color-danger-subtle)] p-3 text-sm text-[var(--color-danger)]">
           {(msgsQuery.error as Error).message}
+        </div>
+      )}
+
+      {!msgsQuery.error && !searchResult && msgsQuery.data?.partial && (
+        <div className="m-3 rounded-md border border-[var(--color-warning)]/30 bg-[var(--color-warning-subtle)] p-3 text-sm text-[var(--color-warning)]">
+          This page may be incomplete — a very large record delayed loading past the
+          server's timeout, so the newest message(s) might be missing. Try Refresh.
         </div>
       )}
 

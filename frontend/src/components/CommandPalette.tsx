@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -90,7 +90,9 @@ type Listener = () => void;
 const openListeners = new Set<Listener>();
 
 export function openCommandPalette(): void {
-  openListeners.forEach((listener) => listener());
+  openListeners.forEach((listener) => {
+    listener();
+  });
 }
 
 export function subscribeCommandPalette(listener: Listener): () => void {
@@ -102,8 +104,13 @@ export function subscribeCommandPalette(listener: Listener): () => void {
 
 export function CommandPalette() {
   const { t } = useTranslation("palette");
-  const tt = (k: string, opts?: Record<string, unknown>): string =>
-    t(k as never, opts as never) as unknown as string;
+  // Memoized so it doesn't get a new identity every render — it's a dependency
+  // of the allItems useMemo below, and an unstable reference there would defeat
+  // that memoization entirely (recomputing the full item list on every render).
+  const tt = useCallback(
+    (k: string, opts?: Record<string, unknown>): string => t(k as never, opts as never) as unknown as string,
+    [t],
+  );
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
@@ -281,6 +288,7 @@ export function CommandPalette() {
     return grouped;
   }, [items, q]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: q is intentionally trigger-only — selection must reset to the top whenever the query text changes, even though the body doesn't read q's value.
   useEffect(() => {
     setSel(0);
   }, [q]);
