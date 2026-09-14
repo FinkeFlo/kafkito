@@ -84,6 +84,17 @@ func TestCopyProduceRequest(t *testing.T) {
 		assert.False(t, ok, "avro payloads lose their wire-format bytes and cannot be reproduced")
 	})
 
+	t.Run("truncated_values_are_skipped", func(t *testing.T) {
+		t.Parallel()
+		msg := kafkapkg.Message{
+			Value: `{"a":1}`, ValueEncoding: "json",
+			ValueSizeBytes: 8 * 1024 * 1024,
+			ValueTruncated: true,
+		}
+		_, ok := copyProduceRequest(msg, false, "alice")
+		assert.False(t, ok, "a 64 KB preview of a larger value must never be copied as if it were the whole record")
+	})
+
 	t.Run("zero_length_value_keeps_the_empty_encoding", func(t *testing.T) {
 		t.Parallel()
 		msg := kafkapkg.Message{

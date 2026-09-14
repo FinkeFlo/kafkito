@@ -10,15 +10,27 @@
 // Non-UTF-8 header values are sent via `headers_b64` for the same reason.
 // Messages whose original bytes are unrecoverable (Schema-Registry-decoded or
 // masked) are refused up front — see `replayBlocker`.
-import { useState } from "react";
+//
+// Large values (message.value_truncated) are a related but distinct case: the
+// message list only ever holds the first 64 KB of a value, so replaying it
+// as-is would silently write a truncated copy instead of the real record.
+// When sourceCluster/sourceTopic are known, this modal fetches the full raw
+// value first (the same endpoint "Download full value" uses) and replays
+// that instead. If the fetch fails (e.g. the value exceeds the 15 MB raw-
+// download cap), the user must explicitly opt in to replaying the truncated
+// preview via a checkbox — never silently.
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  fetchMessageRawBase64,
   fetchTopics,
   produceMessage,
+  RawValueTooLargeError,
   type Message,
 } from "@/lib/api";
 import { produceEncodingFor, replayBlocker } from "@/lib/produce-encoding";
 import { useCluster, type ClusterListItem } from "@/lib/use-cluster";
+import { useFormatters } from "@/lib/use-formatters";
 import { Modal } from "./Modal";
 import { Button } from "./button";
 import { ConfirmDialog } from "./confirm-dialog";
@@ -27,10 +39,36 @@ interface ReplayModalProps {
   open: boolean;
   onClose: () => void;
   message: Message;
+  /** Cluster/topic the message was consumed from — needed to recover the
+   * full value when message.value_truncated. Omitting them falls back to
+   * replaying the truncated preview after an explicit opt-in, same as a
+   * failed fetch. */
+  sourceCluster?: string;
+  sourceTopic?: string;
 }
 
-export function ReplayModal({ open, onClose, message }: ReplayModalProps) {
+type FullValueState =
+  | { status: "idle" }
+  | { status: "fetching" }
+  | { status: "ready"; base64: string }
+  | { status: "error"; message: string };
+
+// Mirrors internal/server/clusters.go's maxProduceBodyBytes (4 MiB): the
+// whole produce JSON body (key + value + headers) must fit under that cap.
+// Base64 inflates raw bytes by ~4/3, and the request also carries the key,
+// headers and JSON punctuation, so a full-value fetch that succeeds against
+// the (independent, 15 MB) raw-download cap can still be too big to send to
+// the produce endpoint. Reserve 512 KiB of headroom for that overhead and
+// treat anything over the remainder as "too large to replay", the same way
+// a fetch failure is handled — never attempt an upload we already know the
+// server will reject with a generic body-too-large error.
+const maxProduceBodyBytes = 4 * 1024 * 1024;
+const produceValueHeadroomBytes = 512 * 1024;
+const maxReplayValueBase64Chars = maxProduceBodyBytes - produceValueHeadroomBytes;
+
+export function ReplayModal({ open, onClose, message, sourceCluster, sourceTopic }: ReplayModalProps) {
   const { clusters } = useCluster();
+  const fmt = useFormatters();
 
   const [destCluster, setDestCluster] = useState<string>("");
   const [destTopic, setDestTopic] = useState<string>("");
@@ -38,6 +76,50 @@ export function ReplayModal({ open, onClose, message }: ReplayModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ partition: number; offset: number } | null>(null);
   const [confirmProd, setConfirmProd] = useState(false);
+  const [fullValue, setFullValue] = useState<FullValueState>({ status: "idle" });
+  const [allowTruncated, setAllowTruncated] = useState(false);
+
+  // Recover the untruncated value up front, whenever the modal opens on a
+  // truncated message. Re-runs per message (offset/partition) so switching
+  // which row is being replayed doesn't reuse a stale fetch.
+  useEffect(() => {
+    if (!open || !message.value_truncated) {
+      setFullValue({ status: "idle" });
+      setAllowTruncated(false);
+      return;
+    }
+    if (!sourceCluster || !sourceTopic) {
+      setFullValue({ status: "error", message: "source cluster/topic unknown" });
+      return;
+    }
+    let cancelled = false;
+    setFullValue({ status: "fetching" });
+    setAllowTruncated(false);
+    fetchMessageRawBase64(sourceCluster, sourceTopic, message.partition, message.offset)
+      .then((base64) => {
+        if (cancelled) return;
+        if (base64.length > maxReplayValueBase64Chars) {
+          setFullValue({
+            status: "error",
+            message: `full value (${fmt.bytes(message.value_size_bytes ?? 0)}) is too large to send to the produce API in one request`,
+          });
+          return;
+        }
+        setFullValue({ status: "ready", base64 });
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        const msg =
+          e instanceof RawValueTooLargeError
+            ? `value exceeds the download limit (${fmt.bytes(message.value_size_bytes ?? 0)})`
+            : ((e as Error).message ?? String(e));
+        setFullValue({ status: "error", message: msg });
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fmt is stable per render; re-fetch is keyed on the message identity + open.
+  }, [open, message.value_truncated, message.partition, message.offset, sourceCluster, sourceTopic]);
 
   // Determine the effective cluster selection (default to first cluster).
   const clusterList: ClusterListItem[] = clusters ?? [];
@@ -57,11 +139,23 @@ export function ReplayModal({ open, onClose, message }: ReplayModalProps) {
   // nothing is sent at all; `keyPayload`/`valuePayload` are then unusable.
   const blocker = replayBlocker(message);
   const keyPayload = produceEncodingFor(message.key, message.key_b64, message.key_encoding);
-  const valuePayload = produceEncodingFor(message.value, message.value_b64, message.value_encoding);
+  // When the full value was recovered, replay that instead of the 64 KB
+  // preview produceEncodingFor would otherwise send.
+  const valuePayload =
+    fullValue.status === "ready"
+      ? { value: fullValue.base64, encoding: "base64" as const }
+      : produceEncodingFor(message.value, message.value_b64, message.value_encoding);
+
+  // Gates the Replay button while a truncated value's full form is still
+  // being fetched, or until the user explicitly accepts a truncated replay.
+  const truncatedNotResolved =
+    message.value_truncated &&
+    fullValue.status !== "ready" &&
+    (fullValue.status !== "error" || !allowTruncated);
 
   const doReplay = async (confirmedProd: boolean) => {
     if (!effectiveCluster || !destTopic.trim()) return;
-    if (blocker || !keyPayload || !valuePayload) return;
+    if (blocker || !keyPayload || !valuePayload || truncatedNotResolved) return;
     setBusy(true);
     setError(null);
     setResult(null);
@@ -111,7 +205,7 @@ export function ReplayModal({ open, onClose, message }: ReplayModalProps) {
   };
 
   const labelCls = "text-[11px] font-semibold uppercase tracking-wider text-muted";
-  const canReplay = !!effectiveCluster && !!destTopic.trim() && !busy && !blocker;
+  const canReplay = !!effectiveCluster && !!destTopic.trim() && !busy && !blocker && !truncatedNotResolved;
 
   return (
     <>
@@ -147,6 +241,40 @@ export function ReplayModal({ open, onClose, message }: ReplayModalProps) {
             <div className="rounded-md border border-danger/30 bg-danger-subtle p-2 text-xs text-danger">
               <div className="font-semibold">Replay not possible</div>
               <p className="mt-0.5">{blocker.reason}</p>
+            </div>
+          )}
+
+          {!blocker && message.value_truncated && fullValue.status === "fetching" && (
+            <div className="rounded-md border border-border bg-panel p-2 text-xs text-muted">
+              Fetching the full value ({fmt.bytes(message.value_size_bytes ?? 0)}) so it can be
+              replayed byte-for-byte…
+            </div>
+          )}
+
+          {!blocker && message.value_truncated && fullValue.status === "ready" && (
+            <div className="rounded-md border border-success/30 bg-success-subtle p-2 text-xs text-success">
+              Full value ({fmt.bytes(message.value_size_bytes ?? 0)}) recovered — replay will send
+              the complete record, not just the 64&nbsp;KB preview.
+            </div>
+          )}
+
+          {!blocker && message.value_truncated && fullValue.status === "error" && (
+            <div className="rounded-md border border-warning/30 bg-warning-subtle p-2 text-xs text-warning">
+              <div className="font-semibold">Only a 64&nbsp;KB preview is available</div>
+              <p className="mt-0.5">
+                Could not recover the full value ({fmt.bytes(message.value_size_bytes ?? 0)}
+                {" "}
+                total): {fullValue.message}.
+              </p>
+              <label className="mt-2 flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={allowTruncated}
+                  onChange={(e) => setAllowTruncated(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-accent"
+                />
+                Replay the truncated 64&nbsp;KB preview anyway (not byte-for-byte)
+              </label>
             </div>
           )}
 

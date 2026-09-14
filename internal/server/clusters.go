@@ -24,6 +24,11 @@ import (
 
 const defaultTestConnectionTimeout = 15 * time.Second
 
+// maxProduceBodyBytes caps the JSON body of a single-record produce request.
+// Exported as a value (not just inline) so the 413 message and any client-side
+// pre-flight size check (the Replay dialog) can reference the same number.
+const maxProduceBodyBytes = 4 << 20 // 4 MiB
+
 // ProdConfirmHeader is the request header the frontend must set to "true"
 // to perform a mutating/dangerous operation (produce, delete topic, delete
 // records, reset offsets) against a cluster marked is_prod. This is the
@@ -588,9 +593,20 @@ func (a *clusterAPI) produceMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req kafkapkg.ProduceRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<20))
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxProduceBodyBytes))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
+		// http.MaxBytesReader wraps an *http.MaxBytesError once the body
+		// exceeds the cap; surface that as a specific 413 (the Replay dialog
+		// relies on this to tell "value too big to produce" apart from a
+		// malformed request) instead of a generic 400.
+		var mbe *http.MaxBytesError
+		if errors.As(err, &mbe) {
+			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{
+				"error": fmt.Sprintf("request body exceeds the %d MB produce limit", maxProduceBodyBytes/(1<<20)),
+			})
+			return
+		}
 		writeJSON(w, http.StatusBadRequest, map[string]string{
 			"error": "invalid body: " + err.Error(),
 		})

@@ -1073,3 +1073,47 @@ export async function downloadMessageRaw(
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+/** Thrown by fetchMessageRawBase64 when the value exceeds the server's raw-download cap (HTTP 413). */
+export class RawValueTooLargeError extends Error {}
+
+function arrayBufferToBase64(buf: ArrayBuffer): string {
+  // Chunked to avoid blowing the call stack on String.fromCharCode(...bytes)
+  // for multi-megabyte payloads.
+  const bytes = new Uint8Array(buf);
+  const chunkSize = 0x8000;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+/**
+ * Fetches the full raw value of a single Kafka record identified by
+ * partition and offset, returning it as a base64 string (rather than
+ * triggering a file download like downloadMessageRaw). Used by the Replay
+ * dialog to recover the untruncated bytes of a value that was cut to 64 KB
+ * for the message list preview. Throws RawValueTooLargeError on HTTP 413,
+ * a plain Error on any other HTTP error.
+ */
+export async function fetchMessageRawBase64(
+  cluster: string,
+  topic: string,
+  partition: number,
+  offset: number,
+): Promise<string> {
+  const path = clusterPath(cluster, `topics/${encodeURIComponent(topic)}/messages/${partition}/${offset}/raw`);
+  const res = await fetchAPI(cluster, path);
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const b = (await res.json()) as { error?: string };
+      detail = b.error ? `: ${b.error}` : "";
+    } catch { /* ignore */ }
+    if (res.status === 413) throw new RawValueTooLargeError(`HTTP 413${detail}`);
+    throw new Error(`HTTP ${res.status}${detail}`);
+  }
+  return arrayBufferToBase64(await res.arrayBuffer());
+}
+
