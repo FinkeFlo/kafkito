@@ -311,7 +311,7 @@ func (r *Registry) CreateGroup(ctx context.Context, cluster string, req CreateGr
 		DryRun:      req.DryRun,
 	})
 	if err != nil {
-		if isAuthorizationFailure(err.Error()) {
+		if IsAuthorizationFailure(err.Error()) {
 			return nil, fmt.Errorf("%w: %v", ErrNotAuthorized, err)
 		}
 		return nil, err
@@ -319,20 +319,21 @@ func (r *Registry) CreateGroup(ctx context.Context, cluster string, req CreateGr
 	// A commit denied by ACLs surfaces as a per-partition authorization error,
 	// so the group was NOT created. Fail clearly instead of reporting success.
 	for _, pr := range res.Results {
-		if isAuthorizationFailure(pr.Error) {
+		if IsAuthorizationFailure(pr.Error) {
 			return nil, fmt.Errorf("%w: group %q", ErrNotAuthorized, group)
 		}
 	}
 	return res, nil
 }
 
-// isAuthorizationFailure reports whether msg carries a Kafka authorization
+// IsAuthorizationFailure reports whether msg carries a Kafka authorization
 // failure. Kafka error codes are stable uppercase tokens
 // (GROUP_AUTHORIZATION_FAILED, TOPIC_AUTHORIZATION_FAILED,
 // CLUSTER_AUTHORIZATION_FAILED), so matching the shared "AUTHORIZATION_FAILED"
 // token classifies all three. It inspects the Kafka error-code token, not a
-// free-form human message.
-func isAuthorizationFailure(msg string) bool {
+// free-form human message. Exported so callers (e.g. internal/server) can
+// classify these as 403s instead of a generic 502 upstream error.
+func IsAuthorizationFailure(msg string) bool {
 	return strings.Contains(msg, "AUTHORIZATION_FAILED")
 }
 

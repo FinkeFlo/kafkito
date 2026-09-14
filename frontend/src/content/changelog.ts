@@ -26,6 +26,24 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.1.14",
+    date: "2026-09-14",
+    items: [
+      {
+        type: "fix",
+        title: "Replay/produce now reports Kafka ACL denials clearly",
+        description:
+          "Replaying or producing a message to a topic the connected credential isn't authorized to write to used to fail with a generic \"HTTP 502: upstream kafka error\". It now returns a clear 403 explaining that the cluster credential's ACLs don't permit the write, instead of a vague gateway error.",
+      },
+      {
+        type: "feature",
+        title: "Search private clusters by name or broker",
+        description:
+          "The Private clusters settings page now has the same filter box as Topics: type to narrow the list by cluster name or broker address, with a live match counter.",
+      },
+    ],
+  },
+  {
     version: "1.1.13",
     date: "2026-08-12",
     items: [

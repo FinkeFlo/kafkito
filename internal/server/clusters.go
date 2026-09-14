@@ -625,6 +625,17 @@ func (a *clusterAPI) produceMessage(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
 			return
 		}
+		// The broker rejected the produce because the connected user/credential
+		// lacks WRITE (or Idempotent Write) ACLs on the topic. Surface this as
+		// 403 with a specific message instead of the generic 502, since it's an
+		// actionable permission problem, not an upstream outage.
+		if kafkapkg.IsAuthorizationFailure(msg) {
+			writeJSON(w, http.StatusForbidden, map[string]string{
+				"error": fmt.Sprintf("not authorized to produce to topic %q (check the cluster credential's ACLs)", topic),
+				"code":  "kafka_not_authorized",
+			})
+			return
+		}
 		gatewayError(ctx, w, a.log, "produce message", err)
 		return
 	}
