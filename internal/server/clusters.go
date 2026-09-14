@@ -20,6 +20,7 @@ import (
 	kafkapkg "github.com/FinkeFlo/kafkito/pkg/kafka"
 	"github.com/FinkeFlo/kafkito/pkg/rbac"
 	"github.com/go-chi/chi/v5"
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 const defaultTestConnectionTimeout = 15 * time.Second
@@ -639,6 +640,18 @@ func (a *clusterAPI) produceMessage(w http.ResponseWriter, r *http.Request) {
 		}
 		if isClientProduceErr(msg) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
+			return
+		}
+		// A record larger than kafkito's client-side batch cap (see
+		// kgo.ProducerBatchMaxBytes in clientOpts) or the destination broker's
+		// own max.message.bytes is a caller-actionable input problem, not an
+		// upstream outage — surface it as 413 with the concrete limit instead
+		// of the generic 502.
+		if errors.Is(err, kerr.MessageTooLarge) {
+			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{
+				"error": fmt.Sprintf("message too large to produce to topic %q (limit is %d MB)", topic, kafkapkg.ProducerBatchMaxBytes/(1<<20)),
+				"code":  "kafka_message_too_large",
+			})
 			return
 		}
 		// The broker rejected the produce because the connected user/credential

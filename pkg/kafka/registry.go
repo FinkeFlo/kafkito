@@ -35,6 +35,14 @@ import (
 // ErrUnknownCluster is returned when a lookup targets a non-configured cluster.
 var ErrUnknownCluster = errors.New("unknown cluster")
 
+// ProducerBatchMaxBytes is kafkito's client-side cap on a single produced
+// record batch, overriding franz-go's 1,000,012-byte default (Kafka's stock
+// max.message.bytes). Replaying a recovered full value (see Registry.Produce)
+// can legitimately exceed the stock default for topics whose brokers allow
+// larger messages. Exported so internal/server can quote the exact limit in
+// the 413 it returns when a produce exceeds it.
+const ProducerBatchMaxBytes = 10 << 20 // 10 MiB
+
 // TopicInfo is a lightweight view of a Kafka topic for list pages. Metric
 // fields are filled in best-effort from the metrics collector; a nil pointer
 // means "not yet known" (distinct from "zero") so the frontend can render
@@ -256,6 +264,15 @@ func clientOpts(cfg config.ClusterConfig, log *slog.Logger) []kgo.Opt {
 		// Honour a caller-chosen Record.Partition; kgo's default partitioner
 		// overwrites it (see explicitOrKeyPartitioner).
 		kgo.RecordPartitioner(explicitOrKeyPartitioner()),
+		// franz-go defaults to a 1,000,012-byte batch cap (Kafka's stock
+		// max.message.bytes). Replaying a recovered full value (see
+		// registry.Produce) can legitimately exceed that for topics whose
+		// brokers allow larger messages, so raise kafkito's client-side cap
+		// to 10 MiB. This is independent of the actual broker's
+		// max.message.bytes; producing above the destination broker's real
+		// limit still fails, just with a broker-reported error instead of
+		// this client short-circuiting first.
+		kgo.ProducerBatchMaxBytes(10 << 20),
 	}
 
 	if cfg.TLS.Enabled && cfg.TLS.InsecureSkipVerify {

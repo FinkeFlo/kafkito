@@ -26,8 +26,20 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.1.16",
+    date: "2026-09-14",
+    items: [
+      {
+        type: "fix",
+        title: "Clear error when a produced message is too large",
+        description:
+          "Replaying or producing a message larger than the client's batch limit used to fail with a generic \"HTTP 502: upstream kafka error\". The limit is now explicitly set to 10 MB and an oversized message now returns a clear error stating the size limit instead of a vague gateway error.",
+      },
+    ],
+  },
+  {
     version: "1.1.15",
-    date: "2026-09-15",
+    date: "2026-09-14",
     items: [
       {
         type: "fix",
