@@ -141,6 +141,10 @@ export interface MessagesPage {
   messages: Message[];
   has_more?: boolean;
   next_cursor?: string;
+  /** True when this "latest" page could not fully collect its tail window
+   * before the server-side timeout (e.g. a very large record stalled the
+   * transfer) — the page may be missing the very newest record(s). */
+  partial?: boolean;
 }
 
 export interface MessageCountPartition {

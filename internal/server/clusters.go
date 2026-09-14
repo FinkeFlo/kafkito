@@ -334,6 +334,9 @@ func (a *clusterAPI) consumeMessages(w http.ResponseWriter, r *http.Request) {
 		"messages": res.Messages,
 		"has_more": res.HasMore,
 	}
+	if res.Partial {
+		resp["partial"] = true
+	}
 	if res.NextCursor != nil {
 		if s, encErr := kafkapkg.EncodeCursor(*res.NextCursor); encErr == nil {
 			resp["next_cursor"] = s

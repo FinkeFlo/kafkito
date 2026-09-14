@@ -34,6 +34,7 @@ import { useFormatters } from "@/lib/use-formatters";
 import { Modal } from "./Modal";
 import { Button } from "./button";
 import { ConfirmDialog } from "./confirm-dialog";
+import { TopicCombobox } from "./topic-combobox";
 
 interface ReplayModalProps {
   open: boolean;
@@ -53,16 +54,18 @@ type FullValueState =
   | { status: "ready"; base64: string }
   | { status: "error"; message: string };
 
-// Mirrors internal/server/clusters.go's maxProduceBodyBytes (4 MiB): the
-// whole produce JSON body (key + value + headers) must fit under that cap.
-// Base64 inflates raw bytes by ~4/3, and the request also carries the key,
-// headers and JSON punctuation, so a full-value fetch that succeeds against
-// the (independent, 15 MB) raw-download cap can still be too big to send to
+// Mirrors internal/server/clusters.go's maxProduceBodyBytes (15 MiB): the
+// whole produce JSON body (key + value + headers) must fit under that cap
+// once decompressed server-side — gzip (see lib/api.ts's maybeGzipBody)
+// only shrinks bytes on the wire, not this ceiling. Base64 inflates raw
+// bytes by ~4/3, and the request also carries the key, headers and JSON
+// punctuation, so a full-value fetch that succeeds against the
+// (independent, 15 MB) raw-download cap can still be too big to send to
 // the produce endpoint. Reserve 512 KiB of headroom for that overhead and
 // treat anything over the remainder as "too large to replay", the same way
 // a fetch failure is handled — never attempt an upload we already know the
 // server will reject with a generic body-too-large error.
-const maxProduceBodyBytes = 4 * 1024 * 1024;
+const maxProduceBodyBytes = 15 * 1024 * 1024;
 const produceValueHeadroomBytes = 512 * 1024;
 const maxReplayValueBase64Chars = maxProduceBodyBytes - produceValueHeadroomBytes;
 
@@ -134,6 +137,7 @@ export function ReplayModal({ open, onClose, message, sourceCluster, sourceTopic
   });
 
   const isProdDest = !!clusterList.find((c) => c.name === effectiveCluster)?.is_prod;
+
 
   // Fidelity check. Non-null means the original bytes cannot be reproduced, so
   // nothing is sent at all; `keyPayload`/`valuePayload` are then unusable.
@@ -217,7 +221,7 @@ export function ReplayModal({ open, onClose, message, sourceCluster, sourceTopic
         actions={
           <>
             <Button variant="ghost" size="sm" onClick={handleClose} disabled={busy}>
-              Cancel
+              {result ? "Close" : "Cancel"}
             </Button>
             <Button
               variant="primary"
@@ -253,7 +257,7 @@ export function ReplayModal({ open, onClose, message, sourceCluster, sourceTopic
 
           {!blocker && message.value_truncated && fullValue.status === "ready" && (
             <div className="rounded-md border border-success/30 bg-success-subtle p-2 text-xs text-success">
-              Full value ({fmt.bytes(message.value_size_bytes ?? 0)}) recovered — replay will send
+              Full value ({fmt.bytes(message.value_size_bytes ?? 0)}) loaded — replay will send
               the complete record, not just the 64&nbsp;KB preview.
             </div>
           )}
@@ -301,24 +305,16 @@ export function ReplayModal({ open, onClose, message, sourceCluster, sourceTopic
 
           <div>
             <label className={`mb-1 block ${labelCls}`}>Destination topic</label>
-            <input
-              list="replay-topics"
+            <TopicCombobox
               value={destTopic}
-              onChange={(e) => {
-                setDestTopic(e.target.value);
+              onChange={(v) => {
+                setDestTopic(v);
                 setResult(null);
                 setError(null);
               }}
+              topics={(topicsQuery.data ?? []).map((t) => t.name)}
               placeholder="topic-name"
-              className="w-full rounded-md border border-border bg-panel px-3 py-1.5 text-sm font-mono"
             />
-            {topicsQuery.data && topicsQuery.data.length > 0 && (
-              <datalist id="replay-topics">
-                {topicsQuery.data.map((t) => (
-                  <option key={t.name} value={t.name} />
-                ))}
-              </datalist>
-            )}
           </div>
 
           {error && (

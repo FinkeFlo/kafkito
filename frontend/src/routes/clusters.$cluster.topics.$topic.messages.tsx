@@ -1143,6 +1143,13 @@ function MessagesPanel({
         </div>
       )}
 
+      {!msgsQuery.error && !searchResult && msgsQuery.data?.partial && (
+        <div className="m-3 rounded-md border border-[var(--color-warning)]/30 bg-[var(--color-warning-subtle)] p-3 text-sm text-[var(--color-warning)]">
+          This page may be incomplete — a very large record delayed loading past the
+          server's timeout, so the newest message(s) might be missing. Try Refresh.
+        </div>
+      )}
+
       {displayMessages.length === 0 && searching && (
         <div className="p-8 text-center text-sm text-[var(--color-text-subtle)]">
           Searching… {fmt.number(searchResult?.stats.scanned ?? 0)} scanned, no match yet.

@@ -15,6 +15,7 @@ import { useCluster, type ClusterListItem } from "@/lib/use-cluster";
 import { Button } from "./button";
 import { Input } from "./Input";
 import { ConfirmDialog } from "./confirm-dialog";
+import { TopicCombobox } from "./topic-combobox";
 import { getPrivateClusterByName, toBackendClusterConfig } from "@/lib/private-clusters";
 
 interface BulkCopyPanelProps {
@@ -193,25 +194,17 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
           {/* Destination topic */}
           <div>
             <label className={`mb-1 block ${labelCls}`}>Destination topic</label>
-            <input
-              list="bulk-copy-topics"
+            <TopicCombobox
               value={destTopic}
-              onChange={(e) => {
-                setDestTopic(e.target.value);
+              onChange={(v) => {
+                setDestTopic(v);
                 setProgress(null);
                 setStopped(false);
               }}
+              topics={(topicsQuery.data ?? []).map((t) => t.name)}
               placeholder="topic-name"
               disabled={running}
-              className="w-full rounded-md border border-border bg-panel px-3 py-1.5 text-sm font-mono disabled:opacity-50"
             />
-            {topicsQuery.data && topicsQuery.data.length > 0 && (
-              <datalist id="bulk-copy-topics">
-                {topicsQuery.data.map((t) => (
-                  <option key={t.name} value={t.name} />
-                ))}
-              </datalist>
-            )}
           </div>
         </div>
 
