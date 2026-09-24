@@ -3,8 +3,10 @@
 # `docker compose up -d kafka`) with the deterministic fixture state the
 # Playwright walks need:
 #
-#   topic e2e-walk-target  4 partitions, 12 messages
-#   topic e2e-walk-large   1 partition, 50 messages (Delete-Records walk)
+#   topic e2e-walk-target      4 partitions, 12 messages
+#   topic e2e-walk-large       1 partition, 50 messages (Delete-Records walk)
+#   topic e2e-large-message    1 partition, 1 JSON message ~100 KB (large-messages walk)
+#   topic e2e-large-message-xml 1 partition, 1 XML message ~100 KB (large-messages walk)
 #   consumer group e2e-idle-group  in Empty state (consumed once, then exited)
 #
 # Idempotent: safe to re-run; topics are recreated, the consumer is run
@@ -110,6 +112,10 @@ func main() {
   defer cl.Close()
 
   sc := bufio.NewScanner(os.Stdin)
+  // Default bufio.Scanner max token size is 64 KB — too small for the
+  // large-message fixture's ~100 KB line. Raise it to 8 MB (matching the
+  // largest fixture kafkito itself is expected to handle).
+  sc.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
   for sc.Scan() {
     line := strings.TrimSpace(sc.Text())
     if line == "" {
@@ -153,6 +159,41 @@ leave_group_empty() {
     >/dev/null 2>&1 || true
 }
 
+# produce_large_json puts one JSON record whose value is ~100 KB — well past
+# consumer.go's 64 KB truncation boundary (maxMessageValueBytes) but safely
+# under both json-interactive.tsx's 1 MB interactive-tree size cap and the
+# broker's default message.max.bytes, so large-messages.spec.ts exercises the
+# real success path (search past 64 KB, click-to-filter, PathSense hydrated
+# suggestions), not either size guard's fallback. `_padding` is placed
+# *before* `order` so the fields the walk asserts on are guaranteed to start
+# past byte 64K — i.e. genuinely inside the truncated-away tail, not merely
+# by luck of key ordering.
+produce_large_json() {
+  local topic="$1"
+  local now_ms
+  now_ms=$(( $(date +%s) * 1000 ))
+  local padding
+  padding=$(printf '%*s' 100000 '' | tr ' ' 'y')
+  local value
+  value="{\"_padding\":\"${padding}\",\"order\":{\"id\":\"E2E-LARGE-1\",\"customer\":{\"name\":\"E2E Tester\",\"email\":\"e2e-tester@example.com\"},\"items\":[{\"sku\":\"SKU-1\",\"price\":19.99,\"qty\":2},{\"sku\":\"E2E-NEEDLE-SKU\",\"price\":42.5,\"qty\":3}],\"notes\":\"e2e-search-needle\"}}"
+  printf '%s\t%s\n' "${now_ms}" "${value}" | produce_spread_lines "${topic}"
+}
+
+# produce_large_xml mirrors produce_large_json but with an XML value, to
+# cover consumer.go's equivalent truncation-tolerant detection for XML
+# (looksXML: first non-whitespace byte is '<'). Same `_padding` placement
+# rationale as produce_large_json.
+produce_large_xml() {
+  local topic="$1"
+  local now_ms
+  now_ms=$(( $(date +%s) * 1000 ))
+  local padding
+  padding=$(printf '%*s' 100000 '' | tr ' ' 'y')
+  local value
+  value="<root><_padding>${padding}</_padding><order><id>E2E-LARGE-XML-1</id><notes>e2e-search-needle-xml</notes></order></root>"
+  printf '%s\t%s\n' "${now_ms}" "${value}" | produce_spread_lines "${topic}"
+}
+
 main() {
   echo "seed: waiting for broker on ${BROKER_INTERNAL} (via ${CONTAINER})"
   wait_for_broker
@@ -165,6 +206,8 @@ main() {
   # "old" the moment they're produced.
   recreate_topic "e2e-walk-target" 4 "retention.ms=864000000"
   recreate_topic "e2e-walk-large" 1
+  recreate_topic "e2e-large-message" 1
+  recreate_topic "e2e-large-message-xml" 1
 
   echo "seed: producing fixture messages"
   now_ms=$(( $(date +%s) * 1000 ))
@@ -176,6 +219,8 @@ main() {
     for i in $(seq 7 12); do printf '%s\tseed-message-%s\n' "$((now_ms - 1 * day_ms))" "$i"; done
   } | produce_spread_lines "e2e-walk-target"
   produce_lines "e2e-walk-large" 50
+  produce_large_json "e2e-large-message"
+  produce_large_xml "e2e-large-message-xml"
 
   echo "seed: bringing group e2e-idle-group to Empty"
   leave_group_empty "e2e-walk-target" "e2e-idle-group"

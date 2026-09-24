@@ -15,6 +15,7 @@
 //   "empty"  zero-length payload, rendered = ""    → must NOT become nil
 //   "text"   UTF-8, rendered = the exact string
 //   "json"   UTF-8 JSON, rendered = the exact string
+//   "xml"    UTF-8 XML, rendered = the exact string
 //   "binary" non-UTF-8; rendered is a *truncated* hex preview ("0x" + up to
 //            64 bytes of hex) — only `b64` holds the full bytes
 //   "avro" / "json_schema" / "protobuf": a Schema-Registry decoder replaced the
@@ -78,7 +79,7 @@ export function produceEncodingFor(
       return { value: "", encoding: "text" };
 
     default:
-      // "text", "json" and anything unknown. Unknown encodings deliberately
+      // "text", "json", "xml" and anything unknown. Unknown encodings deliberately
       // fall back to the rendered string rather than to null: every encoding
       // the backend has ever emitted apart from "binary" and the SR formats
       // renders the payload verbatim, so pass-through is the reproduction that

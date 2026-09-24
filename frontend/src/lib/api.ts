@@ -1129,6 +1129,18 @@ function arrayBufferToBase64(buf: ArrayBuffer): string {
 }
 
 /**
+ * Decodes a standard-base64 string (as returned by fetchMessageRawBase64)
+ * into a UTF-8 text string. Goes through raw bytes rather than a plain
+ * `atob()` + string cast so multi-byte UTF-8 characters decode correctly.
+ */
+export function base64ToUtf8(b64: string): string {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder("utf-8").decode(bytes);
+}
+
+/**
  * Fetches the full raw value of a single Kafka record identified by
  * partition and offset, returning it as a base64 string (rather than
  * triggering a file download like downloadMessageRaw). Used by the Replay

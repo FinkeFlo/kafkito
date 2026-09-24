@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -338,4 +339,81 @@ func TestIntegration_SearchMessages(t *testing.T) {
 	})
 	require.NoError(t, err, "jsonpath search")
 	require.Equal(t, 2, jpRes.Stats.Matched, "jsonpath $.amount > 1000 should match 2 records")
+}
+
+// TestIntegration_SearchMessages_LargeValue is the end-to-end regression
+// guard for the "search silently misses matches in large records" bug: a
+// record whose JSON value is well past maxMessageValueBytes (64 KB) carries
+// a needle placed only near the end of the payload. Both contains and
+// jsonpath search must still find it — truncating before matching (the old
+// behaviour) would either miss the needle outright (contains) or corrupt the
+// JSON and turn the record into a silently-dropped parse error (jsonpath).
+func TestIntegration_SearchMessages_LargeValue(t *testing.T) {
+	broker := startBroker(t)
+	reg := newRegistry(t, broker)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	topic := "it-search-large"
+	require.NoError(t, reg.CreateTopic(ctx, "it", CreateTopicRequest{
+		Name:              topic,
+		Partitions:        1,
+		ReplicationFactor: 1,
+	}))
+
+	// ~200 KB padding pushes the needle well past the 64 KB truncation
+	// boundary while staying comfortably under the broker's default
+	// message.max.bytes so the produce itself never becomes the bottleneck
+	// under test.
+	pad := strings.Repeat("x", 200*1024)
+	big := `{"padding":"` + pad + `","status":"needle-shipped"}`
+	small := `{"padding":"short","status":"other"}`
+
+	_, err := reg.Produce(ctx, "it", topic, ProduceRequest{Value: big})
+	require.NoError(t, err)
+	_, err = reg.Produce(ctx, "it", topic, ProduceRequest{Value: small})
+	require.NoError(t, err)
+
+	// 1) contains "needle-shipped" — only reachable if matching runs against
+	// the full value rather than a 64 KB-truncated prefix.
+	containsRes, err := reg.SearchMessages(ctx, "it", topic, SearchOptions{
+		Partition:   -1,
+		Limit:       100,
+		Budget:      1000,
+		Direction:   DirOldestFirst,
+		Mode:        SearchModeContains,
+		Value:       "needle-shipped",
+		Zones:       []SearchZone{ZoneValue},
+		StopOnLimit: true,
+		Timeout:     8 * time.Second,
+	})
+	require.NoError(t, err, "contains search")
+	require.Equal(t, 1, containsRes.Stats.Matched, "contains must find the needle even though it sits past the truncation boundary")
+	require.Len(t, containsRes.Messages, 1)
+	// The response itself must still be the bounded 64 KB preview: matching
+	// against the full value must not leak an unbounded value into the API
+	// response.
+	assert.True(t, containsRes.Messages[0].ValueTruncated, "the returned hit must still carry the bounded preview, not the full value")
+	assert.LessOrEqual(t, len(containsRes.Messages[0].Value), maxMessageValueBytes)
+
+	// 2) jsonpath $.status == "needle-shipped" — only reachable if the JSON
+	// is parsed whole; truncating first corrupts the JSON structure and the
+	// record would silently become a parse error instead of a match.
+	jpRes, err := reg.SearchMessages(ctx, "it", topic, SearchOptions{
+		Partition:   -1,
+		Limit:       100,
+		Budget:      1000,
+		Direction:   DirOldestFirst,
+		Mode:        SearchModeJSONPath,
+		Path:        "$.status",
+		Op:          OpEq,
+		Value:       "needle-shipped",
+		Zones:       []SearchZone{ZoneValue},
+		StopOnLimit: true,
+		Timeout:     8 * time.Second,
+	})
+	require.NoError(t, err, "jsonpath search")
+	require.Equal(t, 1, jpRes.Stats.Matched, "jsonpath must parse and match the full record instead of erroring on a truncated fragment")
+	require.Equal(t, 0, jpRes.Stats.ParseErrors, "the large record must not be counted as a parse error")
 }

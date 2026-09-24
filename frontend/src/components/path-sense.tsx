@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PathTree } from "@/lib/path-tree";
+import { useFuzzy } from "@/lib/fuzzy";
+import { Highlight } from "@/components/highlight";
 
 export interface PathSenseProps {
   tree: PathTree;
@@ -78,13 +80,17 @@ export function PathSense({
   }, [value]);
 
   const allRows = useMemo(() => toRows(tree), [tree]);
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const base = q
-      ? allRows.filter((r) => r.path.toLowerCase().includes(q))
-      : allRows.slice(0, TOP_N);
-    return base;
-  }, [allRows, query]);
+  // Substring/prefix matching over the whole path (e.g. "pric" or "order.pric"
+  // finds "$.order.items[*].price"), tolerant of the occasional typo — same
+  // Fuse-based helper the Command Palette and topic list use, so behavior
+  // and highlighting are consistent across the app. Ranking by rank() only
+  // applies with no active query; an active query defers to Fuse's own
+  // relevance ordering.
+  const fuzzy = useFuzzy(allRows, { keys: ["path"], query });
+  const filtered = useMemo(
+    () => (query.trim() ? fuzzy.results : allRows.slice(0, TOP_N)),
+    [fuzzy.results, allRows, query],
+  );
 
   const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Escape") {
@@ -143,10 +149,12 @@ export function PathSense({
                         onPick(r.path, r.sampleValue);
                         setOpen(false);
                       }}
-                      className="flex w-full items-center justify-between gap-3 px-2 py-1 text-left hover:bg-accent-subtle"
+                      className="flex w-full items-center gap-3 px-2 py-1 text-left hover:bg-accent-subtle"
                     >
-                      <span className="font-mono">{r.path}</span>
-                      <span className="text-muted">
+                      <span className="min-w-0 flex-1 truncate font-mono" title={r.path}>
+                        <Highlight text={r.path} ranges={fuzzy.rangesFor(r, "path")} />
+                      </span>
+                      <span className="shrink-0 whitespace-nowrap text-muted">
                         {r.type}
                         {r.preview ? `  ${r.preview}` : ""}
                       </span>

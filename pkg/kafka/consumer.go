@@ -4,12 +4,15 @@
 package kafka
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"time"
 	"unicode/utf8"
@@ -657,23 +660,40 @@ func buildNextCursor(
 }
 
 func recordToMessage(rec *kgo.Record) Message {
+	return buildMessage(rec, true)
+}
+
+// recordToMessageFull behaves like recordToMessage but never truncates the
+// decoded value, regardless of size. It exists for the search scan
+// (SearchMessages), which must match user queries against the full record
+// content — truncating before matching would silently hide matches located
+// past maxMessageValueBytes and would corrupt structured (JSONPath/XPath)
+// parsing of any record larger than the cap. Callers must not put the
+// resulting Message into a response as-is; rebuild the hit via
+// recordToMessage (and applySRDecoder, not applySRDecoderFull) first so
+// response sizes stay bounded exactly like every other consume path.
+func recordToMessageFull(rec *kgo.Record) Message {
+	return buildMessage(rec, false)
+}
+
+func buildMessage(rec *kgo.Record, truncate bool) Message {
 	m := Message{
 		Partition:      rec.Partition,
 		Offset:         rec.Offset,
 		Timestamp:      rec.Timestamp.UnixMilli(),
 		ValueSizeBytes: int64(len(rec.Value)),
 	}
-	m.Key, m.KeyEncoding, m.KeyB64 = decodeBytes(rec.Key)
+	m.Key, m.KeyEncoding, m.KeyB64 = decodeBytes(rec.Key, false)
 
 	// Truncate the raw value bytes before decoding to prevent large payloads
 	// from causing outsized string allocations. The full byte length is already
 	// stored in ValueSizeBytes so the UI can show the original size.
 	valBytes := rec.Value
-	if int64(len(valBytes)) > maxMessageValueBytes {
+	if truncate && int64(len(valBytes)) > maxMessageValueBytes {
 		valBytes = valBytes[:maxMessageValueBytes]
 		m.ValueTruncated = true
 	}
-	m.Value, m.ValueEncoding, m.ValueB64 = decodeBytes(valBytes)
+	m.Value, m.ValueEncoding, m.ValueB64 = decodeBytes(valBytes, m.ValueTruncated)
 	if len(rec.Headers) > 0 {
 		m.Headers = make(map[string]string, len(rec.Headers))
 		for _, h := range rec.Headers {
@@ -699,6 +719,16 @@ func recordToMessage(rec *kgo.Record) Message {
 // fails, the raw render is kept and meta is still attached so the UI can show
 // "schema id N (decode error)".
 func (m *Message) applySRDecoder(ctx context.Context, dec *SRDecoder, rawKey, rawValue []byte) {
+	m.applySRDecode(ctx, dec, rawKey, rawValue, true)
+}
+
+// applySRDecoderFull behaves like applySRDecoder but never truncates the
+// decoded value. See recordToMessageFull for why the search scan needs this.
+func (m *Message) applySRDecoderFull(ctx context.Context, dec *SRDecoder, rawKey, rawValue []byte) {
+	m.applySRDecode(ctx, dec, rawKey, rawValue, false)
+}
+
+func (m *Message) applySRDecode(ctx context.Context, dec *SRDecoder, rawKey, rawValue []byte, truncate bool) {
 	if dec == nil {
 		return
 	}
@@ -714,7 +744,7 @@ func (m *Message) applySRDecoder(ctx context.Context, dec *SRDecoder, rawKey, ra
 	if rendered, meta, ok, _ := dec.Decode(ctx, rawValue); meta.Format != "" {
 		if ok {
 			m.Value = rendered
-			if int64(len(m.Value)) > maxMessageValueBytes {
+			if truncate && int64(len(m.Value)) > maxMessageValueBytes {
 				m.Value = m.Value[:maxMessageValueBytes]
 				m.ValueTruncated = true
 			}
@@ -728,7 +758,7 @@ func (m *Message) applySRDecoder(ctx context.Context, dec *SRDecoder, rawKey, ra
 
 // decodeBytes detects json/text/binary and returns a rendered string plus encoding.
 // For binary payloads, it returns a hex preview and full base64 in b64.
-func decodeBytes(b []byte) (rendered, encoding, b64 string) {
+func decodeBytes(b []byte, truncated bool) (rendered, encoding, b64 string) {
 	if b == nil {
 		return "", "null", ""
 	}
@@ -737,8 +767,19 @@ func decodeBytes(b []byte) (rendered, encoding, b64 string) {
 	}
 	if utf8.Valid(b) {
 		trimmed := bytesTrimSpace(b)
-		if len(trimmed) > 0 && (trimmed[0] == '{' || trimmed[0] == '[') && json.Valid(trimmed) {
+		looksJSON := len(trimmed) > 0 && (trimmed[0] == '{' || trimmed[0] == '[')
+		// A truncated value is cut off mid-structure, so json.Valid on it will
+		// (almost) always fail even for genuinely JSON payloads — checking only
+		// the first non-whitespace byte (which truncation never removes) is the
+		// best signal available. The full value is validated for real on
+		// demand when the UI loads it in full; a false positive here just
+		// falls back to a plain-text render at that point.
+		if looksJSON && (truncated || json.Valid(trimmed)) {
 			return string(b), "json", ""
+		}
+		looksXML := len(trimmed) > 0 && trimmed[0] == '<'
+		if looksXML && (truncated || validXML(trimmed)) {
+			return string(b), "xml", ""
 		}
 		return string(b), "text", ""
 	}
@@ -747,6 +788,19 @@ func decodeBytes(b []byte) (rendered, encoding, b64 string) {
 		preview = preview[:64]
 	}
 	return "0x" + hex.EncodeToString(preview), "binary", base64.StdEncoding.EncodeToString(b)
+}
+
+// validXML reports whether b is a well-formed XML document by tokenizing it
+// end to end — cheaper than building a DOM (xmlquery.Parse, used by the
+// XPath search matcher) when all that's needed is a validity check.
+func validXML(b []byte) bool {
+	dec := xml.NewDecoder(bytes.NewReader(b))
+	for {
+		_, err := dec.Token()
+		if err != nil {
+			return errors.Is(err, io.EOF)
+		}
+	}
 }
 
 func bytesTrimSpace(b []byte) []byte {

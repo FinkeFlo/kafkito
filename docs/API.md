@@ -69,6 +69,15 @@ as `value_b64` with `value_encoding=binary`. Schema-Registry encoded records
 are decoded transparently when an SR is configured for the cluster and carry a
 `value_sr` meta block (`schema_id`, `subject`, `version`, `format`).
 
+`value_encoding` is `json` or `xml` when the value's structure was detected,
+`text` otherwise. A value over 64 KB (`value_truncated=true`) only has its
+first 64 KB in `value`, so `json`/`xml` detection there is a syntactic sniff
+(does it start with `{`/`[` or `<`?) rather than full validation — occasionally
+wrong for a truncated preview, but the alternative (reporting `text` for every
+large JSON/XML record just because truncation broke its structure) is wrong
+far more often. Fetch the full value via the raw-download endpoint to get a
+definitive answer.
+
 `headers` holds header values as text. A header value that is not valid UTF-8
 is rendered there as `0x…` hex — display only — and its raw bytes are also
 returned in the optional `headers_b64` map (standard base64, only the affected
@@ -93,7 +102,7 @@ Quick example — simple contains across message value:
 ```bash
 curl -s -X POST "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/search" \
   -H 'content-type: application/json' \
-  -d '{"query":"customerNumber","zones":["value"],"mode":"contains","direction":"backward","limit":20,"max_scan":5000}' \
+  -d '{"value":"customerNumber","zones":["value"],"mode":"contains","direction":"backward","limit":20,"max_scan":5000}' \
   | jq '.stats, (.messages[] | {p:.partition, off:.offset})'
 ```
 
@@ -119,6 +128,7 @@ Notes:
 - JSONPath filters return nodes; use `op=exists` to treat any match as a hit.
 - JS mode receives a parsed JSON object as `parsed` and can express arbitrarily complex predicates. The server enforces a short per-message timeout for JS filters.
 - Use `zones` to control where the scanner looks (`value`, `headers`, `key`).
+- Matching runs against each record's full, untruncated content, so `contains`/`jsonpath`/`xpath`/`js` all find hits anywhere in large values (there is no size limit on what is *searched*). Only the message previews in the response stay capped at 64 KB per value, same as `GET .../messages` — use the raw-download endpoint to fetch a full value for a hit.
 
 ### Produce
 

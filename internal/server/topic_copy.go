@@ -664,7 +664,7 @@ func copyProduceRequest(msg kafkapkg.Message, preservePartition bool, user strin
 // a compacted destination) and a zero-length key re-produced as nil changes
 // partitioning, since franz-go hashes an empty key but round-robins a nil one.
 // "null" stays on "text" precisely because that collapse is the faithful
-// reproduction there: nil in, nil out. "text" and "json" round-trip through the
+// reproduction there: nil in, nil out. "text", "json" and "xml" round-trip through the
 // rendered string as-is via "text".
 //
 // Schema-Registry-decoded fields ("avro", "json_schema", "protobuf") are
@@ -679,7 +679,7 @@ func produceEncodingFor(rendered, b64, encoding string) (value, produceEncoding 
 		return b64, "base64", true
 	case "empty":
 		return "", "empty", true
-	default: // "null", "json", "text"
+	default: // "null", "json", "xml", "text"
 		return rendered, "text", true
 	}
 }
