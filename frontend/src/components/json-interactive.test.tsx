@@ -18,7 +18,6 @@ describe("JsonInteractive", () => {
     expect(onPick).toHaveBeenCalledWith(
       [{ kind: "key", name: "orderId" }],
       "A1",
-      [0],
     );
   });
 
@@ -32,11 +31,10 @@ describe("JsonInteractive", () => {
     expect(onPick).toHaveBeenCalledWith(
       [{ kind: "key", name: "orderId" }],
       undefined,
-      [0],
     );
   });
 
-  it("clicking inside an array fires a trail with index token and array length", async () => {
+  it("clicking inside an array fires a trail with a concrete index token", async () => {
     const onPick = vi.fn();
     const user = userEvent.setup();
     render(
@@ -55,7 +53,6 @@ describe("JsonInteractive", () => {
         { kind: "key", name: "x" },
       ],
       1,
-      [0, 2, 0],
     );
   });
 

@@ -6,7 +6,6 @@ export interface JsonInteractiveProps {
   onPick: (
     trail: Token[],
     leafValue: unknown,
-    arrayLengthAtIndex: number[],
   ) => void;
 }
 
@@ -48,7 +47,6 @@ export function JsonInteractive({ value, onPick }: JsonInteractiveProps) {
       <Node
         node={value}
         trail={[]}
-        arrayLengths={[]}
         onPick={onPick}
         indent={0}
       />
@@ -59,21 +57,18 @@ export function JsonInteractive({ value, onPick }: JsonInteractiveProps) {
 interface NodeProps {
   node: unknown;
   trail: Token[];
-  arrayLengths: number[];
   onPick: (
     trail: Token[],
     leafValue: unknown,
-    arrayLengthAtIndex: number[],
   ) => void;
   indent: number;
 }
 
-function Node({ node, trail, arrayLengths, onPick, indent }: NodeProps) {
+function Node({ node, trail, onPick, indent }: NodeProps) {
   if (node === null || typeof node !== "object") {
     return (
       <ClickableScalar
         trail={trail}
-        arrayLengths={arrayLengths}
         value={node}
         onPick={onPick}
       />
@@ -85,7 +80,6 @@ function Node({ node, trail, arrayLengths, onPick, indent }: NodeProps) {
         key={`${buildJsonPath(trail)}:${node.length}`}
         arr={node}
         trail={trail}
-        arrayLengths={arrayLengths}
         onPick={onPick}
         indent={indent}
       />
@@ -95,7 +89,6 @@ function Node({ node, trail, arrayLengths, onPick, indent }: NodeProps) {
     <ObjectNode
       obj={node as Record<string, unknown>}
       trail={trail}
-      arrayLengths={arrayLengths}
       onPick={onPick}
       indent={indent}
     />
@@ -104,23 +97,20 @@ function Node({ node, trail, arrayLengths, onPick, indent }: NodeProps) {
 
 function ClickableScalar({
   trail,
-  arrayLengths,
   value,
   onPick,
 }: {
   trail: Token[];
-  arrayLengths: number[];
   value: unknown;
   onPick: (
     trail: Token[],
     leafValue: unknown,
-    arrayLengthAtIndex: number[],
   ) => void;
 }) {
   return (
     <button
       type="button"
-      onClick={() => onPick(trail, value, arrayLengths)}
+      onClick={() => onPick(trail, value)}
       className="cursor-pointer rounded px-0.5 hover:bg-accent-subtle"
     >
       {value === null
@@ -135,17 +125,14 @@ function ClickableScalar({
 function ObjectNode({
   obj,
   trail,
-  arrayLengths,
   onPick,
   indent,
 }: {
   obj: Record<string, unknown>;
   trail: Token[];
-  arrayLengths: number[];
   onPick: (
     trail: Token[],
     leafValue: unknown,
-    arrayLengthAtIndex: number[],
   ) => void;
   indent: number;
 }) {
@@ -159,13 +146,12 @@ function ObjectNode({
       {entries.map(([k, v], i) => {
         const childTrail: Token[] = [...trail, { kind: "key", name: k }];
         // 0 placeholder; arrays push real length at their level.
-        const childLengths = [...arrayLengths, 0];
         return (
           <span key={k}>
             {inner}
             <button
               type="button"
-              onClick={() => onPick(childTrail, undefined, childLengths)}
+              onClick={() => onPick(childTrail, undefined)}
               className="rounded px-0.5 text-accent hover:bg-accent-subtle"
             >
               {`"${k}"`}
@@ -174,7 +160,6 @@ function ObjectNode({
             <Node
               node={v}
               trail={childTrail}
-              arrayLengths={childLengths}
               onPick={onPick}
               indent={indent + 1}
             />
@@ -192,17 +177,14 @@ function ObjectNode({
 function ArrayNode({
   arr,
   trail,
-  arrayLengths,
   onPick,
   indent,
 }: {
   arr: unknown[];
   trail: Token[];
-  arrayLengths: number[];
   onPick: (
     trail: Token[],
     leafValue: unknown,
-    arrayLengthAtIndex: number[],
   ) => void;
   indent: number;
 }) {
@@ -231,14 +213,12 @@ function ArrayNode({
       {"[\n"}
       {arr.map((item, i) => {
         const childTrail: Token[] = [...trail, { kind: "index", value: i }];
-        const childLengths = [...arrayLengths, arr.length];
         return (
           <span key={i}>
             {inner}
             <Node
               node={item}
               trail={childTrail}
-              arrayLengths={childLengths}
               onPick={onPick}
               indent={indent + 1}
             />

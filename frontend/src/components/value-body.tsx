@@ -4,49 +4,46 @@
 //
 // Large values are a special case: the message list only ever holds the
 // first 64 KB of a value (`message.value_truncated`), and a truncated JSON
-// preview is usually cut mid-structure, so JSON.parse throws and silently
-// falls back to plain text — disabling click-to-filter for every message
-// over 64 KB. Instead of failing silently, offer to load the full record on
-// demand (via the same raw-download endpoint the "Download full value"
-// button and Replay dialog already use) before attempting to parse and
-// render the interactive tree. This is deliberately opt-in (a button click)
-// rather than automatic like ReplayModal's full-value fetch, since most rows
-// are never expanded/filtered and an automatic fetch for every truncated row
-// would be wasteful.
+// preview is cut mid-structure, so JSON.parse throws and click-to-filter is
+// unavailable for every message over 64 KB. Instead of failing silently,
+// offer to load the full record on demand (via the same raw-download
+// endpoint the "Download full value" button and the Replay dialog already
+// use). This is deliberately opt-in rather than automatic like
+// ReplayModal's full-value fetch, since most rows are never expanded and an
+// automatic fetch for every truncated row would be wasteful.
 //
-// Detecting this case can't rely on `m.value_encoding === "json"`: the
-// backend detects encoding *after* truncating, and a value cut off
-// mid-structure is (almost) never still valid JSON, so the backend itself
-// reports `value_encoding: "text"` for exactly these messages. Use
-// looksLikeJson (first non-whitespace character only, which truncation
-// never removes) instead.
-import { useState } from "react";
-import {
-  base64ToUtf8,
-  fetchMessageRawBase64,
-  RawValueTooLargeError,
-  type Message,
-} from "@/lib/api";
+// Two cases deliberately do *not* offer the button:
+//
+//   - Schema-Registry values. The list value is the *decoded* JSON rendering,
+//     but /raw returns the raw Avro/Protobuf wire bytes, which JSON.parse can
+//     never read. Offering the button there would guarantee an error.
+//   - Values above JsonInteractive's own SIZE_LIMIT_BYTES. Downloading them
+//     would succeed only for the tree renderer to refuse them, so say so up
+//     front with a disabled button and a visible reason.
+import { useMemo, useState } from "react";
+import { base64ToUtf8, RawValueTooLargeError, type Message } from "@/lib/api";
+import { prettyValue } from "@/lib/format";
 import type { Token } from "@/lib/path-builder";
-import { looksLikeJson } from "@/lib/looks-like-json";
 import { useFormatters } from "@/lib/use-formatters";
-import { JsonInteractive } from "@/components/json-interactive";
+import { useMessageRawValue } from "@/lib/use-message-raw-value";
+import { JsonInteractive, SIZE_LIMIT_BYTES } from "@/components/json-interactive";
+import { Button } from "@/components/button";
+import { Notice } from "@/components/Notice";
 
-type FullValueState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "ready"; parsed: unknown }
-  | { status: "error"; message: string };
+function ClickToFilterHint() {
+  return (
+    <div className="mb-1 inline-flex items-center gap-1 rounded-md border border-border bg-accent-subtle px-1.5 py-0.5 text-[10px] text-muted">
+      click to filter
+    </div>
+  );
+}
 
-export function pretty(s: string, enc: string): string {
-  if (enc === "json") {
-    try {
-      return JSON.stringify(JSON.parse(s), null, 2);
-    } catch {
-      return s;
-    }
-  }
-  return s;
+function ValuePre({ m }: { m: Message }) {
+  return (
+    <pre className="overflow-auto text-xs">
+      {prettyValue(m.value ?? "", m.value_encoding)}
+    </pre>
+  );
 }
 
 export function ValueBody({
@@ -56,102 +53,145 @@ export function ValueBody({
   topic,
 }: {
   m: Message;
-  onPick: (
-    trail: Token[],
-    leafValue: unknown,
-    arrayLengths: number[],
-  ) => void;
+  onPick: (trail: Token[], leafValue: unknown) => void;
   cluster: string;
   topic: string;
 }) {
   const fmt = useFormatters();
-  const [fullValue, setFullValue] = useState<FullValueState>({
-    status: "idle",
-  });
-  const isJson = m.value_encoding === "json";
-  // A value truncated to 64 KB is usually no longer *valid* JSON (cut off
-  // mid-structure), so the backend itself reports value_encoding: "text"
-  // for it — value_encoding === "json" cannot be trusted to find large,
-  // truncated JSON messages. looksLikeJson checks only the first
-  // non-whitespace character, which truncation never removes.
-  const truncatedLooksLikeJson =
-    m.value_truncated === true && looksLikeJson(m.value ?? "");
 
-  if (truncatedLooksLikeJson) {
-    if (fullValue.status === "ready") {
+  // Since the search fix, the backend classifies a value cut off
+  // mid-structure by its first non-whitespace byte, so `value_encoding`
+  // stays "json" for truncated JSON instead of degrading to "text".
+  const isTruncatedJson = m.value_truncated === true && m.value_encoding === "json";
+  const isSchemaRegistry = !!m.value_sr;
+  const tooLargeForTree = (m.value_size_bytes ?? 0) > SIZE_LIMIT_BYTES;
+  const canLoadFull = isTruncatedJson && !isSchemaRegistry && !tooLargeForTree;
+
+  // Hooks must run unconditionally, so the query is declared before any of
+  // the branches below can return. `enabled` keeps it inert until the user
+  // actually asks for the full value.
+  const [wantsFull, setWantsFull] = useState(false);
+  const rawQuery = useMessageRawValue({
+    cluster,
+    topic,
+    partition: m.partition,
+    offset: m.offset,
+    enabled: canLoadFull && wantsFull,
+  });
+
+  const fullParsed = useMemo(() => {
+    if (rawQuery.data === undefined) return undefined;
+    try {
+      return { ok: true as const, value: JSON.parse(base64ToUtf8(rawQuery.data)) };
+    } catch {
+      return { ok: false as const };
+    }
+  }, [rawQuery.data]);
+
+  const inlineParsed = useMemo(() => {
+    if (m.value_encoding !== "json" || !m.value || m.value_truncated) return undefined;
+    try {
+      return { ok: true as const, value: JSON.parse(m.value) };
+    } catch {
+      return undefined;
+    }
+  }, [m.value, m.value_encoding, m.value_truncated]);
+
+  if (isTruncatedJson) {
+    if (fullParsed?.ok) {
       return (
         <div>
-          <div className="mb-1 inline-flex items-center gap-1 rounded border border-border bg-accent-subtle px-1.5 py-0.5 text-[10px] text-muted">
-            ⌕ click to filter
-          </div>
-          <JsonInteractive value={fullValue.parsed} onPick={onPick} />
+          <p className="sr-only" role="status">
+            Full value loaded. Click to filter is now available.
+          </p>
+          <ClickToFilterHint />
+          <JsonInteractive value={fullParsed.value} onPick={onPick} />
         </div>
       );
     }
-    const loadFullValue = async () => {
-      setFullValue({ status: "loading" });
-      try {
-        const base64 = await fetchMessageRawBase64(
-          cluster,
-          topic,
-          m.partition,
-          m.offset,
-        );
-        const parsed = JSON.parse(base64ToUtf8(base64));
-        setFullValue({ status: "ready", parsed });
-      } catch (err) {
-        const message =
-          err instanceof RawValueTooLargeError
-            ? `full value (${m.value_size_bytes ? fmt.bytes(m.value_size_bytes) : "unknown size"}) exceeds the download limit`
-            : err instanceof SyntaxError
-              ? "full value could not be parsed as JSON"
-              : ((err as Error).message ?? String(err));
-        setFullValue({ status: "error", message });
-      }
-    };
+
+    const sizeLabel = m.value_size_bytes ? fmt.bytes(m.value_size_bytes) : "unknown size";
+    const limitLabel = fmt.bytes(SIZE_LIMIT_BYTES);
+
     return (
       <div>
-        <pre className="overflow-auto text-xs">
-          {pretty(m.value ?? "", m.value_encoding)}
-        </pre>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={loadFullValue}
-            disabled={fullValue.status === "loading"}
-            className="rounded border border-border px-2 py-1 text-[11px] hover:border-border-strong disabled:opacity-50"
-          >
-            {fullValue.status === "loading"
-              ? "Loading full value…"
-              : "Load full value to enable click-to-filter"}
-          </button>
-          {fullValue.status === "error" && (
-            <span className="text-[11px] text-danger">
-              {fullValue.message} — enter the path manually instead.
-            </span>
+        <ValuePre m={m} />
+        <div className="mt-2 flex flex-col gap-2">
+          {isSchemaRegistry ? (
+            <p className="text-[11px] text-muted">
+              Click to filter is not available for Schema Registry values — the
+              full record is only downloadable in its encoded wire format. Enter
+              the path manually instead.
+            </p>
+          ) : tooLargeForTree ? (
+            <>
+              <div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled
+                  aria-describedby={`value-too-large-${m.partition}-${m.offset}`}
+                >
+                  Load full value to enable click-to-filter
+                </Button>
+              </div>
+              <p
+                id={`value-too-large-${m.partition}-${m.offset}`}
+                className="text-[11px] text-muted"
+              >
+                Full value is {sizeLabel} — above the {limitLabel} interactive
+                limit. Enter the path manually instead.
+              </p>
+            </>
+          ) : (
+            <>
+              <div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  loading={rawQuery.isFetching}
+                  onClick={() => setWantsFull(true)}
+                >
+                  {rawQuery.isFetching
+                    ? "Loading full value"
+                    : "Load full value to enable click-to-filter"}
+                </Button>
+              </div>
+              {!rawQuery.isFetching && (rawQuery.error || fullParsed?.ok === false) && (
+                <Notice
+                  intent="danger"
+                  actions={
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => void rawQuery.refetch()}
+                    >
+                      Retry
+                    </Button>
+                  }
+                >
+                  {rawQuery.error
+                    ? rawQuery.error instanceof RawValueTooLargeError
+                      ? `Full value (${sizeLabel}) exceeds the download limit. Enter the path manually instead.`
+                      : `${rawQuery.error.message} — enter the path manually instead.`
+                    : "Full value could not be parsed as JSON. Enter the path manually instead."}
+                </Notice>
+              )}
+            </>
           )}
         </div>
       </div>
     );
   }
-  if (isJson && m.value) {
-    try {
-      const parsed = JSON.parse(m.value);
-      return (
-        <div>
-          <div className="mb-1 inline-flex items-center gap-1 rounded border border-border bg-accent-subtle px-1.5 py-0.5 text-[10px] text-muted">
-            ⌕ click to filter
-          </div>
-          <JsonInteractive value={parsed} onPick={onPick} />
-        </div>
-      );
-    } catch {
-      // fall through to pretty()
-    }
+
+  if (inlineParsed?.ok) {
+    return (
+      <div>
+        <ClickToFilterHint />
+        <JsonInteractive value={inlineParsed.value} onPick={onPick} />
+      </div>
+    );
   }
-  return (
-    <pre className="overflow-auto text-xs">
-      {pretty(m.value ?? "", m.value_encoding)}
-    </pre>
-  );
+
+  return <ValuePre m={m} />;
 }

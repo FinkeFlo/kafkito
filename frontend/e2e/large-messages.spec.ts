@@ -21,7 +21,7 @@ test.describe("Large messages (truncation-tolerant search & click-to-filter)", (
     await page.goto(`/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}/messages`);
 
     await page.getByRole("button", { name: "Search", exact: true }).click();
-    await page.getByLabel("Search value").fill(NEEDLE_TEXT);
+    await page.getByLabel("Value", { exact: true }).fill(NEEDLE_TEXT);
     await page.getByRole("button", { name: "Search", exact: true }).click();
 
     // stats.matched === 1: search.go's SearchMessages scans the full record
@@ -79,15 +79,15 @@ test.describe("Large messages (truncation-tolerant search & click-to-filter)", (
     // length/order between messages, so a fixed index is rarely useful).
     const pathInput = page.getByPlaceholder("Type or ↓ for top fields");
     await expect(pathInput).toHaveValue("$.order.items[*].sku");
-    await expect(page.getByLabel("Search operator")).toHaveValue("eq");
-    await expect(page.getByLabel("Search value")).toHaveValue(NEEDLE_SKU);
+    await expect(page.getByLabel("Operator", { exact: true })).toHaveValue("eq");
+    await expect(page.getByLabel("Value", { exact: true })).toHaveValue(NEEDLE_SKU);
   });
 
   test("PathSense suggests fields hydrated from the full (untruncated) value", async ({ page }) => {
     await page.goto(`/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}/messages`);
 
     await page.getByRole("button", { name: "Search", exact: true }).click();
-    await page.getByLabel("Search mode").selectOption("jsonpath");
+    await page.getByLabel("Mode", { exact: true }).selectOption("jsonpath");
 
     const pathInput = page.getByPlaceholder("Type or ↓ for top fields");
     // "email" only exists under order.customer.email, past the 64 KB

@@ -1153,9 +1153,10 @@ export async function fetchMessageRawBase64(
   topic: string,
   partition: number,
   offset: number,
+  signal?: AbortSignal,
 ): Promise<string> {
   const path = clusterPath(cluster, `topics/${encodeURIComponent(topic)}/messages/${partition}/${offset}/raw`);
-  const res = await fetchAPI(cluster, path);
+  const res = await fetchAPI(cluster, path, { signal });
   if (!res.ok) {
     let detail = "";
     try {

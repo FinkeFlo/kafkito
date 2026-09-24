@@ -22,7 +22,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  fetchMessageRawBase64,
   fetchTopics,
   produceMessage,
   RawValueTooLargeError,
@@ -31,6 +30,7 @@ import {
 import { produceEncodingFor, replayBlocker } from "@/lib/produce-encoding";
 import { useCluster, type ClusterListItem } from "@/lib/use-cluster";
 import { useFormatters } from "@/lib/use-formatters";
+import { useMessageRawValue } from "@/lib/use-message-raw-value";
 import { Modal } from "./Modal";
 import { Button } from "./button";
 import { ConfirmDialog } from "./confirm-dialog";
@@ -69,6 +69,43 @@ const maxProduceBodyBytes = 15 * 1024 * 1024;
 const produceValueHeadroomBytes = 512 * 1024;
 const maxReplayValueBase64Chars = maxProduceBodyBytes - produceValueHeadroomBytes;
 
+/**
+ * Folds the raw-value query into the FullValueState the dialog renders.
+ * Kept as a pure function so the precedence (no source > in flight > error >
+ * too large > ready) is explicit and unit-testable instead of buried in JSX.
+ */
+function resolveFullValue(args: {
+  needsFullValue: boolean;
+  hasSource: boolean;
+  isFetching: boolean;
+  error: unknown;
+  base64: string | undefined;
+  sizeLabel: string;
+}): FullValueState {
+  if (!args.needsFullValue) return { status: "idle" };
+  if (!args.hasSource) return { status: "error", message: "source cluster/topic unknown" };
+  if (args.isFetching) return { status: "fetching" };
+  if (args.error) {
+    return {
+      status: "error",
+      message:
+        args.error instanceof RawValueTooLargeError
+          ? `value exceeds the download limit (${args.sizeLabel})`
+          : args.error instanceof Error
+            ? args.error.message
+            : String(args.error),
+    };
+  }
+  if (args.base64 === undefined) return { status: "fetching" };
+  if (args.base64.length > maxReplayValueBase64Chars) {
+    return {
+      status: "error",
+      message: `full value (${args.sizeLabel}) is too large to send to the produce API in one request`,
+    };
+  }
+  return { status: "ready", base64: args.base64 };
+}
+
 export function ReplayModal({ open, onClose, message, sourceCluster, sourceTopic }: ReplayModalProps) {
   const { clusters } = useCluster();
   const fmt = useFormatters();
@@ -79,50 +116,38 @@ export function ReplayModal({ open, onClose, message, sourceCluster, sourceTopic
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ partition: number; offset: number } | null>(null);
   const [confirmProd, setConfirmProd] = useState(false);
-  const [fullValue, setFullValue] = useState<FullValueState>({ status: "idle" });
   const [allowTruncated, setAllowTruncated] = useState(false);
 
   // Recover the untruncated value up front, whenever the modal opens on a
-  // truncated message. Re-runs per message (offset/partition) so switching
-  // which row is being replayed doesn't reuse a stale fetch.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: deliberately keyed on message.partition/offset (not the whole message object) so the fetch re-triggers only on "which record" changes, not on every re-render's new message reference; fmt.bytes is included since useFormatters() is memoized and only changes with locale.
+  // truncated message. The query key carries partition/offset, so switching
+  // which row is being replayed never reuses a stale fetch, and re-opening
+  // the modal on the same row serves from cache instead of downloading
+  // megabytes again.
+  const needsFullValue = open && !!message.value_truncated && !replayBlocker(message);
+  const rawQuery = useMessageRawValue({
+    cluster: sourceCluster ?? "",
+    topic: sourceTopic ?? "",
+    partition: message.partition,
+    offset: message.offset,
+    enabled: needsFullValue,
+  });
+
+  // Re-arm the "replay the truncated preview anyway" opt-in whenever the
+  // modal targets a different record, so a previous acceptance cannot leak
+  // into the next replay.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deliberately keyed on which record is targeted, not on the whole message object (whose identity changes on every render).
   useEffect(() => {
-    if (!open || !message.value_truncated || replayBlocker(message)) {
-      setFullValue({ status: "idle" });
-      setAllowTruncated(false);
-      return;
-    }
-    if (!sourceCluster || !sourceTopic) {
-      setFullValue({ status: "error", message: "source cluster/topic unknown" });
-      return;
-    }
-    let cancelled = false;
-    setFullValue({ status: "fetching" });
     setAllowTruncated(false);
-    fetchMessageRawBase64(sourceCluster, sourceTopic, message.partition, message.offset)
-      .then((base64) => {
-        if (cancelled) return;
-        if (base64.length > maxReplayValueBase64Chars) {
-          setFullValue({
-            status: "error",
-            message: `full value (${fmt.bytes(message.value_size_bytes ?? 0)}) is too large to send to the produce API in one request`,
-          });
-          return;
-        }
-        setFullValue({ status: "ready", base64 });
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        const msg =
-          e instanceof RawValueTooLargeError
-            ? `value exceeds the download limit (${fmt.bytes(message.value_size_bytes ?? 0)})`
-            : ((e as Error).message ?? String(e));
-        setFullValue({ status: "error", message: msg });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, message.value_truncated, message.partition, message.offset, sourceCluster, sourceTopic, fmt.bytes]);
+  }, [open, message.partition, message.offset]);
+
+  const fullValue: FullValueState = resolveFullValue({
+    needsFullValue,
+    hasSource: !!sourceCluster && !!sourceTopic,
+    isFetching: rawQuery.isFetching,
+    error: rawQuery.error,
+    base64: rawQuery.data,
+    sizeLabel: fmt.bytes(message.value_size_bytes ?? 0),
+  });
 
   // Determine the effective cluster selection (default to first cluster).
   const clusterList: ClusterListItem[] = clusters ?? [];

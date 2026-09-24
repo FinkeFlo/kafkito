@@ -21,3 +21,16 @@ export function buildJsonPath(trail: Token[]): string {
   }
   return out;
 }
+
+/**
+ * Replaces every concrete array index in a trail with a wildcard.
+ *
+ * Arrays vary in length and order between messages, so a path pinned to a
+ * fixed index (`$.items[1].price`) almost never matches the next record.
+ * Clicking a value therefore always searches across every entry
+ * (`$.items[*].price`) rather than asking the user to pick a scope.
+ * Trails without any index are returned unchanged.
+ */
+export function wildcardArrayIndices(trail: Token[]): Token[] {
+  return trail.map((t) => (t.kind === "index" ? { kind: "star" } : t));
+}

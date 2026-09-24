@@ -39,16 +39,16 @@ func TestRecordToMessage_TruncatesLargeValue(t *testing.T) {
 	assert.NotContains(t, msg.Value, "secret-marker", "needle placed past the truncation boundary must not survive truncation")
 }
 
-// TestRecordToMessageFull_KeepsFullValue proves the search-path helper never
+// TestRecordToMatchMessage_KeepsFullValue proves the search-path helper never
 // truncates, so a needle placed past maxMessageValueBytes survives and is
 // available for matching — the actual bug being fixed here.
-func TestRecordToMessageFull_KeepsFullValue(t *testing.T) {
+func TestRecordToMatchMessage_KeepsFullValue(t *testing.T) {
 	t.Parallel()
 
 	val := bigJSONWithNeedle("secret-marker")
 	rec := &kgo.Record{Value: val}
 
-	msg := recordToMessageFull(rec)
+	msg := recordToMatchMessage(rec)
 
 	assert.False(t, msg.ValueTruncated, "the full-decode path must not truncate")
 	assert.Equal(t, string(val), msg.Value)
@@ -67,7 +67,7 @@ func TestContainsMatcher_FindsNeedlePastTruncationBoundary(t *testing.T) {
 
 	cm := &containsMatcher{needle: "secret-marker", zones: []SearchZone{ZoneValue}}
 
-	fullMsg := recordToMessageFull(rec)
+	fullMsg := recordToMatchMessage(rec)
 	hit, err := cm.match(&fullMsg)
 	require.NoError(t, err)
 	assert.True(t, hit, "contains match against the full value must find the needle")
@@ -94,7 +94,7 @@ func TestJSONPathMatcher_ParsesLargeValue(t *testing.T) {
 	pm, err := newPathMatcher(jsonPathEval(expr), OpEq, "secret-marker")
 	require.NoError(t, err)
 
-	fullMsg := recordToMessageFull(rec)
+	fullMsg := recordToMatchMessage(rec)
 	hit, err := pm.match(&fullMsg)
 	require.NoError(t, err, "JSONPath must parse the full, untruncated JSON without error")
 	assert.True(t, hit, "JSONPath match against the full value must find the needle")
@@ -122,7 +122,7 @@ func TestXPathMatcher_ParsesLargeValue(t *testing.T) {
 	pm, err := newPathMatcher(xmlPathEval(expr), OpEq, "needle-shipped")
 	require.NoError(t, err)
 
-	fullMsg := recordToMessageFull(rec)
+	fullMsg := recordToMatchMessage(rec)
 	hit, err := pm.match(&fullMsg)
 	require.NoError(t, err, "XPath must parse the full, untruncated XML without error")
 	assert.True(t, hit, "XPath match against the full value must find the needle")
