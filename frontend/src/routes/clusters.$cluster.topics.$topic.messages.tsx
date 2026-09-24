@@ -16,12 +16,12 @@ import {
   type SearchStats,
   type SearchRequest,
 } from "@/lib/api";
+import { hydrateTruncatedSampleMessages } from "@/lib/hydrate-sample";
 import { buildPathTree } from "@/lib/path-tree";
 import { buildJsonPath, type Token } from "@/lib/path-builder";
 import { dedupeMessages } from "@/lib/dedupe-messages";
 import { PathSense } from "@/components/path-sense";
-import { ArrayScopePopover } from "@/components/array-scope-popover";
-import { JsonInteractive } from "@/components/json-interactive";
+import { ValueBody, pretty } from "@/components/value-body";
 import { Button } from "@/components/button";
 import { Timestamp } from "@/components/timestamp";
 import { MessageRangeCountPreview } from "@/components/message-range-count-preview";
@@ -278,10 +278,25 @@ function MessagesPanel({
   // Set to true to abort an in-flight auto-chain between continuation calls.
   const stopSearchRef = useRef(false);
 
-  // Sample query (lazy, only when JSONPath search is open)
+  // Sample query (lazy, only when JSONPath search is open). Field-path
+  // suggestions need each sample message's full JSON structure, but the
+  // sample endpoint returns the same 64 KB-truncated preview as the message
+  // list — silently starving PathSense of any field that only appears past
+  // the truncation boundary (or dropping the message outright, since
+  // truncated JSON usually fails to parse). hydrateTruncatedSampleMessages
+  // fetches the full raw value for any truncated sample, falling back to
+  // the truncated preview on failure.
   const sampleQuery = useQuery<SampleResponse>({
     queryKey: ["sample", cluster, topic],
-    queryFn: () => fetchSample(cluster, topic, 5, -1),
+    queryFn: async () => {
+      const res = await fetchSample(cluster, topic, 5, -1);
+      const messages = await hydrateTruncatedSampleMessages(
+        cluster,
+        topic,
+        res.messages,
+      );
+      return { ...res, messages };
+    },
     enabled: searchOpen && mode === "jsonpath",
     staleTime: 5 * 60_000,
   });
@@ -302,16 +317,6 @@ function MessagesPanel({
       );
     return buildPathTree(parsed);
   }, [sampleQuery.data]);
-
-  const [arrayPicker, setArrayPicker] = useState<
-    | {
-        trail: Token[];
-        leafValue: unknown;
-        arrayLengths: number[];
-        arrayDepth: number;
-      }
-    | null
-  >(null);
 
   const [undoToast, setUndoToast] = useState<
     | { previous: { path: string; op: SearchOp; needle: string }; until: number }
@@ -348,21 +353,15 @@ function MessagesPanel({
     return () => clearTimeout(timer);
   }, [undoToast]);
 
-  const handlePick = (
-    trail: Token[],
-    leafValue: unknown,
-    arrayLengths: number[],
-  ) => {
+  const handlePick = (trail: Token[], leafValue: unknown) => {
     setSearchOpen(true);
-    const lastIndexFromEnd = [...trail]
-      .reverse()
-      .findIndex((t) => t.kind === "index");
-    if (lastIndexFromEnd === -1) {
-      finalizePick(trail, leafValue);
-      return;
-    }
-    const arrayDepth = trail.length - 1 - lastIndexFromEnd;
-    setArrayPicker({ trail, leafValue, arrayLengths, arrayDepth });
+    // Arrays vary in length/order between messages, so a fixed index (e.g.
+    // items[1]) is rarely what anyone wants. Always search across every
+    // entry instead of asking the user to choose.
+    const wildcardTrail = trail.map((t) =>
+      t.kind === "index" ? ({ kind: "star" } as Token) : t,
+    );
+    finalizePick(wildcardTrail, leafValue);
   };
 
   const [showCoachmark, setShowCoachmark] = useState(() => {
@@ -761,7 +760,10 @@ function MessagesPanel({
         >
           Refresh
         </button>
-        <span className="text-xs text-[var(--color-text-muted)]">
+        <span
+          data-testid="messages-count"
+          className="text-xs text-[var(--color-text-muted)]"
+        >
           {inSearchMode
             ? fmt.number(searchResult?.stats.matched ?? 0)
             : fmt.number(displayMessages.length)}
@@ -773,39 +775,6 @@ function MessagesPanel({
 
       {searchOpen && (
         <div className="space-y-3 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3">
-          {arrayPicker && (
-            <div className="mb-3">
-              <ArrayScopePopover
-                arrayPath={buildJsonPath(
-                  arrayPicker.trail.slice(0, arrayPicker.arrayDepth),
-                )}
-                arrayLength={
-                  arrayPicker.arrayLengths[arrayPicker.arrayDepth] ?? 0
-                }
-                indexLeafPath={buildJsonPath(arrayPicker.trail)}
-                starLeafPath={buildJsonPath(
-                  arrayPicker.trail.map((t, i) =>
-                    i === arrayPicker.arrayDepth
-                      ? ({ kind: "star" } as Token)
-                      : t,
-                  ),
-                )}
-                onApply={(sel) => {
-                  const finalTrail =
-                    sel === "star"
-                      ? arrayPicker.trail.map((t, i) =>
-                          i === arrayPicker.arrayDepth
-                            ? ({ kind: "star" } as Token)
-                            : t,
-                        )
-                      : arrayPicker.trail;
-                  finalizePick(finalTrail, arrayPicker.leafValue);
-                  setArrayPicker(null);
-                }}
-                onCancel={() => setArrayPicker(null)}
-              />
-            </div>
-          )}
           {undoToast && (
             <div className="flex items-center gap-3 rounded border border-border bg-panel p-2 text-xs">
               <span>Path replaced by click.</span>
@@ -825,6 +794,7 @@ function MessagesPanel({
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <label className="font-medium">Mode</label>
             <select
+              aria-label="Search mode"
               value={mode}
               onChange={(e) => setMode(e.target.value as SearchMode)}
               className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1"
@@ -871,6 +841,7 @@ function MessagesPanel({
                 )}
                 <label className="font-medium">Op</label>
                 <select
+                  aria-label="Search operator"
                   value={op}
                   onChange={(e) => setOp(e.target.value as SearchOp)}
                   className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1"
@@ -904,6 +875,7 @@ function MessagesPanel({
               />
             ) : (
               <input
+                aria-label="Search value"
                 value={needle}
                 onChange={(e) => setNeedle(e.target.value)}
                 placeholder={
@@ -1204,39 +1176,6 @@ function MessagesPanel({
   );
 }
 
-function ValueBody({
-  m,
-  onPick,
-}: {
-  m: Message;
-  onPick: (
-    trail: Token[],
-    leafValue: unknown,
-    arrayLengths: number[],
-  ) => void;
-}) {
-  const isJson = m.value_encoding === "json";
-  if (isJson && m.value) {
-    try {
-      const parsed = JSON.parse(m.value);
-      return (
-        <div>
-          <div className="mb-1 inline-flex items-center gap-1 rounded border border-border bg-accent-subtle px-1.5 py-0.5 text-[10px] text-muted">
-            ⌕ click to filter
-          </div>
-          <JsonInteractive value={parsed} onPick={onPick} />
-        </div>
-      );
-    } catch {
-      // fall through to pretty()
-    }
-  }
-  return (
-    <pre className="overflow-auto text-xs">
-      {pretty(m.value ?? "", m.value_encoding)}
-    </pre>
-  );
-}
 
 function MessageRow({
   m,
@@ -1289,6 +1228,7 @@ function MessageRow({
 
   return (
     <div
+      data-testid="message-row"
       className="cursor-pointer px-4 py-2 text-xs transition-colors hover:bg-[var(--color-surface-hover)]"
       onClick={() => setOpen(!open)}
       role="button"
@@ -1363,7 +1303,7 @@ function MessageRow({
           </div>
           <DetailSection
             label={`value · ${m.value_encoding}${m.value_sr ? ` · sr id ${m.value_sr.schema_id ?? "?"}` : ""}${m.value_truncated ? ` · preview only — full size ${m.value_size_bytes ? fmt.bytes(m.value_size_bytes) : "unknown"}` : ""}`}
-            body={<ValueBody m={m} onPick={onPick} />}
+            body={<ValueBody m={m} onPick={onPick} cluster={cluster} topic={topic} />}
             action={
               <div className="flex items-center gap-1.5">
                 <button
@@ -1459,6 +1399,7 @@ function DetailSection({
 function EncodingBadge({ enc }: { enc: string }) {
   const styles: Record<string, string> = {
     json: "bg-[var(--color-success-subtle)] text-[var(--color-success)]",
+    xml: "bg-[var(--color-success-subtle)] text-[var(--color-success)]",
     text: "bg-[var(--color-surface-subtle)] text-[var(--color-text)]",
     binary: "bg-[var(--color-warning-subtle)] text-[var(--color-warning)]",
     null: "bg-[var(--color-surface-subtle)] text-[var(--color-text-subtle)]",
@@ -1497,19 +1438,8 @@ function SRBadge({ meta }: { meta: { format?: string; schema_id?: number; subjec
 
 // Single-section body formatter removed — the row now renders key/value/headers
 // as individual DetailSection blocks for better readability and per-field copy.
-
-
-
-function pretty(s: string, enc: string): string {
-  if (enc === "json") {
-    try {
-      return JSON.stringify(JSON.parse(s), null, 2);
-    } catch {
-      return s;
-    }
-  }
-  return s;
-}
+// pretty() now lives in @/components/value-body (co-located with ValueBody,
+// its main caller) and is re-imported above for the key body in DetailSection.
 
 // Time-range picker styled after Grafana's dashboard time picker: a single
 // toolbar trigger that opens a two-column popover (absolute / quick ranges).

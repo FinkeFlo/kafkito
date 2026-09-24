@@ -26,6 +26,54 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.1.18",
+    date: "2026-09-24",
+    items: [
+      {
+        type: "fix",
+        title: "Search now finds matches anywhere in large messages",
+        description:
+          "Contains, JSONPath, XPath and JS search all matched only against the first 64 KB of a value, so a message larger than that could silently look like it had no matches at all (or fail to parse for the path-based modes). Search now scans each record's full content; only the message previews in results still cap at 64 KB.",
+      },
+      {
+        type: "fix",
+        title: "Click-to-filter works for large (truncated) messages",
+        description:
+          "Clicking a value to build a JSONPath/XPath query silently fell back to plain text for any message over 64 KB, since the truncated preview usually isn't valid JSON. A \"Load full value to enable click-to-filter\" button now fetches the complete record on demand before rendering the interactive tree.",
+      },
+      {
+        type: "fix",
+        title: "Field-path suggestions no longer miss fields from large sample messages",
+        description:
+          "The JSONPath field-picker's suggestion list is built from a few sample messages, which were truncated the same way and so could omit or drop fields entirely for topics with large messages. Truncated samples are now hydrated with their full value before building the suggestion tree.",
+      },
+      {
+        type: "feature",
+        title: "Fuzzy matching and highlighting in the field-path suggestion list",
+        description:
+          "Typing a partial or misspelled field name (e.g. \"pric\" for \"$.order.items[*].price\") now finds matches anywhere in the path, with the matched characters highlighted — consistent with fuzzy search elsewhere in the app.",
+      },
+      {
+        type: "fix",
+        title: "Clicking an array value always searches every entry",
+        description:
+          "Clicking a value inside an array used to ask whether to match only that one index (e.g. items[1].sku) or every entry (items[*].sku). A fixed index rarely makes sense — array order and length vary between messages — so click-to-filter now always builds the items[*] (wildcard) form and skips the extra step.",
+      },
+      {
+        type: "fix",
+        title: "Large XML values are now labeled correctly",
+        description:
+          "Like JSON, an XML value larger than 64 KB is only ever a truncated preview, and truncation almost always breaks a value's structure — the encoding was falling back to \"text\" even for genuinely XML records. Encoding detection is now truncation-tolerant for XML too, so the badge and downstream tooling see \"xml\" instead.",
+      },
+      {
+        type: "fix",
+        title: "Long field names in the path suggestion list no longer overflow",
+        description:
+          "A deeply nested or long field name in the JSONPath suggestion dropdown could overflow past the edge of the list and overlap neighboring controls. Long paths are now truncated with an ellipsis (hover to see the full path).",
+      },
+    ],
+  },
+  {
     version: "1.1.17",
     date: "2026-09-14",
     items: [

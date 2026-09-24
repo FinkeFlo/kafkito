@@ -455,9 +455,13 @@ scan:
 				lowestOffset[p] = rec.Offset
 			}
 			scanned++
-			msg := recordToMessage(rec)
-			msg.applySRDecoder(ctx, dec, rec.Key, rec.Value)
-			hit, err := mt.match(&msg)
+			// Match against the full, untruncated record content: truncating
+			// first (as the consume/list path does) would silently hide
+			// contains-matches past maxMessageValueBytes and would corrupt
+			// JSONPath/XPath/JS parsing of any record larger than that cap.
+			fullMsg := recordToMessageFull(rec)
+			fullMsg.applySRDecoderFull(ctx, dec, rec.Key, rec.Value)
+			hit, err := mt.match(&fullMsg)
 			if err != nil {
 				parseErrors++
 				slog.WarnContext(ctx, "search: skipping message – parse error",
@@ -474,6 +478,12 @@ scan:
 				return
 			}
 			if hit {
+				// Rebuild the hit through the truncating path so the response
+				// carries the same bounded preview (and ValueTruncated flag)
+				// as every other consume path, regardless of how large the
+				// full record we just matched against was.
+				msg := recordToMessage(rec)
+				msg.applySRDecoder(ctx, dec, rec.Key, rec.Value)
 				if !policy.IsEmpty() && msg.Value != "" {
 					if mv, did := policy.Apply(topic, msg.Value); did {
 						msg.Value = mv

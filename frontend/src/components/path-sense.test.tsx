@@ -63,8 +63,39 @@ describe("PathSense", () => {
     await user.click(input);
     await user.type(input, "cust");
 
-    expect(screen.getByText("$.customerName")).toBeInTheDocument();
-    expect(screen.queryByText("$.orderId")).not.toBeInTheDocument();
+    // The match is highlighted via <mark>, splitting "$.customerName" across
+    // several text nodes, so match on the row's full text content instead of
+    // an exact single-node string.
+    expect(
+      screen.getByText(
+        (_, el) =>
+          el?.classList.contains("font-mono") === true &&
+          el.textContent === "$.customerName",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/orderId/)).not.toBeInTheDocument();
+  });
+
+  it("matches on a substring anywhere in the path, not just a prefix, and highlights the matched range", async () => {
+    const user = userEvent.setup();
+    render(
+      <PathSense
+        tree={makeTree([
+          ["$.order.items[*].price", { type: "number" }],
+          ["$.order.items[*].sku", { type: "string" }],
+        ])}
+        value=""
+        onChange={() => {}}
+        onPick={() => {}}
+      />,
+    );
+
+    const input = screen.getByRole("combobox");
+    await user.click(input);
+    await user.type(input, "pric");
+
+    expect(screen.getByText("pric", { selector: "mark" })).toBeInTheDocument();
+    expect(screen.queryByText(/sku/)).not.toBeInTheDocument();
   });
 
   it("calls onPick when an entry is clicked", async () => {
