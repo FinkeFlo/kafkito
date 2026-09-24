@@ -9,6 +9,8 @@ export interface PathSenseProps {
   onChange: (next: string) => void;
   onPick: (path: string, sampleValue: unknown) => void;
   placeholder?: string;
+  /** Applied to the inner combobox input so an external <label htmlFor> can target it. */
+  id?: string;
 }
 
 const TOP_N = 8;
@@ -69,6 +71,7 @@ export function PathSense({
   onChange,
   onPick,
   placeholder = "Type or ↓ for top fields",
+  id,
 }: PathSenseProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value);
@@ -80,10 +83,13 @@ export function PathSense({
   }, [value]);
 
   const allRows = useMemo(() => toRows(tree), [tree]);
-  // Substring/prefix matching over the whole path (e.g. "pric" or "order.pric"
-  // finds "$.order.items[*].price"), tolerant of the occasional typo — same
-  // Fuse-based helper the Command Palette and topic list use, so behavior
-  // and highlighting are consistent across the app. Ranking by rank() only
+  // Token-wise substring matching over the whole path: every whitespace-
+  // separated token of the query must appear somewhere in the path, in any
+  // order (so "order price" finds "$.order.items[*].price", as does "pric").
+  // This is the same Fuse-based helper the Command Palette and topic list
+  // use, so behavior and highlighting are consistent across the app. Note
+  // that it is *not* typo-tolerant — lib/fuzzy.ts pins Fuse to threshold 0
+  // and exact tokens, so "pirce" finds nothing. Ranking by rank() only
   // applies with no active query; an active query defers to Fuse's own
   // relevance ordering.
   const fuzzy = useFuzzy(allRows, { keys: ["path"], query });
@@ -116,6 +122,7 @@ export function PathSense({
       }}
     >
       <input
+        id={id}
         role="combobox"
         aria-expanded={open}
         value={query}

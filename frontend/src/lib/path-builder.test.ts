@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildJsonPath, type Token } from "./path-builder";
+import { buildJsonPath, wildcardArrayIndices, type Token } from "./path-builder";
 
 describe("buildJsonPath", () => {
   it("returns '$' for an empty trail", () => {
@@ -55,5 +55,68 @@ describe("buildJsonPath", () => {
     expect(
       buildJsonPath([{ kind: "key", name: "it's" }]),
     ).toBe("$['it\\'s']");
+  });
+});
+
+// Regression coverage for the array-scope behaviour that replaced the
+// ArrayScopePopover: picking a value inside an array always searches every
+// entry, so these cases used to be covered by array-scope-popover.test.tsx.
+describe("wildcardArrayIndices", () => {
+  it("returns an empty trail unchanged", () => {
+    expect(wildcardArrayIndices([])).toEqual([]);
+  });
+
+  it("leaves trails without any index untouched", () => {
+    const trail: Token[] = [
+      { kind: "key", name: "order" },
+      { kind: "key", name: "id" },
+    ];
+    expect(wildcardArrayIndices(trail)).toEqual(trail);
+    expect(buildJsonPath(wildcardArrayIndices(trail))).toBe("$.order.id");
+  });
+
+  it("replaces a single array index with a wildcard", () => {
+    const trail: Token[] = [
+      { kind: "key", name: "items" },
+      { kind: "index", value: 0 },
+      { kind: "key", name: "price" },
+    ];
+    expect(buildJsonPath(wildcardArrayIndices(trail))).toBe("$.items[*].price");
+  });
+
+  it("replaces every index in a nested array trail", () => {
+    const trail: Token[] = [
+      { kind: "key", name: "items" },
+      { kind: "index", value: 0 },
+      { kind: "key", name: "tags" },
+      { kind: "index", value: 2 },
+    ];
+    expect(buildJsonPath(wildcardArrayIndices(trail))).toBe("$.items[*].tags[*]");
+  });
+
+  it("keeps existing wildcards as wildcards", () => {
+    const trail: Token[] = [
+      { kind: "key", name: "items" },
+      { kind: "star" },
+      { kind: "index", value: 7 },
+    ];
+    expect(buildJsonPath(wildcardArrayIndices(trail))).toBe("$.items[*][*]");
+  });
+
+  it("does not mutate the input trail", () => {
+    const trail: Token[] = [
+      { kind: "key", name: "items" },
+      { kind: "index", value: 3 },
+    ];
+    wildcardArrayIndices(trail);
+    expect(trail[1]).toEqual({ kind: "index", value: 3 });
+  });
+
+  it("wildcards a top-level array index", () => {
+    const trail: Token[] = [
+      { kind: "index", value: 5 },
+      { kind: "key", name: "status" },
+    ];
+    expect(buildJsonPath(wildcardArrayIndices(trail))).toBe("$[*].status");
   });
 });

@@ -18,10 +18,11 @@ import {
 } from "@/lib/api";
 import { hydrateTruncatedSampleMessages } from "@/lib/hydrate-sample";
 import { buildPathTree } from "@/lib/path-tree";
-import { buildJsonPath, type Token } from "@/lib/path-builder";
+import { buildJsonPath, wildcardArrayIndices, type Token } from "@/lib/path-builder";
 import { dedupeMessages } from "@/lib/dedupe-messages";
 import { PathSense } from "@/components/path-sense";
-import { ValueBody, pretty } from "@/components/value-body";
+import { ValueBody } from "@/components/value-body";
+import { prettyValue } from "@/lib/format";
 import { Button } from "@/components/button";
 import { Timestamp } from "@/components/timestamp";
 import { MessageRangeCountPreview } from "@/components/message-range-count-preview";
@@ -288,12 +289,13 @@ function MessagesPanel({
   // the truncated preview on failure.
   const sampleQuery = useQuery<SampleResponse>({
     queryKey: ["sample", cluster, topic],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const res = await fetchSample(cluster, topic, 5, -1);
       const messages = await hydrateTruncatedSampleMessages(
         cluster,
         topic,
         res.messages,
+        signal,
       );
       return { ...res, messages };
     },
@@ -355,13 +357,7 @@ function MessagesPanel({
 
   const handlePick = (trail: Token[], leafValue: unknown) => {
     setSearchOpen(true);
-    // Arrays vary in length/order between messages, so a fixed index (e.g.
-    // items[1]) is rarely what anyone wants. Always search across every
-    // entry instead of asking the user to choose.
-    const wildcardTrail = trail.map((t) =>
-      t.kind === "index" ? ({ kind: "star" } as Token) : t,
-    );
-    finalizePick(wildcardTrail, leafValue);
+    finalizePick(wildcardArrayIndices(trail), leafValue);
   };
 
   const [showCoachmark, setShowCoachmark] = useState(() => {
@@ -600,8 +596,12 @@ function MessagesPanel({
     );
   }, [rawMessages, sortOrder]);
 
+  // Points the coachmark at a row that actually renders the click-to-filter
+  // tree. Since the search fix the backend keeps reporting "json" for values
+  // it truncated mid-structure, and those rows show a "Load full value"
+  // button instead of a clickable tree — teaching on one would be misleading.
   const firstJsonIdx = displayMessages.findIndex(
-    (m) => m.value_encoding === "json",
+    (m) => m.value_encoding === "json" && !m.value_truncated,
   );
 
   useEffect(() => {
@@ -792,9 +792,11 @@ function MessagesPanel({
             </div>
           )}
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <label className="font-medium">Mode</label>
+            <label className="font-medium" htmlFor="search-mode">
+              Mode
+            </label>
             <select
-              aria-label="Search mode"
+              id="search-mode"
               value={mode}
               onChange={(e) => setMode(e.target.value as SearchMode)}
               className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1"
@@ -807,10 +809,13 @@ function MessagesPanel({
 
             {mode !== "contains" && mode !== "js" && (
               <>
-                <label className="font-medium">Path</label>
+                <label className="font-medium" htmlFor="search-path">
+                  Path
+                </label>
                 {mode === "jsonpath" ? (
                   <div className="w-56">
                     <PathSense
+                      id="search-path"
                       tree={pathTree}
                       value={path}
                       onChange={setPath}
@@ -833,15 +838,18 @@ function MessagesPanel({
                   </div>
                 ) : (
                   <input
+                    id="search-path"
                     value={path}
                     onChange={(e) => setPath(e.target.value)}
                     placeholder="//order/@status"
                     className="w-56 rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1 font-mono"
                   />
                 )}
-                <label className="font-medium">Op</label>
+                <label className="font-medium" htmlFor="search-operator">
+                  Operator
+                </label>
                 <select
-                  aria-label="Search operator"
+                  id="search-operator"
                   value={op}
                   onChange={(e) => setOp(e.target.value as SearchOp)}
                   className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1"
@@ -858,15 +866,15 @@ function MessagesPanel({
                 </select>
               </>
             )}
-            <label className="font-medium">
-              {mode === "contains"
-                ? "Text"
-                : mode === "js"
-                  ? "JS-Ausdruck"
-                  : "Wert"}
+            <label
+              className="font-medium"
+              htmlFor={mode === "js" ? "search-expression" : "search-value"}
+            >
+              {mode === "js" ? "Expression" : "Value"}
             </label>
             {mode === "js" ? (
               <textarea
+                id="search-expression"
                 value={needle}
                 onChange={(e) => setNeedle(e.target.value)}
                 placeholder={'parsed && parsed.amount > 1000 && key.startsWith("ord-")'}
@@ -875,15 +883,15 @@ function MessagesPanel({
               />
             ) : (
               <input
-                aria-label="Search value"
+                id="search-value"
                 value={needle}
                 onChange={(e) => setNeedle(e.target.value)}
                 placeholder={
                   mode === "contains"
                     ? "Substring"
                     : op === "exists"
-                      ? "(ignoriert)"
-                      : "z.B. 42 / shipped / ^A.*"
+                      ? "(ignored)"
+                      : "e.g. 42 / shipped / ^A.*"
                 }
                 className="w-56 rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1 font-mono"
                 disabled={mode !== "contains" && op === "exists"}
@@ -892,7 +900,7 @@ function MessagesPanel({
           </div>
           {mode === "js" && (
             <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-2 text-[11px] text-[var(--color-text-muted)]">
-              Variablen:{" "}
+              Variables:{" "}
               <code className="font-mono">key</code>,{" "}
               <code className="font-mono">value</code> (string),{" "}
               <code className="font-mono">parsed</code> (JSON),{" "}
@@ -1182,11 +1190,7 @@ function MessageRow({
   onPick,
 }: {
   m: Message;
-  onPick: (
-    trail: Token[],
-    leafValue: unknown,
-    arrayLengths: number[],
-  ) => void;
+  onPick: (trail: Token[], leafValue: unknown) => void;
 }) {
   const fmt = useFormatters();
   const { cluster, topic } = Route.useParams();
@@ -1286,7 +1290,7 @@ function MessageRow({
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <DetailSection
               label={`key · ${m.key === undefined ? "none" : m.key_encoding}`}
-              body={m.key === undefined ? "(no key)" : pretty(m.key, m.key_encoding)}
+              body={m.key === undefined ? "(no key)" : prettyValue(m.key, m.key_encoding)}
               empty={m.key === undefined}
             />
             <DetailSection
@@ -1438,8 +1442,7 @@ function SRBadge({ meta }: { meta: { format?: string; schema_id?: number; subjec
 
 // Single-section body formatter removed — the row now renders key/value/headers
 // as individual DetailSection blocks for better readability and per-field copy.
-// pretty() now lives in @/components/value-body (co-located with ValueBody,
-// its main caller) and is re-imported above for the key body in DetailSection.
+// The shared value formatter lives in @/lib/format as prettyValue().
 
 // Time-range picker styled after Grafana's dashboard time picker: a single
 // toolbar trigger that opens a two-column popover (absolute / quick ranges).

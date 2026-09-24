@@ -124,6 +124,10 @@ const (
 	// show a "preview only" indicator.
 	maxMessageValueBytes = 64 * 1024 // 64 KB
 
+	// binaryPreviewBytes is how many leading bytes of a non-UTF-8 payload are
+	// rendered as the "0x…" hex preview shown in place of the value.
+	binaryPreviewBytes = 64
+
 	// balanceBuffer absorbs timestamp-interleaving wobble between partitions
 	// when merging "last N" results across multiple partitions. With it, the
 	// per-partition tail size is ceil(N/K) + buffer; without it, partitions
@@ -659,24 +663,10 @@ func buildNextCursor(
 	return &c, true
 }
 
+// recordToMessage renders a record for the consume/list path: the value is
+// capped at maxMessageValueBytes so response sizes stay bounded. The search
+// scan uses recordToMatchMessage instead, which must not truncate.
 func recordToMessage(rec *kgo.Record) Message {
-	return buildMessage(rec, true)
-}
-
-// recordToMessageFull behaves like recordToMessage but never truncates the
-// decoded value, regardless of size. It exists for the search scan
-// (SearchMessages), which must match user queries against the full record
-// content — truncating before matching would silently hide matches located
-// past maxMessageValueBytes and would corrupt structured (JSONPath/XPath)
-// parsing of any record larger than the cap. Callers must not put the
-// resulting Message into a response as-is; rebuild the hit via
-// recordToMessage (and applySRDecoder, not applySRDecoderFull) first so
-// response sizes stay bounded exactly like every other consume path.
-func recordToMessageFull(rec *kgo.Record) Message {
-	return buildMessage(rec, false)
-}
-
-func buildMessage(rec *kgo.Record, truncate bool) Message {
 	m := Message{
 		Partition:      rec.Partition,
 		Offset:         rec.Offset,
@@ -689,7 +679,7 @@ func buildMessage(rec *kgo.Record, truncate bool) Message {
 	// from causing outsized string allocations. The full byte length is already
 	// stored in ValueSizeBytes so the UI can show the original size.
 	valBytes := rec.Value
-	if truncate && int64(len(valBytes)) > maxMessageValueBytes {
+	if int64(len(valBytes)) > maxMessageValueBytes {
 		valBytes = valBytes[:maxMessageValueBytes]
 		m.ValueTruncated = true
 	}
@@ -711,6 +701,63 @@ func buildMessage(rec *kgo.Record, truncate bool) Message {
 		}
 	}
 	return m
+}
+
+// recordToMatchMessage builds the untruncated Message the search scan matches
+// against. It exists because matching must see the full record content —
+// truncating first (as the consume/list path does) would silently hide
+// matches located past maxMessageValueBytes and would corrupt structured
+// (JSONPath/XPath/JS) parsing of any record larger than that cap.
+//
+// It deliberately populates only the fields the matchers actually read
+// (Partition, Offset, Timestamp, Key, Value, Headers). In particular it skips
+// the base64 rendering of the raw value: on the list path that string is
+// capped at maxMessageValueBytes, but over the full value it costs ~1.33x the
+// record size per scanned record and no matcher ever reads it. It likewise
+// skips json.Valid/validXML, since ValueEncoding is not read during matching
+// either.
+//
+// Callers must not put the resulting Message into a response as-is; rebuild
+// the hit via recordToMessage (and applySRDecoder, not applySRDecoderFull)
+// first so response sizes stay bounded exactly like every other consume path.
+func recordToMatchMessage(rec *kgo.Record) Message {
+	m := Message{
+		Partition:      rec.Partition,
+		Offset:         rec.Offset,
+		Timestamp:      rec.Timestamp.UnixMilli(),
+		ValueSizeBytes: int64(len(rec.Value)),
+	}
+	m.Key = renderForMatch(rec.Key)
+	m.Value = renderForMatch(rec.Value)
+	if len(rec.Headers) > 0 {
+		m.Headers = make(map[string]string, len(rec.Headers))
+		for _, h := range rec.Headers {
+			if utf8.Valid(h.Value) {
+				m.Headers[h.Key] = string(h.Value)
+			} else {
+				m.Headers[h.Key] = "0x" + hex.EncodeToString(h.Value)
+			}
+		}
+	}
+	return m
+}
+
+// renderForMatch returns the same rendered string decodeBytes produces for an
+// untruncated input, without computing the encoding label or the base64 of the
+// raw bytes. Keep this byte-identical to decodeBytes's rendered return value —
+// TestRenderForMatchMatchesDecodeBytes guards that.
+func renderForMatch(b []byte) string {
+	if len(b) == 0 {
+		return ""
+	}
+	if utf8.Valid(b) {
+		return string(b)
+	}
+	preview := b
+	if len(preview) > binaryPreviewBytes {
+		preview = preview[:binaryPreviewBytes]
+	}
+	return "0x" + hex.EncodeToString(preview)
 }
 
 // applySRDecoder runs the optional Schema-Registry decoder over key+value of m.
@@ -784,8 +831,8 @@ func decodeBytes(b []byte, truncated bool) (rendered, encoding, b64 string) {
 		return string(b), "text", ""
 	}
 	preview := b
-	if len(preview) > 64 {
-		preview = preview[:64]
+	if len(preview) > binaryPreviewBytes {
+		preview = preview[:binaryPreviewBytes]
 	}
 	return "0x" + hex.EncodeToString(preview), "binary", base64.StdEncoding.EncodeToString(b)
 }

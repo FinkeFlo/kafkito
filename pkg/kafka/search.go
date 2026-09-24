@@ -459,7 +459,10 @@ scan:
 			// first (as the consume/list path does) would silently hide
 			// contains-matches past maxMessageValueBytes and would corrupt
 			// JSONPath/XPath/JS parsing of any record larger than that cap.
-			fullMsg := recordToMessageFull(rec)
+			// recordToMatchMessage fills only the fields the matchers read,
+			// so scanning a large record does not pay for a base64 rendering
+			// of its full value that nothing consumes.
+			fullMsg := recordToMatchMessage(rec)
 			fullMsg.applySRDecoderFull(ctx, dec, rec.Key, rec.Value)
 			hit, err := mt.match(&fullMsg)
 			if err != nil {

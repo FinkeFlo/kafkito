@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { hydrateTruncatedSampleMessages } from "./hydrate-sample";
+import {
+  hydrateTruncatedSampleMessages,
+  MAX_HYDRATE_VALUE_BYTES,
+} from "./hydrate-sample";
 import { RawValueTooLargeError, type Message } from "./api";
 
 const fetchMessageRawBase64 = vi.hoisted(() => vi.fn());
@@ -16,11 +19,9 @@ function message(overrides: Partial<Message> = {}): Message {
     timestamp_ms: 0,
     key_encoding: "text",
     value: "{}",
-    // Truncation happens before the backend classifies the encoding, and a
-    // value cut off mid-structure is (almost) never still valid JSON — so
-    // real truncated JSON messages arrive as value_encoding: "text", not
-    // "json". Mirrors the actual backend behavior (see looksLikeJson).
-    value_encoding: "text",
+    // The backend classifies a value cut off mid-structure by its first
+    // non-whitespace byte, so truncated JSON keeps value_encoding: "json".
+    value_encoding: "json",
     ...overrides,
   };
 }
@@ -39,10 +40,11 @@ describe("hydrateTruncatedSampleMessages", () => {
     expect(fetchMessageRawBase64).not.toHaveBeenCalled();
   });
 
-  it("leaves truncated text that doesn't look like JSON untouched", async () => {
+  it("leaves truncated non-JSON text untouched", async () => {
     const msgs = [
       message({
         value: "just a long log line, not JSON",
+        value_encoding: "text",
         value_truncated: true,
       }),
     ];
@@ -53,7 +55,7 @@ describe("hydrateTruncatedSampleMessages", () => {
     expect(fetchMessageRawBase64).not.toHaveBeenCalled();
   });
 
-  it("hydrates a truncated value that looks like JSON even though the backend reported it as value_encoding: text", async () => {
+  it("hydrates a truncated JSON value", async () => {
     const full = JSON.stringify({ order: { id: "A1", price: 9.99 } });
     fetchMessageRawBase64.mockResolvedValue(
       Buffer.from(full, "utf8").toString("base64"),
@@ -81,6 +83,7 @@ describe("hydrateTruncatedSampleMessages", () => {
       "my-topic",
       2,
       55,
+      undefined,
     );
   });
 
@@ -122,5 +125,71 @@ describe("hydrateTruncatedSampleMessages", () => {
     });
     expect(result[1]).toEqual(msgs[1]);
     expect(result[2]).toEqual(msgs[2]);
+  });
+
+  it("skips Schema Registry values, whose raw bytes are not JSON", async () => {
+    const msgs = [
+      message({
+        value: '{"order":{"id":"A1"',
+        value_truncated: true,
+        value_sr: { format: "json", schema_id: 7 },
+      } as Partial<Message>),
+    ];
+
+    const result = await hydrateTruncatedSampleMessages("c", "t", msgs);
+
+    expect(result).toEqual(msgs);
+    expect(fetchMessageRawBase64).not.toHaveBeenCalled();
+  });
+
+  it("skips values above the hydrate size limit instead of downloading them", async () => {
+    const msgs = [
+      message({
+        value: '{"a":1',
+        value_truncated: true,
+        value_size_bytes: MAX_HYDRATE_VALUE_BYTES + 1,
+      }),
+    ];
+
+    const result = await hydrateTruncatedSampleMessages("c", "t", msgs);
+
+    expect(result).toEqual(msgs);
+    expect(fetchMessageRawBase64).not.toHaveBeenCalled();
+  });
+
+  it("still hydrates a value exactly at the size limit", async () => {
+    fetchMessageRawBase64.mockResolvedValue(
+      Buffer.from(JSON.stringify({ a: 1 }), "utf8").toString("base64"),
+    );
+    const msgs = [
+      message({
+        value: '{"a":1',
+        value_truncated: true,
+        value_size_bytes: MAX_HYDRATE_VALUE_BYTES,
+      }),
+    ];
+
+    const result = await hydrateTruncatedSampleMessages("c", "t", msgs);
+
+    expect(result[0].value_truncated).toBe(false);
+    expect(fetchMessageRawBase64).toHaveBeenCalledTimes(1);
+  });
+
+  it("forwards the abort signal to the fetch layer", async () => {
+    fetchMessageRawBase64.mockResolvedValue(
+      Buffer.from("{}", "utf8").toString("base64"),
+    );
+    const controller = new AbortController();
+    const msgs = [message({ value: '{"a":1', value_truncated: true })];
+
+    await hydrateTruncatedSampleMessages("c", "t", msgs, controller.signal);
+
+    expect(fetchMessageRawBase64).toHaveBeenCalledWith(
+      "c",
+      "t",
+      0,
+      1,
+      controller.signal,
+    );
   });
 });

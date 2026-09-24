@@ -220,4 +220,23 @@ describe("PathSense", () => {
     // It must toggle "items[2]" -> "items[*]", derived from the typed query.
     expect(onChange).toHaveBeenCalledWith("items[*].sku");
   });
+
+  it("forwards an id to the combobox input so an external label can target it", () => {
+    render(
+      <>
+        <label htmlFor="search-path">Path</label>
+        <PathSense
+          id="search-path"
+          tree={emptyTree}
+          value=""
+          onChange={vi.fn()}
+          onPick={vi.fn()}
+        />
+      </>,
+    );
+
+    // Without the id the label would be a dangling reference in JSONPath
+    // mode, where PathSense replaces the plain <input id="search-path">.
+    expect(screen.getByLabelText("Path")).toBe(screen.getByRole("combobox"));
+  });
 });

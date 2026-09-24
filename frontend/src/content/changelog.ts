@@ -39,7 +39,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         type: "fix",
         title: "Click-to-filter works for large (truncated) messages",
         description:
-          "Clicking a value to build a JSONPath/XPath query silently fell back to plain text for any message over 64 KB, since the truncated preview usually isn't valid JSON. A \"Load full value to enable click-to-filter\" button now fetches the complete record on demand before rendering the interactive tree.",
+          "Clicking a value to build a JSONPath/XPath query silently fell back to plain text for any message over 64 KB, since the truncated preview usually isn't valid JSON. A \"Load full value to enable click-to-filter\" button now fetches the complete record on demand before rendering the interactive tree. The button covers JSON values up to 1 MB; larger values say so instead of loading, and Schema Registry topics are not covered yet because the raw download returns encoded wire bytes.",
       },
       {
         type: "fix",
@@ -49,9 +49,9 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         type: "feature",
-        title: "Fuzzy matching and highlighting in the field-path suggestion list",
+        title: "Substring matching and highlighting in the field-path suggestion list",
         description:
-          "Typing a partial or misspelled field name (e.g. \"pric\" for \"$.order.items[*].price\") now finds matches anywhere in the path, with the matched characters highlighted — consistent with fuzzy search elsewhere in the app.",
+          "Typing part of a field name (e.g. \"pric\" for \"$.order.items[*].price\") now finds matches anywhere in the path, with the matched characters highlighted. Multiple words are matched independently and in any order, so \"order price\" finds the same path — consistent with search elsewhere in the app.",
       },
       {
         type: "fix",

@@ -91,6 +91,64 @@ curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages?limit=20&from=lat
 curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages?partition=0&from=oldest&limit=100" | jq
 ```
 
+### Download raw value
+
+`GET /api/v1/clusters/{cluster}/topics/{topic}/messages/{partition}/{offset}/raw`
+
+Streams the untruncated value bytes of a single record verbatim — no base64,
+no JSON envelope, no Schema-Registry decoding. This is the endpoint to use
+whenever the 64 KB preview in `GET .../messages` is not enough: to inspect a
+large value in full, to confirm a truncated preview's real encoding, or to
+re-produce a record byte-for-byte.
+
+| Path param  | Type    | Notes                                     |
+| ----------- | ------- | ----------------------------------------- |
+| `partition` | `int32` | Exact partition; `-1` is not accepted.    |
+| `offset`    | `int64` | Exact offset; must be `>= 0`.             |
+
+Takes no query parameters.
+
+Response headers:
+
+- `Content-Type` is sniffed from the bytes: `application/json` for a value
+  that starts with `{`/`[` *and* validates as JSON, `text/plain; charset=utf-8`
+  for any other valid UTF-8, `application/octet-stream` otherwise. Note that
+  XML is served as `text/plain`.
+- `Content-Disposition: attachment; filename="{topic}-p{partition}-o{offset}.{ext}"`
+  with `ext` one of `json`, `txt`, `bin`, matching the sniffed type.
+- `Content-Length` is the exact byte length of the value.
+
+Status codes:
+
+| Status | When                                                              |
+| ------ | ----------------------------------------------------------------- |
+| `200`  | Value returned in the body.                                       |
+| `400`  | `partition` is not an int32, or `offset` is not a non-negative int64. |
+| `404`  | Unknown cluster.                                                  |
+| `413`  | Value is larger than the 15 MB download cap.                      |
+| `502`  | Broker error, or no record at that partition/offset.              |
+
+The 15 MB cap is fixed (not configurable) so a single oversized record cannot
+exhaust process memory. `400`/`404`/`413` respond with `{ "error": "..." }`;
+`502` responds with `{ "error": "upstream kafka error", "code": "kafka_upstream" }`.
+
+The body is always the **raw wire bytes**. For a Schema-Registry encoded
+record that means the Avro/Protobuf payload including the 5-byte magic +
+schema-id prefix — *not* the decoded JSON that `GET .../messages` returns in
+`value`. Decode it against the schema yourself if you need the JSON form.
+
+```bash
+# Inspect a large JSON value in full
+curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/0/12345/raw" | jq
+
+# Save a binary value to disk
+curl -sOJ "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/0/12345/raw"
+
+# A value over the cap returns 413
+curl -s -o /dev/null -w '%{http_code}\n' \
+  "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/0/99999/raw"
+```
+
 ### Search
 
 `POST /api/v1/clusters/{cluster}/topics/{topic}/messages/search`

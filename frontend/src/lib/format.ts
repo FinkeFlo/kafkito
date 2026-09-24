@@ -270,3 +270,19 @@ export function lagVariant(lag: number | bigint | null | undefined): LagVariant 
   if (n < 10_000) return "warning";
   return "danger";
 }
+
+/**
+ * Pretty-prints a message value for display in a <pre> block.
+ *
+ * Only re-indents values the backend already classified as JSON, and falls
+ * back to the original string whenever parsing fails — which is the normal
+ * case for a value the list path truncated mid-structure.
+ */
+export function prettyValue(s: string, encoding: string): string {
+  if (encoding !== "json") return s;
+  try {
+    return JSON.stringify(JSON.parse(s), null, 2);
+  } catch {
+    return s;
+  }
+}
