@@ -4,6 +4,8 @@ BIN := bin/kafkito
 PKG := ./...
 VERSION ?= 0.0.0-dev
 IMAGE ?= ghcr.io/finkeflo/kafkito:dev
+# Optional Go build tags for `make test` (e.g. TAGS=btp). Empty by default.
+TAGS ?=
 # Pinned air version. Bump deliberately; keep .air.toml's reference in sync.
 AIR_VERSION ?= v1.65.1
 
@@ -17,7 +19,7 @@ help:
 	@echo "  dev                - full local loop: Compose + backend (air) + frontend (Vite)"
 	@echo "  dev-down           - tear down the Compose dev stack"
 	@echo "  worktree-init      - write per-worktree .env.dev with a free port pair"
-	@echo "  test               - go test -race ./..."
+	@echo "  test               - go test -race ./... (TAGS=btp for the btp build)"
 	@echo "  test-integration   - integration tests (requires Docker)"
 	@echo "  lint               - golangci-lint run (default + btp build tags, pinned version in ./bin)"
 	@echo "  lint-install       - install golangci-lint $(GOLANGCI_LINT_VERSION) into ./bin if missing or outdated"
@@ -45,12 +47,12 @@ frontend-build:
 frontend-dev:
 	cd frontend && bun run dev
 
-# Mirrors the frontend job in .github/workflows/ci.yml; keep the order in sync.
+# CI's frontend job (.github/workflows/ci.yml) runs this target.
 frontend-check:
 	cd frontend && bun run lint && bun run build && bun run test
 
-# api/openapi.yaml is the HTTP contract (ADR-0005). Keep REDOCLY_VERSION in
-# sync with the frontend job in .github/workflows/ci.yml.
+# api/openapi.yaml is the HTTP contract (ADR-0005). CI's frontend job runs
+# api-check, so REDOCLY_VERSION is the only Redocly pin.
 REDOCLY_VERSION ?= 2.54.3
 
 api-generate:
@@ -81,7 +83,7 @@ run-dev:
 	go run -tags devauth ./cmd/kafkito
 
 test:
-	go test -race -count=1 $(PKG)
+	go test -race -count=1 $(if $(TAGS),-tags "$(TAGS)") $(PKG)
 
 # Integration tests require Docker (Testcontainers-Go). Skipped otherwise.
 test-integration:

@@ -15,18 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v7
+      - uses: ./.github/actions/setup
         with:
-          # Minor line from go.mod; resolves to the latest patch release, like
-          # the golang:1.26-alpine image in the Dockerfile. go-version-file would
-          # pin the exact go.mod minimum (1.26.0) and miss security patches.
-          go-version: "1.26"
-
-      - uses: oven-sh/setup-bun@v2
-
-      - name: Install frontend deps
-        working-directory: frontend
-        run: bun install --frozen-lockfile
+          go: "true"
+          frontend-deps: "true"
 
       - name: Cache Playwright browsers
         id: cache-playwright
