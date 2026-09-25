@@ -5,6 +5,7 @@ package config
 
 import (
 	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -220,4 +221,74 @@ func TestRedacted(t *testing.T) {
 	assert.Equal(t, "secret", c.Auth.Password, "original must not be mutated")
 	assert.Equal(t, "***", r.Auth.Password)
 	assert.Equal(t, "u", r.Auth.Username)
+}
+
+func TestLogDefaults(t *testing.T) {
+	t.Setenv("KAFKITO_CONFIG", "")
+	t.Setenv("KAFKITO_KAFKA_BROKERS", "")
+
+	cfg, err := Load("")
+	require.NoError(t, err)
+	assert.Equal(t, "info", cfg.Log.Level)
+	assert.Equal(t, "json", cfg.Log.Format)
+	assert.Equal(t, slog.LevelInfo, cfg.Log.SlogLevel())
+	assert.Equal(t, "json", cfg.Log.FormatName())
+}
+
+func TestLogEnvBinding(t *testing.T) {
+	t.Setenv("KAFKITO_CONFIG", "")
+	t.Setenv("KAFKITO_KAFKA_BROKERS", "")
+	t.Setenv("KAFKITO_LOG_LEVEL", "DEBUG")
+	t.Setenv("KAFKITO_LOG_FORMAT", "text")
+
+	cfg, err := Load("")
+	require.NoError(t, err)
+	assert.Equal(t, slog.LevelDebug, cfg.Log.SlogLevel())
+	assert.Equal(t, "text", cfg.Log.FormatName())
+}
+
+func TestLogEmptyEnvFallsBackToDefaults(t *testing.T) {
+	t.Setenv("KAFKITO_CONFIG", "")
+	t.Setenv("KAFKITO_KAFKA_BROKERS", "")
+	t.Setenv("KAFKITO_LOG_LEVEL", "")
+	t.Setenv("KAFKITO_LOG_FORMAT", "")
+
+	cfg, err := Load("")
+	require.NoError(t, err)
+	assert.Equal(t, slog.LevelInfo, cfg.Log.SlogLevel())
+	assert.Equal(t, "json", cfg.Log.FormatName())
+}
+
+func TestLogValidation(t *testing.T) {
+	cases := []struct {
+		name    string
+		log     LogConfig
+		wantErr string
+	}{
+		{"all levels ok", LogConfig{Level: "warn", Format: "json"}, ""},
+		{"error level ok", LogConfig{Level: "error", Format: "text"}, ""},
+		{"unknown level", LogConfig{Level: "verbose"}, "log.level"},
+		{"unknown format", LogConfig{Format: "logfmt"}, "log.format"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := Config{Log: tc.log}.Validate()
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantErr)
+		})
+	}
+}
+
+func TestLogInvalidEnvRejectedOnLoad(t *testing.T) {
+	t.Setenv("KAFKITO_CONFIG", "")
+	t.Setenv("KAFKITO_KAFKA_BROKERS", "")
+	t.Setenv("KAFKITO_LOG_LEVEL", "trace")
+
+	_, err := Load("")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "log.level")
 }

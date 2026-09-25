@@ -18,6 +18,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -50,6 +51,63 @@ type Config struct {
 	Clusters []ClusterConfig `koanf:"clusters"`
 	RBAC     RBACConfig      `koanf:"rbac"`
 	Auth     AppAuthConfig   `koanf:"auth"`
+	Log      LogConfig       `koanf:"log"`
+}
+
+// Log levels and formats accepted by LogConfig.
+const (
+	LogLevelDebug = "debug"
+	LogLevelInfo  = "info"
+	LogLevelWarn  = "warn"
+	LogLevelError = "error"
+
+	LogFormatJSON = "json"
+	LogFormatText = "text"
+)
+
+// LogConfig controls the process logger. Populated from KAFKITO_LOG_LEVEL and
+// KAFKITO_LOG_FORMAT (or log.level / log.format in YAML). Values are
+// case-insensitive; empty means the default (info, json).
+type LogConfig struct {
+	Level  string `koanf:"level"`
+	Format string `koanf:"format"`
+}
+
+// SlogLevel returns the slog level for Level. Unknown values map to info;
+// Validate rejects them before this is reached in normal startup.
+func (l LogConfig) SlogLevel() slog.Level {
+	switch strings.ToLower(strings.TrimSpace(l.Level)) {
+	case LogLevelDebug:
+		return slog.LevelDebug
+	case LogLevelWarn:
+		return slog.LevelWarn
+	case LogLevelError:
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
+}
+
+// FormatName returns the normalized output format ("json" or "text").
+func (l LogConfig) FormatName() string {
+	if strings.ToLower(strings.TrimSpace(l.Format)) == LogFormatText {
+		return LogFormatText
+	}
+	return LogFormatJSON
+}
+
+func (l LogConfig) validate() error {
+	switch strings.ToLower(strings.TrimSpace(l.Level)) {
+	case "", LogLevelDebug, LogLevelInfo, LogLevelWarn, LogLevelError:
+	default:
+		return fmt.Errorf("log.level %q not supported (use debug|info|warn|error)", l.Level)
+	}
+	switch strings.ToLower(strings.TrimSpace(l.Format)) {
+	case "", LogFormatJSON, LogFormatText:
+	default:
+		return fmt.Errorf("log.format %q not supported (use json|text)", l.Format)
+	}
+	return nil
 }
 
 // AppAuthConfig is the top-level authentication configuration for kafkito itself
@@ -179,6 +237,7 @@ func (c ClusterConfig) Redacted() ClusterConfig {
 func Defaults() Config {
 	return Config{
 		Server: ServerConfig{Addr: ":37421"},
+		Log:    LogConfig{Level: LogLevelInfo, Format: LogFormatJSON},
 	}
 }
 
@@ -222,6 +281,9 @@ func Load(path string) (Config, error) {
 // It is intentionally lenient: zero clusters is allowed (kafkito still
 // starts, but cluster-scoped endpoints will report unavailable).
 func (c Config) Validate() error {
+	if err := c.Log.validate(); err != nil {
+		return err
+	}
 	seen := make(map[string]struct{}, len(c.Clusters))
 	for i, cl := range c.Clusters {
 		if strings.TrimSpace(cl.Name) == "" {
@@ -270,7 +332,8 @@ func (c Config) ClusterByName(name string) (ClusterConfig, bool) {
 	return ClusterConfig{}, false
 }
 
-// envKeyTransform maps e.g. KAFKITO_SERVER_ADDR -> server.addr.
+// envKeyTransform maps e.g. KAFKITO_SERVER_ADDR -> server.addr and
+// KAFKITO_LOG_LEVEL -> log.level.
 // Known list-type keys (brokers) split on comma.
 func envKeyTransform(key string) string {
 	key = strings.ToLower(strings.TrimPrefix(key, "KAFKITO_"))
