@@ -158,7 +158,6 @@ func TestParseConsumeQuery(t *testing.T) {
 		{name: "garbage cursor", raw: "cursor=!!!", wantErr: "invalid cursor"},
 	}
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -214,7 +213,6 @@ func TestParseCountQuery(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -290,7 +288,6 @@ func TestParseSearchBody(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -337,7 +334,6 @@ func TestParseSampleQueryCapsN(t *testing.T) {
 		{"n=-3 raises to 1", "n=-3", 1},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

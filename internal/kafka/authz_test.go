@@ -21,7 +21,6 @@ func TestIsAuthorizationFailure(t *testing.T) {
 		{name: "empty", msg: "", want: false},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			if got := IsAuthorizationFailure(tc.msg); got != tc.want {

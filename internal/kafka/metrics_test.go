@@ -110,7 +110,6 @@ func TestPtrHelpers_DereferenceToValue(t *testing.T) {
 		{name: "ptrFloat64", got: *ptrFloat64(1.5), want: 1.5},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tc.want, tc.got)

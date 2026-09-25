@@ -186,7 +186,6 @@ func TestBuildTopicConsumers(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			got := buildTopicConsumers(context.Background(), tc.inputs, tc.ends, tc.endsKnown, tc.fetch)

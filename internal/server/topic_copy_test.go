@@ -45,7 +45,6 @@ func TestProduceEncodingFor(t *testing.T) {
 		{name: "protobuf", rendered: `{"a":1}`, encoding: "protobuf", wantOK: false},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			value, encoding, ok := produceEncodingFor(tc.rendered, tc.b64, tc.encoding)
@@ -231,7 +230,6 @@ func TestCopyMessages_ValidationErrors(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters/test/topics/orders/copy", bytes.NewReader([]byte(tc.body)))

@@ -222,7 +222,6 @@ func buildTopicConsumers(
 	var mu sync.Mutex
 
 	for _, c := range candidates {
-		c := c
 		g.Go(func() error {
 			committed, ferr := fetch(gctx, c.GroupID)
 

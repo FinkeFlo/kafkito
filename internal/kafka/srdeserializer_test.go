@@ -118,7 +118,6 @@ func TestIsSRFramed_RecognisesByteLayout(t *testing.T) {
 		{name: "accepts_minimal_framed_header", raw: []byte{0x00, 0x00, 0x00, 0x00, 0x01}, want: true},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tc.want, IsSRFramed(tc.raw))

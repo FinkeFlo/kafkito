@@ -313,7 +313,6 @@ func TestRBACMiddleware_DispatchBranches(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -426,7 +425,6 @@ func TestResolvePermission_RepresentativeEntries(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

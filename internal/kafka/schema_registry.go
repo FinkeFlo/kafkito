@@ -321,7 +321,6 @@ func (c *SchemaRegistryClient) ListSubjectsWithVersions(ctx context.Context) ([]
 	g.SetLimit(8)
 	var mu sync.Mutex
 	for i, s := range subs {
-		i, s := i, s
 		g.Go(func() error {
 			sub := Subject{Name: s}
 			if vs, err := c.ListVersions(gctx, s); err == nil {

@@ -30,7 +30,6 @@ func TestHealthz_ReturnsOK_PerPath(t *testing.T) {
 		{name: "readyz", path: "/readyz", wantNoteSub: "no kafka clusters configured"},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -120,7 +119,6 @@ func TestSPAFallback_ServesHTML_ForDeepClientRoutes(t *testing.T) {
 		{name: "groups", path: "/groups"},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -151,7 +149,6 @@ func TestSPAFallback_RejectsNonIdempotentVerbs(t *testing.T) {
 		{name: "DELETE", method: http.MethodDelete},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -183,7 +180,6 @@ func TestBackendPrefixes_NeverFallThroughToSPAShell(t *testing.T) {
 		{name: "user_api_unknown", path: "/user-api/unknown"},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

@@ -47,7 +47,6 @@ func TestBlockedIP(t *testing.T) {
 		{"8.8.8.8", false},        // public
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.ip, func(t *testing.T) {
 			t.Parallel()
 			addr, err := netip.ParseAddr(tc.ip)
