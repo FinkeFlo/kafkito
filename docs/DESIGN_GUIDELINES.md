@@ -524,7 +524,13 @@ Every commit must pass:
 cd frontend
 npm run lint            # tsc -b --noEmit
 npm run build           # tsr generate + tsc + vite build
+npm run test            # vitest, incl. static checks in src/__checks__
 ```
+
+`src/__checks__/` holds source-level checks that run with the unit tests:
+undeclared `var(--color-*)` tokens, route files without a parent layout,
+and raw Date formatters that bypass `<Timestamp>` (opt out per line with
+`// allow-raw-date: <reason>`).
 
 If any of these fails, the commit is not done.
 
@@ -552,8 +558,6 @@ Copy this into the PR description and tick each box.
 - [ ] Works in dark mode
 - [ ] npm run lint passes
 - [ ] npm run build passes
-- [ ] npm run check:routes passes
-- [ ] npm run check:dates passes
 - [ ] npm run test passes
 - [ ] routeTree.gen.ts regenerated and committed
 - [ ] Every TODO(backend): comment is also listed in the PR body

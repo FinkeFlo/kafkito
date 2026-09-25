@@ -26,7 +26,7 @@ help:
 	@echo "  frontend-install   - bun install in frontend/"
 	@echo "  frontend-build     - bun run build in frontend/"
 	@echo "  frontend-dev       - bun run dev in frontend/"
-	@echo "  frontend-check     - frontend lint, build, static checks and tests (as in CI)"
+	@echo "  frontend-check     - frontend lint, build and tests (as in CI)"
 	@echo "  docker-build       - docker build -t $(IMAGE)"
 	@echo "  compose-up/down    - docker compose lifecycle"
 	@echo "  e2e                - opt-in Playwright walks against a local fixture stack"
@@ -42,9 +42,7 @@ frontend-dev:
 
 # Mirrors the frontend job in .github/workflows/ci.yml; keep the order in sync.
 frontend-check:
-	cd frontend && bun run lint && bun run build && \
-		bun run check:routes && \
-		bun run check:dates && bun run test
+	cd frontend && bun run lint && bun run build && bun run test
 
 # Canonical local gate. Run before opening a PR.
 check: test lint proto-lint frontend-check

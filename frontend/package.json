@@ -12,8 +12,6 @@
     "typecheck": "tsr generate && tsc -b --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check:routes": "bash scripts/check-route-orphans.sh",
-    "check:dates": "bash scripts/check-date-format.sh",
     "check:contrast": "node scripts/check-contrast.mjs"
   },
   "dependencies": {
