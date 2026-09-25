@@ -1,3 +1,5 @@
+import type { components } from "../lib/api.gen";
+
 // Shape of GET /user-api/currentUser (built-in @sap/approuter endpoint).
 export interface CurrentUser {
   firstname: string;
@@ -7,15 +9,5 @@ export interface CurrentUser {
   displayName: string;
 }
 
-// Shape of GET /api/v1/me (kafkito Go backend, JWT-aware).
-export interface Me {
-  user: string;
-  email: string;
-  tenant: string;
-  scopes: string[];
-  roles: string[];
-  permissions: Record<string, string[]>;
-  anonymous: boolean;
-  jwt: boolean;
-  rbac_enabled: boolean;
-}
+// Shape of GET /api/v1/me, generated from api/openapi.yaml.
+export type Me = components["schemas"]["MeResponse"];

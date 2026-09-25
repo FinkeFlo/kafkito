@@ -12,7 +12,8 @@
     "typecheck": "tsr generate && tsc -b --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check:contrast": "node scripts/check-contrast.mjs"
+    "check:contrast": "node scripts/check-contrast.mjs",
+    "api:generate": "bunx openapi-typescript@7.13.0 ../api/openapi.yaml -o src/lib/api.gen.ts --default-non-nullable false"
   },
   "dependencies": {
     "@radix-ui/react-tooltip": "^1.2.13",
