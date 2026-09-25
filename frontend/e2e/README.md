@@ -45,6 +45,7 @@ docker-compose.yml                  apache/kafka:3.8.1 + cp-schema-registry (exi
 frontend/playwright.config.ts       Playwright bootstrap (testDir = ./e2e)
 frontend/e2e/fixtures/seed.sh       seeds the broker via `docker exec kafkito-kafka`
 frontend/e2e/*.spec.ts              the actual walks
+frontend/e2e/csp.spec.ts            fails on any Content-Security-Policy violation (needs the Go-served build)
 Makefile :: e2e, e2e-up, e2e-test, e2e-down
 .github/workflows/e2e.yml           CI workflow with browser caching + artifact upload
 ```

@@ -120,6 +120,32 @@ To see every request on SAP BTP Cloud Foundry temporarily:
 cf set-env <app> KAFKITO_LOG_LEVEL=debug && cf restart <app>
 ```
 
+### Security headers
+
+Every response (API, UI and static files) carries:
+
+```text
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+X-Content-Type-Options: nosniff
+Referrer-Policy: no-referrer
+Cross-Origin-Opener-Policy: same-origin
+X-Frame-Options: DENY
+```
+
+Private-cluster credentials are kept in the browser's localStorage, so the
+policy allows no inline scripts or styles and no third-party origins.
+
+- **Embedding in an iframe** (e.g. an SAP BTP launchpad): set
+  `KAFKITO_SERVER_FRAME_ANCESTORS` (YAML `server.frame_ancestors`) to a
+  space-separated CSP source list, e.g. `'self' https://*.launchpad.example.com`.
+  `X-Frame-Options: DENY` is only sent while the value is `'none'`, because it
+  cannot express an allow-list.
+- **HSTS** is not set by kafkito: TLS is terminated by the upstream proxy or
+  router, which should send `Strict-Transport-Security`.
+- **`make dev`** serves the UI through Vite, which sets none of these headers;
+  the policy only applies when the Go binary serves the UI (`make build`,
+  images, `make e2e`).
+
 ## Why kafkito?
 
 - **Single static binary** — no JVM, no side-car containers, ~50 MB RAM footprint.

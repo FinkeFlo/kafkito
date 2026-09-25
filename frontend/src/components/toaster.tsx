@@ -1,4 +1,7 @@
 import { Toaster as SonnerToaster } from "sonner";
+// Loaded as a stylesheet instead of sonner's runtime <style> injection, which
+// the CSP blocks (see sonnerExternalStyles in vite.config.ts).
+import "sonner/dist/styles.css";
 import { useTheme } from "@/lib/use-theme";
 
 /**

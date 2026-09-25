@@ -46,6 +46,7 @@ func New(opts Options) http.Handler {
 	// Handler loggers add request_id to every *Context log call.
 	handlerLog := withRequestIDLogging(opts.Logger)
 
+	r.Use(securityHeadersMiddleware(opts.Config.Server.FrameAncestors))
 	r.Use(middleware.CleanPath)
 	// Outside Recoverer so recovered panics are logged with status 500.
 	r.Use(requestLogMiddleware(baseLog))
