@@ -59,6 +59,10 @@ Makefile :: e2e, e2e-up, e2e-test, e2e-down
   mutation code (we have Go integration tests for that).
 - Cluster name in URLs is `KAFKITO_E2E_CLUSTER` (defaults to `local` —
   the auto-cluster name from the `KAFKITO_KAFKA_BROKERS` shortcut).
+- `clusters.spec.ts` tests private-cluster connections against the fixture
+  broker through the host's private IPv4 address, because the backend
+  refuses loopback brokers for private clusters. It picks the first
+  RFC 1918 interface address; set `KAFKITO_E2E_HOST_IP` to override.
 
 ## What is NOT here yet
 
