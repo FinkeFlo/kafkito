@@ -22,8 +22,8 @@ Before writing any frontend code, do these five things:
    its structure (imports order, query setup, layout scaffold).
 4. Use Tailwind utilities generated from `@theme` tokens
    (e.g. `bg-panel`, `text-muted`, `border-border`). Never hard-code hex
-   values, never use the default Tailwind palette classes (`bg-slate-50`,
-   `text-gray-700`, etc.) in new code.
+   values. The default Tailwind palette is disabled in `@theme`, so
+   classes like `bg-slate-50` or `text-gray-700` generate no CSS.
 5. Never fabricate backend data. If a field does not exist on the API
    type, render `"—"` and add a `// TODO(backend): …` comment.
 
@@ -91,7 +91,7 @@ Notes:
 **Don't:**
 
 ```tsx
-// ❌ default Tailwind palette
+// ❌ default Tailwind palette (disabled in @theme, generates no CSS)
 <div className="rounded-xl border border-slate-200 bg-white p-4">
 // ❌ inline style with hex
 <div style={{ background: "#ffffff", borderColor: "#e5e7eb" }}>
@@ -524,15 +524,12 @@ Every commit must pass:
 cd frontend
 npm run lint            # tsc -b --noEmit
 npm run build           # tsr generate + tsc + vite build
-npm run check:palette   # fails on default Tailwind palette classes in the current diff
 ```
 
 If any of these fails, the commit is not done.
 
-`check:palette` only looks at added lines in `git diff origin/main...HEAD`
-so pre-existing legacy usages (e.g. in `topics_.$topic.messages.tsx`)
-do not block you. To scan everything (e.g. after migrating a legacy
-route), run `bash frontend/scripts/check-palette.sh --all`.
+The default Tailwind palette is disabled in `@theme` (`--color-*: initial`),
+so default palette classes cannot slip in.
 
 ---
 
@@ -555,7 +552,6 @@ Copy this into the PR description and tick each box.
 - [ ] Works in dark mode
 - [ ] npm run lint passes
 - [ ] npm run build passes
-- [ ] npm run check:palette passes
 - [ ] npm run check:tokens passes
 - [ ] npm run check:routes passes
 - [ ] npm run check:dates passes
@@ -575,7 +571,7 @@ mutations, SCRAM rotate). Setup + scope: `frontend/e2e/README.md`.
 
 1. ❌ Hard-coded hex values, rgb(), or hsl() in component code.
 2. ❌ Default Tailwind palette classes (`bg-slate-*`, `text-gray-*`,
-   `border-zinc-*`) in new code.
+   `border-zinc-*`). They are disabled in `@theme` and generate no CSS.
 3. ❌ `max-w-6xl` on data-dense pages.
 4. ❌ Per-page cluster picker.
 5. ❌ Adding a dependency without discussion.

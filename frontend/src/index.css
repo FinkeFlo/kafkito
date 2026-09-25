@@ -4,6 +4,10 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
+  /* Disable Tailwind's default color palette (slate, gray, red, white, …):
+   * only the project tokens below generate color utilities. */
+  --color-*: initial;
+
   /* Surfaces */
   --color-bg:             oklch(0.985 0.003 247);
   --color-panel:          oklch(1     0     0  );

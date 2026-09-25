@@ -12,7 +12,6 @@
     "typecheck": "tsr generate && tsc -b --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check:palette": "bash scripts/check-palette.sh",
     "check:tokens": "bash scripts/check-tokens.sh",
     "check:routes": "bash scripts/check-route-orphans.sh",
     "check:dates": "bash scripts/check-date-format.sh",
