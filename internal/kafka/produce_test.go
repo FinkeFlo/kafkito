@@ -80,7 +80,7 @@ func TestDecodeProducePayload_EmptyVsText(t *testing.T) {
 	empty, err := decodeProducePayload("", "empty")
 	require.NoError(t, err)
 	require.NotNil(t, empty)
-	assert.Len(t, empty, 0)
+	assert.Empty(t, empty)
 }
 
 func TestBuildRecord_PayloadsAndPartition(t *testing.T) {
@@ -356,9 +356,9 @@ func TestRoundTrip_ZeroLengthValue(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NotNil(t, rec.Key, "zero-length key must not become nil (that changes partitioning)")
-	assert.Len(t, rec.Key, 0)
+	assert.Empty(t, rec.Key)
 	require.NotNil(t, rec.Value, "zero-length value must not become a tombstone")
-	assert.Len(t, rec.Value, 0)
+	assert.Empty(t, rec.Value)
 
 	// Contrast: the same payload sent as "text" is a deliberate tombstone.
 	tombstone, err := buildRecord("dst", ProduceRequest{Value: "", ValueEncoding: "text"})

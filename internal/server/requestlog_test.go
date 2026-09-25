@@ -232,7 +232,9 @@ func TestRequestLog_FlushPassesThrough(t *testing.T) {
 	r := testRouter(log)
 	r.Get("/api/stream", func(w http.ResponseWriter, _ *http.Request) {
 		f, ok := w.(http.Flusher)
-		require.True(t, ok, "wrapped writer must implement http.Flusher")
+		if !assert.True(t, ok, "wrapped writer must implement http.Flusher") {
+			return
+		}
 		w.Header().Set("Content-Type", "text/event-stream")
 		_, _ = w.Write([]byte("data: 1\n\n"))
 		f.Flush()

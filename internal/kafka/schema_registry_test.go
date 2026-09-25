@@ -5,7 +5,6 @@ package kafka
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -24,7 +23,7 @@ func TestSchemaRegistryClient_GuardedRefusesLoopbackDial(t *testing.T) {
 	err := c.do(context.Background(), http.MethodGet, "/subjects", nil, nil)
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, netguard.ErrBlockedAddress),
+	assert.ErrorIs(t, err, netguard.ErrBlockedAddress,
 		"expected ErrBlockedAddress, got: %v", err)
 }
 
@@ -99,7 +98,7 @@ func TestSchemaRegistryDo_RefusesBasicAuthOverPlaintextHTTP(t *testing.T) {
 	err := c.do(context.Background(), http.MethodGet, "/subjects", nil, nil)
 
 	require.Error(t, err, "credentials over http must be refused before sending")
-	assert.True(t, errors.Is(err, ErrInsecureSchemaRegistryAuth),
+	assert.ErrorIs(t, err, ErrInsecureSchemaRegistryAuth,
 		"want ErrInsecureSchemaRegistryAuth, got %v", err)
 }
 
@@ -148,7 +147,7 @@ func TestRegistry_SchemaRegistry_GuardednessFromNamePrefix(t *testing.T) {
 
 		err = client.do(context.Background(), http.MethodGet, "/subjects", nil, nil)
 		require.Error(t, err, "adhoc SR client must be guarded and block loopback dial")
-		assert.True(t, errors.Is(err, netguard.ErrBlockedAddress),
+		assert.ErrorIs(t, err, netguard.ErrBlockedAddress,
 			"expected ErrBlockedAddress, got: %v", err)
 	})
 }

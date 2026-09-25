@@ -149,7 +149,7 @@ func TestAuthModeDefaultsEmpty(t *testing.T) {
 
 	cfg, err := Load("")
 	require.NoError(t, err)
-	assert.Equal(t, "", cfg.Auth.Mode)
+	assert.Empty(t, cfg.Auth.Mode)
 }
 
 // TestClusterConfigJSONRoundTrip guards the json tags on ClusterConfig and its

@@ -161,11 +161,12 @@ func TestSRDecoderLookup_FetchDoesNotHoldLockForOtherIDs(t *testing.T) {
 		done <- err
 	}()
 
+	var err error
 	select {
-	case err := <-done:
-		assert.NoError(t, err, "id=2 lookup must complete while id=1 fetch is blocked")
+	case err = <-done:
 	case <-time.After(2 * time.Second):
 		t.Fatal("id=2 lookup blocked behind id=1 fetch — write lock is still held during the HTTP call")
 	}
 	close(release)
+	require.NoError(t, err, "id=2 lookup must complete while id=1 fetch is blocked")
 }

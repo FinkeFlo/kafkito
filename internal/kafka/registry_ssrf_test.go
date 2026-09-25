@@ -9,7 +9,6 @@ package kafka
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"testing"
 	"time"
@@ -53,7 +52,7 @@ func TestClientOpts_AdhocCluster_DialBlockedAddress(t *testing.T) {
 	err = cl.Ping(ctx)
 
 	require.Error(t, err, "Ping to a blocked address must fail")
-	assert.True(t, errors.Is(err, netguard.ErrBlockedAddress),
+	assert.ErrorIs(t, err, netguard.ErrBlockedAddress,
 		"expected ErrBlockedAddress for adhoc cluster dialing blocked broker, got: %v", err)
 }
 
@@ -82,7 +81,7 @@ func TestClientOpts_ConfiguredCluster_NoSSRFGuard(t *testing.T) {
 	err = cl.Ping(ctx)
 
 	require.Error(t, err, "Ping to a non-listening port must fail")
-	assert.False(t, errors.Is(err, netguard.ErrBlockedAddress),
+	assert.NotErrorIs(t, err, netguard.ErrBlockedAddress,
 		"configured cluster must NOT trigger ErrBlockedAddress, got: %v", err)
 }
 

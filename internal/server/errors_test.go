@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,6 +33,6 @@ func TestGatewayError_HidesDetailFromClientButLogsIt(t *testing.T) {
 	assert.Equal(t, "kafka_upstream", body["code"])
 	assert.NotContains(t, rec.Body.String(), "broker-internal-7.corp.local",
 		"internal hostname must not leak to the client")
-	assert.True(t, strings.Contains(buf.String(), "broker-internal-7.corp.local"),
+	assert.Contains(t, buf.String(), "broker-internal-7.corp.local",
 		"full error must be logged server-side")
 }

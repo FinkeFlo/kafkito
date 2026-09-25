@@ -90,8 +90,10 @@ func TestPrivateClusterMiddleware_StoresDecodedConfigInContext_WhenHeaderValid(t
 	var seen bool
 	next := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		got, ok := privateClusterFromContext(r.Context())
-		require.True(t, ok, "ctx must carry decoded config")
-		require.Len(t, got.Brokers, 1)
+		if !assert.True(t, ok, "ctx must carry decoded config") ||
+			!assert.Len(t, got.Brokers, 1) {
+			return
+		}
 		assert.Equal(t, "203.0.113.10:9092", got.Brokers[0])
 		seen = true
 	})
