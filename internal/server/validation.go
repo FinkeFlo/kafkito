@@ -53,6 +53,12 @@ func newRequestValidator(errs errorWriter) (func(http.Handler) http.Handler, err
 	if err != nil {
 		return nil, err
 	}
+	return newDocValidator(doc, errs), nil
+}
+
+// newDocValidator builds the request validator of newRequestValidator for
+// doc.
+func newDocValidator(doc *openapi3.T, errs errorWriter) func(http.Handler) http.Handler {
 	// The middleware clears Servers on the document it gets; hand it a
 	// shallow copy so the shared document stays untouched.
 	cp := *doc
@@ -72,7 +78,7 @@ func newRequestValidator(errs errorWriter) (func(http.Handler) http.Handler, err
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			validated.ServeHTTP(w, withCleanURLPath(r))
 		})
-	}, nil
+	}
 }
 
 // withCleanURLPath returns r with a cleaned URL path. chi's CleanPath only
@@ -244,6 +250,11 @@ func describeSchemaError(se *openapi3.SchemaError) (string, string) {
 		return jsonPointer(se.JSONPointer()), describeSchemaField(se)
 	}
 	ptr, detail := splitSchemaReason(se.Reason)
+	// A single missing property is reported at its own pointer, like the
+	// built-in validator does. The name comes from the schema's required list.
+	if name, ok := strings.CutPrefix(detail, "missing property '"); ok && strings.HasSuffix(name, "'") {
+		return strings.TrimSuffix(ptr, "/") + jsonPointer([]string{strings.TrimSuffix(name, "'")}), "is required"
+	}
 	return ptr, describeSchemaDetail(detail)
 }
 
@@ -356,7 +367,7 @@ func describeSchemaField(se *openapi3.SchemaError) string {
 	switch se.SchemaField {
 	case "type":
 		if s.Type != nil {
-			return "must be of type " + strings.Join(s.Type.Slice(), ", ")
+			return "must be of type " + strings.Join(s.Type.Slice(), " or ")
 		}
 	case "enum":
 		return "must be one of the allowed values"
