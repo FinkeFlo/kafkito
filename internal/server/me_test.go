@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/FinkeFlo/kafkito/internal/auth"
+	"github.com/FinkeFlo/kafkito/internal/config"
 	"github.com/FinkeFlo/kafkito/internal/server"
-	"github.com/FinkeFlo/kafkito/pkg/config"
 )
 
 type stubValidator struct{ p *auth.Principal }

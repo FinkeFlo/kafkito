@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/FinkeFlo/kafkito/pkg/netguard"
+	"github.com/FinkeFlo/kafkito/internal/netguard"
 )
 
 // stubResolver returns a fixed slice of IPs for any host, simulating a

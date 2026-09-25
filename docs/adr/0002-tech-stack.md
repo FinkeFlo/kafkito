@@ -74,3 +74,5 @@ kafkito is a single-binary Kafka management UI (see ADR-0001). We need a stack t
   Cloud Foundry, where logs are viewed via `cf logs`.
 - **RPC layer:** the Connect-RPC decision will be revisited in ADR-0005
   (upcoming).
+- **Go package layout:** application packages live under `internal/` (no
+  public Go API); `pkg/` is reserved for code intended for external import.

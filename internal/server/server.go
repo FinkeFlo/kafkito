@@ -16,10 +16,10 @@ import (
 
 	"github.com/FinkeFlo/kafkito/frontend"
 	"github.com/FinkeFlo/kafkito/internal/auth"
-	"github.com/FinkeFlo/kafkito/pkg/config"
-	kafkapkg "github.com/FinkeFlo/kafkito/pkg/kafka"
+	"github.com/FinkeFlo/kafkito/internal/config"
+	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
+	"github.com/FinkeFlo/kafkito/internal/rbac"
 	"github.com/FinkeFlo/kafkito/pkg/proto/kafkito/v1/kafkitov1connect"
-	"github.com/FinkeFlo/kafkito/pkg/rbac"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )

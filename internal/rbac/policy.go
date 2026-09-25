@@ -9,7 +9,7 @@ package rbac
 import (
 	"strings"
 
-	"github.com/FinkeFlo/kafkito/pkg/config"
+	"github.com/FinkeFlo/kafkito/internal/config"
 )
 
 // Canonical RBAC actions.

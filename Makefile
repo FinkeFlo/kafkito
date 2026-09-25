@@ -67,7 +67,7 @@ test:
 
 # Integration tests require Docker (Testcontainers-Go). Skipped otherwise.
 test-integration:
-	go test -race -count=1 -tags=integration -timeout=10m ./pkg/kafka/...
+	go test -race -count=1 -tags=integration -timeout=10m ./internal/kafka/...
 
 lint:
 	golangci-lint run

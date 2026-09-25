@@ -4,7 +4,7 @@
 import { MAX_DEPTH, MAX_PATHS, type PathTree } from "./path-tree";
 
 /** Cheap pre-check mirroring the backend's own `trimmed[0] == '<'` XML guard
- * (decodeBytes/looksXML in pkg/kafka/consumer.go) — used to filter sample
+ * (decodeBytes/looksXML in internal/kafka/consumer.go) — used to filter sample
  * values before attempting a full DOMParser parse. */
 export function looksLikeXml(value: string | undefined | null): boolean {
   return !!value && value.trimStart().startsWith("<");

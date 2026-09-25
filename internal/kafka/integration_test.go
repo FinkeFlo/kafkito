@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 	tckafka "github.com/testcontainers/testcontainers-go/modules/kafka"
 
-	"github.com/FinkeFlo/kafkito/pkg/config"
+	"github.com/FinkeFlo/kafkito/internal/config"
 )
 
 // startBroker boots a single-node Kafka (KRaft) container and returns the

@@ -10,7 +10,7 @@
 // module was introduced to fix. When you change the rules here, change them
 // there too (and vice versa).
 //
-// Background — what the consumer emits (pkg/kafka/consumer.go, decodeBytes):
+// Background — what the consumer emits (internal/kafka/consumer.go, decodeBytes):
 //   "null"   nil payload, rendered = ""            → faithful reproduction is nil
 //   "empty"  zero-length payload, rendered = ""    → must NOT become nil
 //   "text"   UTF-8, rendered = the exact string

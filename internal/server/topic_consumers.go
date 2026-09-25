@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"time"
 
-	kafkapkg "github.com/FinkeFlo/kafkito/pkg/kafka"
-	"github.com/FinkeFlo/kafkito/pkg/rbac"
+	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
+	"github.com/FinkeFlo/kafkito/internal/rbac"
 	"github.com/go-chi/chi/v5"
 )
 

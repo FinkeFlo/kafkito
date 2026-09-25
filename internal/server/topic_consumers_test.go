@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/FinkeFlo/kafkito/pkg/config"
-	kafkapkg "github.com/FinkeFlo/kafkito/pkg/kafka"
+	"github.com/FinkeFlo/kafkito/internal/config"
+	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 )
 
 // TestTopicConsumersUnknownClusterReturns404 ensures the route is mounted and

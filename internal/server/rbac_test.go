@@ -18,8 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/FinkeFlo/kafkito/internal/auth"
-	"github.com/FinkeFlo/kafkito/pkg/config"
-	"github.com/FinkeFlo/kafkito/pkg/rbac"
+	"github.com/FinkeFlo/kafkito/internal/config"
+	"github.com/FinkeFlo/kafkito/internal/rbac"
 )
 
 const (

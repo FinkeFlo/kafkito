@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/FinkeFlo/kafkito/pkg/config"
-	"github.com/FinkeFlo/kafkito/pkg/netguard"
+	"github.com/FinkeFlo/kafkito/internal/config"
+	"github.com/FinkeFlo/kafkito/internal/netguard"
 )
 
 func TestSchemaRegistryClient_GuardedRefusesLoopbackDial(t *testing.T) {

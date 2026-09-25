@@ -19,9 +19,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FinkeFlo/kafkito/pkg/config"
-	kafkapkg "github.com/FinkeFlo/kafkito/pkg/kafka"
-	"github.com/FinkeFlo/kafkito/pkg/rbac"
+	"github.com/FinkeFlo/kafkito/internal/config"
+	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
+	"github.com/FinkeFlo/kafkito/internal/rbac"
 	"github.com/go-chi/chi/v5"
 	"github.com/twmb/franz-go/pkg/kerr"
 )
@@ -744,7 +744,7 @@ func isClientProduceErr(msg string) bool {
 
 // isInvalidPartitionErr reports whether a produce failed because the requested
 // partition does not exist on the topic. franz-go raises this from the
-// partitioner (see pkg/kafka's explicitOrKeyPartitioner), so the wording comes
+// partitioner (see internal/kafka's explicitOrKeyPartitioner), so the wording comes
 // from kgo rather than kafkito.
 func isInvalidPartitionErr(msg string) bool {
 	return strings.Contains(msg, "invalid record partitioning choice")

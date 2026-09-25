@@ -21,9 +21,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/FinkeFlo/kafkito/pkg/config"
-	"github.com/FinkeFlo/kafkito/pkg/masking"
-	"github.com/FinkeFlo/kafkito/pkg/netguard"
+	"github.com/FinkeFlo/kafkito/internal/config"
+	"github.com/FinkeFlo/kafkito/internal/masking"
+	"github.com/FinkeFlo/kafkito/internal/netguard"
 	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
