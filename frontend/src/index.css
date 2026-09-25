@@ -128,10 +128,10 @@ html.dark {
   --color-tint-red-fg:    oklch(0.82  0.15  28);
   /* Dark scrim must be DARKER than dark `--color-panel` (L≈0.21) to be
    * visible under modals — otherwise the scrim composites lighter than
-   * the panel beneath it and disappears (E1#6 / E3#10). */
+   * the panel beneath it and disappears. */
   --color-overlay:        oklch(0.04 0.01 252 / 0.65);
   /* `--color-focus` and `--color-focus-on-accent` were `:root`-only
-   * before this change (E3#10). Re-declare for dark per § 2.4 of the
+   * before this change. Re-declare for dark per § 2.4 of the
    * design guidelines. Dark `--color-accent` at L=0.70 contrasts
    * ~6.5:1 against `--color-panel`, ~7.5:1 against `--color-bg`, and
    * ~5.7:1 against `--color-subtle`, so a single
@@ -177,7 +177,7 @@ body {
  *     stack `shadow-sm` / `shadow-xl` (cards, modals, toasts,
  *     tooltips) keep their elevation on focus.
  *
- * E1#1 (the headline 1.0:1 dark-mode primary button focus ring) is
+ * The 1.0:1 dark-mode primary button focus ring is
  * resolved at the *primitive* level: Phase 2's
  * `<Button variant="primary">` and `<Button variant="danger">` add an
  * explicit `focus-visible:outline-color: var(--color-focus-on-accent)`
@@ -186,12 +186,8 @@ body {
  * (`--color-bg`, `--color-panel`, `--color-subtle`, `--color-hover`)
  * in both modes — see the contrast report for measured ratios.
  *
- * NOTE for Phase 5 (`doc-reconciler`): § 4.4 line 197 of
- * `docs/DESIGN_GUIDELINES.md` says "Never use `outline` for visual
- * treatment. Use `ring-*` for focus only." That rule cannot coexist
- * with `overflow: hidden` ancestors (Tailwind `ring-*` is implemented
- * via `box-shadow` and would be clipped). Phase 5 needs to update the
- * guideline to permit `outline` for focus indicators. */
+ * `docs/DESIGN_GUIDELINES.md` § 4.4 documents this rule as the canonical
+ * focus indicator. */
 :where(button, a, [role="button"], input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;

@@ -31,7 +31,7 @@ const labelByVariant: Record<BadgeVariant, string> = {
 
 /**
  * Single source of truth for consumer-lag visualization.
- * Threshold logic (§3) lives here — never compare lag values directly in feature code.
+ * Threshold logic lives here — never compare lag values directly in feature code.
  */
 export function LagBadge({ value, className, showZero = true }: LagBadgeProps) {
   const fmt = useFormatters();

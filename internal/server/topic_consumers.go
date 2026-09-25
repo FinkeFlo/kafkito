@@ -15,7 +15,7 @@ import (
 )
 
 // listTopicConsumers returns the consumer groups currently reading from the
-// given topic. Bounded by a 5s upstream timeout per usability plan §2.
+// given topic. Bounded by a 5s upstream timeout.
 func (a *clusterAPI) listTopicConsumers(w http.ResponseWriter, r *http.Request) {
 	cluster := chi.URLParam(r, "cluster")
 	topic := chi.URLParam(r, "topic")

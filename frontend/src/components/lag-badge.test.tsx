@@ -16,7 +16,7 @@ function setup(props: Partial<ComponentProps<typeof LagBadge>> = {}) {
 // Intentionally NOT asserting on `aria-hidden="true"` for the glyph span:
 // that would couple tests to implementation detail of an a11y attribute the
 // user-perceivable behaviour (sr-only label text) already covers, which is a
-// docs/TEST_DISCIPLINE.md §1 Fragile Test smell. The sr-only label
+// Fragile Test smell. The sr-only label
 // assertions below are the load-bearing a11y contract.
 describe("LagBadge", () => {
   it("renders the unknown-lag sr-only label and visible em-dash when value is null (C1)", () => {

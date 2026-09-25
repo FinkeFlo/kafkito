@@ -3,8 +3,8 @@
 #
 # Verifies that every `var(--color-X)` reference in TSX/TS/CSS sources points
 # to a `--color-X` token actually declared in `frontend/src/index.css`. Catches
-# the bug class fixed in PLAN § 1.3b (`var(--color-on-accent)` typo —
-# the real token is `--color-accent-foreground`).
+# typos such as `var(--color-on-accent)` (the real token is
+# `--color-accent-foreground`).
 #
 # Algorithm:
 #
@@ -20,8 +20,8 @@
 #   3. Any referenced X not in the declared set → fail with location.
 #
 # Scope is `--color-*` only — other custom-property families (`--font-*`,
-# etc.) are out of scope for v1; the bug class we're guarding (PLAN § 1.3b)
-# is colour tokens. Extend the regex if needed later.
+# etc.) are out of scope for v1; the bug class we're guarding is colour
+# tokens. Extend the regex if needed later.
 #
 # Same triple-mode CLI as `check-palette.sh`:
 #   frontend/scripts/check-tokens.sh                # diff vs origin/main

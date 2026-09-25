@@ -6,8 +6,6 @@
  * e.g. "de-DE"). Omit it to keep the historical en-US output. React UI should
  * pull the active locale through `useFormatters()` so the user-menu toggle
  * (Auto · DE · EN) is honored everywhere.
- *
- * See: .github/instructions/frontend-styleguide.instructions.md §4.
  */
 
 const DEFAULT_LOCALE = "en-US";
@@ -258,8 +256,8 @@ export function formatRate(
 export type LagVariant = "neutral" | "warning" | "danger";
 
 /**
- * Map a lag value to its semantic variant. Single source of truth for thresholds
- * (see frontend-styleguide §3). Internal — UI must use <LagBadge> instead.
+ * Map a lag value to its semantic variant. Single source of truth for thresholds.
+ * Internal — UI must use <LagBadge> instead.
  *
  * @internal
  */

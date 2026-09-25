@@ -12,7 +12,7 @@ export interface TopicConsumerSummary {
  * return a map of `topic -> groups consuming it`.
  *
  * The shape is intentionally minimal — extend by adding fields here, never
- * inline derive at the component level (per usability.md §6).
+ * inline derive at the component level.
  *
  * Usage:
  *   const map = useMemo(() => aggregateConsumers(groupDetails), [groupDetails]);
@@ -49,7 +49,7 @@ export function aggregateConsumers(
 /**
  * Lightweight variant when only `GroupInfo` (without offsets) is available.
  * Cannot resolve per-topic lag; returns empty map.
- * Use only as placeholder until a richer endpoint is wired (see plan §2).
+ * Use only as placeholder until a richer endpoint is wired.
  */
 export function aggregateConsumersFromInfo(
   _groups: ReadonlyArray<GroupInfo>,
