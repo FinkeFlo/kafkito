@@ -21,7 +21,7 @@ GitHub Actions.
 ## Style
 
 - Backend: idiomatic Go 1.26, golangci-lint clean.
-- Frontend: Tailwind tokens from `@theme`, no default palette classes. See `docs/DESIGN_GUIDELINES.md`.
+- Frontend: Tailwind tokens from `@theme`; the default palette is disabled there. See `docs/DESIGN_GUIDELINES.md`.
 - UI strings and code comments are English only. No emojis in UI chrome, logs, or commit messages.
 
 ## Secret scanning

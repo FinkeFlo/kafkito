@@ -9,7 +9,7 @@ import {
 import { normalizeVersion } from "@/lib/whats-new";
 
 // Token-only badge styling. Refine per DESIGN_GUIDELINES if needed; keep
-// to @theme tokens (check:palette blocks default-palette classes).
+// to @theme tokens (the default palette is disabled in index.css).
 const BADGE: Record<ChangelogItemType, { label: string; cls: string }> = {
   feature: { label: "Feature", cls: "border border-border text-accent" },
   fix: { label: "Fix", cls: "border border-border text-muted" },
