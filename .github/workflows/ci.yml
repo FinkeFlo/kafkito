@@ -90,7 +90,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
-      - run: docker build --build-arg BUILD_TAGS="${{ matrix.build_tags }}" -t "kafkito:ci-${{ matrix.build_tags || 'default' }}" .
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          build-args: BUILD_TAGS=${{ matrix.build_tags }}
+          tags: kafkito:ci-${{ matrix.build_tags || 'default' }}
+          push: false
+          # One cache scope per variant so they don't evict each other.
+          cache-from: type=gha,scope=docker-${{ matrix.build_tags || 'default' }}
+          cache-to: type=gha,mode=max,scope=docker-${{ matrix.build_tags || 'default' }}
 
   dco:
     if: github.event_name == 'pull_request'
