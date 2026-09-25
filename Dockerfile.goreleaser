@@ -1,0 +1,14 @@
+# syntax=docker/dockerfile:1.7
+#
+# Release image used by goreleaser (dockers_v2 in .goreleaser.yaml). It only
+# packages the prebuilt, statically linked binary; goreleaser places it at
+# $TARGETPLATFORM/kafkito in the build context. For local builds from source
+# use the multi-stage Dockerfile instead (make docker-build).
+FROM gcr.io/distroless/static-debian12:nonroot
+ARG TARGETPLATFORM
+WORKDIR /
+COPY $TARGETPLATFORM/kafkito /kafkito
+USER nonroot:nonroot
+EXPOSE 37421
+ENV PORT=37421
+ENTRYPOINT ["/kafkito"]
