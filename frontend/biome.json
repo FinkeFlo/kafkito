@@ -27,8 +27,8 @@
     "rules": {
       "recommended": true,
       "correctness": {
-        "noUnusedVariables": "off",
-        "noUnusedImports": "off"
+        "noUnusedVariables": "error",
+        "noUnusedImports": "error"
       },
       "suspicious": {
         "noExplicitAny": "off",
