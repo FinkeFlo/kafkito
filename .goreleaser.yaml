@@ -1,0 +1,159 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+#
+# Release pipeline for kafkito, run by .github/workflows/release.yml on a
+# pushed v* tag (after the changelog release gate). Local dry run:
+# `make release-snapshot` (see CONTRIBUTING.md "Releasing").
+version: 2
+
+project_name: kafkito
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-SNAPSHOT-{{ .ShortCommit }}"
+
+before:
+  hooks:
+    # Build the SPA once; every Go build below embeds frontend/dist.
+    - sh -c "cd frontend && bun install --frozen-lockfile && bun run build"
+
+builds:
+  # Default distribution: binaries + archives + the plain image variant.
+  - id: default
+    main: ./cmd/kafkito
+    binary: kafkito
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ignore:
+      # Parity with the previous release matrix.
+      - goos: windows
+        goarch: arm64
+    flags: [-trimpath]
+    # main.version keeps the tag form (v1.2.3) the app has always reported;
+    # the frontend normalizes it via normalizeVersion(). Equal to {{ .Tag }}
+    # on releases, and a v-prefixed snapshot version in snapshot builds.
+    ldflags: ["-s -w -X main.version=v{{ .Version }}"]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+  # SAP BTP / XSUAA build (ADR-0004). Image only.
+  - id: btp
+    main: ./cmd/kafkito
+    binary: kafkito
+    env: [CGO_ENABLED=0]
+    tags: [btp]
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w -X main.version=v{{ .Version }}"]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+  # Local/dev build with auth disabled by default ("-local" image). Image only.
+  - id: devauth
+    main: ./cmd/kafkito
+    binary: kafkito
+    env: [CGO_ENABLED=0]
+    tags: [devauth]
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w -X main.version=v{{ .Version }}"]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: default
+    ids: [default]
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - NOTICE
+      - README.md
+
+checksum:
+  name_template: SHA256SUMS
+  algorithm: sha256
+
+# SPDX SBOM per archive (requires syft on PATH).
+sboms:
+  - artifacts: archive
+
+dockers_v2:
+  - id: default
+    ids: [default]
+    dockerfile: Dockerfile.goreleaser
+    images: [ghcr.io/finkeflo/kafkito]
+    tags:
+      - "v{{ .Version }}"
+      - "{{ if not .IsSnapshot }}latest{{ end }}"
+    platforms: [linux/amd64, linux/arm64]
+    labels: &oci_labels
+      org.opencontainers.image.title: kafkito
+      org.opencontainers.image.description: Web UI for managing and observing Apache Kafka clusters
+      org.opencontainers.image.source: https://github.com/finkeflo/kafkito
+      org.opencontainers.image.url: https://github.com/finkeflo/kafkito
+      org.opencontainers.image.version: "v{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.created: "{{ .Date }}"
+      org.opencontainers.image.licenses: Apache-2.0
+    annotations: *oci_labels
+
+  - id: btp
+    ids: [btp]
+    dockerfile: Dockerfile.goreleaser
+    images: [ghcr.io/finkeflo/kafkito]
+    tags:
+      - "v{{ .Version }}-btp"
+      - "{{ if not .IsSnapshot }}latest-btp{{ end }}"
+    platforms: [linux/amd64, linux/arm64]
+    labels: *oci_labels
+    annotations: *oci_labels
+
+  - id: devauth
+    ids: [devauth]
+    dockerfile: Dockerfile.goreleaser
+    images: [ghcr.io/finkeflo/kafkito]
+    tags:
+      - "v{{ .Version }}-local"
+      - "{{ if not .IsSnapshot }}latest-local{{ end }}"
+    platforms: [linux/amd64, linux/arm64]
+    labels: *oci_labels
+    annotations: *oci_labels
+
+changelog:
+  # Built from local git history (no API calls), grouped by Conventional
+  # Commit type. Groups are matched in the order listed and rendered by
+  # `order`, so fix(security) lands in Security, not Bug Fixes.
+  use: git
+  sort: asc
+  abbrev: 7
+  filters:
+    exclude:
+      - '^docs\(changelog\)'
+      - '^(chore|ci|test|style)(\([^)]*\))?!?:'
+      - '^Merge (pull request|branch|remote-tracking branch)'
+  groups:
+    - title: Security
+      regexp: '^(security(\([^)]*\))?|[a-z]+\(security\))!?:'
+      order: 2
+    - title: Features
+      regexp: '^feat(\([^)]*\))?!?:'
+      order: 0
+    - title: Bug Fixes
+      regexp: '^fix(\([^)]*\))?!?:'
+      order: 1
+    - title: Dependencies
+      regexp: '^(deps|build\(deps\))(\([^)]*\))?!?:'
+      order: 4
+    - title: Others
+      order: 3
+
+release:
+  github:
+    owner: finkeflo
+    name: kafkito
+  draft: false
+  prerelease: auto
+  header: |
+    Curated highlights for this release are shown in the app under "What's new".
