@@ -49,18 +49,17 @@ func (e *paramError) Error() string { return e.msg }
 
 func badParam(msg string) *paramError { return &paramError{status: http.StatusBadRequest, msg: msg} }
 
-// writeParamError writes err as a JSON error response and returns true so the
-// caller can return immediately. A *paramError keeps its specific status and
-// message; any other error is reported as a generic 400 so a malformed request
-// can never fall through into handler logic with partially-parsed options.
-func writeParamError(w http.ResponseWriter, err error) bool {
+// writeParamError writes err as a JSON error response; the caller must return
+// right after. A *paramError keeps its specific status and message; any other
+// error is reported as a generic 400 so a malformed request can never fall
+// through into handler logic with partially-parsed options.
+func writeParamError(w http.ResponseWriter, err error) {
 	var pe *paramError
 	if errors.As(err, &pe) {
 		writeJSON(w, pe.status, map[string]string{"error": pe.msg})
-		return true
+		return
 	}
 	writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request parameters"})
-	return true
 }
 
 // parseConsumeQuery maps URL query to ConsumeOptions.

@@ -16,7 +16,7 @@ func TestMessageTimelineWithAdmin_SlotsSinglePartition(t *testing.T) {
 	t.Parallel()
 
 	adm := &fakeMessageCountAdmin{
-		md: testTopicMetadata("orders", 0),
+		md: testTopicMetadata(0),
 		starts: kadm.ListedOffsets{
 			"orders": {0: {Topic: "orders", Partition: 0, Offset: 0}},
 		},
@@ -54,7 +54,7 @@ func TestMessageTimelineWithAdmin_SumsAcrossPartitions(t *testing.T) {
 	t.Parallel()
 
 	adm := &fakeMessageCountAdmin{
-		md: testTopicMetadata("orders", 0, 1),
+		md: testTopicMetadata(0, 1),
 		starts: kadm.ListedOffsets{
 			"orders": {
 				0: {Topic: "orders", Partition: 0, Offset: 0},
@@ -98,7 +98,7 @@ func TestMessageTimelineWithAdmin_MissingEdgeOffsetFallsBackToEndOffset(t *testi
 	// entry for that partition; the slot should fall back to the end
 	// offset (nothing produced after the last slot).
 	adm := &fakeMessageCountAdmin{
-		md: testTopicMetadata("orders", 0),
+		md: testTopicMetadata(0),
 		starts: kadm.ListedOffsets{
 			"orders": {0: {Topic: "orders", Partition: 0, Offset: 0}},
 		},
@@ -128,7 +128,7 @@ func TestMessageTimelineWithAdmin_MissingEdgeOffsetFallsBackToEndOffset(t *testi
 func TestMessageTimelineWithAdmin_RejectsInvalidRange(t *testing.T) {
 	t.Parallel()
 
-	adm := &fakeMessageCountAdmin{md: testTopicMetadata("orders", 0)}
+	adm := &fakeMessageCountAdmin{md: testTopicMetadata(0)}
 
 	_, err := messageTimelineWithAdmin(context.Background(), adm, "c1", "orders", MessageTimelineOptions{
 		FromTSMs: 100,
@@ -142,7 +142,7 @@ func TestMessageTimelineWithAdmin_RejectsInvalidRange(t *testing.T) {
 func TestMessageTimelineWithAdmin_RejectsTooManySlots(t *testing.T) {
 	t.Parallel()
 
-	adm := &fakeMessageCountAdmin{md: testTopicMetadata("orders", 0)}
+	adm := &fakeMessageCountAdmin{md: testTopicMetadata(0)}
 
 	_, err := messageTimelineWithAdmin(context.Background(), adm, "c1", "orders", MessageTimelineOptions{
 		FromTSMs: 0,
@@ -156,7 +156,7 @@ func TestMessageTimelineWithAdmin_RejectsTooManySlots(t *testing.T) {
 func TestMessageTimelineWithAdmin_RequestedPartitionMustExist(t *testing.T) {
 	t.Parallel()
 
-	adm := &fakeMessageCountAdmin{md: testTopicMetadata("orders", 0)}
+	adm := &fakeMessageCountAdmin{md: testTopicMetadata(0)}
 
 	_, err := messageTimelineWithAdmin(context.Background(), adm, "c1", "orders", MessageTimelineOptions{
 		Partition: 3,
