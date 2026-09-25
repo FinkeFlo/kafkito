@@ -1640,6 +1640,7 @@ export interface components {
         /** @description Invalid request (parameters, body, or private-cluster header). */
         BadRequest: {
             headers: {
+                "X-Request-Id": components["headers"]["RequestId"];
                 [name: string]: unknown;
             };
             content: {
@@ -1649,6 +1650,7 @@ export interface components {
         /** @description Missing or invalid bearer token. */
         Unauthorized: {
             headers: {
+                "X-Request-Id": components["headers"]["RequestId"];
                 /** @description Always `Bearer realm="kafkito"`. */
                 "WWW-Authenticate"?: string;
                 [name: string]: unknown;
@@ -1660,6 +1662,7 @@ export interface components {
         /** @description RBAC denied the action (`error: forbidden` plus `resource` and `action`, or `code: rbac_denied`), or the broker rejected the credential's ACLs (`code: kafka_not_authorized`). */
         Forbidden: {
             headers: {
+                "X-Request-Id": components["headers"]["RequestId"];
                 [name: string]: unknown;
             };
             content: {
@@ -1669,6 +1672,7 @@ export interface components {
         /** @description Unknown cluster, topic, or Schema Registry not configured. */
         NotFound: {
             headers: {
+                "X-Request-Id": components["headers"]["RequestId"];
                 [name: string]: unknown;
             };
             content: {
@@ -1678,6 +1682,7 @@ export interface components {
         /** @description Request body or record value exceeds the server-side limit. */
         PayloadTooLarge: {
             headers: {
+                "X-Request-Id": components["headers"]["RequestId"];
                 [name: string]: unknown;
             };
             content: {
@@ -1687,6 +1692,7 @@ export interface components {
         /** @description Cluster is marked `is_prod` and the `X-Kafkito-Confirm-Prod: true` header is missing (`code: production_confirmation_required`). */
         ProdConfirmationRequired: {
             headers: {
+                "X-Request-Id": components["headers"]["RequestId"];
                 [name: string]: unknown;
             };
             content: {
@@ -1696,6 +1702,7 @@ export interface components {
         /** @description Upstream Kafka / Schema Registry error. Details are logged server-side only (`code: kafka_upstream`). */
         BadGateway: {
             headers: {
+                "X-Request-Id": components["headers"]["RequestId"];
                 [name: string]: unknown;
             };
             content: {
@@ -1721,7 +1728,10 @@ export interface components {
         ToTsMsQuery: number;
     };
     requestBodies: never;
-    headers: never;
+    headers: {
+        /** @description Request correlation id, set on every response. Reuses the inbound `X-Vcap-Request-Id`, the trace-id of a W3C `traceparent` or an inbound `X-Request-Id` when present (in that order), otherwise freshly generated. Matches the `request_id` field in the server logs. */
+        RequestId: string;
+    };
     pathItems: never;
 }
 export type $defs = Record<string, never>;
@@ -1738,6 +1748,7 @@ export interface operations {
             /** @description Service is alive. */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1758,6 +1769,7 @@ export interface operations {
             /** @description All clusters reachable, or no clusters configured. */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1767,6 +1779,7 @@ export interface operations {
             /** @description At least one configured cluster is unreachable. */
             503: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1787,6 +1800,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1808,6 +1822,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1829,6 +1844,7 @@ export interface operations {
             /** @description The raw OpenAPI 3.1 document. */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1850,6 +1866,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1878,6 +1895,7 @@ export interface operations {
             /** @description Probe finished (see `reachable`). */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1906,6 +1924,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1936,6 +1955,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1966,6 +1986,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1997,6 +2018,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2032,6 +2054,7 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2064,6 +2087,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2098,6 +2122,7 @@ export interface operations {
             /** @description Deleted */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2131,6 +2156,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2145,6 +2171,7 @@ export interface operations {
             /** @description Listing consumers timed out (`code: topic_consumers_timeout`). */
             504: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2176,6 +2203,7 @@ export interface operations {
             /** @description Per-entry results. */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2214,6 +2242,7 @@ export interface operations {
             /** @description Per-partition results. */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2264,6 +2293,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2304,6 +2334,7 @@ export interface operations {
             /** @description Produced */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2345,6 +2376,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2386,6 +2418,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2420,6 +2453,7 @@ export interface operations {
             /** @description Raw value bytes. */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     /** @description `attachment; filename="<topic>-p<partition>-o<offset>.<ext>"` */
                     "Content-Disposition"?: string;
                     [name: string]: unknown;
@@ -2462,6 +2496,7 @@ export interface operations {
             /** @description Sample fetched. */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2498,6 +2533,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2545,6 +2581,7 @@ export interface operations {
              */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2561,6 +2598,7 @@ export interface operations {
             /** @description Invalid body, missing `dest_topic`, both or neither destination field set, destination equal to the source cluster+topic (the copy would never terminate), unknown `dest_cluster`, `dest_topic` does not exist on the destination (the destination is never auto-created), or `preserve_partition` with too few partitions on the destination topic. */
             400: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2573,6 +2611,7 @@ export interface operations {
             /** @description Too many concurrent copy jobs server-wide (limit 4). The body carries `code: copy_concurrency_limit`. Copies are long-running and each holds broker connections, so the server sheds load rather than queueing. */
             429: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     /** @description Seconds to wait before retrying. */
                     "Retry-After"?: number;
                     [name: string]: unknown;
@@ -2602,6 +2641,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2637,6 +2677,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2650,6 +2691,7 @@ export interface operations {
             /** @description Group already exists. */
             409: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2678,6 +2720,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2710,6 +2753,7 @@ export interface operations {
             /** @description Deleted */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2748,6 +2792,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2780,6 +2825,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2815,6 +2861,7 @@ export interface operations {
             /** @description Deleted */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2847,6 +2894,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2883,6 +2931,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2917,6 +2966,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2948,6 +2998,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2983,6 +3034,7 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -3018,6 +3070,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -3049,6 +3102,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -3084,6 +3138,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -3119,6 +3174,7 @@ export interface operations {
             /** @description Deleted */
             200: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
                 content: {
