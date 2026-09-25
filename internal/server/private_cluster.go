@@ -14,6 +14,7 @@ import (
 
 	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
+	"github.com/FinkeFlo/kafkito/internal/netguard"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -89,7 +90,7 @@ func validatePrivateClusterConfig(cfg config.ClusterConfig) error {
 		if strings.TrimSpace(b) == "" {
 			return errors.New("broker address must not be empty")
 		}
-		if err := validateOutboundHost(strings.TrimSpace(b)); err != nil {
+		if err := netguard.ValidateHost(strings.TrimSpace(b)); err != nil {
 			return fmt.Errorf("broker %q: %w", b, err)
 		}
 	}
@@ -104,7 +105,7 @@ func validatePrivateClusterConfig(cfg config.ClusterConfig) error {
 		return fmt.Errorf("auth.type %q not supported", cfg.Auth.Type)
 	}
 	if u := strings.TrimSpace(cfg.SchemaRegistry.URL); u != "" {
-		if err := validateOutboundURL(u); err != nil {
+		if err := netguard.ValidateURL(u); err != nil {
 			return fmt.Errorf("schema_registry.url: %w", err)
 		}
 	}

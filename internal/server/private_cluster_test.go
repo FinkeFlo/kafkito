@@ -246,3 +246,33 @@ func TestConfigValidateRejectsReservedNames(t *testing.T) {
 		})
 	}
 }
+
+func TestValidatePrivateClusterConfig_BlocksSSRFSchemaRegistry(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.ClusterConfig{
+		Brokers: []string{"203.0.113.10:9092"},
+		Auth:    config.AuthConfig{Type: "none"},
+		SchemaRegistry: config.SchemaRegistryConfig{
+			URL: "http://169.254.169.254/latest/meta-data/",
+		},
+	}
+
+	err := validatePrivateClusterConfig(cfg)
+
+	assert.Error(t, err, "SR URL pointing at the metadata endpoint must be rejected")
+}
+
+func TestValidatePrivateClusterConfig_BlocksSSRFBroker(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.ClusterConfig{
+		Brokers: []string{"203.0.113.10:9092", "127.0.0.1:9092"},
+		Auth:    config.AuthConfig{Type: "none"},
+	}
+
+	err := validatePrivateClusterConfig(cfg)
+
+	require.Error(t, err, "a loopback broker must be rejected even after a valid one")
+	assert.Contains(t, err.Error(), `broker "127.0.0.1:9092"`)
+}
