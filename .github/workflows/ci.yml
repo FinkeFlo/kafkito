@@ -100,6 +100,16 @@ jobs:
           cache-from: type=gha,scope=docker-${{ matrix.build_tags || 'default' }}
           cache-to: type=gha,mode=max,scope=docker-${{ matrix.build_tags || 'default' }}
 
+  # Lints the workflows and the local setup action (`make actionlint`).
+  actionlint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          go: "true"
+      - run: make actionlint
+
   dco:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
