@@ -104,6 +104,7 @@ func TestConfigLogValue_EmitsStructuralStartupSummary(t *testing.T) {
 			Roles:       []RoleConfig{{Name: "admin"}, {Name: "viewer"}, {Name: "ops"}},
 			Subjects:    []SubjectConfig{{User: "alice"}},
 		},
+		Log: LogConfig{Level: "debug", Format: "text"},
 	}
 
 	got := logToJSONAttrs(t, "config", cfg)
@@ -114,4 +115,6 @@ func TestConfigLogValue_EmitsStructuralStartupSummary(t *testing.T) {
 	assert.Contains(t, got, `"rbac_default_role":"viewer"`, "got=%s", got)
 	assert.Contains(t, got, `"rbac_roles":3`, "got=%s", got)
 	assert.Contains(t, got, `"rbac_subjects":1`, "got=%s", got)
+	assert.Contains(t, got, `"log_level":"debug"`, "got=%s", got)
+	assert.Contains(t, got, `"log_format":"text"`, "got=%s", got)
 }

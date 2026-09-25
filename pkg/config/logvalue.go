@@ -7,6 +7,7 @@ package config
 
 import (
 	"log/slog"
+	"strings"
 )
 
 // LogValue implements slog.LogValuer so that AuthConfig is always logged
@@ -62,5 +63,7 @@ func (c Config) LogValue() slog.Value {
 		slog.String("rbac_default_role", c.RBAC.DefaultRole),
 		slog.Int("rbac_roles", len(c.RBAC.Roles)),
 		slog.Int("rbac_subjects", len(c.RBAC.Subjects)),
+		slog.String("log_level", strings.ToLower(c.Log.SlogLevel().String())),
+		slog.String("log_format", c.Log.FormatName()),
 	)
 }
