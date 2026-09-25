@@ -19,7 +19,6 @@ import (
 	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/FinkeFlo/kafkito/internal/rbac"
-	"github.com/FinkeFlo/kafkito/pkg/proto/kafkito/v1/kafkitov1connect"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -31,7 +30,7 @@ type Options struct {
 	Registry *kafkapkg.Registry // may be nil (no kafka configured)
 	Config   config.Config
 	// Auth validates incoming bearer tokens and injects auth.Principal into
-	// the request context for /api/v1/* and /rpc/* routes. nil disables the
+	// the request context for /api/v1/* routes. nil disables the
 	// auth middleware (used by tests).
 	Auth auth.Validator
 }
@@ -79,15 +78,6 @@ func New(opts Options) http.Handler {
 		api.MethodNotAllowed(apiMethodNotAllowed)
 	})
 
-	// Connect-RPC surface, parallel to REST. Mounted under /rpc to keep
-	// procedure paths (/rpc/kafkito.v1.InfoService/GetInfo) clearly separated.
-	connectPath, connectHandler := kafkitov1connect.NewInfoServiceHandler(newInfoConnectHandler(opts.Version))
-	if opts.Auth != nil {
-		r.With(auth.MiddlewareFor(opts.Auth), capturePrincipal).Mount("/rpc"+connectPath, http.StripPrefix("/rpc", connectHandler))
-	} else {
-		r.Mount("/rpc"+connectPath, http.StripPrefix("/rpc", connectHandler))
-	}
-
 	mountUserAPIStub(r)
 
 	spa, err := frontend.Handler()
@@ -131,6 +121,8 @@ func isBackendPrefix(p string) bool {
 	switch {
 	case strings.HasPrefix(p, "/api/"), p == "/api":
 		return true
+	// /rpc hosted the removed Connect-RPC surface (ADR-0005). Kept reserved so
+	// stale clients get a JSON 404 instead of the SPA shell.
 	case strings.HasPrefix(p, "/rpc/"), p == "/rpc":
 		return true
 	case strings.HasPrefix(p, "/user-api/"), p == "/user-api":

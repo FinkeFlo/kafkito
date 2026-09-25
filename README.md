@@ -68,8 +68,8 @@ make dev              # Compose + backend (air) + frontend (Vite), one command
 ```
 
 Open the Vite URL printed in the `[frontend]` stream
-(default `http://localhost:37422`). Backend changes under `cmd/`,
-`internal/`, or `pkg/` rebuild automatically; frontend changes hot-reload
+(default `http://localhost:37422`). Backend changes under `cmd/` or
+`internal/` rebuild automatically; frontend changes hot-reload
 through Vite. Press Ctrl-C in the `make dev` terminal to stop both
 processes (the Compose stack stays up — tear it down with `make dev-down`).
 
@@ -115,7 +115,7 @@ cf set-env <app> KAFKITO_LOG_LEVEL=debug && cf restart <app>
 
 | Layer | Tech |
 |---|---|
-| Backend | Go 1.26 · Chi · Connect-RPC (`buf`) · `twmb/franz-go` + `kadm` + `sr` · `dop251/goja` · `knadh/koanf` · `log/slog` |
+| Backend | Go 1.26 · Chi · OpenAPI 3.1 · `twmb/franz-go` + `kadm` + `sr` · `dop251/goja` · `knadh/koanf` · `log/slog` |
 | Frontend | React 19 · Vite · TanStack Router · shadcn/ui · Tailwind · Bun |
 | Distribution | Single Go binary (`//go:embed`-ed SPA) · distroless multi-arch Docker image |
 

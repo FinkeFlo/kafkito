@@ -24,7 +24,6 @@ export default defineConfig({
     port: FRONTEND_PORT,
     proxy: {
       "/api":      BACKEND_URL,
-      "/rpc":      BACKEND_URL,
       "/user-api": BACKEND_URL,
     },
   },

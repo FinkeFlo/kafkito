@@ -13,14 +13,12 @@ env_files = [".env.dev"]
 [build]
   cmd = "go build -tags devauth -o ./tmp/kafkito ./cmd/kafkito"
   entrypoint = ["./tmp/kafkito"]
-  include_dir = ["cmd", "internal", "pkg"]
+  include_dir = ["cmd", "internal"]
   include_ext = ["go"]
   exclude_dir = ["frontend", "bin", "tmp", "dist", "node_modules", ".git", "deploy", "examples", "docs", ".worktrees"]
   exclude_regex = [
     "_test\\.go$",
     ".*_mock\\.go$",
-    ".*\\.pb\\.go$",
-    ".*\\.connect\\.go$",
   ]
   exclude_unchanged = true
   kill_delay = "500ms"

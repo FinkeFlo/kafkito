@@ -3,7 +3,6 @@ module github.com/FinkeFlo/kafkito
 go 1.26.0
 
 require (
-	connectrpc.com/connect v1.21.0
 	github.com/antchfx/xmlquery v1.5.1
 	github.com/antchfx/xpath v1.3.8
 	github.com/dop251/goja v0.0.0-20260719185829-0fc1d42c1dc9
@@ -23,7 +22,6 @@ require (
 	github.com/twmb/franz-go/pkg/kadm v1.18.0
 	github.com/twmb/franz-go/pkg/kmsg v1.13.1
 	golang.org/x/sync v0.23.0
-	google.golang.org/protobuf v1.36.12
 )
 
 require (

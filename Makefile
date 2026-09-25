@@ -1,4 +1,4 @@
-.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev frontend-check check proto proto-lint e2e e2e-up e2e-test e2e-down e2e-clean help
+.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev frontend-check check e2e e2e-up e2e-test e2e-down e2e-clean help
 
 BIN := bin/kafkito
 PKG := ./...
@@ -9,7 +9,7 @@ AIR_VERSION ?= v1.65.1
 
 help:
 	@echo "Targets:"
-	@echo "  check              - canonical local gate: test lint proto-lint frontend-check"
+	@echo "  check              - canonical local gate: test lint frontend-check"
 	@echo "  build              - build frontend then Go binary into $(BIN)"
 	@echo "  build-go           - build only the Go binary (skip frontend)"
 	@echo "  run                - build and run the binary"
@@ -21,8 +21,6 @@ help:
 	@echo "  test-integration   - integration tests (requires Docker)"
 	@echo "  lint               - golangci-lint run"
 	@echo "  tidy               - go mod tidy"
-	@echo "  proto              - buf generate"
-	@echo "  proto-lint         - buf lint (skipped if buf is not installed)"
 	@echo "  frontend-install   - bun install in frontend/"
 	@echo "  frontend-build     - bun run build in frontend/"
 	@echo "  frontend-dev       - bun run dev in frontend/"
@@ -45,7 +43,7 @@ frontend-check:
 	cd frontend && bun run lint && bun run build && bun run test
 
 # Canonical local gate. Run before opening a PR.
-check: test lint proto-lint frontend-check
+check: test lint frontend-check
 
 build: frontend-build
 	mkdir -p bin
@@ -168,16 +166,6 @@ e2e-clean:
 	@rm -f $(E2E_PID) $(E2E_LOG)
 	@echo "e2e: cleaned port $(E2E_PORT) and stale state"
 
-
-proto:
-	buf generate
-
-proto-lint:
-	@if command -v buf >/dev/null 2>&1; then \
-		buf lint; \
-	else \
-		echo "proto-lint: buf not found on PATH, skipping"; \
-	fi
 
 # --- Dev iteration loop -------------------------------------------------
 # `worktree-init` writes a per-worktree .env.dev with a free port pair.
