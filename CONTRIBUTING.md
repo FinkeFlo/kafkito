@@ -14,8 +14,10 @@ GitHub Actions.
 1. Fork, branch, code.
 2. `make check` — runs Go tests, golangci-lint and all frontend checks. Requires
    Go, Bun and golangci-lint on your PATH.
-3. Open a PR with a clear description and a Test plan.
-4. Sign off your commits (`-s`).
+3. Changing the HTTP API? Edit `api/openapi.yaml` (the contract, see ADR-0005)
+   and run `make api-generate` to refresh the generated frontend types.
+4. Open a PR with a clear description and a Test plan.
+5. Sign off your commits (`-s`).
 
 ## Style
 

@@ -1,4 +1,4 @@
-.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev frontend-check check e2e e2e-up e2e-test e2e-down e2e-clean help
+.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev frontend-check api-generate api-lint api-check check e2e e2e-up e2e-test e2e-down e2e-clean help
 
 BIN := bin/kafkito
 PKG := ./...
@@ -9,7 +9,7 @@ AIR_VERSION ?= v1.65.1
 
 help:
 	@echo "Targets:"
-	@echo "  check              - canonical local gate: test lint frontend-check"
+	@echo "  check              - canonical local gate: test lint api-check frontend-check"
 	@echo "  build              - build frontend then Go binary into $(BIN)"
 	@echo "  build-go           - build only the Go binary (skip frontend)"
 	@echo "  run                - build and run the binary"
@@ -25,6 +25,9 @@ help:
 	@echo "  frontend-build     - bun run build in frontend/"
 	@echo "  frontend-dev       - bun run dev in frontend/"
 	@echo "  frontend-check     - frontend lint, build and tests (as in CI)"
+	@echo "  api-generate       - regenerate frontend/src/lib/api.gen.ts from api/openapi.yaml"
+	@echo "  api-lint           - lint api/openapi.yaml with Redocly"
+	@echo "  api-check          - api-lint + fail if api.gen.ts is out of date"
 	@echo "  docker-build       - docker build -t $(IMAGE)"
 	@echo "  compose-up/down    - docker compose lifecycle"
 	@echo "  e2e                - opt-in Playwright walks against a local fixture stack"
@@ -42,8 +45,21 @@ frontend-dev:
 frontend-check:
 	cd frontend && bun run lint && bun run build && bun run test
 
+# api/openapi.yaml is the HTTP contract (ADR-0005). Keep REDOCLY_VERSION in
+# sync with the frontend job in .github/workflows/ci.yml.
+REDOCLY_VERSION ?= 2.54.3
+
+api-generate:
+	cd frontend && bun run api:generate
+
+api-lint:
+	bunx @redocly/cli@$(REDOCLY_VERSION) lint api/openapi.yaml
+
+api-check: api-lint api-generate
+	git diff --exit-code -- frontend/src/lib/api.gen.ts
+
 # Canonical local gate. Run before opening a PR.
-check: test lint frontend-check
+check: test lint api-check frontend-check
 
 build: frontend-build
 	mkdir -p bin
