@@ -13,10 +13,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup
+        with:
+          frontend-deps: "true"
       - name: Check changelog entry for ${{ github.ref_name }}
         run: make release-check VERSION=${{ github.ref_name }}
 
@@ -33,13 +32,12 @@ jobs:
         with:
           # Full history and tags for the changelog and version detection.
           fetch-depth: 0
-      - uses: actions/setup-go@v7
+      # No frontend-deps: the goreleaser before-hook installs and builds the
+      # frontend itself.
+      - uses: ./.github/actions/setup
         with:
-          # Minor line from go.mod; resolves to the latest patch release, like
-          # the golang:1.26-alpine image in the Dockerfile. go-version-file would
-          # pin the exact go.mod minimum (1.26.0) and miss security patches.
-          go-version: "1.26"
-      - uses: oven-sh/setup-bun@v2
+          go: "true"
+          bun: "true"
       - uses: anchore/sbom-action/download-syft@v0
       - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4

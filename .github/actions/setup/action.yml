@@ -1,0 +1,45 @@
+name: Setup toolchain
+description: >-
+  Sets up Go and/or Bun (and optionally the frontend dependencies) with caching.
+  Run after actions/checkout.
+
+inputs:
+  go:
+    description: Set up Go (with module and build cache).
+    required: false
+    default: "false"
+  bun:
+    description: Set up Bun.
+    required: false
+    default: "false"
+  frontend-deps:
+    description: Run `bun install --frozen-lockfile` in frontend/ with a cached Bun install cache. Implies bun.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - if: inputs.go == 'true'
+      uses: actions/setup-go@v7
+      with:
+        # Minor line from go.mod; resolves to the latest patch release, like
+        # the golang:1.26-alpine image in the Dockerfile. go-version-file would
+        # pin the exact go.mod minimum (1.26.0) and miss security patches.
+        go-version: "1.26"
+
+    - if: inputs.bun == 'true' || inputs.frontend-deps == 'true'
+      uses: oven-sh/setup-bun@v2
+
+    - if: inputs.frontend-deps == 'true'
+      uses: actions/cache@v6
+      with:
+        path: ~/.bun/install/cache
+        key: bun-${{ runner.os }}-${{ hashFiles('frontend/bun.lock') }}
+        restore-keys: bun-${{ runner.os }}-
+
+    - if: inputs.frontend-deps == 'true'
+      name: Install frontend dependencies
+      shell: bash
+      working-directory: frontend
+      run: bun install --frozen-lockfile
