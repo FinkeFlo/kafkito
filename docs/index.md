@@ -29,3 +29,4 @@ consumer groups, schemas, ACLs, and RBAC-aware operations in one place.
 | [ADR-0002](adr/0002-tech-stack.md) | Chosen stack |
 | [ADR-0003](adr/0003-cloud-foundry-readiness.md) | Cloud Foundry readiness |
 | [ADR-0004](adr/0004-xsuaa-build-tag.md) | XSUAA build-tag plugin |
+| [ADR-0005](adr/0005-openapi-contract.md) | OpenAPI 3.1 as the HTTP contract |

@@ -72,7 +72,10 @@ kafkito is a single-binary Kafka management UI (see ADR-0001). We need a stack t
 - **Observability:** OpenTelemetry and Prometheus are not implemented and are
   not planned until there is a consumer for them. Production runs on SAP BTP
   Cloud Foundry, where logs are viewed via `cf logs`.
-- **RPC layer:** the Connect-RPC decision will be revisited in ADR-0005
-  (upcoming).
+- **RPC layer:** superseded by [ADR-0005](0005-openapi-contract.md).
+  Connect-RPC and `buf` are removed; the HTTP contract is the OpenAPI 3.1
+  spec at `api/openapi.yaml`, and the frontend uses TanStack Query with
+  TypeScript types generated from that spec (this also replaces the
+  "Connect-RPC generated client" in the State / data row).
 - **Go package layout:** application packages live under `internal/` (no
   public Go API); `pkg/` is reserved for code intended for external import.
