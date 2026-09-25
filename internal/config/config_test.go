@@ -292,3 +292,105 @@ func TestLogInvalidEnvRejectedOnLoad(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "log.level")
 }
+
+func TestAuthOIDCEnvBinding(t *testing.T) {
+	t.Setenv("KAFKITO_CONFIG", "")
+	t.Setenv("KAFKITO_KAFKA_BROKERS", "")
+	t.Setenv("KAFKITO_AUTH_MODE", "oidc")
+	t.Setenv("KAFKITO_AUTH_OIDC_ISSUER_URL", "https://idp.example.com/realms/kafkito")
+	t.Setenv("KAFKITO_AUTH_OIDC_AUDIENCE", "kafkito-api")
+	t.Setenv("KAFKITO_AUTH_OIDC_JWKS_URL", "https://idp.example.com/realms/kafkito/certs")
+
+	cfg, err := Load("")
+	require.NoError(t, err)
+	assert.Equal(t, "oidc", cfg.Auth.Mode)
+	assert.Equal(t, OIDCAuthConfig{
+		IssuerURL: "https://idp.example.com/realms/kafkito",
+		Audience:  "kafkito-api",
+		JWKSURL:   "https://idp.example.com/realms/kafkito/certs",
+	}, cfg.Auth.OIDC)
+}
+
+func TestAuthOIDCYAMLAndEnvOverride(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "kafkito.yaml")
+	require.NoError(t, os.WriteFile(p, []byte(`
+auth:
+  mode: oidc
+  oidc:
+    issuer_url: https://yaml.example.com
+    audience: yaml-aud
+`), 0o600))
+	t.Setenv("KAFKITO_CONFIG", "")
+	t.Setenv("KAFKITO_KAFKA_BROKERS", "")
+	t.Setenv("KAFKITO_AUTH_OIDC_ISSUER_URL", "https://env.example.com")
+
+	cfg, err := Load(p)
+	require.NoError(t, err)
+	assert.Equal(t, "https://env.example.com", cfg.Auth.OIDC.IssuerURL)
+	assert.Equal(t, "yaml-aud", cfg.Auth.OIDC.Audience)
+	assert.Empty(t, cfg.Auth.OIDC.JWKSURL)
+}
+
+func TestAuthOIDCMissingIssuerRejectedOnLoad(t *testing.T) {
+	t.Setenv("KAFKITO_CONFIG", "")
+	t.Setenv("KAFKITO_KAFKA_BROKERS", "")
+	t.Setenv("KAFKITO_AUTH_MODE", "oidc")
+	t.Setenv("KAFKITO_AUTH_OIDC_AUDIENCE", "kafkito-api")
+
+	_, err := Load("")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "auth.oidc.issuer_url is required")
+}
+
+func TestEnvKeyTransform(t *testing.T) {
+	cases := map[string]string{
+		"KAFKITO_SERVER_ADDR":          "server.addr",
+		"KAFKITO_LOG_LEVEL":            "log.level",
+		"KAFKITO_AUTH_MODE":            "auth.mode",
+		"KAFKITO_AUTH_OIDC_AUDIENCE":   "auth.oidc.audience",
+		"KAFKITO_AUTH_OIDC_ISSUER_URL": "auth.oidc.issuer_url",
+		"KAFKITO_AUTH_OIDC_JWKS_URL":   "auth.oidc.jwks_url",
+	}
+	for in, want := range cases {
+		assert.Equal(t, want, envKeyTransform(in), in)
+	}
+}
+
+func TestAuthOIDCValidation(t *testing.T) {
+	ok := OIDCAuthConfig{IssuerURL: "https://idp.example.com", Audience: "aud"}
+	with := func(f func(*OIDCAuthConfig)) OIDCAuthConfig {
+		c := ok
+		f(&c)
+		return c
+	}
+	cases := []struct {
+		name    string
+		mode    string
+		oidc    OIDCAuthConfig
+		wantErr string
+	}{
+		{"valid", "oidc", ok, ""},
+		{"valid_with_jwks", "oidc", with(func(c *OIDCAuthConfig) { c.JWKSURL = "https://idp.example.com/certs" }), ""},
+		{"http_localhost_ok", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "http://localhost:8080/realms/k" }), ""},
+		{"http_loopback_ok", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "http://127.0.0.1:8080" }), ""},
+		{"other_mode_ignores_oidc", "mock", OIDCAuthConfig{IssuerURL: "not a url"}, ""},
+		{"missing_issuer", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "" }), "issuer_url is required"},
+		{"missing_audience", "oidc", with(func(c *OIDCAuthConfig) { c.Audience = " " }), "audience is required"},
+		{"relative_issuer", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "idp.example.com" }), "absolute URL"},
+		{"http_remote_issuer", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "http://idp.example.com" }), "https"},
+		{"ftp_issuer", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "ftp://idp.example.com" }), "https"},
+		{"http_remote_jwks", "oidc", with(func(c *OIDCAuthConfig) { c.JWKSURL = "http://idp.example.com/certs" }), "auth.oidc.jwks_url"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := Config{Auth: AppAuthConfig{Mode: tc.mode, OIDC: tc.oidc}}.Validate()
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantErr)
+		})
+	}
+}

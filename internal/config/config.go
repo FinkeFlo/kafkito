@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"strings"
 
@@ -111,12 +112,77 @@ func (l LogConfig) validate() error {
 }
 
 // AppAuthConfig is the top-level authentication configuration for kafkito itself
-// (distinct from per-cluster SASL auth). Mode is populated from KAFKITO_AUTH_MODE.
-// Valid values: "off", "mock", "oidc". Tagged builds may register additional
-// IdP-specific modes — see internal/auth.Register and the build-tagged files
-// under internal/auth/.
+// (distinct from per-cluster SASL auth). Mode is populated from KAFKITO_AUTH_MODE;
+// empty means "off". Available modes depend on the build:
+//   - "off":  no authentication; only in -tags devauth builds
+//   - "mock": JWT validation against an in-process test issuer; all builds
+//   - "oidc": JWT validation against an external OIDC issuer; all builds
+//   - "xsuaa": SAP XSUAA via VCAP_SERVICES; only in -tags btp builds
+//
+// See internal/auth.Register and the build-tagged files under internal/auth/.
 type AppAuthConfig struct {
-	Mode string `koanf:"mode"`
+	Mode string         `koanf:"mode"`
+	OIDC OIDCAuthConfig `koanf:"oidc"`
+}
+
+// AuthModeOIDC is the Mode value selecting the generic OIDC validator.
+const AuthModeOIDC = "oidc"
+
+// OIDCAuthConfig configures the generic "oidc" auth mode. kafkito only
+// validates bearer JWTs; login is handled by an upstream auth proxy.
+type OIDCAuthConfig struct {
+	// IssuerURL is the expected "iss" claim and the base for OpenID Connect
+	// discovery. Required in oidc mode. Env: KAFKITO_AUTH_OIDC_ISSUER_URL.
+	IssuerURL string `koanf:"issuer_url"`
+	// Audience is the value the token's "aud" claim must contain. Required in
+	// oidc mode. Env: KAFKITO_AUTH_OIDC_AUDIENCE.
+	Audience string `koanf:"audience"`
+	// JWKSURL overrides the signing-key endpoint. When empty it is discovered
+	// from <IssuerURL>/.well-known/openid-configuration at startup.
+	// Env: KAFKITO_AUTH_OIDC_JWKS_URL.
+	JWKSURL string `koanf:"jwks_url"`
+}
+
+func (a AppAuthConfig) validate() error {
+	if a.Mode != AuthModeOIDC {
+		return nil
+	}
+	if strings.TrimSpace(a.OIDC.IssuerURL) == "" {
+		return errors.New("auth.oidc.issuer_url is required when auth.mode is oidc")
+	}
+	if strings.TrimSpace(a.OIDC.Audience) == "" {
+		return errors.New("auth.oidc.audience is required when auth.mode is oidc")
+	}
+	if err := validateOIDCURL("auth.oidc.issuer_url", a.OIDC.IssuerURL); err != nil {
+		return err
+	}
+	if a.OIDC.JWKSURL != "" {
+		if err := validateOIDCURL("auth.oidc.jwks_url", a.OIDC.JWKSURL); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateOIDCURL requires an absolute https URL; plain http is accepted only
+// for loopback hosts (localhost, 127.0.0.1, ::1) to allow local testing.
+func validateOIDCURL(key, raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil || !u.IsAbs() || u.Host == "" {
+		return fmt.Errorf("%s %q must be an absolute URL", key, raw)
+	}
+	switch u.Scheme {
+	case "https":
+		return nil
+	case "http":
+		switch u.Hostname() {
+		case "localhost", "127.0.0.1", "::1":
+			return nil
+		}
+		return fmt.Errorf("%s %q must use https (http is allowed only for localhost)", key, raw)
+	default:
+		return fmt.Errorf("%s %q must use https", key, raw)
+	}
 }
 
 // RBACConfig is the top-level RBAC configuration block.
@@ -284,6 +350,9 @@ func (c Config) Validate() error {
 	if err := c.Log.validate(); err != nil {
 		return err
 	}
+	if err := c.Auth.validate(); err != nil {
+		return err
+	}
 	seen := make(map[string]struct{}, len(c.Clusters))
 	for i, cl := range c.Clusters {
 		if strings.TrimSpace(cl.Name) == "" {
@@ -332,12 +401,24 @@ func (c Config) ClusterByName(name string) (ClusterConfig, bool) {
 	return ClusterConfig{}, false
 }
 
+// envKeyAliases restores leaf keys that contain an underscore, which the
+// generic "_" -> "." rule in envKeyTransform would otherwise split into a
+// nested path (auth.oidc.issuer.url instead of auth.oidc.issuer_url).
+var envKeyAliases = map[string]string{
+	"auth.oidc.issuer.url": "auth.oidc.issuer_url",
+	"auth.oidc.jwks.url":   "auth.oidc.jwks_url",
+}
+
 // envKeyTransform maps e.g. KAFKITO_SERVER_ADDR -> server.addr and
-// KAFKITO_LOG_LEVEL -> log.level.
-// Known list-type keys (brokers) split on comma.
+// KAFKITO_LOG_LEVEL -> log.level. Keys whose leaf name contains an underscore
+// are resolved through envKeyAliases.
 func envKeyTransform(key string) string {
 	key = strings.ToLower(strings.TrimPrefix(key, "KAFKITO_"))
-	return strings.ReplaceAll(key, "_", ".")
+	key = strings.ReplaceAll(key, "_", ".")
+	if alias, ok := envKeyAliases[key]; ok {
+		return alias
+	}
+	return key
 }
 
 // applyShortcuts synthesizes a default cluster from KAFKITO_KAFKA_BROKERS
