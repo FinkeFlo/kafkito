@@ -1,4 +1,4 @@
-.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev proto proto-lint e2e e2e-up e2e-test e2e-down e2e-clean help
+.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev frontend-check check proto proto-lint e2e e2e-up e2e-test e2e-down e2e-clean help
 
 BIN := bin/kafkito
 PKG := ./...
@@ -9,6 +9,7 @@ AIR_VERSION ?= v1.65.1
 
 help:
 	@echo "Targets:"
+	@echo "  check              - canonical local gate: test lint proto-lint frontend-check"
 	@echo "  build              - build frontend then Go binary into $(BIN)"
 	@echo "  build-go           - build only the Go binary (skip frontend)"
 	@echo "  run                - build and run the binary"
@@ -21,10 +22,11 @@ help:
 	@echo "  lint               - golangci-lint run"
 	@echo "  tidy               - go mod tidy"
 	@echo "  proto              - buf generate"
-	@echo "  proto-lint         - buf lint"
+	@echo "  proto-lint         - buf lint (skipped if buf is not installed)"
 	@echo "  frontend-install   - bun install in frontend/"
 	@echo "  frontend-build     - bun run build in frontend/"
 	@echo "  frontend-dev       - bun run dev in frontend/"
+	@echo "  frontend-check     - frontend lint, build, static checks and tests (as in CI)"
 	@echo "  docker-build       - docker build -t $(IMAGE)"
 	@echo "  compose-up/down    - docker compose lifecycle"
 	@echo "  e2e                - opt-in Playwright walks against a local fixture stack"
@@ -37,6 +39,15 @@ frontend-build:
 
 frontend-dev:
 	cd frontend && bun run dev
+
+# Mirrors the frontend job in .github/workflows/ci.yml; keep the order in sync.
+frontend-check:
+	cd frontend && bun run lint && bun run build && bun run check:palette && \
+		bun run check:strings && bun run check:tokens && bun run check:routes && \
+		bun run check:dates && bun run test
+
+# Canonical local gate. Run before opening a PR.
+check: test lint proto-lint frontend-check
 
 build: frontend-build
 	mkdir -p bin
@@ -164,7 +175,11 @@ proto:
 	buf generate
 
 proto-lint:
-	buf lint
+	@if command -v buf >/dev/null 2>&1; then \
+		buf lint; \
+	else \
+		echo "proto-lint: buf not found on PATH, skipping"; \
+	fi
 
 # --- Dev iteration loop -------------------------------------------------
 # `worktree-init` writes a per-worktree .env.dev with a free port pair.
