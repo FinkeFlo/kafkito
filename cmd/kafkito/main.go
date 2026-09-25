@@ -33,16 +33,21 @@ var version = "0.0.0-dev"
 func main() {
 	configPath := flag.String("config", "", "path to YAML config file (overrides KAFKITO_CONFIG)")
 	flag.Parse()
+	os.Exit(run(*configPath))
+}
 
+// run starts the server and blocks until shutdown. It returns the process exit
+// code instead of calling os.Exit itself, so deferred cleanup always runs.
+func run(configPath string) int {
 	// Bootstrap logger until the config (which carries the log settings) is
 	// loaded; config-load errors are reported through it.
 	bootstrap := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(bootstrap)
 
-	cfg, err := config.Load(*configPath)
+	cfg, err := config.Load(configPath)
 	if err != nil {
 		bootstrap.Error("config load failed", "err", err)
-		os.Exit(2)
+		return 2
 	}
 
 	logger := newLogger(cfg.Log)
@@ -77,7 +82,7 @@ func main() {
 	validator, cleanup, err := auth.BuildValidator(modeCfg)
 	if err != nil {
 		logger.Error("auth init failed", "mode", mode, "err", err)
-		os.Exit(2)
+		return 2
 	}
 	defer cleanup()
 	logger.Info("auth initialised", "mode", mode)
@@ -85,7 +90,7 @@ func main() {
 	addr := listenAddress(cfg.Server.Addr)
 	if err := guardAuthMode(mode, addr, os.Getenv); err != nil {
 		logger.Error("insecure auth configuration", "mode", mode, "addr", addr, "err", err)
-		os.Exit(2)
+		return 2
 	}
 
 	srv := &http.Server{
@@ -115,9 +120,10 @@ func main() {
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("graceful shutdown failed", "err", err)
-		os.Exit(1)
+		return 1
 	}
 	logger.Info("kafkito stopped")
+	return 0
 }
 
 // newLogger builds the process logger on stdout from the log config.
