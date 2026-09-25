@@ -1,0 +1,30 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/oapi-codegen/oapi-codegen/v2.8.0/configuration-schema.json
+#
+# Go server code generated from api/openapi.yaml (ADR-0005). Regenerate with
+# `make api-generate`; `make api-check` fails on drift.
+#
+# Operations are migrated to the generated strict server incrementally: only
+# the operationIds listed below are generated. Every other route is still a
+# hand-written chi handler in internal/server.
+package: api
+generate:
+  models: true
+  chi-server: true
+  strict-server: true
+output-options:
+  overlay:
+    path: api/oapi-codegen.overlay.yaml
+  include-operation-ids:
+    # meta
+    - getHealth
+    - getReadiness
+    - getInfo
+    - getMe
+    - getOpenApiSpec
+    # clusters
+    - listClusters
+    - testCluster
+    - getCapabilities
+    - refreshCapabilities
+    - listBrokers
+output: internal/server/api/server.gen.go

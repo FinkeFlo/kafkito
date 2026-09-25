@@ -1,0 +1,40 @@
+# OpenAPI Overlay applied by oapi-codegen only (see api/oapi-codegen.yaml).
+# Maps spec schemas onto the existing Go domain types so the generated server
+# serialises exactly what the handlers returned before, and keeps Go-specific
+# extensions out of the published contract (api/openapi.yaml).
+overlay: 1.0.0
+info:
+  title: kafkito Go type mappings
+  version: 1.0.0
+actions:
+  - target: $.components.schemas.ClusterConfig
+    update:
+      x-go-type: config.ClusterConfig
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/config
+  - target: $.components.schemas.ClusterInfo
+    update:
+      x-go-type: kafka.ClusterInfo
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.Capabilities
+    update:
+      x-go-type: kafka.Capabilities
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.BrokerInfo
+    update:
+      x-go-type: kafka.BrokerInfo
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  # The header is decoded and validated by privateClusterMiddleware; the
+  # generated binding only passes the raw value through.
+  - target: $.components.parameters.PrivateClusterHeader.schema
+    update:
+      x-go-type: string
+  # requestLogMiddleware sets X-Request-Id on every response before the
+  # handler runs. Generated response writers must not overwrite it.
+  - target: $.paths.*.*.responses.*.headers.X-Request-Id
+    remove: true
+  - target: $.components.responses.*.headers.X-Request-Id
+    remove: true
