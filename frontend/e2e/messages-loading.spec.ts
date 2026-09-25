@@ -5,21 +5,28 @@ const TOPIC = "e2e-walk-large";
 
 test.describe("Messages list loading state", () => {
   test("shows a loading hint instead of claiming the topic is empty", async ({ page }) => {
-    // Hold the first /messages response open so the pre-resolve render is
-    // observable. Without this the fetch resolves too quickly to assert on.
+    // Hold the first message list response open so the pre-resolve render
+    // is observable. Without this the fetch resolves too quickly to assert
+    // on. Match the list endpoint exactly: the page requests
+    // /messages/count in the same tick, and holding that one instead lets
+    // the list resolve before the assertion.
     let release: (() => void) | undefined;
     const held = new Promise<void>((resolve) => {
       release = resolve;
     });
     let heldOnce = false;
 
-    await page.route("**/api/v1/clusters/**/messages**", async (route) => {
-      if (!heldOnce) {
-        heldOnce = true;
-        await held;
-      }
-      await route.continue();
-    });
+    const listPath = `/api/v1/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}/messages`;
+    await page.route(
+      (url) => url.pathname === listPath,
+      async (route) => {
+        if (!heldOnce) {
+          heldOnce = true;
+          await held;
+        }
+        await route.continue();
+      },
+    );
 
     await page.goto(
       `/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}/messages`,
@@ -30,6 +37,7 @@ test.describe("Messages list loading state", () => {
     // was known yet.
     await expect(page.getByText("Loading messages…")).toBeVisible();
     await expect(page.getByText("No messages.")).toHaveCount(0);
+    expect(heldOnce).toBe(true);
 
     release?.();
 
