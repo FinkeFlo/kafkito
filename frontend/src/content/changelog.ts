@@ -89,6 +89,12 @@ export const CHANGELOG: ChangelogEntry[] = [
         description:
           "With a pinned theme, native controls followed the operating system instead — a dark dropdown on the light canvas. They now match the app.",
       },
+      {
+        type: "fix",
+        title: "Click-to-filter size limit stated in a comparable unit",
+        description:
+          "The limit read \"977 KiB\" next to a value size in MiB, so it took mental arithmetic to tell them apart. It is now a round 1 MiB.",
+      },
     ],
   },
   {
