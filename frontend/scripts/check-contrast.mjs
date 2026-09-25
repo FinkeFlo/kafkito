@@ -332,8 +332,8 @@ function walk(dir, out = []) {
 /**
  * Extract candidate "class strings" from a source file. We scan for
  * `className="..."`, `className={"..."}`, `className={\`...\`}`, `class="..."`,
- * and `clsx(...)` / `cn(...)` / `twMerge(...)` argument bodies. Mimics how
- * `check-palette.sh` works: regex over text, no JSX parser.
+ * and `clsx(...)` / `cn(...)` / `twMerge(...)` argument bodies. Plain regex
+ * over text, no JSX parser.
  */
 function extractClassStrings(src) {
   const out = [];
