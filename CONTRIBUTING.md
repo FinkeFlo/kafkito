@@ -13,8 +13,7 @@ GitHub Actions.
 
 1. Fork, branch, code.
 2. `make check` — runs Go tests, golangci-lint and all frontend checks. Requires
-   Go, Bun and golangci-lint on your PATH (`buf` is optional; `proto-lint` is
-   skipped without it).
+   Go, Bun and golangci-lint on your PATH.
 3. Open a PR with a clear description and a Test plan.
 4. Sign off your commits (`-s`).
 

@@ -179,7 +179,7 @@ func TestBackendPrefixes_NeverFallThroughToSPAShell(t *testing.T) {
 	}{
 		{name: "api_nope", path: "/api/nope"},
 		{name: "api_v1_does_not_exist", path: "/api/v1/does/not/exist"},
-		{name: "rpc_unknown_service", path: "/rpc/some.unknown.Service/Method"},
+		{name: "rpc_removed_surface", path: "/rpc/kafkito.v1.InfoService/GetInfo"},
 		{name: "user_api_unknown", path: "/user-api/unknown"},
 	}
 	for _, tc := range cases {

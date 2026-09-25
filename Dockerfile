@@ -29,7 +29,6 @@ RUN go mod download
 
 COPY cmd ./cmd
 COPY internal ./internal
-COPY pkg ./pkg
 COPY frontend ./frontend
 # Overwrite placeholder dist/ with freshly built frontend assets.
 COPY --from=frontend /app/dist ./frontend/dist
