@@ -10,8 +10,11 @@ const TOPIC = "e2e-large-message";
 // field under `order` used below is guaranteed to start past byte 64K, i.e.
 // inside the part of the value the backend truncates away from the
 // list/search preview. produce_large_xml puts an analogous single ~100 KB
-// XML record on e2e-large-message-xml. If seed.sh's payload shape changes,
-// the assertions below need to move with it.
+// XML record on e2e-large-message-xml:
+// `<root><_padding>y…</_padding><order id=… status="shipped">…</order></root>`,
+// again with `_padding` first so `order` and everything under it is past the
+// boundary. If seed.sh's payload shape changes, the assertions below need to
+// move with it.
 const NEEDLE_SKU = "E2E-NEEDLE-SKU";
 const NEEDLE_TEXT = "e2e-search-needle";
 const XML_TOPIC = "e2e-large-message-xml";
@@ -97,5 +100,37 @@ test.describe("Large messages (truncation-tolerant search & click-to-filter)", (
     // as JSON at all and would otherwise yield an empty suggestion tree).
     await pathInput.fill("ema");
     await expect(page.getByText("$.order.customer.email", { exact: true })).toBeVisible();
+  });
+
+  test("XPath PathSense suggests XML element and attribute paths from the hydrated value", async ({
+    page,
+  }) => {
+    await page.goto(`/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(XML_TOPIC)}/messages`);
+
+    await page.getByRole("button", { name: "Search", exact: true }).click();
+    await page.getByLabel("Mode", { exact: true }).selectOption("xpath");
+
+    const pathInput = page.getByLabel("Path", { exact: true });
+    // Every element below `_padding` starts past the 64 KB truncation
+    // boundary, and the truncated preview is cut mid-element so it does not
+    // parse as XML at all — seeing these suggestions proves the sample query
+    // hydrated the full raw value before building the XPath tree.
+    await pathInput.fill("notes");
+    await expect(page.getByText("//root/order/notes", { exact: true })).toBeVisible();
+
+    // Attributes surface as `@name` …
+    await pathInput.fill("sku");
+    await expect(
+      page.getByText("//root/order/items/item/@sku", { exact: true }),
+    ).toBeVisible();
+
+    // … and picking a scalar prefills the operator and value, exactly as
+    // JSONPath mode already does.
+    await pathInput.fill("status");
+    await page.getByText("//root/order/@status", { exact: true }).click();
+
+    await expect(pathInput).toHaveValue("//root/order/@status");
+    await expect(page.getByLabel("Operator", { exact: true })).toHaveValue("eq");
+    await expect(page.getByLabel("Value", { exact: true })).toHaveValue("shipped");
   });
 });

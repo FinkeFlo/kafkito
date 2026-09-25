@@ -181,8 +181,13 @@ produce_large_json() {
 
 # produce_large_xml mirrors produce_large_json but with an XML value, to
 # cover consumer.go's equivalent truncation-tolerant detection for XML
-# (looksXML: first non-whitespace byte is '<'). Same `_padding` placement
-# rationale as produce_large_json.
+# (looksXML: first non-whitespace byte is '<') and XPath PathSense's
+# hydrated suggestions. Same `_padding` placement rationale as
+# produce_large_json: every element/attribute asserted on in
+# large-messages.spec.ts starts past byte 64K. The `status` attribute and
+# the repeated `<item sku=...>` siblings exist so the spec can assert that
+# attributes are suggested as `@name` and that repeated siblings collapse
+# onto one path rather than being indexed per position.
 produce_large_xml() {
   local topic="$1"
   local now_ms
@@ -190,7 +195,7 @@ produce_large_xml() {
   local padding
   padding=$(printf '%*s' 100000 '' | tr ' ' 'y')
   local value
-  value="<root><_padding>${padding}</_padding><order><id>E2E-LARGE-XML-1</id><notes>e2e-search-needle-xml</notes></order></root>"
+  value="<root><_padding>${padding}</_padding><order id=\"E2E-LARGE-XML-1\" status=\"shipped\"><notes>e2e-search-needle-xml</notes><items><item sku=\"XML-SKU-1\"/><item sku=\"XML-SKU-2\"/></items></order></root>"
   printf '%s\t%s\n' "${now_ms}" "${value}" | produce_spread_lines "${topic}"
 }
 

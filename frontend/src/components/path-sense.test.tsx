@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { createEvent, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PathSense } from "./path-sense";
 import type { PathInfo, PathTree } from "@/lib/path-tree";
@@ -219,6 +219,49 @@ describe("PathSense", () => {
 
     // It must toggle "items[2]" -> "items[*]", derived from the typed query.
     expect(onChange).toHaveBeenCalledWith("items[*].sku");
+  });
+
+  it("does not rewrite XPath positional predicates on Tab when the toggle is off", () => {
+    const onChange = vi.fn();
+    render(
+      <PathSense
+        tree={emptyTree}
+        value=""
+        onChange={onChange}
+        onPick={vi.fn()}
+        arrayIndexToggle={false}
+      />,
+    );
+    const input = screen.getByRole("combobox");
+    fireEvent.change(input, { target: { value: "//order/items/item[2]/@sku" } });
+    onChange.mockClear();
+
+    fireEvent.keyDown(input, { key: "Tab" });
+
+    // `item[*]` is valid XPath but selects elements having a child *element*,
+    // so the JSONPath "all entries" rewrite would silently change the query's
+    // meaning — and for attribute-only <item sku=…/> it matches nothing.
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("lets Tab move focus out of the input when the toggle is off", () => {
+    render(
+      <PathSense
+        tree={emptyTree}
+        value=""
+        onChange={vi.fn()}
+        onPick={vi.fn()}
+        arrayIndexToggle={false}
+      />,
+    );
+    const input = screen.getByRole("combobox");
+    fireEvent.change(input, { target: { value: "//order/items/item[2]/@sku" } });
+
+    const event = createEvent.keyDown(input, { key: "Tab" });
+    fireEvent(input, event);
+
+    // preventDefault would trap keyboard users in the Path field.
+    expect(event.defaultPrevented).toBe(false);
   });
 
   it("forwards an id to the combobox input so an external label can target it", () => {
