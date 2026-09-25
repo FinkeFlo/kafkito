@@ -563,7 +563,7 @@ Copy this into the PR description and tick each box.
 - [ ] Every TODO(backend): comment is also listed in the PR body
 ```
 
-The full hard-gate string is in `CLAUDE.md`. `make e2e` is **opt-in**
+`make check` runs the full local gate. `make e2e` is **opt-in**
 (too slow for the per-commit gate) — run it before merging any PR
 that touches a destructive flow (Reset-Offsets, Delete-Records, ACL
 mutations, SCRAM rotate). Setup + scope: `frontend/e2e/README.md`.

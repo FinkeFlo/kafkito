@@ -12,7 +12,9 @@ GitHub Actions.
 ## Workflow
 
 1. Fork, branch, code.
-2. `make test && make lint` (Go); `cd frontend && bun run lint && bun run build && bun run check:palette && bun run check:strings && bun run check:tokens && bun run check:routes && bun run check:dates && bun run test` (frontend).
+2. `make check` — runs Go tests, golangci-lint and all frontend checks. Requires
+   Go, Bun and golangci-lint on your PATH (`buf` is optional; `proto-lint` is
+   skipped without it).
 3. Open a PR with a clear description and a Test plan.
 4. Sign off your commits (`-s`).
 
