@@ -207,36 +207,3 @@ func resolvePermission(r *http.Request) (resType, resName, action, bodyField str
 	}
 	return "", "", "", ""
 }
-
-// handleMe returns the current principal, roles and materialized permissions.
-func handleMe(policy *rbac.Policy) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Prefer the JWT-derived principal; fall back to legacy header trust for compatibility.
-		var (
-			user   string
-			email  string
-			scopes []string
-			tenant string
-			hasJWT bool
-		)
-		if p, ok := auth.PrincipalFromContext(r.Context()); ok {
-			hasJWT = true
-			email = p.Email
-			scopes = p.Scopes
-			tenant = p.Tenant
-		}
-		// rbacSubject is the single identity resolver: principal first, header fallback.
-		user = rbacSubject(r, policy)
-		writeJSON(w, http.StatusOK, map[string]any{
-			"user":         user,
-			"email":        email,
-			"tenant":       tenant,
-			"scopes":       scopes,
-			"roles":        policy.ResolveRoles(user),
-			"permissions":  policy.MaterializePermissions(user),
-			"anonymous":    user == "",
-			"jwt":          hasJWT,
-			"rbac_enabled": policy.Enabled(),
-		})
-	}
-}
