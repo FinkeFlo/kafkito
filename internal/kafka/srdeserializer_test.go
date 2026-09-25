@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/FinkeFlo/kafkito/pkg/config"
+	"github.com/FinkeFlo/kafkito/internal/config"
 )
 
 // TestSRDecoder_AvroRoundtrip_DecodesPayloadAndExposesMetadata wires

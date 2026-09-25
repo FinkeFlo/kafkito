@@ -13,8 +13,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/FinkeFlo/kafkito/pkg/config"
-	"github.com/FinkeFlo/kafkito/pkg/masking"
+	"github.com/FinkeFlo/kafkito/internal/config"
+	"github.com/FinkeFlo/kafkito/internal/masking"
 )
 
 // AdhocPrefix is the internal cluster-name prefix used for ephemeral clusters

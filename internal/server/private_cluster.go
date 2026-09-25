@@ -12,8 +12,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/FinkeFlo/kafkito/pkg/config"
-	kafkapkg "github.com/FinkeFlo/kafkito/pkg/kafka"
+	"github.com/FinkeFlo/kafkito/internal/config"
+	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/go-chi/chi/v5"
 )
 

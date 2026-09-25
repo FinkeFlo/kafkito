@@ -17,8 +17,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/FinkeFlo/kafkito/pkg/config"
-	"github.com/FinkeFlo/kafkito/pkg/netguard"
+	"github.com/FinkeFlo/kafkito/internal/config"
+	"github.com/FinkeFlo/kafkito/internal/netguard"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
@@ -155,13 +155,13 @@ func TestClientOpts_ConfiguredCluster_TLSEnabled_UsesDialTLSConfigPath(t *testin
 }
 
 // TestAdhocPrefixMatchesConfigConstant guards the finding-#1 safety invariant:
-// the ad-hoc detection in pkg/kafka (AdhocPrefix) and the validation guard in
-// pkg/config (AdhocClusterPrefix) are two independent "__adhoc_" constants.
+// the ad-hoc detection in internal/kafka (AdhocPrefix) and the validation guard in
+// internal/config (AdhocClusterPrefix) are two independent "__adhoc_" constants.
 // They must stay equal or operator-config validation and ad-hoc routing could
 // disagree about which names are reserved.
 func TestAdhocPrefixMatchesConfigConstant(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t, config.AdhocClusterPrefix, AdhocPrefix,
-		"pkg/kafka.AdhocPrefix and pkg/config.AdhocClusterPrefix must stay equal")
+		"internal/kafka.AdhocPrefix and internal/config.AdhocClusterPrefix must stay equal")
 }

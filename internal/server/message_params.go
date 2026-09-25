@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	kafkapkg "github.com/FinkeFlo/kafkito/pkg/kafka"
+	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 )
 
 // maxSearchBodyBytes bounds the search request body to protect against memory

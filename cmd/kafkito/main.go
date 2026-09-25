@@ -22,9 +22,9 @@ import (
 	"time"
 
 	"github.com/FinkeFlo/kafkito/internal/auth"
+	"github.com/FinkeFlo/kafkito/internal/config"
+	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/FinkeFlo/kafkito/internal/server"
-	"github.com/FinkeFlo/kafkito/pkg/config"
-	kafkapkg "github.com/FinkeFlo/kafkito/pkg/kafka"
 )
 
 // version is overridden at build time via -ldflags "-X main.version=...".

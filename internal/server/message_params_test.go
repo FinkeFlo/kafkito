@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	kafkapkg "github.com/FinkeFlo/kafkito/pkg/kafka"
+	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 )
 
 func mustEncodeCursor(t *testing.T, dir kafkapkg.CursorDirection, parts map[int32]int64) string {

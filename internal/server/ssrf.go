@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/FinkeFlo/kafkito/pkg/netguard"
+	"github.com/FinkeFlo/kafkito/internal/netguard"
 )
 
 // blockedIP reports whether an outbound connection to ip must be refused to

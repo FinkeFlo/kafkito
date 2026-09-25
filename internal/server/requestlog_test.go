@@ -15,7 +15,7 @@ import (
 	"testing"
 
 	"github.com/FinkeFlo/kafkito/internal/auth"
-	"github.com/FinkeFlo/kafkito/pkg/config"
+	"github.com/FinkeFlo/kafkito/internal/config"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"

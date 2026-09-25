@@ -17,8 +17,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/FinkeFlo/kafkito/pkg/config"
-	"github.com/FinkeFlo/kafkito/pkg/netguard"
+	"github.com/FinkeFlo/kafkito/internal/config"
+	"github.com/FinkeFlo/kafkito/internal/netguard"
 	"golang.org/x/sync/errgroup"
 )
 

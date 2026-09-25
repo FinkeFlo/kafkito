@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FinkeFlo/kafkito/pkg/config"
-	kafkapkg "github.com/FinkeFlo/kafkito/pkg/kafka"
+	"github.com/FinkeFlo/kafkito/internal/config"
+	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -107,7 +107,7 @@ type copyRequest struct {
 
 	// FromTSMs / ToTSMs are UNIX millisecond timestamps bounding which source
 	// messages to copy. FromTSMs is inclusive, ToTSMs exclusive (matching
-	// pkg/kafka's timeline convention). Zero means "no bound"; for ToTSMs the
+	// internal/kafka's timeline convention). Zero means "no bound"; for ToTSMs the
 	// handler substitutes the job's start time, see copyMessages.
 	FromTSMs int64 `json:"from_ts_ms,omitempty"`
 	ToTSMs   int64 `json:"to_ts_ms,omitempty"`
@@ -598,7 +598,7 @@ func isTopicMissingErr(err error) bool {
 //     through this route.)
 //   - Schema-Registry-decoded key/value: see produceEncodingFor.
 //   - Truncated value: ConsumeMessages caps Value at 64 KB (maxMessageValueBytes
-//     in pkg/kafka/consumer.go) to bound per-record memory during the batch
+//     in internal/kafka/consumer.go) to bound per-record memory during the batch
 //     consume/produce loop this function feeds. What we hold for a larger
 //     record is only the first 64 KB, so copying it would silently write a
 //     truncated record instead of the original — the same "approximated
