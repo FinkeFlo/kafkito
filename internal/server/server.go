@@ -7,7 +7,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -55,27 +54,37 @@ func New(opts Options) http.Handler {
 
 	policy := rbac.Compile(opts.Config.RBAC)
 
-	r.Get("/healthz", handleHealth)
-	r.Get("/readyz", handleReady(opts.Registry))
+	generated, err := newGeneratedRoutes(&apiServer{
+		version:         opts.Version,
+		policy:          policy,
+		reg:             opts.Registry,
+		log:             handlerLog,
+		testConnTimeout: opts.Config.Server.TestConnectionTimeout,
+	}, errorWriter{log: handlerLog})
+	if err != nil {
+		// The document is embedded and covered by tests; failing here is a
+		// build defect, not a runtime condition.
+		panic(err)
+	}
+
+	generated.mountRoot(r)
 
 	r.Route("/api", func(api chi.Router) {
 		api.Route("/v1", func(v1 chi.Router) {
 			if opts.Auth != nil {
 				v1.Use(auth.MiddlewareFor(opts.Auth), capturePrincipal)
 			}
-			v1.Get("/info", handleInfo(opts.Version))
-			v1.Get("/me", handleMe(policy))
-			v1.Get("/openapi.yaml", handleOpenAPISpec)
+			generated.mountMeta(v1)
 			if opts.Registry != nil {
 				v1.Group(func(g chi.Router) {
 					g.Use(privateClusterMiddleware)
 					g.Use(rbacMiddleware(policy))
 					g.Use(resolvePrivateClusterParam(opts.Registry))
+					generated.mountClusters(g)
 					(&clusterAPI{
-						reg:             opts.Registry,
-						policy:          policy,
-						log:             handlerLog,
-						testConnTimeout: opts.Config.Server.TestConnectionTimeout,
+						reg:    opts.Registry,
+						policy: policy,
+						log:    handlerLog,
 					}).mount(g)
 				})
 			}
@@ -137,56 +146,6 @@ func isBackendPrefix(p string) bool {
 		return true
 	}
 	return false
-}
-
-func handleHealth(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-}
-
-// handleReady reports overall readiness. With a kafka Registry, all configured
-// clusters are probed with a 1s timeout; if any is unreachable (or no clusters
-// are configured), the endpoint returns 503. Without a Registry, it still
-// returns 200 ("server up, no kafka configured").
-func handleReady(reg *kafkapkg.Registry) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if reg == nil || len(reg.Names()) == 0 {
-			writeJSON(w, http.StatusOK, map[string]any{
-				"status":   "ok",
-				"clusters": []any{},
-				"note":     "no kafka clusters configured",
-			})
-			return
-		}
-		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
-		defer cancel()
-		infos := reg.Describe(ctx, 1*time.Second)
-		allOK := true
-		for _, c := range infos {
-			if !c.Reachable {
-				allOK = false
-				break
-			}
-		}
-		status := http.StatusOK
-		payload := "ready"
-		if !allOK {
-			status = http.StatusServiceUnavailable
-			payload = "degraded"
-		}
-		writeJSON(w, status, map[string]any{
-			"status":   payload,
-			"clusters": infos,
-		})
-	}
-}
-
-func handleInfo(version string) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]string{
-			"name":    "kafkito",
-			"version": version,
-		})
-	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

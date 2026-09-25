@@ -18,7 +18,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/FinkeFlo/kafkito/internal/rbac"
 	"github.com/go-chi/chi/v5"
@@ -75,31 +74,14 @@ func (a *clusterAPI) requireProdConfirmation(w http.ResponseWriter, r *http.Requ
 	return false
 }
 
-// testConnectionTimeout returns the budget for the user-driven Test
-// connection probe (server.test_connection_timeout, env
-// KAFKITO_TEST_CONNECTION_TIMEOUT). Non-positive values fall back to
-// config.DefaultTestConnectionTimeout.
-func (a *clusterAPI) testConnectionTimeout() time.Duration {
-	if a.testConnTimeout <= 0 {
-		return config.DefaultTestConnectionTimeout
-	}
-	return a.testConnTimeout
-}
-
 // clusterAPI wires cluster- and topic-related endpoints.
 type clusterAPI struct {
-	reg             *kafkapkg.Registry
-	policy          *rbac.Policy
-	log             *slog.Logger
-	testConnTimeout time.Duration
+	reg    *kafkapkg.Registry
+	policy *rbac.Policy
+	log    *slog.Logger
 }
 
 func (a *clusterAPI) mount(r chi.Router) {
-	r.Get("/clusters", a.listClusters)
-	r.Post("/clusters/_test", a.testCluster)
-	r.Get("/clusters/{cluster}/capabilities", a.getCapabilities)
-	r.Post("/clusters/{cluster}/capabilities/refresh", a.refreshCapabilities)
-	r.Get("/clusters/{cluster}/brokers", a.listBrokers)
 	r.Get("/clusters/{cluster}/topics", a.listTopics)
 	r.Post("/clusters/{cluster}/topics", a.createTopic)
 	r.Get("/clusters/{cluster}/topics/{topic}", a.describeTopic)
@@ -131,88 +113,6 @@ func (a *clusterAPI) mount(r chi.Router) {
 	r.Get("/clusters/{cluster}/users", a.listSCRAMUsers)
 	r.Post("/clusters/{cluster}/users", a.upsertSCRAMUser)
 	r.Delete("/clusters/{cluster}/users/{user}", a.deleteSCRAMUser)
-}
-
-// listClusters returns the configured clusters with a live reachability probe.
-func (a *clusterAPI) listClusters(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
-	defer cancel()
-	out := a.reg.Describe(ctx, 1*time.Second)
-	writeJSON(w, http.StatusOK, map[string]any{"clusters": out})
-}
-
-// testCluster probes a user-supplied ClusterConfig (sent either as the
-// request body or as the X-Kafkito-Cluster header, with body winning) and
-// reports reachability plus a short capability probe. Used by the frontend
-// settings UI to validate private-cluster credentials before storing them
-// in the browser.
-func (a *clusterAPI) testCluster(w http.ResponseWriter, r *http.Request) {
-	var cfg config.ClusterConfig
-	if r.ContentLength > 0 {
-		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxPrivateClusterHeaderBytes))
-		if err := dec.Decode(&cfg); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body: " + err.Error()})
-			return
-		}
-		if err := validatePrivateClusterConfig(cfg); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
-			return
-		}
-	} else if ctxCfg, ok := privateClusterFromContext(r.Context()); ok {
-		cfg = ctxCfg
-	} else {
-		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": "cluster config required in body or " + PrivateClusterHeader + " header",
-		})
-		return
-	}
-	name, err := a.reg.UseAdhoc(cfg)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
-		return
-	}
-	// Cheap config validation: build the kgo client up-front so that
-	// misconfigured TLS / unparseable broker URLs surface as a 400 here
-	// rather than burning the full Ping budget. Client construction is
-	// synchronous and does not dial; the resulting client is cached on
-	// the registry, so the subsequent Ping reuses it.
-	if _, cerr := a.reg.Client(name); cerr != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": cerr.Error()})
-		return
-	}
-	pingCtx, pingCancel := context.WithTimeout(r.Context(), a.testConnectionTimeout())
-	defer pingCancel()
-	info := kafkapkg.ClusterInfo{
-		Name:           "",
-		IsProd:         cfg.IsProd,
-		AuthType:       strings.ToLower(strings.TrimSpace(cfg.Auth.Type)),
-		TLS:            cfg.TLS.Enabled,
-		SchemaRegistry: strings.TrimSpace(cfg.SchemaRegistry.URL) != "",
-	}
-	if info.AuthType == "" {
-		info.AuthType = "none"
-	}
-	if err := a.reg.Ping(pingCtx, name); err != nil {
-		// Intentional: testCluster is a user-invoked diagnostic for a cluster
-		// the caller supplied and owns. Returning the raw connection error is
-		// the point of this endpoint — it tells the user exactly why their
-		// broker is unreachable (wrong host/port, TLS mismatch, SASL failure,
-		// etc.). This is NOT an accidental gatewayError leak; do not route
-		// through gatewayError here.
-		if a.log != nil {
-			a.log.ErrorContext(pingCtx, "testCluster ping failed", "err", err)
-		}
-		info.Reachable = false
-		info.Error = err.Error()
-	} else {
-		info.Reachable = true
-		capCtx, capCancel := context.WithTimeout(r.Context(), 4*time.Second)
-		if caps, cerr := a.reg.Capabilities(capCtx, name); cerr == nil {
-			info.Capabilities = caps
-		}
-		capCancel()
-	}
-	writeJSON(w, http.StatusOK, info)
 }
 
 // listTopics returns the topics of the named cluster.
@@ -511,50 +411,6 @@ func (a *clusterAPI) sampleMessages(w http.ResponseWriter, r *http.Request) {
 		"messages":   res.Messages,
 		"sampled_at": time.Now().UnixMilli(),
 	})
-}
-
-// getCapabilities returns the cached capability probe for a cluster.
-func (a *clusterAPI) getCapabilities(w http.ResponseWriter, r *http.Request) {
-	cluster := chi.URLParam(r, "cluster")
-	ctx, cancel := context.WithTimeout(r.Context(), 6*time.Second)
-	defer cancel()
-	caps, err := a.reg.Capabilities(ctx, cluster)
-	if err != nil {
-		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
-			return
-		}
-		gatewayError(ctx, w, a.log, "get capabilities", err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"cluster":      cluster,
-		"capabilities": caps,
-	})
-}
-
-// refreshCapabilities invalidates the probe cache and re-runs it.
-func (a *clusterAPI) refreshCapabilities(w http.ResponseWriter, r *http.Request) {
-	cluster := chi.URLParam(r, "cluster")
-	a.reg.RefreshCapabilities(cluster)
-	a.getCapabilities(w, r)
-}
-
-// listBrokers returns the brokers of a cluster.
-func (a *clusterAPI) listBrokers(w http.ResponseWriter, r *http.Request) {
-	cluster := chi.URLParam(r, "cluster")
-	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
-	defer cancel()
-	brokers, err := a.reg.ListBrokers(ctx, cluster)
-	if err != nil {
-		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
-			return
-		}
-		gatewayError(ctx, w, a.log, "list brokers", err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"cluster": cluster, "brokers": brokers})
 }
 
 // listGroups returns the consumer groups of a cluster.

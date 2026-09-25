@@ -90,19 +90,32 @@ func validatePrivateClusterConfig(cfg config.ClusterConfig) error {
 		if strings.TrimSpace(b) == "" {
 			return errors.New("broker address must not be empty")
 		}
+	}
+	switch t := strings.ToLower(strings.TrimSpace(cfg.Auth.Type)); t {
+	case "", "none", "plain", "scram-sha-256", "scram-sha-512":
+	default:
+		return fmt.Errorf("auth.type %q not supported", cfg.Auth.Type)
+	}
+	return validateClusterPolicy(cfg)
+}
+
+// validateClusterPolicy checks the rules of a structurally valid
+// ClusterConfig that the OpenAPI document cannot express: the outbound-host
+// (SSRF) policy for broker and Schema Registry hosts, and the credentials a
+// SASL mechanism requires. Request bodies get the structural checks from the
+// request validator; the opaque X-Kafkito-Cluster header gets them from
+// validatePrivateClusterConfig.
+func validateClusterPolicy(cfg config.ClusterConfig) error {
+	for _, b := range cfg.Brokers {
 		if err := netguard.ValidateHost(strings.TrimSpace(b)); err != nil {
 			return fmt.Errorf("broker %q: %w", b, err)
 		}
 	}
-	t := strings.ToLower(strings.TrimSpace(cfg.Auth.Type))
-	switch t {
-	case "", "none":
+	switch t := strings.ToLower(strings.TrimSpace(cfg.Auth.Type)); t {
 	case "plain", "scram-sha-256", "scram-sha-512":
 		if cfg.Auth.Username == "" || cfg.Auth.Password == "" {
 			return fmt.Errorf("auth %q requires username and password", t)
 		}
-	default:
-		return fmt.Errorf("auth.type %q not supported", cfg.Auth.Type)
 	}
 	if u := strings.TrimSpace(cfg.SchemaRegistry.URL); u != "" {
 		if err := netguard.ValidateURL(u); err != nil {
