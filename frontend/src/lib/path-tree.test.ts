@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildPathTree,
   MAX_DEPTH,
+  MAX_PATHS,
   MAX_SAMPLE_VALUES,
   type PathInfo,
   type PathType,
@@ -81,5 +82,55 @@ describe("buildPathTree", () => {
 
   it("ignores non-object samples (scalars or arrays at root)", () => {
     expect(buildPathTree(["a", 1, true, null]).size).toBe(0);
+  });
+
+  it(`caps the tree at ${MAX_PATHS} paths`, () => {
+    // An object keyed by id is the realistic trigger: unlike an array, whose
+    // entries all collapse onto one `[*]` path, every key becomes its own
+    // path. Hydrated samples reach several MB, so this is reachable in
+    // practice rather than merely theoretical.
+    const byId: Record<string, unknown> = {};
+    for (let i = 0; i < MAX_PATHS + 50; i++) byId[`user_${i}`] = { name: "n" };
+
+    const tree = buildPathTree([byId]);
+
+    expect(tree.size).toBe(MAX_PATHS);
+  });
+
+  it("stops walking once the cap is reached instead of scanning the rest", () => {
+    // The cap used to only reject surplus paths, so a hydrated multi-megabyte
+    // sample was still walked to the end — building a path string and probing
+    // a full Map for every one of tens of thousands of nodes, synchronously,
+    // inside a render-path memo (~500 ms of blocked main thread).
+    const byId: Record<string, unknown> = {};
+    for (let i = 0; i < MAX_PATHS + 50; i++) byId[`user_${i}`] = { name: "n" };
+
+    let touched = false;
+    const tripwire = new Proxy(
+      {},
+      {
+        ownKeys() {
+          touched = true;
+          return [];
+        },
+        get() {
+          touched = true;
+          return undefined;
+        },
+      },
+    );
+
+    const tree = buildPathTree([byId, tripwire]);
+
+    expect(tree.size).toBe(MAX_PATHS);
+    expect(touched).toBe(false);
+  });
+
+  it("walks every sample when the cap is not reached", () => {
+    // Guards the early abort against over-reach: the common case must still
+    // aggregate across all samples.
+    const tree = buildPathTree([{ a: 1 }, { b: 2 }, { c: 3 }]);
+
+    expect([...tree.keys()].sort()).toEqual(["$.a", "$.b", "$.c"]);
   });
 });

@@ -54,6 +54,12 @@ export const CHANGELOG: ChangelogEntry[] = [
           "Typing part of a field name (e.g. \"pric\" for \"$.order.items[*].price\") now finds matches anywhere in the path, with the matched characters highlighted. Multiple words are matched independently and in any order, so \"order price\" finds the same path — consistent with search elsewhere in the app.",
       },
       {
+        type: "feature",
+        title: "Field-path suggestions for XPath search",
+        description:
+          "XPath mode was a plain text box: you had to know the document structure up front. It now gets the same suggestion dropdown JSONPath has, built from a few sample messages — elements and attributes (as @name), with repeated siblings collapsed onto one path. Picking a value prefills the operator and value, and large samples are hydrated past the 64 KB boundary first, just like JSONPath's.",
+      },
+      {
         type: "fix",
         title: "Clicking an array value always searches every entry",
         description:

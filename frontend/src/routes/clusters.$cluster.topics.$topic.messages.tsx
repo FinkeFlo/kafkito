@@ -16,8 +16,12 @@ import {
   type SearchStats,
   type SearchRequest,
 } from "@/lib/api";
-import { hydrateTruncatedSampleMessages } from "@/lib/hydrate-sample";
+import {
+  hydrateTruncatedSampleMessages,
+  type HydratableEncoding,
+} from "@/lib/hydrate-sample";
 import { buildPathTree } from "@/lib/path-tree";
+import { buildXmlPathTree, looksLikeXml } from "@/lib/xml-path-tree";
 import { buildJsonPath, wildcardArrayIndices, type Token } from "@/lib/path-builder";
 import { dedupeMessages } from "@/lib/dedupe-messages";
 import { PathSense } from "@/components/path-sense";
@@ -279,16 +283,22 @@ function MessagesPanel({
   // Set to true to abort an in-flight auto-chain between continuation calls.
   const stopSearchRef = useRef(false);
 
-  // Sample query (lazy, only when JSONPath search is open). Field-path
-  // suggestions need each sample message's full JSON structure, but the
-  // sample endpoint returns the same 64 KB-truncated preview as the message
-  // list — silently starving PathSense of any field that only appears past
-  // the truncation boundary (or dropping the message outright, since
-  // truncated JSON usually fails to parse). hydrateTruncatedSampleMessages
-  // fetches the full raw value for any truncated sample, falling back to
-  // the truncated preview on failure.
+  // Sample query (lazy, only when a structured — JSONPath or XPath — search
+  // is open). Field-path suggestions need each sample message's full
+  // structure, but the sample endpoint returns the same 64 KB-truncated
+  // preview as the message list — silently starving PathSense of any field
+  // that only appears past the truncation boundary (or dropping the message
+  // outright, since truncated JSON/XML usually fails to parse).
+  // hydrateTruncatedSampleMessages fetches the full raw value for any
+  // truncated sample, falling back to the truncated preview on failure.
+  //
+  // Keyed by encoding, not by mode, so the two structured modes share a
+  // cache entry whenever they hydrate the same thing. Hydration only fetches
+  // values the active tree can parse: pulling up to MAX_HYDRATE_VALUE_BYTES
+  // per sample for the builder that will discard them is pure waste.
+  const sampleEncoding: HydratableEncoding = mode === "xpath" ? "xml" : "json";
   const sampleQuery = useQuery<SampleResponse>({
-    queryKey: ["sample", cluster, topic],
+    queryKey: ["sample", cluster, topic, sampleEncoding],
     queryFn: async ({ signal }) => {
       const res = await fetchSample(cluster, topic, 5, -1);
       const messages = await hydrateTruncatedSampleMessages(
@@ -296,10 +306,11 @@ function MessagesPanel({
         topic,
         res.messages,
         signal,
+        sampleEncoding,
       );
       return { ...res, messages };
     },
-    enabled: searchOpen && mode === "jsonpath",
+    enabled: searchOpen && (mode === "jsonpath" || mode === "xpath"),
     staleTime: 5 * 60_000,
   });
 
@@ -318,6 +329,15 @@ function MessagesPanel({
           v !== null && typeof v === "object" && !Array.isArray(v),
       );
     return buildPathTree(parsed);
+  }, [sampleQuery.data]);
+
+  // XPath's suggestion tree is built from the same (already hydrated)
+  // samples, parsed with the browser's DOMParser rather than JSON.parse.
+  const xmlPathTree = useMemo(() => {
+    const values = (sampleQuery.data?.messages ?? [])
+      .map((m) => m.value ?? "")
+      .filter(looksLikeXml);
+    return buildXmlPathTree(values);
   }, [sampleQuery.data]);
 
   const [undoToast, setUndoToast] = useState<
@@ -812,39 +832,42 @@ function MessagesPanel({
                 <label className="font-medium" htmlFor="search-path">
                   Path
                 </label>
-                {mode === "jsonpath" ? (
-                  <div className="w-56">
-                    <PathSense
-                      id="search-path"
-                      tree={pathTree}
-                      value={path}
-                      onChange={setPath}
-                      onPick={(picked, sample) => {
-                        setPath(picked);
-                        const isScalar =
-                          sample !== undefined &&
-                          sample !== null &&
-                          typeof sample !== "object";
-                        if (isScalar) {
-                          setOp("eq");
-                          setNeedle(String(sample));
-                        } else {
-                          // object/array/null/undefined → use exists semantics
-                          setOp("exists");
-                          setNeedle("");
-                        }
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <input
+                {/* Both structured modes get PathSense; only the suggestion
+                    tree and its XML/JSON-flavored copy differ. */}
+                <div className="w-56">
+                  <PathSense
                     id="search-path"
+                    tree={mode === "xpath" ? xmlPathTree : pathTree}
                     value={path}
-                    onChange={(e) => setPath(e.target.value)}
-                    placeholder="//order/@status"
-                    className="w-56 rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1 font-mono"
+                    onChange={setPath}
+                    placeholder={
+                      mode === "xpath"
+                        ? "//order/@status"
+                        : "Type or ↓ for top fields"
+                    }
+                    emptyMessage={
+                      mode === "xpath"
+                        ? "Sample isn't XML or topic is empty — enter path manually."
+                        : "Sample isn't JSON or topic is empty — enter path manually."
+                    }
+                    arrayIndexToggle={mode !== "xpath"}
+                    onPick={(picked, sample) => {
+                      setPath(picked);
+                      const isScalar =
+                        sample !== undefined &&
+                        sample !== null &&
+                        typeof sample !== "object";
+                      if (isScalar) {
+                        setOp("eq");
+                        setNeedle(String(sample));
+                      } else {
+                        // object/array/null/undefined → use exists semantics
+                        setOp("exists");
+                        setNeedle("");
+                      }
+                    }}
                   />
-                )}
+                </div>
                 <label className="font-medium" htmlFor="search-operator">
                   Operator
                 </label>

@@ -11,6 +11,18 @@ export interface PathSenseProps {
   placeholder?: string;
   /** Applied to the inner combobox input so an external <label htmlFor> can target it. */
   id?: string;
+  /** Shown in the dropdown when `tree` is empty. Defaults to JSONPath's
+   * copy; XPath mode passes its own XML-flavored message. */
+  emptyMessage?: string;
+  /**
+   * Enables the Tab shortcut that flips the last array segment between a
+   * numeric index and `[*]`. JSONPath-only: in XPath `item[2]` and `item[*]`
+   * are both valid but mean unrelated things (`[*]` selects elements having
+   * a child *element*), so rewriting one into the other would silently
+   * change the query's meaning — and the `preventDefault` would trap focus
+   * in the input. XPath mode passes `false`.
+   */
+  arrayIndexToggle?: boolean;
 }
 
 const TOP_N = 8;
@@ -33,9 +45,12 @@ function previewOf(values: unknown[], distinctCount: number): string {
 function rank(path: string, type: string): number {
   let score = 0;
   if (type !== "object" && type !== "array") score += 5;
-  const depth = (path.match(/\./g) || []).length;
+  // Separators cover both JSONPath (`$.order.items[*].sku`) and XPath
+  // (`//order/items/item/@sku`); without `/` every XPath row would score an
+  // identical depth of 0 and the shallow-first ordering would collapse.
+  const depth = (path.match(/[./]/g) || []).length;
   score -= depth;
-  const tail = path.split(/[.\[]/).pop() ?? "";
+  const tail = path.split(/[.[/]/).pop() ?? "";
   if (COMMON_BOOST.test(tail)) score += 3;
   return score;
 }
@@ -72,6 +87,8 @@ export function PathSense({
   onPick,
   placeholder = "Type or ↓ for top fields",
   id,
+  emptyMessage = "Sample isn't JSON or topic is empty — enter path manually.",
+  arrayIndexToggle = true,
 }: PathSenseProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value);
@@ -104,7 +121,7 @@ export function PathSense({
     } else if (e.key === "ArrowDown") {
       setOpen(true);
     } else if (e.key === "Tab") {
-      if (/\[(\*|\d+)\]/.test(query)) {
+      if (arrayIndexToggle && /\[(\*|\d+)\]/.test(query)) {
         e.preventDefault();
         onChange(toggleArraySegment(query));
       }
@@ -138,9 +155,7 @@ export function PathSense({
       {open && (
         <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-panel shadow-lg">
           {allRows.length === 0 ? (
-            <div className="p-2 text-xs text-muted">
-              Sample isn't JSON or topic is empty — enter path manually.
-            </div>
+            <div className="p-2 text-xs text-muted">{emptyMessage}</div>
           ) : (
             <ul className="max-h-72 overflow-auto py-1 text-xs">
               {filtered.length === 0 ? (

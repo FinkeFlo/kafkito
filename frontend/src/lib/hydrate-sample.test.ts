@@ -55,6 +55,50 @@ describe("hydrateTruncatedSampleMessages", () => {
     expect(fetchMessageRawBase64).not.toHaveBeenCalled();
   });
 
+  it("hydrates a truncated XML value, so XPath PathSense sees the full document", async () => {
+    const full = "<order><id>A1</id><status>shipped</status></order>";
+    fetchMessageRawBase64.mockResolvedValue(
+      Buffer.from(full, "utf-8").toString("base64"),
+    );
+    const msgs = [
+      message({
+        value: "<order><id>A1</id><sta",
+        value_encoding: "xml",
+        value_truncated: true,
+      }),
+    ];
+
+    const result = await hydrateTruncatedSampleMessages(
+      "c",
+      "t",
+      msgs,
+      undefined,
+      "xml",
+    );
+
+    expect(result[0].value).toBe(full);
+    expect(result[0].value_truncated).toBe(false);
+    expect(fetchMessageRawBase64).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fetch values of an encoding the caller's tree cannot parse", async () => {
+    const msgs = [
+      message({ value: "<order><id>A1</id><sta", value_encoding: "xml", value_truncated: true }),
+      message({ offset: 2, value: '{"a":1', value_encoding: "json", value_truncated: true }),
+    ];
+
+    // JSONPath mode: the XML sample would be discarded by JSON.parse anyway,
+    // so downloading up to MAX_HYDRATE_VALUE_BYTES for it is pure waste.
+    fetchMessageRawBase64.mockResolvedValue(
+      Buffer.from('{"a":1}', "utf-8").toString("base64"),
+    );
+
+    await hydrateTruncatedSampleMessages("c", "t", msgs, undefined, "json");
+
+    expect(fetchMessageRawBase64).toHaveBeenCalledTimes(1);
+    expect(fetchMessageRawBase64).toHaveBeenCalledWith("c", "t", 0, 2, undefined);
+  });
+
   it("hydrates a truncated JSON value", async () => {
     const full = JSON.stringify({ order: { id: "A1", price: 9.99 } });
     fetchMessageRawBase64.mockResolvedValue(
