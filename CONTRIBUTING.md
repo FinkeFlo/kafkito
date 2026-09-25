@@ -28,6 +28,10 @@ GitHub Actions.
 4. Open a PR with a clear description and a Test plan.
 5. Sign off your commits (`-s`).
 
+Pure formatting commits are listed in `.git-blame-ignore-revs`. GitHub skips
+them in blame views; locally run
+`git config blame.ignoreRevsFile .git-blame-ignore-revs` once per clone.
+
 ## Pre-commit hooks
 
 Optional. `.pre-commit-config.yaml` defines lean hooks that only look at
