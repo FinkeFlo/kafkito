@@ -29,7 +29,7 @@ help:
 	@echo "  frontend-install   - bun install in frontend/"
 	@echo "  frontend-build     - bun run build in frontend/"
 	@echo "  frontend-dev       - bun run dev in frontend/"
-	@echo "  frontend-check     - frontend lint, build and tests (as in CI)"
+	@echo "  frontend-check     - frontend lint, knip, build and tests (as in CI)"
 	@echo "  api-generate       - regenerate frontend/src/lib/api.gen.ts from api/openapi.yaml"
 	@echo "  api-lint           - lint api/openapi.yaml with Redocly"
 	@echo "  api-check          - api-lint + fail if api.gen.ts is out of date"
@@ -50,7 +50,7 @@ frontend-dev:
 
 # CI's frontend job (.github/workflows/ci.yml) runs this target.
 frontend-check:
-	cd frontend && bun run lint && bun run build && bun run test
+	cd frontend && bun run lint && bun run knip && bun run build && bun run test
 
 # api/openapi.yaml is the HTTP contract (ADR-0005). CI's frontend job runs
 # api-check, so REDOCLY_VERSION is the only Redocly pin.
