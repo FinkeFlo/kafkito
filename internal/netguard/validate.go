@@ -1,7 +1,7 @@
 // Copyright 2026 The kafkito Authors.
 // Licensed under the Apache License, Version 2.0.
 
-package server
+package netguard
 
 import (
 	"fmt"
@@ -9,19 +9,16 @@ import (
 	"net/netip"
 	"net/url"
 	"strings"
-
-	"github.com/FinkeFlo/kafkito/internal/netguard"
 )
 
-// blockedIP reports whether an outbound connection to ip must be refused to
-// prevent SSRF. Delegates to netguard.BlockedIP.
-func blockedIP(ip netip.Addr) bool {
-	return netguard.BlockedIP(ip)
-}
-
-// validateOutboundHost resolves host (a "host" or "host:port") and returns an
-// error if it is empty or any resolved address is blocked.
-func validateOutboundHost(host string) error {
+// ValidateHost resolves host (a "host" or "host:port") and returns an error
+// if it is empty or any resolved address is blocked (see BlockedIP).
+//
+// This is a pre-flight check that turns obviously unsafe destinations into a
+// friendly validation error before any connection is attempted. It is not
+// the enforcement point: DNS can change between this check and the dial, so
+// outbound connections must still go through GuardedDialContext.
+func ValidateHost(host string) error {
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
 	}
@@ -29,14 +26,12 @@ func validateOutboundHost(host string) error {
 	if host == "" {
 		return fmt.Errorf("empty host")
 	}
-	// Literal IP: check directly.
 	if addr, err := netip.ParseAddr(host); err == nil {
-		if blockedIP(addr) {
+		if BlockedIP(addr) {
 			return fmt.Errorf("host %q resolves to a blocked address", host)
 		}
 		return nil
 	}
-	// Hostname: resolve and check every address.
 	addrs, err := net.LookupHost(host)
 	if err != nil {
 		return fmt.Errorf("resolve %q: %w", host, err)
@@ -46,16 +41,16 @@ func validateOutboundHost(host string) error {
 		if perr != nil {
 			continue
 		}
-		if blockedIP(addr) {
+		if BlockedIP(addr) {
 			return fmt.Errorf("host %q resolves to a blocked address %s", host, a)
 		}
 	}
 	return nil
 }
 
-// validateOutboundURL parses raw, requires an http(s) scheme, and validates the
-// host against the SSRF block-list.
-func validateOutboundURL(raw string) error {
+// ValidateURL parses raw, requires an http(s) scheme, and validates its host
+// with ValidateHost. Like ValidateHost it is a pre-flight check only.
+func ValidateURL(raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil {
 		return fmt.Errorf("invalid url: %w", err)
@@ -67,5 +62,5 @@ func validateOutboundURL(raw string) error {
 	if u.Host == "" {
 		return fmt.Errorf("url has no host")
 	}
-	return validateOutboundHost(u.Host)
+	return ValidateHost(u.Host)
 }
