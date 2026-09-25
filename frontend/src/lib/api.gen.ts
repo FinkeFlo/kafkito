@@ -864,7 +864,7 @@ export interface components {
         Error: {
             /** @description Human-readable message (`unauthorized`, `forbidden`, `not found`, ...). */
             error: string;
-            /** @description Machine-readable code where one exists, e.g. `kafka_upstream`, `production_confirmation_required`, `copy_concurrency_limit`, `kafka_message_too_large`, `kafka_not_authorized`, `rbac_denied`, `topic_consumers_timeout`. */
+            /** @description Machine-readable code where one exists, e.g. `kafka_upstream`, `production_confirmation_required`, `copy_concurrency_limit`, `kafka_message_too_large`, `kafka_not_authorized`, `rbac_denied`, `topic_consumers_timeout`, `invalid_request` (the request does not match this document; `error` names the parameter or body field and the violated rule, never the submitted value). */
             code?: string;
             /** @description Detail for 401 responses from the auth middleware. */
             message?: string;
@@ -1352,11 +1352,8 @@ export interface components {
             is_prod?: boolean;
             brokers: string[];
             auth?: {
-                /**
-                 * @description Case-insensitive. `plain` / `scram-*` require `username` and `password`.
-                 * @enum {string}
-                 */
-                type?: "" | "none" | "plain" | "scram-sha-256" | "scram-sha-512";
+                /** @description One of `none`, `plain`, `scram-sha-256`, `scram-sha-512` (case-insensitive; empty = `none`). `plain` / `scram-*` require `username` and `password`. */
+                type?: string;
                 username?: string;
                 /** Format: password */
                 password?: string;

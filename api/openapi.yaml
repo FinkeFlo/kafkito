@@ -1354,7 +1354,9 @@ components:
             Machine-readable code where one exists, e.g. `kafka_upstream`,
             `production_confirmation_required`, `copy_concurrency_limit`,
             `kafka_message_too_large`, `kafka_not_authorized`, `rbac_denied`,
-            `topic_consumers_timeout`.
+            `topic_consumers_timeout`, `invalid_request` (the request does not
+            match this document; `error` names the parameter or body field
+            and the violated rule, never the submitted value).
         message:
           type: string
           description: Detail for 401 responses from the auth middleware.
@@ -1943,14 +1945,20 @@ components:
         brokers:
           type: array
           minItems: 1
-          items: { type: string }
+          items:
+            type: string
+            pattern: '\S'
+            description: "`host:port`; must not be blank."
         auth:
           type: object
           properties:
             type:
               type: string
-              enum: ["", none, plain, scram-sha-256, scram-sha-512]
-              description: Case-insensitive. `plain` / `scram-*` require `username` and `password`.
+              pattern: '^\s*(?:[Nn][Oo][Nn][Ee]|[Pp][Ll][Aa][Ii][Nn]|[Ss][Cc][Rr][Aa][Mm]-[Ss][Hh][Aa]-(?:256|512))?\s*$'
+              description: >
+                One of `none`, `plain`, `scram-sha-256`, `scram-sha-512`
+                (case-insensitive; empty = `none`). `plain` / `scram-*` require
+                `username` and `password`.
             username: { type: string }
             password: { type: string, format: password }
         tls:
