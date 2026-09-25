@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -33,17 +34,24 @@ func main() {
 	configPath := flag.String("config", "", "path to YAML config file (overrides KAFKITO_CONFIG)")
 	flag.Parse()
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	slog.SetDefault(logger)
+	// Bootstrap logger until the config (which carries the log settings) is
+	// loaded; config-load errors are reported through it.
+	bootstrap := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	slog.SetDefault(bootstrap)
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
-		logger.Error("config load failed", "err", err)
+		bootstrap.Error("config load failed", "err", err)
 		os.Exit(2)
 	}
+
+	logger := newLogger(cfg.Log)
+	slog.SetDefault(logger)
 	logger.Info("config loaded",
 		"addr", cfg.Server.Addr,
 		"clusters", len(cfg.Clusters),
+		"log_level", strings.ToLower(cfg.Log.SlogLevel().String()),
+		"log_format", cfg.Log.FormatName(),
 	)
 
 	registry := kafkapkg.NewRegistry(cfg.Clusters, logger)
@@ -110,6 +118,15 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("kafkito stopped")
+}
+
+// newLogger builds the process logger on stdout from the log config.
+func newLogger(c config.LogConfig) *slog.Logger {
+	opts := &slog.HandlerOptions{Level: c.SlogLevel()}
+	if c.FormatName() == config.LogFormatText {
+		return slog.New(slog.NewTextHandler(os.Stdout, opts))
+	}
+	return slog.New(slog.NewJSONHandler(os.Stdout, opts))
 }
 
 // listenAddress returns the HTTP listen address. Honors $PORT (Cloud Foundry /
