@@ -53,7 +53,7 @@ type offsetFetcher func(ctx context.Context, group string) (map[int32]int64, err
 // Implementation notes:
 //   - Dead groups are skipped.
 //   - Per-group offset fetches run in parallel under an errgroup with a
-//     concurrency cap of 8 (backend-styleguide §5).
+//     concurrency cap of 8.
 //   - ListEndOffsets is called once per request and the result is reused for
 //     lag computation.
 //   - Partial errors (e.g. one group cannot be described or its offsets

@@ -29,7 +29,7 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BASE="${BASE:-origin/main}"
 
-# Stage 1 — canonical German-token wordlist (PLAN § 1.1 + 1.1-followup).
+# Stage 1 — canonical German-token wordlist.
 # Word-boundary anchored via `\b` in the alternation. `grep -i` for case
 # insensitivity. Update this list when a new German cognate slips through.
 WORDLIST='\b(Nachricht|Suchen|Letzte|Lade|Aktualisieren|Veroeffentlichen|Veröffentlichen|Bestaetigen|Bestätigen|Abbrechen|Loeschen|Löschen|Erstellen|Heute|Gestern|Tipp:|Klicke|Pfad|Beispiel|Zeitraum|Benutzerdefiniert|Verstanden|Uebernehmen|Übernehmen|Rueckgaengig|Rückgängig|Tippen|Felder|Eintraege|Einträge|Allen|Parse-Fehler|uebersprungen|übersprungen|erschoepft|erschöpft|wurde|durch|veraendert|verändert|loeschen|löschen)\b'
