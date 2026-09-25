@@ -55,3 +55,4 @@ nav:
       - ADR-0002: adr/0002-tech-stack.md
       - ADR-0003: adr/0003-cloud-foundry-readiness.md
       - ADR-0004: adr/0004-xsuaa-build-tag.md
+      - ADR-0005: adr/0005-openapi-contract.md

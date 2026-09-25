@@ -127,6 +127,7 @@ See [docs/adr/](./docs/adr/) for Architecture Decision Records.
 - [x] ADR-0002: Tech Stack
 - [x] ADR-0003: Cloud Foundry Readiness
 - [x] ADR-0004: XSUAA as a build-tagged plugin
+- [x] ADR-0005: OpenAPI 3.1 as the HTTP contract
 
 ## Contributing
 

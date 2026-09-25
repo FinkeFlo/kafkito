@@ -27,10 +27,16 @@ endpoints that back the web UI — stable, documented, scriptable.
   bodies: list endpoints always return `{ "<resource>": [...] }`, not bare
   arrays, so new fields can be added without breaking clients.
 
-## Live docs
+## Contract and live docs
 
-- **Raw OpenAPI 3.1**: `GET /api/v1/openapi.yaml`. Open it in any OpenAPI
-  viewer (e.g. Swagger Editor, Redocly, or your IDE's OpenAPI plugin).
+- **The contract** is the OpenAPI 3.1 document
+  [`api/openapi.yaml`](https://github.com/FinkeFlo/kafkito/blob/main/api/openapi.yaml) (see
+  [ADR-0005](adr/0005-openapi-contract.md)). It lists every endpoint,
+  parameter, request/response schema and error shape. The tables below are
+  a scripting-oriented summary; when they disagree, the spec wins.
+- **Raw OpenAPI 3.1**: `GET /api/v1/openapi.yaml` serves the same document
+  from the running binary. Open it in any OpenAPI viewer (e.g. Swagger
+  Editor, Redocly, or your IDE's OpenAPI plugin).
 
 ## Meta
 
