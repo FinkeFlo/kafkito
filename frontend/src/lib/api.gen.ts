@@ -1352,8 +1352,11 @@ export interface components {
             is_prod?: boolean;
             brokers: string[];
             auth?: {
-                /** @description One of `none`, `plain`, `scram-sha-256`, `scram-sha-512` (case-insensitive; empty = `none`). `plain` / `scram-*` require `username` and `password`. */
-                type?: string;
+                /**
+                 * @description Canonical lowercase values; empty means `none`. `plain` / `scram-*` require `username` and `password`. The `X-Kafkito-Cluster` header is not schema-validated (the server decodes it) and still accepts these values case-insensitively and trimmed, for compatibility with stored private clusters.
+                 * @enum {string}
+                 */
+                type?: "" | "none" | "plain" | "scram-sha-256" | "scram-sha-512";
                 username?: string;
                 /** Format: password */
                 password?: string;

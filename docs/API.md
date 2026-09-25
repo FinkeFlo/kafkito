@@ -469,7 +469,7 @@ Requests to endpoints served by the generated handlers (see
 and the violated rule, but never the submitted value:
 
 ```json
-{ "error": "request body \"/brokers/0\": must match pattern '\\S'", "code": "invalid_request" }
+{ "error": "request body \"/auth/type\": must be one of the allowed values", "code": "invalid_request" }
 ```
 
 JSON request bodies on those endpoints must be sent with
