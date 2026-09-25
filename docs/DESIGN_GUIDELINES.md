@@ -522,7 +522,7 @@ Every commit must pass:
 
 ```bash
 cd frontend
-bun run lint            # tsc -b --noEmit
+bun run lint            # biome check (lint + format) + tsr generate + tsc -b --noEmit
 bun run build           # tsr generate + tsc + vite build
 bun run test            # vitest, incl. static checks in src/__checks__
 ```
