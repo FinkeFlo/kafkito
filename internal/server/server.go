@@ -40,7 +40,16 @@ type Options struct {
 func New(opts Options) http.Handler {
 	r := chi.NewRouter()
 
+	baseLog := opts.Logger
+	if baseLog == nil {
+		baseLog = slog.Default()
+	}
+	// Handler loggers add request_id to every *Context log call.
+	handlerLog := withRequestIDLogging(opts.Logger)
+
 	r.Use(middleware.CleanPath)
+	// Outside Recoverer so recovered panics are logged with status 500.
+	r.Use(requestLogMiddleware(baseLog))
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(30 * time.Second))
 
@@ -52,7 +61,7 @@ func New(opts Options) http.Handler {
 	r.Route("/api", func(api chi.Router) {
 		api.Route("/v1", func(v1 chi.Router) {
 			if opts.Auth != nil {
-				v1.Use(auth.MiddlewareFor(opts.Auth))
+				v1.Use(auth.MiddlewareFor(opts.Auth), capturePrincipal)
 			}
 			v1.Get("/info", handleInfo(opts.Version))
 			v1.Get("/me", handleMe(policy))
@@ -62,7 +71,7 @@ func New(opts Options) http.Handler {
 					g.Use(privateClusterMiddleware)
 					g.Use(rbacMiddleware(policy))
 					g.Use(resolvePrivateClusterParam(opts.Registry))
-					(&clusterAPI{reg: opts.Registry, policy: policy, log: opts.Logger}).mount(g)
+					(&clusterAPI{reg: opts.Registry, policy: policy, log: handlerLog}).mount(g)
 				})
 			}
 		})
@@ -74,7 +83,7 @@ func New(opts Options) http.Handler {
 	// procedure paths (/rpc/kafkito.v1.InfoService/GetInfo) clearly separated.
 	connectPath, connectHandler := kafkitov1connect.NewInfoServiceHandler(newInfoConnectHandler(opts.Version))
 	if opts.Auth != nil {
-		r.With(auth.MiddlewareFor(opts.Auth)).Mount("/rpc"+connectPath, http.StripPrefix("/rpc", connectHandler))
+		r.With(auth.MiddlewareFor(opts.Auth), capturePrincipal).Mount("/rpc"+connectPath, http.StripPrefix("/rpc", connectHandler))
 	} else {
 		r.Mount("/rpc"+connectPath, http.StripPrefix("/rpc", connectHandler))
 	}
