@@ -50,7 +50,7 @@ build-tag rationale.
 
 ### Build from source
 
-Requires Go 1.26+ and Bun 1.3+:
+Requires Go 1.26+ and Bun 1.4+:
 
 ```sh
 git clone https://github.com/FinkeFlo/kafkito && cd kafkito
@@ -60,7 +60,7 @@ KAFKITO_KAFKA_BROKERS=localhost:9092 ./bin/kafkito
 
 ### Local development (hot-reload)
 
-Requires Go 1.26+, Bun 1.3+, and Docker.
+Requires Go 1.26+, Bun 1.4+, and Docker.
 
 ```sh
 make worktree-init    # writes .env.dev with a free port pair
@@ -92,7 +92,7 @@ From an IDE, running `air` directly works too — `.air.toml` loads
 
 | Layer | Tech |
 |---|---|
-| Backend | Go 1.26 · Chi · Connect-RPC (`buf`) · `twmb/franz-go` + `kadm` + `sr` · `dop251/goja` · `knadh/koanf` · `zap`/`slog` · OpenTelemetry |
+| Backend | Go 1.26 · Chi · Connect-RPC (`buf`) · `twmb/franz-go` + `kadm` + `sr` · `dop251/goja` · `knadh/koanf` · `log/slog` |
 | Frontend | React 19 · Vite · TanStack Router · shadcn/ui · Tailwind · Bun |
 | Distribution | Single Go binary (`//go:embed`-ed SPA) · distroless multi-arch Docker image |
 
@@ -104,7 +104,6 @@ See [docs/adr/](./docs/adr/) for Architecture Decision Records.
 - [x] ADR-0002: Tech Stack
 - [x] ADR-0003: Cloud Foundry Readiness
 - [x] ADR-0004: XSUAA as a build-tagged plugin
-- [ ] v0.1.0 MVP: topic list + read-only message browser
 
 ## Contributing
 

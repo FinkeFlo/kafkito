@@ -64,3 +64,36 @@ kafkito will adopt the following principles from day one. None are CF-exclusive 
 - **Assume Kubernetes only.** Rejected — CF compatibility costs almost nothing and is explicitly required by our target users.
 - **Server-side sessions with Redis.** Rejected — a stateless JWT approach avoids an extra dependency and works on any platform.
 - **Use CF-specific libraries (e.g. `cfenv`).** Rejected — we prefer a thin koanf adapter over vendor lock-in.
+
+## Amendments
+
+### 2026-09-25
+
+Corrections to match the implementation:
+
+1. **Authentication follows the auth-proxy pattern.** Login and sessions are
+   handled by an upstream proxy (SAP Approuter on BTP; e.g. oauth2-proxy
+   elsewhere). kafkito itself only validates bearer JWTs on `/api/v1/*`,
+   selected via `KAFKITO_AUTH_MODE`: `off` (`-tags devauth` builds only),
+   `mock`, and `xsuaa` (`-tags btp` builds). A generic `oidc` mode is named in
+   config comments but is not registered in code yet. There is
+   no PKCE Authorization Code flow in the SPA; it is not implemented and not
+   planned. This aligns with the IETF "OAuth 2.0 for Browser-Based Apps"
+   recommendation to keep tokens out of the browser via a BFF/proxy.
+2. **Port fallback** is `:37421`, not `:8080`. Order: `$PORT`, then
+   `server.addr` from config, then `:37421` (`listenAddress` in
+   `cmd/kafkito/main.go`).
+3. **Reverse-proxy headers:** `chi/middleware.RealIP` is not used;
+   `X-Forwarded-*` headers are not interpreted by kafkito.
+4. **XSUAA adapter** lives at `internal/auth/xsuaa` and is compiled only with
+   the `btp` build tag (see ADR-0004), not at `pkg/auth/xsuaa`.
+5. **Local dev auth:** there is no NoOp default. Default builds refuse to start
+   with `KAFKITO_AUTH_MODE=off` (the mode default); `off` is only available in
+   `-tags devauth` builds, where it injects a synthetic principal, and is
+   additionally rejected on Cloud Foundry and on non-loopback binds unless
+   `KAFKITO_INSECURE_AUTH_OFF=true`.
+6. **VCAP_SERVICES** is read only by `-tags btp` builds, to obtain the XSUAA
+   binding. There is no VCAP adapter for Kafka brokers or Schema Registry, and
+   the layered config is `defaults → YAML file → environment variables`.
+7. **Frontend runtime config:** neither the `/api/v1/config/frontend` endpoint
+   nor a `PUBLIC_PATH` base-path setting exists; the SPA is served from `/`.

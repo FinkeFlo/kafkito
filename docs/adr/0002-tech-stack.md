@@ -62,3 +62,15 @@ kafkito is a single-binary Kafka management UI (see ADR-0001). We need a stack t
 - **Sarama** or **IBM/sarama** instead of franz-go — rejected, franz-go is more modern, has better performance and KIP coverage.
 - **Next.js** or **Remix** instead of Vite SPA — rejected, we do not need SSR; a SPA simplifies the `//go:embed` distribution model.
 - **gRPC-Web / grpc-gateway** instead of Connect-RPC — rejected, Connect-RPC offers a simpler protocol with identical tooling benefits.
+
+## Amendments
+
+### 2026-09-25
+
+- **Logging** is `log/slog` only. `go.uber.org/zap` is not used and no zap
+  handler is planned.
+- **Observability:** OpenTelemetry and Prometheus are not implemented and are
+  not planned until there is a consumer for them. Production runs on SAP BTP
+  Cloud Foundry, where logs are viewed via `cf logs`.
+- **RPC layer:** the Connect-RPC decision will be revisited in ADR-0005
+  (upcoming).
