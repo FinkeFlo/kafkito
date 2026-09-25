@@ -30,9 +30,9 @@ help:
 	@echo "  frontend-build     - bun run build in frontend/"
 	@echo "  frontend-dev       - bun run dev in frontend/"
 	@echo "  frontend-check     - frontend lint, knip, build and tests (as in CI)"
-	@echo "  api-generate       - regenerate frontend/src/lib/api.gen.ts from api/openapi.yaml"
+	@echo "  api-generate       - regenerate frontend/src/lib/api.gen.ts and internal/server/api/server.gen.go from api/openapi.yaml"
 	@echo "  api-lint           - lint api/openapi.yaml with Redocly"
-	@echo "  api-check          - api-lint + fail if api.gen.ts is out of date"
+	@echo "  api-check          - api-lint + fail if api.gen.ts or server.gen.go is out of date"
 	@echo "  docker-build       - docker build -t $(IMAGE)"
 	@echo "  compose-up/down    - docker compose lifecycle"
 	@echo "  e2e                - opt-in Playwright walks against a local fixture stack"
@@ -52,18 +52,21 @@ frontend-dev:
 frontend-check:
 	cd frontend && bun run lint && bun run knip && bun run build && bun run test
 
-# api/openapi.yaml is the HTTP contract (ADR-0005). CI's frontend job runs
-# api-check, so REDOCLY_VERSION is the only Redocly pin.
+# api/openapi.yaml is the HTTP contract (ADR-0005). api-generate derives the
+# frontend types and the Go strict server (api/oapi-codegen.yaml) from it;
+# api-check fails on drift in either. CI's frontend job runs api-check, so
+# REDOCLY_VERSION is the only Redocly pin.
 REDOCLY_VERSION ?= 2.54.3
 
 api-generate:
 	cd frontend && bun run api:generate
+	go tool oapi-codegen -config api/oapi-codegen.yaml api/openapi.yaml
 
 api-lint:
 	bunx @redocly/cli@$(REDOCLY_VERSION) lint api/openapi.yaml
 
 api-check: api-lint api-generate
-	git diff --exit-code -- frontend/src/lib/api.gen.ts
+	git diff --exit-code -- frontend/src/lib/api.gen.ts internal/server/api/server.gen.go
 
 # Canonical local gate. Run before opening a PR.
 check: test lint lint-version-check api-check frontend-check

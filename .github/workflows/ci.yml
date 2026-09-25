@@ -45,8 +45,10 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
         with:
+          # Go for the generated strict server (go tool oapi-codegen).
+          go: "true"
           frontend-deps: "true"
-      # OpenAPI lint + generated API types drift check (ADR-0005).
+      # OpenAPI lint + generated TS types and Go server drift check (ADR-0005).
       - run: make api-check
       - run: make frontend-check
 
