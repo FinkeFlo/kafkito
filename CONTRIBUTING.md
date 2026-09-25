@@ -22,6 +22,7 @@ GitHub Actions.
    (`make lint-version-check` enforces this). CI runs the same Makefile
    targets (`make test`, `make api-check`, `make frontend-check`); only
    golangci-lint runs via its GitHub Action, pinned to the same version.
+   `make actionlint` lints the GitHub workflows.
 3. Changing the HTTP API? Edit `api/openapi.yaml` (the contract, see ADR-0005)
    and run `make api-generate` to refresh the generated frontend types.
 4. Open a PR with a clear description and a Test plan.

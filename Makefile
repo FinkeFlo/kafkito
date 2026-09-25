@@ -1,4 +1,4 @@
-.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint lint-install lint-version-check tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev frontend-check api-generate api-lint api-check check release-check release-snapshot e2e e2e-up e2e-test e2e-down e2e-clean help
+.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint lint-install lint-version-check actionlint tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev frontend-check api-generate api-lint api-check check release-check release-snapshot e2e e2e-up e2e-test e2e-down e2e-clean help
 
 BIN := bin/kafkito
 PKG := ./...
@@ -24,6 +24,7 @@ help:
 	@echo "  lint               - golangci-lint run (default + btp build tags, pinned version in ./bin)"
 	@echo "  lint-install       - install golangci-lint $(GOLANGCI_LINT_VERSION) into ./bin if missing or outdated"
 	@echo "  lint-version-check - fail if ci.yml pins a different golangci-lint version"
+	@echo "  actionlint         - lint .github/workflows (pinned actionlint via go run)"
 	@echo "  tidy               - go mod tidy"
 	@echo "  frontend-install   - bun install in frontend/"
 	@echo "  frontend-build     - bun run build in frontend/"
@@ -118,6 +119,13 @@ lint-version-check:
 		echo "golangci-lint version drift: Makefile=$(GOLANGCI_LINT_VERSION) ci.yml=$$ci" >&2; exit 1; \
 	fi; \
 	echo "golangci-lint version in sync: $(GOLANGCI_LINT_VERSION)"
+
+# Pinned actionlint, run ad hoc via `go run` (not a go.mod dependency). Uses
+# shellcheck for run: scripts when it is on PATH (as on GitHub runners).
+ACTIONLINT_VERSION := v1.7.12
+
+actionlint:
+	go run github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION)
 
 tidy:
 	go mod tidy
