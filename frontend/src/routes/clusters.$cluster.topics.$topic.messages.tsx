@@ -18,6 +18,8 @@ import {
 } from "@/lib/api";
 import {
   hydrateTruncatedSampleMessages,
+  isTooLargeToScan,
+  MAX_HYDRATE_VALUE_BYTES,
   type HydratableEncoding,
 } from "@/lib/hydrate-sample";
 import { buildPathTree } from "@/lib/path-tree";
@@ -324,12 +326,21 @@ function MessagesPanel({
           return null;
         }
       })
-      .filter(
-        (v): v is Record<string, unknown> =>
-          v !== null && typeof v === "object" && !Array.isArray(v),
-      );
+      // Arrays are kept: a record whose whole value is an array of rows is a
+      // normal payload shape, and buildPathTree indexes it under `$[*]`.
+      // Scalars carry no field paths and are dropped by the builder itself.
+      .filter((v): v is object => v !== null && typeof v === "object");
     return buildPathTree(parsed);
   }, [sampleQuery.data]);
+
+  // A sample above the hydration cap never gets its full value, so the tree
+  // is built from a 64 KB fragment that is cut mid-structure and therefore
+  // doesn't parse. Reporting that as "isn't JSON" is simply untrue — the
+  // value is valid, it is just too large to scan for field names.
+  const sampleTooLargeToScan = useMemo(
+    () => (sampleQuery.data?.messages ?? []).some(isTooLargeToScan),
+    [sampleQuery.data],
+  );
 
   // XPath's suggestion tree is built from the same (already hydrated)
   // samples, parsed with the browser's DOMParser rather than JSON.parse.
@@ -846,25 +857,21 @@ function MessagesPanel({
                         : "Type or ↓ for top fields"
                     }
                     emptyMessage={
-                      mode === "xpath"
-                        ? "Sample isn't XML or topic is empty — enter path manually."
-                        : "Sample isn't JSON or topic is empty — enter path manually."
+                      sampleTooLargeToScan
+                        ? `Sample is larger than ${fmt.bytes(MAX_HYDRATE_VALUE_BYTES)} — too large to scan for field names. Enter path manually.`
+                        : mode === "xpath"
+                          ? "Sample isn't XML or topic is empty — enter path manually."
+                          : "Sample isn't JSON or topic is empty — enter path manually."
                     }
                     arrayIndexToggle={mode !== "xpath"}
-                    onPick={(picked, sample) => {
+                    onPick={(picked, type) => {
                       setPath(picked);
-                      const isScalar =
-                        sample !== undefined &&
-                        sample !== null &&
-                        typeof sample !== "object";
-                      if (isScalar) {
-                        setOp("eq");
-                        setNeedle(String(sample));
-                      } else {
-                        // object/array/null/undefined → use exists semantics
-                        setOp("exists");
-                        setNeedle("");
-                      }
+                      // The tree carries field names only, so the value is
+                      // yours to type. A container can't be compared with
+                      // `eq` at all, so it gets `exists` semantics.
+                      const isScalar = type !== "object" && type !== "array";
+                      setOp(isScalar ? "eq" : "exists");
+                      setNeedle("");
                     }}
                   />
                 </div>

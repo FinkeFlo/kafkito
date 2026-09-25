@@ -7,6 +7,7 @@
 #   topic e2e-walk-large       1 partition, 50 messages (Delete-Records walk)
 #   topic e2e-large-message    1 partition, 1 JSON message ~100 KB (large-messages walk)
 #   topic e2e-large-message-xml 1 partition, 1 XML message ~100 KB (large-messages walk)
+#   topic e2e-root-array       1 partition, 1 JSON message whose value is an array
 #   consumer group e2e-idle-group  in Empty state (consumed once, then exited)
 #
 # Idempotent: safe to re-run; topics are recreated, the consumer is run
@@ -179,6 +180,23 @@ produce_large_json() {
   printf '%s\t%s\n' "${now_ms}" "${value}" | produce_spread_lines "${topic}"
 }
 
+# produce_root_array_json puts one record whose *whole value* is a JSON array
+# — a batch of rows per message, a normal Kafka shape. buildPathTree used to
+# skip such samples outright, leaving an empty suggestion tree that the UI
+# then mislabelled as "sample isn't JSON". `_padding` sits in the first entry
+# so the asserted field also lands past the 64 KB truncation boundary,
+# covering hydration and the root-array case together.
+produce_root_array_json() {
+  local topic="$1"
+  local now_ms
+  now_ms=$(( $(date +%s) * 1000 ))
+  local padding
+  padding=$(printf '%*s' 100000 '' | tr ' ' 'y')
+  local value
+  value="[{\"_padding\":\"${padding}\",\"RUNID\":\"E2E-RUN-1\",\"meta\":{\"step\":1}},{\"RUNID\":\"E2E-RUN-2\",\"meta\":{\"step\":2}}]"
+  printf '%s\t%s\n' "${now_ms}" "${value}" | produce_spread_lines "${topic}"
+}
+
 # produce_large_xml mirrors produce_large_json but with an XML value, to
 # cover consumer.go's equivalent truncation-tolerant detection for XML
 # (looksXML: first non-whitespace byte is '<') and XPath PathSense's
@@ -213,6 +231,7 @@ main() {
   recreate_topic "e2e-walk-large" 1
   recreate_topic "e2e-large-message" 1
   recreate_topic "e2e-large-message-xml" 1
+  recreate_topic "e2e-root-array" 1
 
   echo "seed: producing fixture messages"
   now_ms=$(( $(date +%s) * 1000 ))
@@ -226,6 +245,7 @@ main() {
   produce_lines "e2e-walk-large" 50
   produce_large_json "e2e-large-message"
   produce_large_xml "e2e-large-message-xml"
+  produce_root_array_json "e2e-root-array"
 
   echo "seed: bringing group e2e-idle-group to Empty"
   leave_group_empty "e2e-walk-target" "e2e-idle-group"

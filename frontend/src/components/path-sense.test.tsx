@@ -11,13 +11,7 @@ const emptyTree: PathTree = new Map();
 function makeTree(entries: Array<[string, Partial<PathInfo>]>): PathTree {
   const t: PathTree = new Map();
   for (const [k, v] of entries) {
-    t.set(k, {
-      type: "string",
-      sampleValues: [],
-      distinctCount: 0,
-      fromN: 1,
-      ...v,
-    });
+    t.set(k, { type: "string", ...v });
   }
   return t;
 }
@@ -29,8 +23,8 @@ describe("PathSense", () => {
     render(
       <PathSense
         tree={makeTree([
-          ["$.orderId", { type: "string", sampleValues: ["A1"] }],
-          ["$.amount", { type: "number", sampleValues: [10] }],
+          ["$.orderId", { type: "string" }],
+          ["$.amount", { type: "number" }],
         ])}
         value=""
         onChange={() => {}}
@@ -42,6 +36,44 @@ describe("PathSense", () => {
 
     expect(screen.getByText("$.orderId")).toBeInTheDocument();
     expect(screen.getByText("$.amount")).toBeInTheDocument();
+  });
+
+  it("lists the field path and its type, and no payload data", async () => {
+    const user = userEvent.setup();
+    render(
+      <PathSense
+        tree={makeTree([["$.status", { type: "string" }]])}
+        value=""
+        onChange={() => {}}
+        onPick={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("combobox"));
+
+    // Exact equality, not a substring check: it is what proves the row
+    // carries nothing beyond the field name and its type — no sample value
+    // and no distinct count.
+    const row = screen.getByText("$.status").closest("button");
+    expect(row?.textContent).toBe("$.statusstring");
+  });
+
+  it("passes the picked path's type, not a value, to onPick", async () => {
+    const onPick = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <PathSense
+        tree={makeTree([["$.meta", { type: "object" }]])}
+        value=""
+        onChange={() => {}}
+        onPick={onPick}
+      />,
+    );
+
+    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getByText("$.meta"));
+
+    expect(onPick).toHaveBeenCalledWith("$.meta", "object");
   });
 
   it("filters as the user types", async () => {
