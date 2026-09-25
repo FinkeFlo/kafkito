@@ -57,7 +57,6 @@ func New(opts Options) http.Handler {
 			v1.Get("/info", handleInfo(opts.Version))
 			v1.Get("/me", handleMe(policy))
 			v1.Get("/openapi.yaml", handleOpenAPISpec)
-			v1.Get("/docs", handleSwaggerUI)
 			if opts.Registry != nil {
 				v1.Group(func(g chi.Router) {
 					g.Use(privateClusterMiddleware)
