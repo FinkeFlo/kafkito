@@ -80,6 +80,23 @@ same Compose-backed Kafka and Schema Registry.
 From an IDE, running `air` directly works too — `.air.toml` loads
 `.env.dev` itself, as long as you've run `make worktree-init` once.
 
+### Configuration
+
+kafkito reads an optional YAML file (`--config` or `KAFKITO_CONFIG`) and
+`KAFKITO_*` environment variables. Later sources win: built-in defaults →
+YAML file → `KAFKITO_*` variables → `$PORT`.
+
+| Variable                          | YAML key                         | Default   | Notes |
+| --------------------------------- | -------------------------------- | --------- | ----- |
+| `KAFKITO_SERVER_ADDR`             | `server.addr`                    | `:37421`  | Listen address. |
+| `PORT`                            | —                                | —         | If set and non-empty, overrides `server.addr` with `:$PORT` (Cloud Foundry / Heroku). |
+| `KAFKITO_TEST_CONNECTION_TIMEOUT` | `server.test_connection_timeout` | `15s`     | Go duration (`30s`, `2m`) for the private-cluster "Test connection" probe. `0` means the default; invalid or negative values fail startup. |
+| `KAFKITO_SERVER_FRAME_ANCESTORS`  | `server.frame_ancestors`         | `'none'`  | CSP `frame-ancestors` source list, see [Security headers](#security-headers). |
+| `KAFKITO_KAFKA_BROKERS`           | —                                | —         | Env-only shortcut: when no `clusters` are configured, defines one cluster named `local` from a comma-separated broker list. |
+
+An invalid listen address (for example `PORT=abc`) fails startup with exit
+code 2.
+
 ### Logging
 
 kafkito logs to stdout via `log/slog`, one line per event:

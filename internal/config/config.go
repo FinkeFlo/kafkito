@@ -10,7 +10,10 @@
 //  1. Built-in defaults
 //  2. YAML file (if --config is given or KAFKITO_CONFIG is set)
 //  3. Environment variables with the KAFKITO_ prefix
-//  4. A convenience shortcut: if no clusters are defined but
+//  4. $PORT (Cloud Foundry / Heroku style): when set and non-empty it
+//     overrides server.addr with ":$PORT", regardless of where server.addr
+//     came from.
+//  5. A convenience shortcut: if no clusters are defined but
 //     KAFKITO_KAFKA_BROKERS is set, a single cluster named "local"
 //     is synthesized from that comma-separated list.
 package config
@@ -19,8 +22,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/env"
@@ -152,11 +157,55 @@ type SubjectConfig struct {
 	Roles []string `koanf:"roles"`
 }
 
+// DefaultAddr is the listen address used when neither server.addr nor $PORT
+// is set.
+const DefaultAddr = ":37421"
+
+// DefaultTestConnectionTimeout is the budget of the user-driven "Test
+// connection" probe when server.test_connection_timeout is unset or zero.
+const DefaultTestConnectionTimeout = 15 * time.Second
+
+// DefaultFrameAncestors is the CSP frame-ancestors source list used when
+// server.frame_ancestors is unset: the UI must not be framed.
+const DefaultFrameAncestors = "'none'"
+
 // ServerConfig controls the HTTP server.
 type ServerConfig struct {
-	// Addr is the bind address, e.g. ":37421". Empty means the default.
-	// $PORT always wins over this, to stay Cloud-Foundry friendly.
+	// Addr is the bind address, e.g. ":37421". Empty means DefaultAddr.
+	// A non-empty $PORT always wins over this (Load rewrites Addr to
+	// ":$PORT"), to stay Cloud-Foundry friendly.
 	Addr string `koanf:"addr"`
+	// TestConnectionTimeout bounds the "Test connection" probe of
+	// POST /api/v1/clusters/_test. Env: KAFKITO_TEST_CONNECTION_TIMEOUT
+	// (Go duration, e.g. "30s"). Zero means DefaultTestConnectionTimeout.
+	TestConnectionTimeout time.Duration `koanf:"test_connection_timeout"`
+	// FrameAncestors is the source list of the Content-Security-Policy
+	// frame-ancestors directive, i.e. which origins may embed the UI in a
+	// frame. Env: KAFKITO_SERVER_FRAME_ANCESTORS. Empty means
+	// DefaultFrameAncestors ('none').
+	FrameAncestors string `koanf:"frame_ancestors"`
+}
+
+// validate rejects values the server could not use. Empty values are valid
+// (they mean "default"). The address check mirrors what net.Listen accepts,
+// so a bad $PORT fails at startup instead of when binding.
+func (s ServerConfig) validate() error {
+	if s.Addr != "" {
+		_, port, err := net.SplitHostPort(s.Addr)
+		if err != nil {
+			return fmt.Errorf("server.addr %q: %w", s.Addr, err)
+		}
+		if _, err := net.LookupPort("tcp", port); err != nil {
+			return fmt.Errorf("server.addr %q: %w", s.Addr, err)
+		}
+	}
+	if s.TestConnectionTimeout < 0 {
+		return fmt.Errorf("server.test_connection_timeout %s must not be negative", s.TestConnectionTimeout)
+	}
+	if strings.ContainsAny(s.FrameAncestors, ";,\r\n") {
+		return fmt.Errorf("server.frame_ancestors must be a space-separated CSP source list (no ';', ',' or newlines)")
+	}
+	return nil
 }
 
 // ClusterConfig describes one Kafka cluster kafkito can connect to.
@@ -236,8 +285,12 @@ func (c ClusterConfig) Redacted() ClusterConfig {
 // Defaults returns the built-in default configuration.
 func Defaults() Config {
 	return Config{
-		Server: ServerConfig{Addr: ":37421"},
-		Log:    LogConfig{Level: LogLevelInfo, Format: LogFormatJSON},
+		Server: ServerConfig{
+			Addr:                  DefaultAddr,
+			TestConnectionTimeout: DefaultTestConnectionTimeout,
+			FrameAncestors:        DefaultFrameAncestors,
+		},
+		Log: LogConfig{Level: LogLevelInfo, Format: LogFormatJSON},
 	}
 }
 
@@ -260,8 +313,17 @@ func Load(path string) (Config, error) {
 		}
 	}
 
-	if err := k.Load(env.Provider("KAFKITO_", ".", envKeyTransform), nil); err != nil {
+	// Env is loaded into its own instance first so env-only shortcuts
+	// (KAFKITO_KAFKA_BROKERS) cannot be triggered from the YAML file.
+	envK := koanf.New(".")
+	if err := envK.Load(env.ProviderWithValue("KAFKITO_", ".", envKeyValue), nil); err != nil {
 		return Config{}, fmt.Errorf("load env: %w", err)
+	}
+	if err := envK.Load(env.ProviderWithValue("PORT", ".", portEnvKeyValue), nil); err != nil {
+		return Config{}, fmt.Errorf("load env: %w", err)
+	}
+	if err := k.Merge(envK); err != nil {
+		return Config{}, fmt.Errorf("merge env: %w", err)
 	}
 
 	var out Config
@@ -269,7 +331,8 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("unmarshal: %w", err)
 	}
 
-	applyShortcuts(&out)
+	applyServerDefaults(&out.Server)
+	applyShortcuts(&out, envK.String(kafkaBrokersKey))
 
 	if err := out.Validate(); err != nil {
 		return Config{}, err
@@ -281,6 +344,9 @@ func Load(path string) (Config, error) {
 // It is intentionally lenient: zero clusters is allowed (kafkito still
 // starts, but cluster-scoped endpoints will report unavailable).
 func (c Config) Validate() error {
+	if err := c.Server.validate(); err != nil {
+		return err
+	}
 	if err := c.Log.validate(); err != nil {
 		return err
 	}
@@ -332,25 +398,70 @@ func (c Config) ClusterByName(name string) (ClusterConfig, bool) {
 	return ClusterConfig{}, false
 }
 
+// kafkaBrokersKey is the koanf key KAFKITO_KAFKA_BROKERS maps to. It is not
+// part of Config; applyShortcuts consumes it.
+const kafkaBrokersKey = "kafka.brokers"
+
+// envKeyAliases maps env vars whose koanf key contains an underscore, which
+// the generic "_" -> "." transform cannot express.
+var envKeyAliases = map[string]string{
+	"KAFKITO_TEST_CONNECTION_TIMEOUT": "server.test_connection_timeout",
+	"KAFKITO_SERVER_FRAME_ANCESTORS":  "server.frame_ancestors",
+}
+
+// envKeyValue maps KAFKITO_* env vars to koanf keys: aliases first, then
+// e.g. KAFKITO_SERVER_ADDR -> server.addr and KAFKITO_LOG_LEVEL -> log.level.
+// Aliased values are trimmed and dropped when empty so that an empty
+// variable keeps the built-in default.
+func envKeyValue(key, value string) (string, any) {
+	if alias, ok := envKeyAliases[key]; ok {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return "", nil
+		}
+		return alias, value
+	}
+	return envKeyTransform(key), value
+}
+
 // envKeyTransform maps e.g. KAFKITO_SERVER_ADDR -> server.addr and
 // KAFKITO_LOG_LEVEL -> log.level.
-// Known list-type keys (brokers) split on comma.
 func envKeyTransform(key string) string {
 	key = strings.ToLower(strings.TrimPrefix(key, "KAFKITO_"))
 	return strings.ReplaceAll(key, "_", ".")
 }
 
-// applyShortcuts synthesizes a default cluster from KAFKITO_KAFKA_BROKERS
-// when no clusters are otherwise configured.
-func applyShortcuts(c *Config) {
+// portEnvKeyValue maps a non-empty $PORT to server.addr=":$PORT". Other
+// variables sharing the "PORT" prefix are ignored.
+func portEnvKeyValue(key, value string) (string, any) {
+	if key != "PORT" || value == "" {
+		return "", nil
+	}
+	return "server.addr", ":" + value
+}
+
+// applyServerDefaults restores defaults for server settings explicitly set
+// to their zero value (e.g. KAFKITO_SERVER_ADDR="").
+func applyServerDefaults(s *ServerConfig) {
+	if s.Addr == "" {
+		s.Addr = DefaultAddr
+	}
+	if s.TestConnectionTimeout == 0 {
+		s.TestConnectionTimeout = DefaultTestConnectionTimeout
+	}
+	if strings.TrimSpace(s.FrameAncestors) == "" {
+		s.FrameAncestors = DefaultFrameAncestors
+	}
+	s.FrameAncestors = strings.Join(strings.Fields(s.FrameAncestors), " ")
+}
+
+// applyShortcuts synthesizes a default cluster from the KAFKITO_KAFKA_BROKERS
+// value (rawBrokers) when no clusters are otherwise configured.
+func applyShortcuts(c *Config, rawBrokers string) {
 	if len(c.Clusters) > 0 {
 		return
 	}
-	raw := os.Getenv("KAFKITO_KAFKA_BROKERS")
-	if raw == "" {
-		return
-	}
-	brokers := splitCSV(raw)
+	brokers := splitCSV(rawBrokers)
 	if len(brokers) == 0 {
 		return
 	}

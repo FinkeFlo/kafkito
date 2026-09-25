@@ -87,7 +87,8 @@ func run(configPath string) int {
 	defer cleanup()
 	logger.Info("auth initialised", "mode", mode)
 
-	addr := listenAddress(cfg.Server.Addr)
+	// config.Load already applied $PORT and the default address.
+	addr := cfg.Server.Addr
 	if err := guardAuthMode(mode, addr, os.Getenv); err != nil {
 		logger.Error("insecure auth configuration", "mode", mode, "addr", addr, "err", err)
 		return 2
@@ -133,16 +134,4 @@ func newLogger(c config.LogConfig) *slog.Logger {
 		return slog.New(slog.NewTextHandler(os.Stdout, opts))
 	}
 	return slog.New(slog.NewJSONHandler(os.Stdout, opts))
-}
-
-// listenAddress returns the HTTP listen address. Honors $PORT (Cloud Foundry /
-// Heroku-style) first, then the configured Server.Addr, and finally :37421.
-func listenAddress(configured string) string {
-	if p := os.Getenv("PORT"); p != "" {
-		return ":" + p
-	}
-	if configured != "" {
-		return configured
-	}
-	return ":37421"
 }

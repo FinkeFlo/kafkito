@@ -13,7 +13,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,8 +24,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/twmb/franz-go/pkg/kerr"
 )
-
-const defaultTestConnectionTimeout = 15 * time.Second
 
 // maxProduceBodyBytes caps the decompressed JSON body of a single-record
 // produce request. Exported as a value (not just inline) so the 413 message
@@ -79,26 +76,22 @@ func (a *clusterAPI) requireProdConfirmation(w http.ResponseWriter, r *http.Requ
 }
 
 // testConnectionTimeout returns the budget for the user-driven Test
-// connection probe. Defaults to 15s; set KAFKITO_TEST_CONNECTION_TIMEOUT
-// (e.g. "30s", "2m") to override for slow corporate networks where cold
-// DNS + TLS + SASL fan-out across all brokers exceeds the default.
-func testConnectionTimeout() time.Duration {
-	raw := strings.TrimSpace(os.Getenv("KAFKITO_TEST_CONNECTION_TIMEOUT"))
-	if raw == "" {
-		return defaultTestConnectionTimeout
+// connection probe (server.test_connection_timeout, env
+// KAFKITO_TEST_CONNECTION_TIMEOUT). Non-positive values fall back to
+// config.DefaultTestConnectionTimeout.
+func (a *clusterAPI) testConnectionTimeout() time.Duration {
+	if a.testConnTimeout <= 0 {
+		return config.DefaultTestConnectionTimeout
 	}
-	d, err := time.ParseDuration(raw)
-	if err != nil || d <= 0 {
-		return defaultTestConnectionTimeout
-	}
-	return d
+	return a.testConnTimeout
 }
 
 // clusterAPI wires cluster- and topic-related endpoints.
 type clusterAPI struct {
-	reg    *kafkapkg.Registry
-	policy *rbac.Policy
-	log    *slog.Logger
+	reg             *kafkapkg.Registry
+	policy          *rbac.Policy
+	log             *slog.Logger
+	testConnTimeout time.Duration
 }
 
 func (a *clusterAPI) mount(r chi.Router) {
@@ -187,7 +180,7 @@ func (a *clusterAPI) testCluster(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": cerr.Error()})
 		return
 	}
-	pingCtx, pingCancel := context.WithTimeout(r.Context(), testConnectionTimeout())
+	pingCtx, pingCancel := context.WithTimeout(r.Context(), a.testConnectionTimeout())
 	defer pingCancel()
 	info := kafkapkg.ClusterInfo{
 		Name:           "",

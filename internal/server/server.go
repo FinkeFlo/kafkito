@@ -70,7 +70,12 @@ func New(opts Options) http.Handler {
 					g.Use(privateClusterMiddleware)
 					g.Use(rbacMiddleware(policy))
 					g.Use(resolvePrivateClusterParam(opts.Registry))
-					(&clusterAPI{reg: opts.Registry, policy: policy, log: handlerLog}).mount(g)
+					(&clusterAPI{
+						reg:             opts.Registry,
+						policy:          policy,
+						log:             handlerLog,
+						testConnTimeout: opts.Config.Server.TestConnectionTimeout,
+					}).mount(g)
 				})
 			}
 		})
