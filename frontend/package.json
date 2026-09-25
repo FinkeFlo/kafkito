@@ -25,11 +25,9 @@
     "@tanstack/react-router": "^1.170.18",
     "clsx": "^2.1.1",
     "fuse.js": "^7.5.0",
-    "i18next": "^26.3.6",
     "lucide-react": "^1.25.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-i18next": "^17.0.10",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0"
   },

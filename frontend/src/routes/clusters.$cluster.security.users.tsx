@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
 import { KeyRound, Trash2 } from "lucide-react";
 import {
   deleteSCRAMUser,
@@ -33,7 +32,6 @@ function UsersPage() {
 
 function UsersBody({ cluster }: { cluster: string }) {
   const qc = useQueryClient();
-  const { t } = useTranslation(["users", "common"]);
   const [showUpsert, setShowUpsert] = useState(false);
   const [upsertDefaults, setUpsertDefaults] = useState<{ user: string; mechanism: string }>({
     user: "",
@@ -50,7 +48,7 @@ function UsersBody({ cluster }: { cluster: string }) {
   const delMut = useMutation({
     mutationFn: (p: { user: string; mechanism: string }) => deleteSCRAMUser(cluster, p.user, p.mechanism),
     onSuccess: (_, p) => {
-      setBanner({ kind: "ok", msg: t("users:delete.success", { user: p.user, mechanism: p.mechanism }) });
+      setBanner({ kind: "ok", msg: `Credential deleted: ${p.user} / ${p.mechanism}` });
       setPendingDelete(null);
       qc.invalidateQueries({ queryKey: ["scram-users", cluster] });
     },
@@ -70,13 +68,13 @@ function UsersBody({ cluster }: { cluster: string }) {
     () => [
       {
         id: "user",
-        header: t("users:columns.user"),
+        header: "User",
         sortValue: (r) => r.user,
         cell: (r) => <span className="font-mono text-[13px] tabular-nums">{r.user}</span>,
       },
       {
         id: "mechanism",
-        header: t("users:columns.mechanism"),
+        header: "Mechanism",
         className: "w-48",
         sortValue: (r) => r.mechanism,
         cell: (r) =>
@@ -88,7 +86,7 @@ function UsersBody({ cluster }: { cluster: string }) {
       },
       {
         id: "iterations",
-        header: t("users:columns.iterations"),
+        header: "Iterations",
         className: "w-32",
         align: "right",
         sortValue: (r) => r.iterations,
@@ -111,7 +109,7 @@ function UsersBody({ cluster }: { cluster: string }) {
                   setShowUpsert(true);
                 }}
               >
-                {t("users:actions.rotate")}
+                Rotate password
               </Button>
               <button
                 type="button"
@@ -119,7 +117,7 @@ function UsersBody({ cluster }: { cluster: string }) {
                   e.stopPropagation();
                   setPendingDelete({ user: r.user, mechanism: r.mechanism });
                 }}
-                aria-label={t("common:actions.delete")}
+                aria-label="Delete"
                 className="text-subtle-text transition-colors hover:text-danger"
               >
                 <Trash2 className="h-4 w-4" />
@@ -128,14 +126,14 @@ function UsersBody({ cluster }: { cluster: string }) {
           ),
       },
     ],
-    [t],
+    [],
   );
 
   const empty = (
     <EmptyState
       icon={<KeyRound className="h-5 w-5" />}
-      title={t("users:empty.title")}
-      description={t("users:empty.description")}
+      title="No SCRAM users"
+      description="Create a SCRAM user to enable SASL authentication."
     />
   );
 
@@ -151,7 +149,7 @@ function UsersBody({ cluster }: { cluster: string }) {
             setShowUpsert(true);
           }}
         >
-          {t("users:actions.new")}
+          + New User
         </Button>
       </div>
       {banner && (
@@ -195,18 +193,18 @@ function UsersBody({ cluster }: { cluster: string }) {
       <ConfirmDialog
         open={pendingDelete !== null}
         onOpenChange={(v) => !v && setPendingDelete(null)}
-        title={t("users:delete.title")}
+        title="Delete SCRAM credential?"
         description={
           pendingDelete ? (
             <span className="block space-y-1">
               <span className="block font-mono text-[13px] tabular-nums">
                 {pendingDelete.user} / {pendingDelete.mechanism}
               </span>
-              <span className="block">{t("users:delete.description")}</span>
+              <span className="block">The user will no longer be able to authenticate with this mechanism. Other mechanisms remain.</span>
             </span>
           ) : undefined
         }
-        confirmLabel={t("users:delete.destructiveLabel")}
+        confirmLabel="Delete credential"
         variant="danger"
         onConfirm={() => {
           if (pendingDelete) delMut.mutate(pendingDelete);
@@ -231,7 +229,6 @@ function UpsertModal({
   onDone: (msg: string) => void;
   onError: (msg: string) => void;
 }) {
-  const { t } = useTranslation(["users", "common"]);
   const [user, setUser] = useState(defaultUser);
   const [mechanism, setMechanism] = useState(defaultMechanism);
   const [password, setPassword] = useState("");
@@ -240,7 +237,7 @@ function UpsertModal({
   const mut = useMutation({
     mutationFn: () => upsertSCRAMUser(cluster, { user, mechanism, password, iterations }),
     onSuccess: () =>
-      onDone(t("users:upsert.successCreate", { user, mechanism, iterations })),
+      onDone(`SCRAM credential set: ${user} / ${mechanism} (${iterations} it.)`),
     onError: (e: Error) => onError(e.message),
   });
 
@@ -251,11 +248,11 @@ function UpsertModal({
       open
       onClose={onClose}
       size="md"
-      title={rotating ? t("users:upsert.rotateTitle") : t("users:upsert.createTitle")}
+      title={rotating ? "Rotate password" : "Create / Update SCRAM User"}
       actions={
         <>
           <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("common:actions.cancel")}
+            Cancel
           </Button>
           <Button
             variant="primary"
@@ -263,14 +260,14 @@ function UpsertModal({
             onClick={() => mut.mutate()}
             disabled={mut.isPending || !user.trim() || !password || iterations < 4096 || iterations > 16384}
           >
-            {mut.isPending ? t("users:upsert.saving") : rotating ? t("users:upsert.rotate") : t("common:actions.create")}
+            {mut.isPending ? "Saving…" : rotating ? "Rotate" : "Create"}
           </Button>
         </>
       }
     >
       <div className="space-y-3 text-sm">
         <div>
-          <label className="block text-xs font-medium text-muted">{t("users:columns.user")}</label>
+          <label className="block text-xs font-medium text-muted">User</label>
           <Input
             value={user}
             onChange={(e) => setUser(e.target.value)}
@@ -280,7 +277,7 @@ function UpsertModal({
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted">{t("users:columns.mechanism")}</label>
+          <label className="block text-xs font-medium text-muted">Mechanism</label>
           <select
             value={mechanism}
             onChange={(e) => setMechanism(e.target.value)}
@@ -295,19 +292,19 @@ function UpsertModal({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted">{t("users:upsert.password")}</label>
+          <label className="block text-xs font-medium text-muted">Password</label>
           <Input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="mt-1 font-mono"
-            placeholder={t("users:upsert.passwordPlaceholder")}
+            placeholder="at least 1 character"
             autoFocus
           />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted">
-            {t("users:upsert.iterations")} <span className="text-subtle-text">{t("users:upsert.iterationsHint")}</span>
+            Iterations <span className="text-subtle-text">(4096–16384, default 8192)</span>
           </label>
           <Input
             type="number"

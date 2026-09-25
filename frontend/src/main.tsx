@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { routeTree } from "./routeTree.gen";
 import { AuthProvider } from "./auth/AuthProvider";
 import { SessionExpiredError } from "./auth/api";
-import "./i18n";
 import "./index.css";
 
 const queryClient = new QueryClient({

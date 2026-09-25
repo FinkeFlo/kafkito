@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useTranslation } from "react-i18next";
 import {
   fetchBrokers,
   fetchGroups,
@@ -36,6 +35,16 @@ type ItemKind =
   | "broker"
   | "subject"
   | "user";
+
+const CATEGORY_LABELS: Record<ItemKind, string> = {
+  nav: "NAV",
+  cluster: "CLUSTER",
+  topic: "TOPIC",
+  group: "GROUP",
+  broker: "BROKER",
+  subject: "SUBJECT",
+  user: "USER",
+};
 
 type Item =
   | { kind: "nav"; label: string; to: string; icon: React.ReactNode }
@@ -103,14 +112,6 @@ export function subscribeCommandPalette(listener: Listener): () => void {
 }
 
 export function CommandPalette() {
-  const { t } = useTranslation("palette");
-  // Memoized so it doesn't get a new identity every render — it's a dependency
-  // of the allItems useMemo below, and an unstable reference there would defeat
-  // that memoization entirely (recomputing the full item list on every render).
-  const tt = useCallback(
-    (k: string, opts?: Record<string, unknown>): string => t(k as never, opts as never) as unknown as string,
-    [t],
-  );
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
@@ -179,16 +180,16 @@ export function CommandPalette() {
 
   const allItems: Item[] = useMemo(() => {
     const base: Item[] = [
-      { kind: "nav", label: tt("nav.home"), to: "/", icon: <Home className="h-3.5 w-3.5" /> },
+      { kind: "nav", label: "Home", to: "/", icon: <Home className="h-3.5 w-3.5" /> },
     ];
     if (activeCluster) {
       const c = encodeURIComponent(activeCluster);
       base.push(
-        { kind: "nav", label: tt("nav.topics"), to: `/clusters/${c}/topics`, icon: <Boxes className="h-3.5 w-3.5" /> },
-        { kind: "nav", label: tt("nav.groups"), to: `/clusters/${c}/groups`, icon: <Users className="h-3.5 w-3.5" /> },
-        { kind: "nav", label: tt("nav.schemas"), to: `/clusters/${c}/schemas`, icon: <FileJson className="h-3.5 w-3.5" /> },
-        { kind: "nav", label: tt("nav.acls"), to: `/clusters/${c}/security/acls`, icon: <Shield className="h-3.5 w-3.5" /> },
-        { kind: "nav", label: tt("nav.users"), to: `/clusters/${c}/security/users`, icon: <UserCog className="h-3.5 w-3.5" /> },
+        { kind: "nav", label: "Topics", to: `/clusters/${c}/topics`, icon: <Boxes className="h-3.5 w-3.5" /> },
+        { kind: "nav", label: "Groups", to: `/clusters/${c}/groups`, icon: <Users className="h-3.5 w-3.5" /> },
+        { kind: "nav", label: "Schemas", to: `/clusters/${c}/schemas`, icon: <FileJson className="h-3.5 w-3.5" /> },
+        { kind: "nav", label: "ACLs", to: `/clusters/${c}/security/acls`, icon: <Shield className="h-3.5 w-3.5" /> },
+        { kind: "nav", label: "SCRAM Users", to: `/clusters/${c}/security/users`, icon: <UserCog className="h-3.5 w-3.5" /> },
       );
     }
     const clusterItems: Item[] = (clusters ?? []).map((c) => ({
@@ -260,7 +261,6 @@ export function CommandPalette() {
     brokersQ.data,
     subjectsQ.data,
     usersQ.data,
-    tt,
   ]);
 
   // Multi-token AND search via the project's canonical fuzzy helper (Fuse,
@@ -365,16 +365,16 @@ export function CommandPalette() {
                 if (it) pick(it);
               }
             }}
-            placeholder={tt("placeholder")}
+            placeholder="Find anything: topic, group, broker, subject, user, cluster…"
             className="flex-1 bg-transparent text-sm"
           />
           <kbd className="rounded border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--color-text-muted)]">
-            {tt("actions.esc")}
+            Esc
           </kbd>
         </div>
         <div className="max-h-[60vh] overflow-y-auto py-1">
           {renderItems.length === 0 && (
-            <div className="p-6 text-center text-sm text-[var(--color-text-muted)]">{tt("noResults")}</div>
+            <div className="p-6 text-center text-sm text-[var(--color-text-muted)]">No results.</div>
           )}
           {renderItems.map((it, i) => (
             <button
@@ -387,7 +387,7 @@ export function CommandPalette() {
               ].join(" ")}
             >
               <span className="w-16 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
-                {tt(`category.${it.kind}`)}
+                {CATEGORY_LABELS[it.kind]}
               </span>
               {it.kind === "nav" && it.icon}
               {it.kind === "group" && <Users className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />}
@@ -396,27 +396,27 @@ export function CommandPalette() {
               {it.kind === "user" && <UserCog className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />}
               <span className="font-mono">{it.label}</span>
               {it.kind === "cluster" && !it.reachable && (
-                <span className="ml-auto text-[10px] text-[var(--color-danger)]">{tt("cluster.unreachable")}</span>
+                <span className="ml-auto text-[10px] text-[var(--color-danger)]">unreachable</span>
               )}
               {it.kind === "topic" && (
-                <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">{tt("topic.on", { cluster: it.cluster })}</span>
+                <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">on {it.cluster}</span>
               )}
               {it.kind === "group" && (
                 <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">{it.state}</span>
               )}
               {it.kind === "broker" && (
                 <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">
-                  {tt("broker.host", { host: it.host, port: it.port })}
+                  {`${it.host}:${it.port}`}
                 </span>
               )}
               {it.kind === "subject" && (
                 <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">
-                  {tt("subject.versions", { latest: it.latest, count: it.versions })}
+                  {`v${it.latest} · ${it.versions} versions`}
                 </span>
               )}
               {it.kind === "user" && (
                 <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">
-                  {it.mechanisms || tt("user.fallback")}
+                  {it.mechanisms || "no mechanism"}
                 </span>
               )}
             </button>
@@ -424,8 +424,8 @@ export function CommandPalette() {
         </div>
         <div className="flex items-center justify-between border-t border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-1.5 text-[10px] text-[var(--color-text-muted)]">
           <span>
-            <kbd className="rounded bg-[var(--color-surface-raised)] px-1 font-mono">↑↓</kbd> {tt("footer.navigate")} ·{" "}
-            <kbd className="rounded bg-[var(--color-surface-raised)] px-1 font-mono">↵</kbd> {tt("footer.open")}
+            <kbd className="rounded bg-[var(--color-surface-raised)] px-1 font-mono">↑↓</kbd> Navigate ·{" "}
+            <kbd className="rounded bg-[var(--color-surface-raised)] px-1 font-mono">↵</kbd> Open
           </span>
           <span>
             <kbd className="rounded bg-[var(--color-surface-raised)] px-1 font-mono">⌘K</kbd> /{" "}

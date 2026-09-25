@@ -1,6 +1,5 @@
 import { Check, Copy } from "lucide-react";
 import { useState, type HTMLAttributes } from "react";
-import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Tooltip } from "./tooltip";
 
@@ -34,7 +33,6 @@ export function MonoId({
   ...rest
 }: MonoIdProps) {
   const [copied, setCopied] = useState(false);
-  const { t } = useTranslation("common");
 
   if (!value) {
     return (
@@ -82,8 +80,8 @@ export function MonoId({
             onClick={onCopy}
             aria-label={
               copied
-                ? t("copy.done", { defaultValue: "Copied" })
-                : `${t("copy.idle", { defaultValue: "Copy" })} ${value}`
+                ? "Copied"
+                : `Copy to clipboard ${value}`
             }
             className={cn(
               "ml-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-[var(--color-text-subtle)]",

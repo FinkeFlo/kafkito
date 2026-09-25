@@ -502,6 +502,8 @@ src/
 - Components: `PascalCase` files and exports.
 - Hooks: `useCamelCase`.
 - Query keys: always arrays, lowercase strings.
+- UI copy is English, written inline in the component (no i18n layer or
+  translation keys).
 - CSS custom properties: `--color-<role>` or `--font-<role>`; nothing
   else.
 
