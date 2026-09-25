@@ -49,8 +49,91 @@ RPC features such as bidirectional streaming.
     path and method in the spec, and the reverse.
   - An `oasdiff` breaking-change check on pull requests, which fails on
     ERR-level changes.
-- **Deferred.** Generating Go server interfaces (oapi-codegen strict-server)
-  is out of scope here and needs a follow-up decision.
+- **Generated Go server.** See [Generated strict server](#generated-strict-server)
+  below. It was added after the initial decision.
+
+## Generated strict server
+
+- **Status:** Accepted
+- **Date:** 2026-09-25
+
+The Go side is generated from the same spec with oapi-codegen v2.8.0, which
+supports OpenAPI 3.1 (including `type: [T, "null"]` and `const`).
+
+- **Codegen.** The tool is pinned as a Go tool dependency
+  (`go get -tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen`)
+  and runs as `go tool oapi-codegen`. `api/oapi-codegen.yaml` generates
+  models, the `chi-server` wrapper and the `strict-server` interface into
+  `internal/server/api/server.gen.go`. `make api-generate` regenerates both
+  the TypeScript types and this file, and `make api-check` fails on drift
+  in either one. The generated file is excluded from golangci-lint by path.
+- **Overlay.** `api/oapi-codegen.overlay.yaml` is applied only by
+  oapi-codegen, so the published spec does not carry Go extensions. It maps
+  spec schemas onto the existing domain types (`config.ClusterConfig`,
+  `kafka.ClusterInfo`, ...), which means the generated server serialises
+  exactly what the hand-written handlers returned. It also drops the
+  `X-Request-Id` response headers, because the request log middleware
+  already sets them.
+- **Incremental migration.** `output-options.include-operation-ids` lists
+  the migrated operations. All other routes stay hand-written chi handlers
+  until they are migrated. The route/spec parity test covers both kinds.
+- **Per-group registration.** The generated `HandlerWithOptions` would put
+  every operation on one router behind one middleware chain. Instead, each
+  generated `ServerInterfaceWrapper` method is registered individually on
+  the chi group it belonged to before (`internal/server/api_routes.go`):
+  the probes have no auth, the meta endpoints run behind auth, and the
+  cluster routes also run the private-cluster, RBAC and
+  private-cluster-param middleware. The relative paths keep the chi route
+  patterns unchanged, because RBAC resolves permissions from those patterns.
+  A test asserts the pattern, chain and permission of every migrated
+  operation.
+- **Request validation.** Each generated route runs
+  `github.com/oapi-codegen/nethttp-middleware` (kin-openapi) after its group
+  middleware, so validation applies to migrated operations only. The rules
+  live in the spec only (enum, pattern, minItems, required, ...), and the
+  duplicated hand-written input checks were removed. The options are:
+  - `AuthenticationFunc = openapi3filter.NoopAuthenticationFunc`:
+    authentication and RBAC stay in the existing middleware. `bearerAuth`
+    in the spec is documentation only.
+  - `DoNotValidateServers`: the server URL differs per deployment.
+  - `SkipSettingDefaults`: the validator must not rewrite requests.
+  - Order: a body limit (`http.MaxBytesReader`) runs before the validator,
+    because kin-openapi buffers the whole body. Routes without a request
+    body get an empty body.
+  - The validator sees a cleaned URL path, so `/api//v1/info` behaves as
+    chi routes it.
+- **Central error mapping.** `internal/server/apierror.go` defines one error
+  type, `apiError{Status, Code, Message}`, and one `writeError`. It maps
+  sentinel errors (`kafka.ErrUnknownCluster`, `kafka.ErrNotAuthorized`,
+  `kafka.ErrGroupExists`, ...), parameter-binding errors and validation
+  errors to status codes through `errors.As`/`errors.Is`. The strict
+  handler's `RequestErrorHandlerFunc` and `ResponseErrorHandlerFunc`, the
+  wrapper's parameter-binding error handler and the validator's
+  `ErrorHandlerWithOpts` all use it. The JSON body is still the `Error`
+  schema (`{"error": ..., "code": ...}`). Only 5xx errors are logged, and
+  the cause stays in the log.
+- **No value echo.** kin-openapi's messages can contain submitted values,
+  for example the base64 `X-Kafkito-Cluster` header including a password.
+  Validation errors are therefore rebuilt from the error structure: the
+  location (parameter name or body JSON pointer) plus the violated rule,
+  taken only from the schema (type, pattern, bound, required names). A
+  test sends invalid requests that carry a password and asserts that
+  neither the response nor the log contains it.
+- **Two schema validators.** For 3.1 documents kin-openapi validates
+  schemas with a JSON Schema 2020-12 validator. Schemas that contain
+  `$ref`, such as `ClusterConfig`, fail to compile there, and kin-openapi
+  silently falls back to its built-in validator. The fallback also handles
+  `type: [T, "null"]` and `const`. The error sanitiser handles both error
+  forms, and both are tested.
+- **Streaming.** oapi-codegen v2.8.0 streams `text/event-stream` responses
+  natively (the strict response type takes an `io.Reader` and flushes).
+  The SSE endpoints (live consume, topic copy progress) can therefore be
+  migrated the same way, but the response writer must keep the request
+  log middleware's `Flush` passthrough.
+- **Open points for later migrations.** Request bodies that are read
+  before the leaf (the RBAC middleware peeks at some JSON bodies) or that
+  are compressed (gzip produce bodies) need their size limit and decoding
+  in front of the validator, the same way `_test` does today.
 
 ## Consequences
 
@@ -65,10 +148,16 @@ RPC features such as bidirectional streaming.
   tooling.
 
 **Negative**
-- The spec is still hand-written, so the Go side is only guarded at the
-  route and method level. Request and response shapes can still drift from
-  the Go structs until server codegen (or response validation in tests) is
-  adopted.
+- The spec is still hand-written. Migrated operations are guarded by the
+  generated interface, request validation and response validation in the
+  contract tests. Routes that are not migrated yet are only guarded at the
+  route and method level.
+- Moving validation into the spec makes some errors stricter or reworded:
+  JSON request bodies need `Content-Type: application/json`, and
+  validation errors have the code `invalid_request` with generated
+  messages. When the spec is corrected to describe existing server
+  behaviour and oasdiff still reports that as breaking, the change is
+  listed with a justification in `.github/oasdiff-err-ignore.txt`.
 - `openapi-typescript` needs the TypeScript 5 JS API, which the project's
   TypeScript 7 does not provide. It therefore runs through a pinned `bunx`
   instead of as a devDependency.

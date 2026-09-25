@@ -450,11 +450,31 @@ curl -s -X POST "$BASE/api/v1/clusters/$CLUSTER/users" \
 
 ## Errors
 
-All error responses look like:
+All error responses share the `Error` schema from the spec:
 
 ```json
-{ "error": "short machine-friendly description", "detail": "optional longer text" }
+{ "error": "human-readable message", "code": "optional_machine_code" }
 ```
+
+`error` is always present. `code` is set where a machine-readable code
+exists (e.g. `kafka_upstream`, `invalid_request`). RBAC
+denials add `resource` and `action`, and 401s from the auth middleware add
+`message`. Upstream Kafka/Schema Registry details are only logged
+server-side; the response carries `"error": "upstream kafka error"`.
+
+Requests to endpoints served by the generated handlers (see
+[ADR-0005](adr/0005-openapi-contract.md)) are validated against
+`api/openapi.yaml` before the handler runs. A mismatch returns `400` with
+`"code": "invalid_request"`, and `error` names the parameter or body field
+and the violated rule, but never the submitted value:
+
+```json
+{ "error": "request body \"/brokers/0\": must match pattern '\\S'", "code": "invalid_request" }
+```
+
+JSON request bodies on those endpoints must be sent with
+`Content-Type: application/json` (a `charset` parameter is fine); other
+content types return `400` `request body: unsupported Content-Type`.
 
 Status codes used by the server:
 
