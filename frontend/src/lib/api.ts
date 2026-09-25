@@ -15,10 +15,8 @@ export type TopicInfo = Schemas["TopicInfo"];
 export type PartitionInfo = Schemas["PartitionInfo"];
 export type TopicConfigEntry = Schemas["TopicConfigEntry"];
 export type TopicDetail = Schemas["TopicDetail"];
-export type SRDecodedMeta = Schemas["SRDecodedMeta"];
 export type Message = Schemas["Message"];
 export type MessagesPage = Schemas["MessagesPage"];
-export type MessageCountPartition = Schemas["MessageCountPartition"];
 export type MessageCountResponse = Schemas["MessageCountResponse"];
 export type BrokerInfo = Schemas["BrokerInfo"];
 export type TopicConsumer = Schemas["TopicConsumer"];
@@ -30,8 +28,6 @@ export type ProduceResult = Schemas["ProduceResult"];
 export type CopyRequest = Schemas["CopyRequest"];
 export type CopyProgressEvent = Schemas["CopyProgressEvent"];
 export type GroupInfo = Schemas["GroupInfo"];
-export type MemberAssignment = Schemas["MemberAssignment"];
-export type GroupMember = Schemas["GroupMember"];
 export type GroupOffset = Schemas["GroupOffset"];
 export type GroupDetail = Schemas["GroupDetail"];
 export type ResetOffsetsRequest = Schemas["ResetOffsetsRequest"];
@@ -39,17 +35,13 @@ export type ResetOffsetResult = Schemas["ResetOffsetResult"];
 export type ResetOffsetsResult = Schemas["ResetOffsetsResponse"];
 export type CreateGroupRequest = Schemas["CreateGroupRequest"];
 export type CreateTopicRequest = Schemas["CreateTopicRequest"];
-export type DeleteRecordsResult = Schemas["DeleteRecordsResult"];
 export type Subject = Schemas["Subject"];
-export type SchemaReference = Schemas["SchemaReference"];
 export type SchemaVersion = Schemas["SchemaVersion"];
 export type AlterTopicConfigsRequest = Schemas["AlterTopicConfigsRequest"];
-export type AlterTopicConfigsResult = Schemas["AlterTopicConfigsResult"];
 export type ACLEntry = Schemas["ACLEntry"];
 export type SearchRequest = Schemas["SearchRequest"];
 export type SearchStats = Schemas["SearchStats"];
 export type SearchResponse = Schemas["SearchResponse"];
-export type SCRAMCredential = Schemas["SCRAMCredential"];
 export type SCRAMUser = Schemas["SCRAMUser"];
 export type ApiError = Schemas["Error"];
 export type ACLSpec = ACLEntry;
@@ -58,7 +50,6 @@ export type ResetStrategy = ResetOffsetsRequest["strategy"];
 export type CreateGroupStrategy = CreateGroupRequest["strategy"];
 export type SearchMode = NonNullable<SearchRequest["mode"]>;
 export type SearchOp = NonNullable<SearchRequest["op"]>;
-export type SearchZone = NonNullable<SearchRequest["zones"]>[number];
 export type SearchDirection = NonNullable<SearchRequest["direction"]>;
 type ConsumeQuery = NonNullable<operations["consumeMessages"]["parameters"]["query"]>;
 
@@ -485,35 +476,6 @@ export function createTopic(
     clusterPath(cluster, `/topics`),
     "POST",
     req,
-  );
-}
-
-export function deleteTopic(
-  cluster: string,
-  topic: string,
-  confirmProd = false,
-): Promise<Schemas["DeletedNameResponse"]> {
-  return sendJSONForCluster<Schemas["DeletedNameResponse"]>(
-    cluster,
-    clusterPath(cluster, `/topics/${encodeURIComponent(topic)}`),
-    "DELETE",
-    undefined,
-    confirmProd,
-  );
-}
-
-export function deleteRecords(
-  cluster: string,
-  topic: string,
-  partitions: Record<number, number>,
-  confirmProd = false,
-): Promise<Schemas["DeleteRecordsResponse"]> {
-  return sendJSONForCluster<Schemas["DeleteRecordsResponse"]>(
-    cluster,
-    clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/records`),
-    "DELETE",
-    { partitions },
-    confirmProd,
   );
 }
 

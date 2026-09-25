@@ -32,18 +32,3 @@ export function Skeleton({
     />
   );
 }
-
-export interface SkeletonRowsProps {
-  count?: number;
-  className?: string;
-}
-
-export function SkeletonRows({ count = 5, className }: SkeletonRowsProps) {
-  return (
-    <div className={cn("space-y-3", className)}>
-      {Array.from({ length: count }).map((_, i) => (
-        <Skeleton key={i} height="h-10" />
-      ))}
-    </div>
-  );
-}

@@ -88,7 +88,7 @@ export function openCommandPalette(): void {
   });
 }
 
-export function subscribeCommandPalette(listener: Listener): () => void {
+function subscribeCommandPalette(listener: Listener): () => void {
   openListeners.add(listener);
   return () => {
     openListeners.delete(listener);

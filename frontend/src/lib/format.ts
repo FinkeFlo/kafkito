@@ -94,11 +94,6 @@ export function formatLag(
   return grouped(locale).format(n);
 }
 
-/** UTC-only timestamp (alias for `formatTimestamp(..., "utc")`). */
-export function formatTs(input: Date | number | string | null | undefined): string {
-  return formatTimestamp(input, "utc");
-}
-
 const BYTE_UNITS = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"] as const;
 
 /**
