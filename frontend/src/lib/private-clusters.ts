@@ -8,6 +8,8 @@
 // documented in the UI. A future Webcrypto-based passphrase layer can wrap
 // the value transparently without changing the storage schema.
 
+import type { components } from "./api.gen";
+
 export const PRIVATE_CLUSTER_SENTINEL = "__private__";
 
 const STORAGE_KEY = "kafkito.private-clusters.v1";
@@ -210,19 +212,7 @@ export function importBundle(raw: string): ImportResult {
 
 // --- Backend header encoding ------------------------------------------
 
-interface BackendClusterConfig {
-  name: string;
-  is_prod?: boolean;
-  brokers: string[];
-  auth: { type: string; username?: string; password?: string };
-  tls: { enabled: boolean; insecure_skip_verify?: boolean };
-  schema_registry?: {
-    url?: string;
-    username?: string;
-    password?: string;
-    insecure_skip_verify?: boolean;
-  };
-}
+type BackendClusterConfig = components["schemas"]["ClusterConfig"];
 
 function toBackendConfig(c: PrivateCluster): BackendClusterConfig {
   return {

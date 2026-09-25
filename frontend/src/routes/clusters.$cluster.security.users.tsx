@@ -6,6 +6,7 @@ import {
   deleteSCRAMUser,
   listSCRAMUsers,
   upsertSCRAMUser,
+  type SCRAMMechanism,
   type SCRAMUser,
 } from "@/lib/api";
 import { DataTable, type DataTableColumn } from "@/components/DataTable";
@@ -21,7 +22,11 @@ export const Route = createFileRoute("/clusters/$cluster/security/users")({
   component: UsersPage,
 });
 
-const MECHANISMS = ["SCRAM-SHA-256", "SCRAM-SHA-512"];
+const MECHANISMS: readonly SCRAMMechanism[] = ["SCRAM-SHA-256", "SCRAM-SHA-512"];
+
+function toMechanism(m: string): SCRAMMechanism {
+  return MECHANISMS.find((x) => x === m) ?? "SCRAM-SHA-256";
+}
 
 type Row = { user: string; mechanism: string; iterations: number };
 
@@ -230,7 +235,7 @@ function UpsertModal({
   onError: (msg: string) => void;
 }) {
   const [user, setUser] = useState(defaultUser);
-  const [mechanism, setMechanism] = useState(defaultMechanism);
+  const [mechanism, setMechanism] = useState<SCRAMMechanism>(toMechanism(defaultMechanism));
   const [password, setPassword] = useState("");
   const [iterations, setIterations] = useState(8192);
 
@@ -280,7 +285,7 @@ function UpsertModal({
           <label className="block text-xs font-medium text-muted">Mechanism</label>
           <select
             value={mechanism}
-            onChange={(e) => setMechanism(e.target.value)}
+            onChange={(e) => setMechanism(toMechanism(e.target.value))}
             disabled={rotating}
             className="mt-1 h-9 w-full rounded-md border border-border bg-panel px-3 text-sm hover:border-border-hover disabled:bg-subtle disabled:text-muted"
           >

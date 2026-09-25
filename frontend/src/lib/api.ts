@@ -2,173 +2,83 @@ import { apiFetch } from "../auth/api";
 import { clusterPath, fetchAPI } from "./api-http";
 import type { PrivateCluster } from "./private-clusters";
 import { toBackendClusterConfig } from "./private-clusters";
+import type { components, operations } from "./api.gen";
 
-export interface InfoResponse {
-  name: string;
-  version: string;
-  commit?: string;
-  built_at?: string;
-}
+// API payload types are generated from api/openapi.yaml (see ADR-0005). Run
+// `bun run api:generate` after editing the spec; do not hand-write DTOs here.
+type Schemas = components["schemas"];
 
-export interface Capabilities {
-  describe_cluster: boolean;
-  list_topics: boolean;
-  describe_configs: boolean;
-  list_groups: boolean;
-  create_topic: boolean;
-  delete_topic: boolean;
-  alter_configs: boolean;
-  errors?: Record<string, string>;
-  probed_at?: string;
-}
+export type InfoResponse = Schemas["InfoResponse"];
+export type Capabilities = Schemas["Capabilities"];
+export type ClusterInfo = Schemas["ClusterInfo"];
+export type TopicInfo = Schemas["TopicInfo"];
+export type PartitionInfo = Schemas["PartitionInfo"];
+export type TopicConfigEntry = Schemas["TopicConfigEntry"];
+export type TopicDetail = Schemas["TopicDetail"];
+export type SRDecodedMeta = Schemas["SRDecodedMeta"];
+export type Message = Schemas["Message"];
+export type MessagesPage = Schemas["MessagesPage"];
+export type MessageCountPartition = Schemas["MessageCountPartition"];
+export type MessageCountResponse = Schemas["MessageCountResponse"];
+export type BrokerInfo = Schemas["BrokerInfo"];
+export type TopicConsumer = Schemas["TopicConsumer"];
+export type MessageTimelineSlot = Schemas["MessageTimelineSlot"];
+export type MessageTimelineResponse = Schemas["MessageTimelineResponse"];
+export type SampleResponse = Schemas["SampleResponse"];
+export type ProduceRequest = Schemas["ProduceRequest"];
+export type ProduceResult = Schemas["ProduceResult"];
+export type CopyRequest = Schemas["CopyRequest"];
+export type CopyProgressEvent = Schemas["CopyProgressEvent"];
+export type GroupInfo = Schemas["GroupInfo"];
+export type MemberAssignment = Schemas["MemberAssignment"];
+export type GroupMember = Schemas["GroupMember"];
+export type GroupOffset = Schemas["GroupOffset"];
+export type GroupDetail = Schemas["GroupDetail"];
+export type ResetOffsetsRequest = Schemas["ResetOffsetsRequest"];
+export type ResetOffsetResult = Schemas["ResetOffsetResult"];
+export type ResetOffsetsResult = Schemas["ResetOffsetsResponse"];
+export type CreateGroupRequest = Schemas["CreateGroupRequest"];
+export type CreateTopicRequest = Schemas["CreateTopicRequest"];
+export type DeleteRecordsResult = Schemas["DeleteRecordsResult"];
+export type Subject = Schemas["Subject"];
+export type SchemaReference = Schemas["SchemaReference"];
+export type SchemaVersion = Schemas["SchemaVersion"];
+export type AlterTopicConfigsRequest = Schemas["AlterTopicConfigsRequest"];
+export type AlterTopicConfigsResult = Schemas["AlterTopicConfigsResult"];
+export type ACLEntry = Schemas["ACLEntry"];
+export type SearchRequest = Schemas["SearchRequest"];
+export type SearchStats = Schemas["SearchStats"];
+export type SearchResponse = Schemas["SearchResponse"];
+export type SCRAMCredential = Schemas["SCRAMCredential"];
+export type SCRAMUser = Schemas["SCRAMUser"];
+export type ApiError = Schemas["Error"];
+export type ACLSpec = ACLEntry;
+export type SCRAMMechanism = Schemas["UpsertSCRAMUserRequest"]["mechanism"];
+export type ResetStrategy = ResetOffsetsRequest["strategy"];
+export type CreateGroupStrategy = CreateGroupRequest["strategy"];
+export type SearchMode = NonNullable<SearchRequest["mode"]>;
+export type SearchOp = NonNullable<SearchRequest["op"]>;
+export type SearchZone = NonNullable<SearchRequest["zones"]>[number];
+export type SearchDirection = NonNullable<SearchRequest["direction"]>;
+type ConsumeQuery = NonNullable<operations["consumeMessages"]["parameters"]["query"]>;
 
-export interface ClusterInfo {
-  name: string;
-  reachable: boolean;
-  error?: string;
-  is_prod?: boolean;
-  auth_type: string;
-  tls: boolean;
-  schema_registry: boolean;
-  capabilities?: Capabilities;
-  // Aggregate counters and metrics (filled best-effort by the background
-  // metrics collector; undefined when not yet known or the cluster is
-  // unreachable).
-  brokers?: number;
-  topics?: number;
-  groups?: number;
-  total_messages?: number;
-  total_lag?: number;
-  total_rate_per_sec?: number;
-}
-
-export interface TopicInfo {
-  name: string;
-  partitions: number;
-  replication_factor: number;
-  is_internal: boolean;
-  // Metric fields filled best-effort. `retention_ms` of -1 means infinite.
-  messages?: number;
-  size_bytes?: number;
-  retention_ms?: number;
-  rate_per_sec?: number;
-  lag?: number;
-}
-
-export interface PartitionInfo {
-  partition: number;
-  leader: number;
-  replicas: number[];
-  isr: number[];
-  start_offset: number;
-  end_offset: number;
-  messages: number;
-}
-
-export interface TopicConfigEntry {
-  name: string;
-  value: string;
-  is_default: boolean;
-  source?: string;
-  sensitive: boolean;
-}
-
-export interface TopicDetail {
-  name: string;
-  is_internal: boolean;
-  partitions: PartitionInfo[];
-  replication_factor: number;
-  messages: number;
-  configs: TopicConfigEntry[];
-  /**
-   * Non-empty when DescribeConfigs failed for this topic and `configs` is
-   * incomplete. Known codes:
-   *   - "unauthorized": missing DescribeConfigs ACL on the topic / cluster.
-   *   - "unavailable":  any other broker-side error.
-   */
-  configs_error?: "unauthorized" | "unavailable" | string;
-  size_bytes?: number;
-}
-
-export interface SRDecodedMeta {
-  format?: string;
-  schema_id?: number;
-  subject?: string;
-  version?: number;
-}
-
-export interface Message {
-  partition: number;
-  offset: number;
-  timestamp_ms: number;
-  key?: string;
-  key_encoding: string;
-  key_b64?: string;
-  value?: string;
-  value_encoding: string;
-  value_b64?: string;
-  headers?: Record<string, string>;
-  /**
-   * Raw (standard-base64) bytes for header values that were not valid UTF-8.
-   * Populated only for those keys; they keep their "0x…" hex rendering in
-   * `headers` for display. Mirrors kafkapkg.Message.HeadersB64.
-   */
-  headers_b64?: Record<string, string>;
-  masked?: boolean;
-  value_size_bytes?: number;
-  value_truncated?: boolean;
-  key_sr?: SRDecodedMeta;
-  value_sr?: SRDecodedMeta;
-}
-
-export interface ConsumeParams {
-  partition?: number;
-  limit?: number;
-  from?: "end" | "start" | "offset";
-  offset?: number;
-  /**
-   * Per-partition seek offsets, used with `from: "offset"` when no single
-   * partition is selected (partition = all). Each listed partition is seeked
-   * to its offset, clamped server-side to the partition's low watermark.
-   */
+/**
+ * Query parameters of consumeMessages. `partitionOffsets` is the structured
+ * form of the wire parameter `partition_offsets` ("p:o,p:o"): per-partition
+ * seek offsets, used with `from: "offset"` when no single partition is
+ * selected. Each listed partition is seeked to its offset, clamped
+ * server-side to the partition's low watermark.
+ */
+export type ConsumeParams = Omit<ConsumeQuery, "partition_offsets"> & {
   partitionOffsets?: Record<number, number>;
-  from_ts_ms?: number;
-  to_ts_ms?: number;
-  cursor?: string;
-}
-
-export interface MessagesPage {
-  messages: Message[];
-  has_more?: boolean;
-  next_cursor?: string;
-  /** True when this "latest" page could not fully collect its tail window
-   * before the server-side timeout (e.g. a very large record stalled the
-   * transfer) — the page may be missing the very newest record(s). */
-  partial?: boolean;
-}
-
-export interface MessageCountPartition {
-  partition: number;
-  from_offset: number;
-  to_offset: number;
-  approx_count: number;
-}
-
-export interface MessageCountResponse {
-  cluster: string;
-  topic: string;
-  from_ts_ms?: number;
-  to_ts_ms?: number;
-  total_approx_count: number;
-  partitions: MessageCountPartition[];
-}
+};
 
 async function getJSON<T>(path: string): Promise<T> {
   const res = await apiFetch(path, { headers: { Accept: "application/json" } });
   if (!res.ok) {
     let detail = "";
     try {
-      const body = (await res.json()) as { error?: string };
+      const body = (await res.json()) as Partial<ApiError>;
       detail = body.error ? `: ${body.error}` : "";
     } catch {
       /* ignore */
@@ -185,7 +95,7 @@ async function getJSONForCluster<T>(cluster: string, path: string): Promise<T> {
   if (!res.ok) {
     let detail = "";
     try {
-      const body = (await res.json()) as { error?: string };
+      const body = (await res.json()) as Partial<ApiError>;
       detail = body.error ? `: ${body.error}` : "";
     } catch {
       /* ignore */
@@ -200,26 +110,18 @@ export function fetchInfo(): Promise<InfoResponse> {
 }
 
 export async function fetchClusters(): Promise<ClusterInfo[]> {
-  const r = await getJSON<{ clusters: ClusterInfo[] }>("/api/v1/clusters");
+  const r = await getJSON<Schemas["ListClustersResponse"]>("/api/v1/clusters");
   return r.clusters;
 }
 
 export async function fetchTopics(cluster: string): Promise<TopicInfo[]> {
-  const r = await getJSONForCluster<{ topics: TopicInfo[] }>(cluster, clusterPath(cluster, `/topics`),
+  const r = await getJSONForCluster<Schemas["ListTopicsResponse"]>(cluster, clusterPath(cluster, `/topics`),
   );
   return r.topics;
 }
 
-export interface BrokerInfo {
-  node_id: number;
-  host: string;
-  port: number;
-  rack?: string;
-  is_controller: boolean;
-}
-
 export async function fetchBrokers(cluster: string): Promise<BrokerInfo[]> {
-  const r = await getJSONForCluster<{ brokers: BrokerInfo[] }>(
+  const r = await getJSONForCluster<Schemas["ListBrokersResponse"]>(
     cluster,
     clusterPath(cluster, `/brokers`),
   );
@@ -230,26 +132,16 @@ export async function fetchTopicDetail(
   cluster: string,
   topic: string,
 ): Promise<TopicDetail> {
-  const r = await getJSONForCluster<{ topic: TopicDetail }>(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}`),
+  const r = await getJSONForCluster<Schemas["DescribeTopicResponse"]>(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}`),
   );
   return r.topic;
-}
-
-export interface TopicConsumer {
-  group_id: string;
-  state: string;
-  members: number;
-  partitions_assigned: number[];
-  lag: number;
-  lag_known: boolean;
-  error?: string;
 }
 
 export async function fetchTopicConsumers(
   cluster: string,
   topic: string,
 ): Promise<TopicConsumer[]> {
-  const r = await getJSONForCluster<{ consumers: TopicConsumer[] }>(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/consumers`),
+  const r = await getJSONForCluster<Schemas["ListTopicConsumersResponse"]>(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/consumers`),
   );
   return r.consumers ?? [];
 }
@@ -299,21 +191,6 @@ export async function fetchMessageCount(
   );
 }
 
-export interface MessageTimelineSlot {
-  from_ts_ms: number;
-  to_ts_ms: number;
-  approx_count: number;
-}
-
-export interface MessageTimelineResponse {
-  cluster: string;
-  topic: string;
-  from_ts_ms: number;
-  to_ts_ms: number;
-  slot_ms: number;
-  slots: MessageTimelineSlot[];
-}
-
 export async function fetchMessageTimeline(
   cluster: string,
   topic: string,
@@ -331,13 +208,6 @@ export async function fetchMessageTimeline(
   );
 }
 
-export interface SampleResponse {
-  cluster: string;
-  topic: string;
-  messages: Message[];
-  sampled_at: number;
-}
-
 export async function fetchSample(
   cluster: string,
   topic: string,
@@ -351,33 +221,6 @@ export async function fetchSample(
     cluster,
     clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/sample?${qs}`),
   );
-}
-
-export interface ProduceRequest {
-  partition?: number;
-  key: string;
-  value: string;
-  /**
-   * "text" (UTF-8 pass-through; an empty value produces a nil payload, i.e. a
-   * tombstone), "base64" (standard or URL-safe raw bytes) or "empty" (a
-   * non-nil zero-length payload). Defaults to "text" server-side.
-   */
-  key_encoding?: "text" | "base64" | "empty";
-  value_encoding?: "text" | "base64" | "empty";
-  headers?: Record<string, string>;
-  /**
-   * Raw (standard-base64) bytes for header values that are not valid UTF-8.
-   * A key present in both `headers` and `headers_b64` is taken from
-   * `headers_b64` and emitted once. Mirrors kafkapkg.ProduceRequest.HeadersB64.
-   */
-  headers_b64?: Record<string, string>;
-}
-
-export interface ProduceResult {
-  topic: string;
-  partition: number;
-  offset: number;
-  timestamp_ms: number;
 }
 
 // PROD_CONFIRM_HEADER must match internal/server/clusters.go's
@@ -441,7 +284,7 @@ export async function produceMessage(
   if (!res.ok) {
     let detail = "";
     try {
-      const b = (await res.json()) as { error?: string };
+      const b = (await res.json()) as Partial<ApiError>;
       detail = b.error ? `: ${b.error}` : "";
     } catch {
       /* ignore */
@@ -454,44 +297,6 @@ export async function produceMessage(
 // ---------------------------------------------------------------------------
 // Bulk message copy
 // ---------------------------------------------------------------------------
-
-export interface CopyRequest {
-  /** Name of a server-configured destination cluster. */
-  dest_cluster?: string;
-  /**
-   * Ad-hoc (private) cluster config for browser-only clusters. Mutually
-   * exclusive with dest_cluster.
-   */
-  dest_cluster_config?: object;
-  dest_topic: string;
-  /** Source partition to copy from; absent = all partitions. */
-  partition?: number;
-  /** Inclusive UNIX ms lower bound on source message timestamps. */
-  from_ts_ms?: number;
-  /**
-   * Exclusive UNIX ms upper bound on source message timestamps. When absent
-   * the server substitutes the moment the copy starts, so copying a live
-   * topic terminates instead of tailing newly produced records.
-   */
-  to_ts_ms?: number;
-  /** Max messages to copy; absent = no limit. */
-  limit?: number;
-  /** When true each message is produced to the same partition it came from. */
-  preserve_partition?: boolean;
-}
-
-export interface CopyProgressEvent {
-  copied: number;
-  /**
-   * Records left out because they cannot be reproduced byte-for-byte:
-   * schema-registry-decoded payloads (the original wire-format bytes are
-   * gone) and records the source cluster's data-masking rules redacted
-   * (copying would write the redaction).
-   */
-  skipped?: number;
-  done?: boolean;
-  error?: string;
-}
 
 /**
  * copyMessages starts a server-side copy from `cluster`/`topic` to the
@@ -538,7 +343,7 @@ export function copyMessages(
     if (!res.ok) {
       let detail = "";
       try {
-        const b = (await res.json()) as { error?: string };
+        const b = (await res.json()) as Partial<ApiError>;
         detail = b.error ? `: ${b.error}` : "";
       } catch { /* ignore */ }
       onProgress({ copied: 0, done: true, error: `HTTP ${res.status}${detail}` });
@@ -579,49 +384,8 @@ export function copyMessages(
   return () => ctrl.abort();
 }
 
-export interface GroupInfo {
-  group_id: string;
-  state: string;
-  protocol_type: string;
-  protocol?: string;
-  coordinator_id: number;
-  members: number;
-  topics?: number;
-  lag: number;
-  lag_known: boolean;
-  error?: string;
-}
-
-export interface MemberAssignment {
-  topic: string;
-  partitions: number[];
-}
-
-export interface GroupMember {
-  member_id: string;
-  instance_id?: string;
-  client_id: string;
-  client_host: string;
-  assignments: MemberAssignment[];
-}
-
-export interface GroupOffset {
-  topic: string;
-  partition: number;
-  offset: number;
-  log_end: number;
-  lag: number;
-  metadata?: string;
-  assigned_to?: string;
-}
-
-export interface GroupDetail extends Omit<GroupInfo, "members"> {
-  members: GroupMember[];
-  offsets: GroupOffset[];
-}
-
 export async function fetchGroups(cluster: string): Promise<GroupInfo[]> {
-  const r = await getJSONForCluster<{ groups: GroupInfo[] }>(cluster, clusterPath(cluster, `/groups`),
+  const r = await getJSONForCluster<Schemas["ListGroupsResponse"]>(cluster, clusterPath(cluster, `/groups`),
   );
   return r.groups ?? [];
 }
@@ -655,7 +419,7 @@ async function sendJSONForCluster<T>(
   if (!res.ok) {
     let detail = "";
     try {
-      const b = (await res.json()) as { error?: string };
+      const b = (await res.json()) as Partial<ApiError>;
       detail = b.error ? `: ${b.error}` : "";
     } catch {
       /* ignore */
@@ -664,38 +428,6 @@ async function sendJSONForCluster<T>(
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
-}
-
-export type ResetStrategy =
-  | "earliest"
-  | "latest"
-  | "offset"
-  | "timestamp"
-  | "shift-by";
-
-export interface ResetOffsetsRequest {
-  topic: string;
-  partitions?: number[];
-  strategy: ResetStrategy;
-  offset?: number;
-  timestamp_ms?: number;
-  shift?: number;
-  dry_run?: boolean;
-}
-
-export interface ResetOffsetResult {
-  partition: number;
-  old_offset: number;
-  new_offset: number;
-  end_offset: number;
-  error?: string;
-}
-
-export interface ResetOffsetsResult {
-  group: string;
-  topic: string;
-  dry_run: boolean;
-  results: ResetOffsetResult[];
 }
 
 export function resetGroupOffsets(
@@ -711,17 +443,6 @@ export function resetGroupOffsets(
   );
 }
 
-export type CreateGroupStrategy = "earliest" | "latest" | "offset" | "timestamp";
-
-export interface CreateGroupRequest {
-  group_id: string;
-  topic: string;
-  strategy: CreateGroupStrategy;
-  offset?: number;
-  timestamp_ms?: number;
-  dry_run?: boolean;
-}
-
 export function createGroup(
   cluster: string,
   req: CreateGroupRequest,
@@ -732,42 +453,32 @@ export function createGroup(
   );
 }
 
-export function deleteGroup(cluster: string, group: string): Promise<void> {
-  return sendJSONForCluster<void>(cluster, clusterPath(cluster, `/groups/${encodeURIComponent(group)}`),
+export function deleteGroup(cluster: string, group: string): Promise<Schemas["DeletedNameResponse"]> {
+  return sendJSONForCluster<Schemas["DeletedNameResponse"]>(cluster, clusterPath(cluster, `/groups/${encodeURIComponent(group)}`),
     "DELETE",
   );
-}
-
-export interface CreateTopicRequest {
-  name: string;
-  partitions: number;
-  replication_factor: number;
-  configs?: Record<string, string>;
 }
 
 export function createTopic(
   cluster: string,
   req: CreateTopicRequest,
-): Promise<void> {
-  return sendJSONForCluster<void>(cluster, clusterPath(cluster, `/topics`),
+): Promise<Schemas["CreatedResponse"]> {
+  return sendJSONForCluster<Schemas["CreatedResponse"]>(cluster, clusterPath(cluster, `/topics`),
     "POST",
     req,
   );
 }
 
-export function deleteTopic(cluster: string, topic: string, confirmProd = false): Promise<void> {
-  return sendJSONForCluster<void>(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}`),
+export function deleteTopic(
+  cluster: string,
+  topic: string,
+  confirmProd = false,
+): Promise<Schemas["DeletedNameResponse"]> {
+  return sendJSONForCluster<Schemas["DeletedNameResponse"]>(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}`),
     "DELETE",
     undefined,
     confirmProd,
   );
-}
-
-export interface DeleteRecordsResult {
-  partition: number;
-  low_watermark: number;
-  requested_offset: number;
-  error?: string;
 }
 
 export function deleteRecords(
@@ -775,8 +486,8 @@ export function deleteRecords(
   topic: string,
   partitions: Record<number, number>,
   confirmProd = false,
-): Promise<{ results: DeleteRecordsResult[] }> {
-  return sendJSONForCluster<{ results: DeleteRecordsResult[] }>(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/records`),
+): Promise<Schemas["DeleteRecordsResponse"]> {
+  return sendJSONForCluster<Schemas["DeleteRecordsResponse"]>(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/records`),
     "DELETE",
     { partitions },
     confirmProd,
@@ -785,33 +496,11 @@ export function deleteRecords(
 
 // --- Schema Registry ---
 
-export interface Subject {
-  name: string;
-  versions: number[];
-  latest_schema_type?: string;
-}
-
-export interface SchemaReference {
-  name: string;
-  subject: string;
-  version: number;
-}
-
-export interface SchemaVersion {
-  subject: string;
-  id: number;
-  version: number;
-  schemaType?: string;
-  schema: string;
-  references?: SchemaReference[];
-  config?: { compatibilityLevel?: string };
-}
-
 export async function listSubjects(cluster: string): Promise<Subject[]> {
   const r = await fetchAPI(cluster, clusterPath(cluster, `/schemas/subjects`),
   );
   if (!r.ok) throw new Error(await r.text());
-  const data = (await r.json()) as { subjects: Subject[] };
+  const data = (await r.json()) as Schemas["ListSubjectsResponse"];
   return data.subjects ?? [];
 }
 
@@ -830,52 +519,31 @@ export function deleteSubject(
   cluster: string,
   subject: string,
   permanent = false,
-): Promise<void> {
-  return sendJSONForCluster<void>(cluster, clusterPath(cluster, `/schemas/subjects/${encodeURIComponent(subject)}${permanent ? "?permanent=true" : ""}`),
+): Promise<Schemas["DeleteSubjectResponse"]> {
+  return sendJSONForCluster<Schemas["DeleteSubjectResponse"]>(cluster, clusterPath(cluster, `/schemas/subjects/${encodeURIComponent(subject)}${permanent ? "?permanent=true" : ""}`),
     "DELETE",
   );
 }
 
 // --- Alter topic configs ---
-export interface AlterTopicConfigsRequest {
-  set?: Record<string, string>;
-  delete?: string[];
-}
-export interface AlterTopicConfigsResult {
-  name: string;
-  op: "set" | "delete";
-  value?: string;
-  error?: string;
-}
 export function alterTopicConfigs(
   cluster: string,
   topic: string,
   req: AlterTopicConfigsRequest,
-): Promise<{ results: AlterTopicConfigsResult[] }> {
-  return sendJSONForCluster<{ results: AlterTopicConfigsResult[] }>(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/configs`),
+): Promise<Schemas["AlterTopicConfigsResponse"]> {
+  return sendJSONForCluster<Schemas["AlterTopicConfigsResponse"]>(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/configs`),
     "PATCH",
     req,
   );
 }
 
 // --- ACLs ---
-export interface ACLEntry {
-  principal: string;
-  host: string;
-  resource_type: string;
-  resource_name: string;
-  pattern_type: string;
-  operation: string;
-  permission_type: string;
-}
 export async function listACLs(cluster: string): Promise<ACLEntry[]> {
   const r = await fetchAPI(cluster, clusterPath(cluster, `/acls`));
   if (!r.ok) throw new Error(await r.text());
-  const data = (await r.json()) as { acls?: ACLEntry[] };
+  const data = (await r.json()) as Schemas["ListACLsResponse"];
   return data.acls ?? [];
 }
-
-export type ACLSpec = ACLEntry;
 
 export async function createACL(cluster: string, spec: ACLSpec): Promise<void> {
   const r = await fetchAPI(cluster, clusterPath(cluster, `/acls`), {
@@ -886,7 +554,7 @@ export async function createACL(cluster: string, spec: ACLSpec): Promise<void> {
   if (!r.ok) {
     const t = await r.text();
     try {
-      throw new Error((JSON.parse(t) as { error?: string }).error ?? t);
+      throw new Error((JSON.parse(t) as Partial<ApiError>).error ?? t);
     } catch {
       throw new Error(t);
     }
@@ -902,53 +570,13 @@ export async function deleteACL(cluster: string, spec: ACLSpec): Promise<number>
   if (!r.ok) {
     const t = await r.text();
     try {
-      throw new Error((JSON.parse(t) as { error?: string }).error ?? t);
+      throw new Error((JSON.parse(t) as Partial<ApiError>).error ?? t);
     } catch {
       throw new Error(t);
     }
   }
-  const data = (await r.json()) as { deleted?: number };
+  const data = (await r.json()) as Schemas["DeleteACLResponse"];
   return data.deleted ?? 0;
-}
-
-export type SearchMode = "contains" | "jsonpath" | "xpath" | "js";
-export type SearchOp = "exists" | "eq" | "ne" | "contains" | "regex" | "gt" | "lt" | "gte" | "lte";
-export type SearchZone = "value" | "key" | "headers";
-export type SearchDirection = "newest_first" | "oldest_first";
-
-export interface SearchRequest {
-  partition?: number;
-  limit?: number;
-  budget?: number;
-  direction?: SearchDirection;
-  stop_on_limit?: boolean;
-  mode?: SearchMode;
-  path?: string;
-  op?: SearchOp;
-  value?: string;
-  zones?: SearchZone[];
-  from_ts_ms?: number;
-  to_ts_ms?: number;
-  cursors?: Record<string, number>;
-}
-
-export interface SearchStats {
-  scanned: number;
-  matched: number;
-  budget_exhausted: boolean;
-  timed_out?: boolean;
-  more_available?: boolean;
-  direction: SearchDirection;
-  next_cursors?: Record<string, number>;
-  resolved_range?: Record<string, { start: number; end: number }>;
-  parse_errors: number;
-  parse_error_offsets?: { partition: number; offset: number; error: string }[];
-  durations_ms?: Record<string, number>;
-}
-
-export interface SearchResponse {
-  messages: Message[] | null;
-  search: SearchStats;
 }
 
 export async function searchMessages(
@@ -967,28 +595,20 @@ export async function searchMessages(
     const txt = await r.text();
     throw new Error(txt || r.statusText);
   }
-  const data = (await r.json()) as { messages: Message[] | null; search: SearchStats };
-  return { messages: data.messages ?? [], search: data.search };
+  const data = (await r.json()) as SearchResponse;
+  return { ...data, messages: data.messages ?? [] };
 }
 
 // --- SCRAM users ---
-export interface SCRAMCredential {
-  mechanism: string;
-  iterations: number;
-}
-export interface SCRAMUser {
-  user: string;
-  credentials: SCRAMCredential[];
-}
 export async function listSCRAMUsers(cluster: string): Promise<SCRAMUser[]> {
   const r = await fetchAPI(cluster, clusterPath(cluster, `/users`));
   if (!r.ok) throw new Error(await r.text());
-  const data = (await r.json()) as { users?: SCRAMUser[] };
+  const data = (await r.json()) as Schemas["ListSCRAMUsersResponse"];
   return data.users ?? [];
 }
 export async function upsertSCRAMUser(
   cluster: string,
-  req: { user: string; mechanism: string; password: string; iterations?: number },
+  req: Schemas["UpsertSCRAMUserRequest"],
 ): Promise<void> {
   const r = await fetchAPI(cluster, clusterPath(cluster, `/users`), {
     method: "POST",
@@ -998,7 +618,7 @@ export async function upsertSCRAMUser(
   if (!r.ok) {
     const t = await r.text();
     try {
-      throw new Error((JSON.parse(t) as { error?: string }).error ?? t);
+      throw new Error((JSON.parse(t) as Partial<ApiError>).error ?? t);
     } catch {
       throw new Error(t);
     }
@@ -1012,7 +632,7 @@ export async function deleteSCRAMUser(cluster: string, user: string, mechanism?:
   if (!r.ok) {
     const t = await r.text();
     try {
-      throw new Error((JSON.parse(t) as { error?: string }).error ?? t);
+      throw new Error((JSON.parse(t) as Partial<ApiError>).error ?? t);
     } catch {
       throw new Error(t);
     }
@@ -1068,7 +688,7 @@ export async function testCluster(cfg: PrivateCluster): Promise<ClusterInfo> {
   if (!res.ok) {
     let detail = "";
     try {
-      const b = (await res.json()) as { error?: string };
+      const b = (await res.json()) as Partial<ApiError>;
       detail = b.error ? `: ${b.error}` : "";
     } catch {
       /* ignore */
@@ -1094,7 +714,7 @@ export async function downloadMessageRaw(
   if (!res.ok) {
     let detail = "";
     try {
-      const b = (await res.json()) as { error?: string };
+      const b = (await res.json()) as Partial<ApiError>;
       detail = b.error ? `: ${b.error}` : "";
     } catch { /* ignore */ }
     throw new Error(`HTTP ${res.status}${detail}`);
@@ -1160,7 +780,7 @@ export async function fetchMessageRawBase64(
   if (!res.ok) {
     let detail = "";
     try {
-      const b = (await res.json()) as { error?: string };
+      const b = (await res.json()) as Partial<ApiError>;
       detail = b.error ? `: ${b.error}` : "";
     } catch { /* ignore */ }
     if (res.status === 413) throw new RawValueTooLargeError(`HTTP 413${detail}`);
