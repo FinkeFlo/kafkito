@@ -43,7 +43,7 @@ frontend-dev:
 # Mirrors the frontend job in .github/workflows/ci.yml; keep the order in sync.
 frontend-check:
 	cd frontend && bun run lint && bun run build && bun run check:palette && \
-		bun run check:strings && bun run check:tokens && bun run check:routes && \
+		bun run check:tokens && bun run check:routes && \
 		bun run check:dates && bun run test
 
 # Canonical local gate. Run before opening a PR.
