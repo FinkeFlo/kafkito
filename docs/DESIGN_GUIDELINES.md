@@ -249,7 +249,7 @@ bypass it.
    globally visible. Secondary routes (Settings, Brokers) stay out of the
    primary tab bar and are reached via the cluster detail page or an
    overflow menu.
-3. Run `npm run routes:generate` (or rely on `npm run build`).
+3. Run `bun run routes:generate` (or rely on `bun run build`).
 4. Commit `routeTree.gen.ts`.
 
 ### 5.3 Cluster selection
@@ -522,9 +522,9 @@ Every commit must pass:
 
 ```bash
 cd frontend
-npm run lint            # tsc -b --noEmit
-npm run build           # tsr generate + tsc + vite build
-npm run test            # vitest, incl. static checks in src/__checks__
+bun run lint            # tsc -b --noEmit
+bun run build           # tsr generate + tsc + vite build
+bun run test            # vitest, incl. static checks in src/__checks__
 ```
 
 `src/__checks__/` holds source-level checks that run with the unit tests:
@@ -556,9 +556,9 @@ Copy this into the PR description and tick each box.
 - [ ] No color-only signaling (pair with text or icon)
 - [ ] Works in light mode
 - [ ] Works in dark mode
-- [ ] npm run lint passes
-- [ ] npm run build passes
-- [ ] npm run test passes
+- [ ] bun run lint passes
+- [ ] bun run build passes
+- [ ] bun run test passes
 - [ ] routeTree.gen.ts regenerated and committed
 - [ ] Every TODO(backend): comment is also listed in the PR body
 ```
