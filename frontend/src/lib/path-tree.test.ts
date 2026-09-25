@@ -3,7 +3,6 @@ import {
   buildPathTree,
   MAX_DEPTH,
   MAX_PATHS,
-  MAX_SAMPLE_VALUES,
   type PathInfo,
   type PathType,
 } from "./path-tree";
@@ -14,44 +13,47 @@ describe("buildPathTree", () => {
   });
 
   it.each<[string, Partial<PathInfo>]>([
-    ["$.id", { type: "string", sampleValues: ["x"], distinctCount: 1, fromN: 1 }],
-    ["$.n", { type: "number", sampleValues: [7] }],
-    ["$.ok", { type: "boolean", sampleValues: [true] }],
-  ])("indexes scalar field %s with type and value", (path, expected) => {
+    ["$.id", { type: "string" }],
+    ["$.n", { type: "number" }],
+    ["$.ok", { type: "boolean" }],
+  ])("indexes scalar field %s with its type", (path, expected) => {
     const tree = buildPathTree([{ id: "x", n: 7, ok: true }]);
 
     expect(tree.get(path)).toMatchObject(expected);
+  });
+
+  it("indexes field names only, carrying no sample data", () => {
+    const tree = buildPathTree([{ id: "secret-value", nested: { n: 42 } }]);
+
+    expect([...tree.keys()].sort()).toEqual([
+      "$.id",
+      "$.nested",
+      "$.nested.n",
+    ]);
+    // The dropdown lists paths, not data: nothing from the payload may be
+    // retained, or a multi-megabyte field would be kept alive by the tree.
+    for (const info of tree.values()) {
+      expect(Object.keys(info)).toEqual(["type"]);
+    }
   });
 
   it("normalizes array indices to [*]", () => {
     const tree = buildPathTree([{ prices: [{ x: 1 }, { x: 2 }, { x: 3 }] }]);
 
     expect(tree.has("$.prices[0].x")).toBe(false);
-    const star = tree.get("$.prices[*].x");
-    expect(star?.type).toBe("number");
-    expect(star?.distinctCount).toBe(3);
-    expect(star?.sampleValues).toEqual([1, 2, 3]);
+    expect(tree.get("$.prices[*].x")?.type).toBe("number");
   });
 
-  it("unions paths across multiple samples and tracks fromN", () => {
+  it("unions paths across multiple samples", () => {
     const tree = buildPathTree([
       { a: 1, b: "x" },
       { a: 2 },
       { a: 3, b: "y" },
     ]);
 
-    expect(tree.get("$.a")?.fromN).toBe(3);
-    expect(tree.get("$.b")?.fromN).toBe(2);
-    expect(tree.get("$.b")?.distinctCount).toBe(2);
-  });
-
-  it(`caps sampleValues at ${MAX_SAMPLE_VALUES} distinct entries`, () => {
-    const samples = Array.from({ length: MAX_SAMPLE_VALUES + 2 }, (_, i) => ({ k: i + 1 }));
-
-    const tree = buildPathTree(samples);
-
-    expect(tree.get("$.k")?.distinctCount).toBe(samples.length);
-    expect(tree.get("$.k")?.sampleValues).toHaveLength(MAX_SAMPLE_VALUES);
+    expect([...tree.keys()].sort()).toEqual(["$.a", "$.b"]);
+    expect(tree.get("$.a")?.type).toBe("number");
+    expect(tree.get("$.b")?.type).toBe("string");
   });
 
   it(`caps depth at ${MAX_DEPTH} levels`, () => {
@@ -80,8 +82,45 @@ describe("buildPathTree", () => {
     expect(tree.get("$.x")?.type).toBe("null");
   });
 
-  it("ignores non-object samples (scalars or arrays at root)", () => {
+  it("ignores scalar samples", () => {
     expect(buildPathTree(["a", 1, true, null]).size).toBe(0);
+  });
+
+  it("indexes a record whose whole value is an array of objects", () => {
+    // A batch of rows per message is a normal Kafka payload shape. These
+    // samples used to be skipped outright, leaving an empty tree that the
+    // UI then reported as "sample isn't JSON".
+    const tree = buildPathTree([
+      [
+        { RUNID: "abc", meta: { step: 1 } },
+        { RUNID: "def", meta: { step: 2 } },
+      ],
+    ]);
+
+    // `$[*].RUNID` is what the backend evaluates; `$.RUNID` matches nothing
+    // on a root-level array.
+    expect(tree.get("$[*].RUNID")?.type).toBe("string");
+    expect(tree.get("$[*].meta.step")?.type).toBe("number");
+    expect(tree.has("$.RUNID")).toBe(false);
+  });
+
+  it("collapses entries of a root array onto one path, like nested arrays", () => {
+    const tree = buildPathTree([[{ a: 1 }, { a: 2 }, { a: 3 }]]);
+
+    expect([...tree.keys()]).toEqual(["$[*]", "$[*].a"]);
+  });
+
+  it("indexes a root array of scalars", () => {
+    const tree = buildPathTree([["x", "y"]]);
+
+    expect(tree.get("$[*]")?.type).toBe("string");
+  });
+
+  it("aggregates root-array and root-object samples into one tree", () => {
+    const tree = buildPathTree([[{ a: 1 }], { b: 2 }]);
+
+    expect(tree.has("$[*].a")).toBe(true);
+    expect(tree.has("$.b")).toBe(true);
   });
 
   it(`caps the tree at ${MAX_PATHS} paths`, () => {

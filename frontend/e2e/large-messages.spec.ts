@@ -18,6 +18,7 @@ const TOPIC = "e2e-large-message";
 const NEEDLE_SKU = "E2E-NEEDLE-SKU";
 const NEEDLE_TEXT = "e2e-search-needle";
 const XML_TOPIC = "e2e-large-message-xml";
+const ROOT_ARRAY_TOPIC = "e2e-root-array";
 
 test.describe("Large messages (truncation-tolerant search & click-to-filter)", () => {
   test("text-contains search finds a needle past the 64 KB truncation boundary", async ({ page }) => {
@@ -102,6 +103,39 @@ test.describe("Large messages (truncation-tolerant search & click-to-filter)", (
     await expect(page.getByText("$.order.customer.email", { exact: true })).toBeVisible();
   });
 
+  test("PathSense suggests paths for a record whose whole value is an array", async ({ page }) => {
+    await page.goto(
+      `/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(ROOT_ARRAY_TOPIC)}/messages`,
+    );
+
+    await page.getByRole("button", { name: "Search", exact: true }).click();
+    await page.getByLabel("Mode", { exact: true }).selectOption("jsonpath");
+
+    const pathInput = page.getByPlaceholder("Type or ↓ for top fields");
+    // A batch of rows per message is a normal Kafka shape, but these samples
+    // used to be skipped entirely, so the dropdown showed "Sample isn't JSON"
+    // for a perfectly valid JSON value. The `$[*]` prefix is required: on a
+    // root-level array the backend matches nothing for `$.RUNID`.
+    await pathInput.fill("RUNID");
+    await expect(page.getByText("$[*].RUNID", { exact: true })).toBeVisible();
+
+    await pathInput.fill("step");
+    await expect(page.getByText("$[*].meta.step", { exact: true })).toBeVisible();
+
+    // Picking it must produce a query the backend actually matches — the
+    // whole point of the `$[*]` prefix. The dropdown carries field names
+    // only, so the value is typed by the user, not prefilled.
+    await pathInput.fill("RUNID");
+    await page.getByText("$[*].RUNID", { exact: true }).click();
+    await expect(pathInput).toHaveValue("$[*].RUNID");
+    await expect(page.getByLabel("Operator", { exact: true })).toHaveValue("eq");
+    await expect(page.getByLabel("Value", { exact: true })).toHaveValue("");
+
+    await page.getByLabel("Value", { exact: true }).fill("E2E-RUN-1");
+    await page.getByRole("button", { name: "Search", exact: true }).click();
+    await expect(page.getByTestId("messages-count")).toHaveText("1");
+  });
+
   test("XPath PathSense suggests XML element and attribute paths from the hydrated value", async ({
     page,
   }) => {
@@ -124,13 +158,13 @@ test.describe("Large messages (truncation-tolerant search & click-to-filter)", (
       page.getByText("//root/order/items/item/@sku", { exact: true }),
     ).toBeVisible();
 
-    // … and picking a scalar prefills the operator and value, exactly as
-    // JSONPath mode already does.
+    // … and picking a scalar prefills the operator, but not the value: the
+    // tree carries element and attribute names only.
     await pathInput.fill("status");
     await page.getByText("//root/order/@status", { exact: true }).click();
 
     await expect(pathInput).toHaveValue("//root/order/@status");
     await expect(page.getByLabel("Operator", { exact: true })).toHaveValue("eq");
-    await expect(page.getByLabel("Value", { exact: true })).toHaveValue("shipped");
+    await expect(page.getByLabel("Value", { exact: true })).toHaveValue("");
   });
 });

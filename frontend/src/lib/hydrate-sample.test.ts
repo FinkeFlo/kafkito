@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   hydrateTruncatedSampleMessages,
+  isTooLargeToScan,
   MAX_HYDRATE_VALUE_BYTES,
 } from "./hydrate-sample";
 import { RawValueTooLargeError, type Message } from "./api";
@@ -235,5 +236,47 @@ describe("hydrateTruncatedSampleMessages", () => {
       1,
       controller.signal,
     );
+  });
+});
+
+describe("isTooLargeToScan", () => {
+  it("flags a truncated value above the hydration cap", () => {
+    // The case the user hit: an 8.4 MiB root array that is valid JSON but
+    // only ever reaches the builder as its 64 KB preview.
+    expect(
+      isTooLargeToScan(
+        message({
+          value_truncated: true,
+          value_size_bytes: MAX_HYDRATE_VALUE_BYTES + 1,
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not flag a value the hydrator can still fetch in full", () => {
+    expect(
+      isTooLargeToScan(
+        message({
+          value_truncated: true,
+          value_size_bytes: MAX_HYDRATE_VALUE_BYTES,
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("does not flag an untruncated value, whatever its size", () => {
+    // Guards against blaming size for a sample that genuinely isn't JSON.
+    expect(
+      isTooLargeToScan(
+        message({
+          value_truncated: false,
+          value_size_bytes: MAX_HYDRATE_VALUE_BYTES * 4,
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("treats a missing size as within the cap", () => {
+    expect(isTooLargeToScan(message({ value_truncated: true }))).toBe(false);
   });
 });

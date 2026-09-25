@@ -8,15 +8,11 @@ export type PathType =
 
 export interface PathInfo {
   type: PathType;
-  sampleValues: unknown[];
-  distinctCount: number;
-  fromN: number;
 }
 
 export type PathTree = Map<string, PathInfo>;
 
 export const MAX_DEPTH = 20;
-export const MAX_SAMPLE_VALUES = 5;
 
 /**
  * Upper bound on the number of distinct paths collected across all samples,
@@ -55,71 +51,29 @@ function detectType(v: unknown): PathType {
   return "object";
 }
 
-function sameScalar(a: unknown, b: unknown): boolean {
-  if (typeof a !== typeof b) return false;
-  return a === b;
+function recordLeaf(tree: PathTree, path: string, value: unknown) {
+  if (tree.has(path)) return;
+  if (tree.size >= MAX_PATHS) return;
+  tree.set(path, { type: detectType(value) });
 }
 
-function recordLeaf(
-  tree: PathTree,
-  seenInThisSample: Set<string>,
-  path: string,
-  value: unknown,
-) {
-  const type = detectType(value);
-  const existing = tree.get(path);
-  const firstTimeInSample = !seenInThisSample.has(path);
-  seenInThisSample.add(path);
-
-  if (!existing) {
-    if (tree.size >= MAX_PATHS) return;
-    tree.set(path, {
-      type,
-      sampleValues: type === "object" || type === "array" ? [] : [value],
-      distinctCount: type === "object" || type === "array" ? 0 : 1,
-      fromN: 1,
-    });
-    return;
-  }
-  if (firstTimeInSample) {
-    existing.fromN += 1;
-  }
-  if (type !== "object" && type !== "array") {
-    const isDistinct = !existing.sampleValues.some((x) =>
-      sameScalar(x, value),
-    );
-    if (isDistinct) {
-      existing.distinctCount += 1;
-      if (existing.sampleValues.length < MAX_SAMPLE_VALUES) {
-        existing.sampleValues.push(value);
-      }
-    }
-  }
-}
-
-function walk(
-  tree: PathTree,
-  seenInThisSample: Set<string>,
-  node: unknown,
-  path: string,
-  depth: number,
-) {
+function walk(tree: PathTree, node: unknown, path: string, depth: number) {
   if (depth > MAX_DEPTH) return;
   // Stop descending once the cap is reached: every further node would only
   // build a path string and hit a full Map before being thrown away.
   if (tree.size >= MAX_PATHS) return;
 
-  recordLeaf(tree, seenInThisSample, path, node);
+  recordLeaf(tree, path, node);
 
   if (Array.isArray(node)) {
     for (const item of node) {
-      walk(tree, seenInThisSample, item, `${path}[*]`, depth + 1);
+      walk(tree, item, `${path}[*]`, depth + 1);
     }
     return;
   }
   if (node && typeof node === "object") {
     for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
-      walk(tree, seenInThisSample, v, `${path}.${k}`, depth + 1);
+      walk(tree, v, `${path}.${k}`, depth + 1);
     }
   }
 }
@@ -128,10 +82,21 @@ export function buildPathTree(samples: unknown[]): PathTree {
   const tree: PathTree = new Map();
   for (const sample of samples) {
     if (tree.size >= MAX_PATHS) break;
-    if (!sample || typeof sample !== "object" || Array.isArray(sample)) continue;
-    const seen = new Set<string>();
+    if (!sample || typeof sample !== "object") continue;
+    if (Array.isArray(sample)) {
+      // A record whose whole value is an array (`[{"RUNID":…}, …]`) is a
+      // normal Kafka payload shape, e.g. a batch of rows per message. Its
+      // entries collapse onto `$[*]` exactly like a nested array's do, and
+      // the backend evaluates `$[*].RUNID` (`$.RUNID` matches nothing).
+      // Skipping these samples left the tree empty, which the UI then
+      // reported as "sample isn't JSON".
+      for (const item of sample) {
+        walk(tree, item, "$[*]", 1);
+      }
+      continue;
+    }
     for (const [k, v] of Object.entries(sample as Record<string, unknown>)) {
-      walk(tree, seen, v, `$.${k}`, 1);
+      walk(tree, v, `$.${k}`, 1);
     }
   }
   return tree;

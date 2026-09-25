@@ -1,7 +1,7 @@
 // XML equivalent of path-tree.ts's buildPathTree, used to feed PathSense
 // suggestions for XPath search mode. Reuses the same PathTree/PathInfo shape
 // so <PathSense> needs no changes to support either mode.
-import { MAX_DEPTH, MAX_PATHS, MAX_SAMPLE_VALUES, type PathTree } from "./path-tree";
+import { MAX_DEPTH, MAX_PATHS, type PathTree } from "./path-tree";
 
 /** Cheap pre-check mirroring the backend's own `trimmed[0] == '<'` XML guard
  * (decodeBytes/looksXML in pkg/kafka/consumer.go) — used to filter sample
@@ -64,52 +64,18 @@ function isNamespaceDeclaration(name: string): boolean {
   return name === "xmlns" || name.startsWith("xmlns:");
 }
 
-function recordNode(
-  tree: PathTree,
-  seenInThisSample: Set<string>,
-  path: string,
-  isContainer: boolean,
-  textValue: string,
-) {
-  const firstTimeInSample = !seenInThisSample.has(path);
-  seenInThisSample.add(path);
-
-  // An empty element (`<item/>`, `<status></status>`) carries no value worth
-  // offering an `= ""` filter for, so it records no sample value and
-  // PathSense falls back to `exists` semantics when it's picked.
-  const hasValue = !isContainer && textValue !== "";
-
+function recordNode(tree: PathTree, path: string, isContainer: boolean) {
   const existing = tree.get(path);
   if (!existing) {
     if (tree.size >= MAX_PATHS) return;
-    tree.set(path, {
-      type: isContainer ? "object" : "string",
-      sampleValues: hasValue ? [textValue] : [],
-      distinctCount: hasValue ? 1 : 0,
-      fromN: 1,
-    });
+    tree.set(path, { type: isContainer ? "object" : "string" });
     return;
-  }
-  if (firstTimeInSample) {
-    existing.fromN += 1;
   }
   // The same path can be a leaf in one sample and a parent in another
   // (`<note>hi</note>` vs `<note><b>hi</b></note>`). Container wins, so the
   // suggestion offers `exists` rather than an `=` against a value only some
   // documents have.
-  if (isContainer) {
-    existing.type = "object";
-    existing.sampleValues.length = 0;
-    existing.distinctCount = 0;
-    return;
-  }
-  if (existing.type === "object" || !hasValue) return;
-  if (!existing.sampleValues.includes(textValue)) {
-    existing.distinctCount += 1;
-    if (existing.sampleValues.length < MAX_SAMPLE_VALUES) {
-      existing.sampleValues.push(textValue);
-    }
-  }
+  if (isContainer) existing.type = "object";
 }
 
 // Unlike JSON arrays, repeated sibling elements with the same tag name don't
@@ -118,7 +84,6 @@ function recordNode(
 // naturally just by walking children and appending `/${tagName}`.
 function walkElement(
   tree: PathTree,
-  seenInThisSample: Set<string>,
   el: Element,
   path: string,
   depth: number,
@@ -130,18 +95,17 @@ function walkElement(
 
   const children = elementChildren(el);
   const isContainer = children.length > 0;
-  const text = isContainer ? "" : (el.textContent ?? "").trim();
-  recordNode(tree, seenInThisSample, path, isContainer, text);
+  recordNode(tree, path, isContainer);
 
   for (const attr of Array.from(el.attributes)) {
     if (isNamespaceDeclaration(attr.name)) continue;
-    recordNode(tree, seenInThisSample, `${path}/@${attr.name}`, false, attr.value);
+    recordNode(tree, `${path}/@${attr.name}`, false);
   }
 
   for (const child of children) {
     // tagName keeps any namespace prefix (`ns:order`), which is what the
     // backend's xmlquery matches against literally.
-    walkElement(tree, seenInThisSample, child, `${path}/${child.tagName}`, depth + 1);
+    walkElement(tree, child, `${path}/${child.tagName}`, depth + 1);
   }
 }
 
@@ -155,7 +119,7 @@ export function buildXmlPathTree(samples: string[]): PathTree {
     const doc = parseXmlDoc(sample);
     const root = doc?.documentElement;
     if (!root) continue;
-    walkElement(tree, new Set<string>(), root, `//${root.tagName}`, 1);
+    walkElement(tree, root, `//${root.tagName}`, 1);
   }
   return tree;
 }

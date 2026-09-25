@@ -15,6 +15,21 @@ export const MAX_HYDRATE_VALUE_BYTES = 4 * 1024 * 1024;
 export type HydratableEncoding = "json" | "xml";
 
 /**
+ * Whether a sample value is too large to be hydrated, and therefore reaches
+ * the path-tree builders as the 64 KB preview only.
+ *
+ * Such a preview is almost always cut mid-structure and fails to parse, so
+ * the builder yields nothing — which must not be reported to the user as
+ * "isn't JSON": the value is perfectly valid, it is only too large to scan.
+ */
+export function isTooLargeToScan(m: Message): boolean {
+  return (
+    m.value_truncated === true &&
+    (m.value_size_bytes ?? 0) > MAX_HYDRATE_VALUE_BYTES
+  );
+}
+
+/**
  * Hydrates truncated JSON/XML sample messages with their full raw value, so
  * PathSense's field-path tree isn't missing fields that only appear past the
  * 64 KB truncation boundary of the `/sample` endpoint (or, for messages cut

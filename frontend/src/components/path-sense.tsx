@@ -7,7 +7,7 @@ export interface PathSenseProps {
   tree: PathTree;
   value: string;
   onChange: (next: string) => void;
-  onPick: (path: string, sampleValue: unknown) => void;
+  onPick: (path: string, type: string) => void;
   placeholder?: string;
   /** Applied to the inner combobox input so an external <label htmlFor> can target it. */
   id?: string;
@@ -31,15 +31,6 @@ const COMMON_BOOST = /(Id|Number|status|type|timestamp|createdAt|updatedAt)$/i;
 interface Row {
   path: string;
   type: string;
-  preview: string;
-  sampleValue: unknown;
-}
-
-function previewOf(values: unknown[], distinctCount: number): string {
-  if (values.length === 0) return "";
-  if (distinctCount > values.length) return `${values.length}+ distinct`;
-  if (distinctCount > 1) return `${distinctCount} distinct`;
-  return JSON.stringify(values[0]);
 }
 
 function rank(path: string, type: string): number {
@@ -58,12 +49,7 @@ function rank(path: string, type: string): number {
 function toRows(tree: PathTree): Row[] {
   const rows: Row[] = [];
   for (const [path, info] of tree) {
-    rows.push({
-      path,
-      type: info.type,
-      preview: previewOf(info.sampleValues, info.distinctCount),
-      sampleValue: info.sampleValues.length > 0 ? info.sampleValues[0] : info.sampleValues,
-    });
+    rows.push({ path, type: info.type });
   }
   rows.sort((a, b) => rank(b.path, b.type) - rank(a.path, a.type));
   return rows;
@@ -168,18 +154,18 @@ export function PathSense({
                       onClick={() => {
                         setQuery(r.path);
                         onChange(r.path);
-                        onPick(r.path, r.sampleValue);
+                        onPick(r.path, r.type);
                         setOpen(false);
                       }}
                       className="flex w-full items-center gap-3 px-2 py-1 text-left hover:bg-accent-subtle"
                     >
+                      {/* Path plus type only. The type is a literal from a
+                          fixed set, never payload from the message, and it is
+                          what drives ranking and the operator prefill. */}
                       <span className="min-w-0 flex-1 truncate font-mono" title={r.path}>
                         <Highlight text={r.path} ranges={fuzzy.rangesFor(r, "path")} />
                       </span>
-                      <span className="shrink-0 whitespace-nowrap text-muted">
-                        {r.type}
-                        {r.preview ? `  ${r.preview}` : ""}
-                      </span>
+                      <span className="shrink-0 text-muted">{r.type}</span>
                     </button>
                   </li>
                 ))

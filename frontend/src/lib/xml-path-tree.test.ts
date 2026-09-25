@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_DEPTH, MAX_PATHS, MAX_SAMPLE_VALUES } from "./path-tree";
+import { MAX_DEPTH, MAX_PATHS } from "./path-tree";
 import { buildXmlPathTree, looksLikeXml } from "./xml-path-tree";
 
 describe("looksLikeXml", () => {
@@ -25,22 +25,28 @@ describe("buildXmlPathTree", () => {
     const tree = buildXmlPathTree(["<order><status>shipped</status></order>"]);
 
     expect(tree.get("//order")).toMatchObject({ type: "object" });
-    expect(tree.get("//order/status")).toMatchObject({
-      type: "string",
-      sampleValues: ["shipped"],
-      distinctCount: 1,
-      fromN: 1,
-    });
+    expect(tree.get("//order/status")).toMatchObject({ type: "string" });
+  });
+
+  it("indexes element names only, carrying no document text", () => {
+    const tree = buildXmlPathTree([
+      '<order id="7"><status>shipped</status></order>',
+    ]);
+
+    expect([...tree.keys()].sort()).toEqual([
+      "//order",
+      "//order/@id",
+      "//order/status",
+    ]);
+    for (const info of tree.values()) {
+      expect(Object.keys(info)).toEqual(["type"]);
+    }
   });
 
   it("indexes attributes as @name paths, always as strings", () => {
     const tree = buildXmlPathTree(['<order id="7"><status>shipped</status></order>']);
 
-    expect(tree.get("//order/@id")).toMatchObject({
-      type: "string",
-      sampleValues: ["7"],
-      distinctCount: 1,
-    });
+    expect(tree.get("//order/@id")).toMatchObject({ type: "string" });
   });
 
   it("collapses repeated sibling elements onto the same path (no [*] needed)", () => {
@@ -53,33 +59,21 @@ describe("buildXmlPathTree", () => {
     // indexed as a leaf — same classification rule as a plain text element.
     const item = tree.get("//items/item");
     expect(item?.type).toBe("string");
-    const sku = tree.get("//items/item/@sku");
-    expect(sku?.distinctCount).toBe(3);
-    expect(sku?.sampleValues).toEqual(["A1", "B2", "C3"]);
+    expect(tree.get("//items/item/@sku")?.type).toBe("string");
   });
 
-  it("unions paths across multiple samples and tracks fromN", () => {
+  it("unions paths across multiple samples", () => {
     const tree = buildXmlPathTree([
       "<order><a>1</a><b>x</b></order>",
       "<order><a>2</a></order>",
       "<order><a>3</a><b>y</b></order>",
     ]);
 
-    expect(tree.get("//order/a")?.fromN).toBe(3);
-    expect(tree.get("//order/b")?.fromN).toBe(2);
-    expect(tree.get("//order/b")?.distinctCount).toBe(2);
-  });
-
-  it(`caps sampleValues at ${MAX_SAMPLE_VALUES} distinct entries`, () => {
-    const samples = Array.from(
-      { length: MAX_SAMPLE_VALUES + 2 },
-      (_, i) => `<order><k>${i + 1}</k></order>`,
-    );
-
-    const tree = buildXmlPathTree(samples);
-
-    expect(tree.get("//order/k")?.distinctCount).toBe(samples.length);
-    expect(tree.get("//order/k")?.sampleValues).toHaveLength(MAX_SAMPLE_VALUES);
+    expect([...tree.keys()].sort()).toEqual([
+      "//order",
+      "//order/a",
+      "//order/b",
+    ]);
   });
 
   it(`caps depth at ${MAX_DEPTH} levels`, () => {
@@ -108,7 +102,7 @@ describe("buildXmlPathTree", () => {
       "<order><status>pending</status></order>",
     ]);
 
-    expect(tree.get("//order/status")?.fromN).toBe(1);
+    expect(tree.get("//order/status")?.type).toBe("string");
   });
 
   it("does not index the browser's injected <parsererror> subtree", () => {
@@ -125,18 +119,15 @@ describe("buildXmlPathTree", () => {
     expect(tree.has("//ns:order/@xmlns")).toBe(false);
     expect(tree.has("//ns:order/@xmlns:ns")).toBe(false);
     // Prefixes are kept verbatim: that is what the backend's xmlquery matches.
-    expect(tree.get("//ns:order/@ns:id")?.sampleValues).toEqual(["7"]);
+    expect(tree.has("//ns:order/@ns:id")).toBe(true);
     expect(tree.has("//ns:order/ns:status")).toBe(true);
   });
 
-  it("records no sample value for an empty element, so picking it means exists", () => {
+  it("indexes an empty element as a path, so it can still be picked", () => {
     const tree = buildXmlPathTree(["<order><status></status><note/></order>"]);
 
-    expect(tree.get("//order/status")).toMatchObject({
-      sampleValues: [],
-      distinctCount: 0,
-    });
-    expect(tree.get("//order/note")?.sampleValues).toEqual([]);
+    expect(tree.get("//order/status")?.type).toBe("string");
+    expect(tree.get("//order/note")?.type).toBe("string");
   });
 
   it("lets container win when a path is a leaf in one sample and a parent in another", () => {
@@ -145,10 +136,7 @@ describe("buildXmlPathTree", () => {
       "<order><note><b>hi</b></note></order>",
     ]);
 
-    expect(tree.get("//order/note")).toMatchObject({
-      type: "object",
-      sampleValues: [],
-    });
+    expect(tree.get("//order/note")?.type).toBe("object");
     expect(tree.has("//order/note/b")).toBe(true);
   });
 
