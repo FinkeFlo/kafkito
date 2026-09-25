@@ -27,6 +27,13 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.13
+      # Validates .goreleaser.yaml (the release pipeline) on every PR.
+      - if: matrix.tags == ''
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: check
 
   frontend:
     runs-on: ubuntu-24.04
