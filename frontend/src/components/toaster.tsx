@@ -1,4 +1,4 @@
-import { Toaster as SonnerToaster, toast } from "sonner";
+import { Toaster as SonnerToaster } from "sonner";
 import { useTheme } from "@/lib/use-theme";
 
 /**
@@ -26,5 +26,3 @@ export function Toaster() {
     />
   );
 }
-
-export { toast };

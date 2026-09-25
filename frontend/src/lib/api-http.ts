@@ -16,7 +16,7 @@ import {
  * name; for private clusters it's the reserved sentinel and a header value
  * carries the full connection details.
  */
-export function clusterRoute(clusterName: string): {
+function clusterRoute(clusterName: string): {
   segment: string;
   headerValue: string | null;
 } {

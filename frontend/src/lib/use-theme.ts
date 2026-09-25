@@ -16,20 +16,12 @@ function systemTheme(): Theme {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-export function resolveTheme(pref: ThemePreference): Theme {
+function resolveTheme(pref: ThemePreference): Theme {
   return pref === "system" ? systemTheme() : pref;
 }
 
-export function applyTheme(theme: Theme): void {
+function applyTheme(theme: Theme): void {
   document.documentElement.classList.toggle("dark", theme === "dark");
-}
-
-/**
- * Synchronous theme bootstrap. Call from index.html (inline) BEFORE first paint
- * to avoid a flash of wrong theme. Idempotent.
- */
-export function bootstrapTheme(): void {
-  applyTheme(resolveTheme(readPreference()));
 }
 
 export function useTheme() {

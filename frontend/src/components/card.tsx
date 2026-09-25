@@ -22,27 +22,3 @@ export function Card({ className, hero, flush, children, ...rest }: CardProps) {
     </div>
   );
 }
-
-export interface CardHeaderProps extends HTMLAttributes<HTMLDivElement> {}
-
-export function CardHeader({ className, children, ...rest }: CardHeaderProps) {
-  return (
-    <div
-      className={cn(
-        "flex items-center justify-between gap-4 border-b border-[var(--color-border)] px-6 py-4",
-        className,
-      )}
-      {...rest}
-    >
-      {children}
-    </div>
-  );
-}
-
-export function CardTitle({ className, children, ...rest }: HTMLAttributes<HTMLHeadingElement>) {
-  return (
-    <h3 className={cn("text-sm font-semibold text-[var(--color-text)]", className)} {...rest}>
-      {children}
-    </h3>
-  );
-}
