@@ -220,7 +220,8 @@ worktree-init:
 #   - Frontend with Vite HMR
 # Sources .env.dev so both children see PORT, KAFKITO_BACKEND_PORT,
 # KAFKITO_FRONTEND_PORT, KAFKITO_KAFKA_BROKERS. Falls back to defaults
-# if .env.dev is missing.
+# if .env.dev is missing. Backend logs default to human-readable text;
+# set KAFKITO_LOG_FORMAT (e.g. in .env.dev) to override.
 # Stop with Ctrl-C in the foreground terminal, or `kill -INT <concurrently-pid>`.
 # `kill -INT` on the make process does NOT propagate to children on macOS.
 dev:
@@ -234,6 +235,7 @@ dev:
 	fi
 	docker compose up -d --wait kafka schema-registry
 	@set -a; if [ -f .env.dev ]; then . ./.env.dev; fi; set +a; \
+	export KAFKITO_LOG_FORMAT="$${KAFKITO_LOG_FORMAT:-text}"; \
 	bunx --bun concurrently@^9 \
 		--names backend,frontend \
 		--prefix-colors blue,magenta \

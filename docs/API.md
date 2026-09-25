@@ -20,6 +20,9 @@ endpoints that back the web UI — stable, documented, scriptable.
   client-supplied header never overrides a validated token. Note that the
   devauth `off` mode injects a synthetic `dev-user` principal. With no RBAC
   configured, every authenticated caller has full access.
+- Every response carries an `X-Request-Id` header. It reuses the inbound
+  `X-Vcap-Request-Id`, `traceparent` trace-id or `X-Request-Id` when present,
+  and matches the `request_id` field in the server logs.
 - JSON everywhere. Request bodies: `Content-Type: application/json`. Response
   bodies: list endpoints always return `{ "<resource>": [...] }`, not bare
   arrays, so new fields can be added without breaking clients.

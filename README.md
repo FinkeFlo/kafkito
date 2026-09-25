@@ -80,6 +80,29 @@ same Compose-backed Kafka and Schema Registry.
 From an IDE, running `air` directly works too — `.air.toml` loads
 `.env.dev` itself, as long as you've run `make worktree-init` once.
 
+### Logging
+
+kafkito logs to stdout via `log/slog`, one line per event:
+
+| Variable             | Values                           | Default |
+| -------------------- | -------------------------------- | ------- |
+| `KAFKITO_LOG_LEVEL`  | `debug`, `info`, `warn`, `error` | `info`  |
+| `KAFKITO_LOG_FORMAT` | `json`, `text`                   | `json`  |
+
+The YAML equivalents are `log.level` and `log.format`; `make dev` defaults to
+`text`. Every API request gets a request id (from `X-Vcap-Request-Id`,
+`traceparent` or `X-Request-Id`, else generated), echoed in the
+`X-Request-Id` response header and attached to its log lines. Server errors
+(5xx) log at `warn`, client errors (4xx) and requests slower than 2s at
+`info`, all other requests at `debug`; health probes and static assets are not
+logged, and query strings, headers and bodies never are.
+
+To see every request on SAP BTP Cloud Foundry temporarily:
+
+```sh
+cf set-env <app> KAFKITO_LOG_LEVEL=debug && cf restart <app>
+```
+
 ## Why kafkito?
 
 - **Single static binary** — no JVM, no side-car containers, ~50 MB RAM footprint.
