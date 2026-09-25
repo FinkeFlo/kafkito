@@ -43,7 +43,10 @@ func (f *fakeMessageCountAdmin) ListOffsetsAfterMilli(_ context.Context, ms int6
 	return f.offsetsAfterMS[ms], nil
 }
 
-func testTopicMetadata(topic string, partitions ...int32) kadm.Metadata {
+// testTopicMetadata returns metadata for the topic "orders" with the given
+// partitions.
+func testTopicMetadata(partitions ...int32) kadm.Metadata {
+	const topic = "orders"
 	partitionsByID := make(kadm.PartitionDetails, len(partitions))
 	for _, p := range partitions {
 		partitionsByID[p] = kadm.PartitionDetail{Topic: topic, Partition: p}
@@ -62,7 +65,7 @@ func TestCountMessagesWithAdmin_AllPartitions(t *testing.T) {
 	t.Parallel()
 
 	adm := &fakeMessageCountAdmin{
-		md: testTopicMetadata("orders", 0, 1),
+		md: testTopicMetadata(0, 1),
 		starts: kadm.ListedOffsets{
 			"orders": {
 				0: {Topic: "orders", Partition: 0, Offset: 10},
@@ -95,7 +98,7 @@ func TestCountMessagesWithAdmin_TimeBoundsCollapseEmptyPartitionsToZero(t *testi
 	t.Parallel()
 
 	adm := &fakeMessageCountAdmin{
-		md: testTopicMetadata("orders", 0, 1),
+		md: testTopicMetadata(0, 1),
 		starts: kadm.ListedOffsets{
 			"orders": {
 				0: {Topic: "orders", Partition: 0, Offset: 0},
@@ -146,7 +149,7 @@ func TestCountMessagesWithAdmin_TimeBoundsCollapseEmptyPartitionsToZero(t *testi
 func TestCountMessagesWithAdmin_RequestedPartitionMustExist(t *testing.T) {
 	t.Parallel()
 
-	adm := &fakeMessageCountAdmin{md: testTopicMetadata("orders", 0)}
+	adm := &fakeMessageCountAdmin{md: testTopicMetadata(0)}
 
 	_, err := countMessagesWithAdmin(context.Background(), adm, "c1", "orders", CountMessagesOptions{
 		Partition: 3,
@@ -160,7 +163,7 @@ func TestCountMessagesWithAdmin_PropagatesTimestampLookupError(t *testing.T) {
 	t.Parallel()
 
 	adm := &fakeMessageCountAdmin{
-		md:         testTopicMetadata("orders", 0),
+		md:         testTopicMetadata(0),
 		starts:     kadm.ListedOffsets{"orders": {0: {Topic: "orders", Partition: 0, Offset: 0}}},
 		ends:       kadm.ListedOffsets{"orders": {0: {Topic: "orders", Partition: 0, Offset: 10}}},
 		offsetsErr: map[int64]error{123: errors.New("boom")},

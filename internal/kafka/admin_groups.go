@@ -177,11 +177,12 @@ func (r *Registry) resolveAndCommit(ctx context.Context, adm *kadm.Client, group
 				newAt = clampToBounds(req.Offset, starts, ends, req.Topic, p)
 			}
 		case ResetShiftBy:
-			if res.OldOffset < 0 {
+			switch {
+			case res.OldOffset < 0:
 				res.Error = "no prior commit to shift from"
-			} else if boundsErr {
+			case boundsErr:
 				res.Error = "offset bounds unavailable; refusing to commit an unclamped shifted offset"
-			} else {
+			default:
 				newAt = clampToBounds(res.OldOffset+req.Shift, starts, ends, req.Topic, p)
 			}
 		}
@@ -312,7 +313,7 @@ func (r *Registry) CreateGroup(ctx context.Context, cluster string, req CreateGr
 	})
 	if err != nil {
 		if IsAuthorizationFailure(err.Error()) {
-			return nil, fmt.Errorf("%w: %v", ErrNotAuthorized, err)
+			return nil, fmt.Errorf("%w: %w", ErrNotAuthorized, err)
 		}
 		return nil, err
 	}
