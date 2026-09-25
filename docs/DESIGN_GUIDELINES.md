@@ -289,12 +289,10 @@ routes.
 |---|---|
 | `<Shell>` | Header + nav + outlet |
 | `<PageHeader>` | `eyebrow?` + `title` + `subtitle?` + `actions?` |
-| `<KpiCard>` | `label` + `value` + `unit?` + `delta?` (optional `trend` consumes `<Sparkline>`) |
+| `<KpiCard>` | `label` + `value` + `unit?` + `delta?` |
 | `<Tag>` | Small mono tag, `variant="neutral" \| "info"` |
 | `<StatusDot>` | 2×2 colored circle |
 | `<StateBadge>` | Consumer-group state pill |
-| `<Sparkline>` | 80×24 SVG sparkline (consumed by `<KpiCard>` via the `trend` prop; available for future dashboard work) |
-| `<Gauge>` | Horizontal usage bar (available for future capacity/utilisation widgets) |
 | `<DataTable>` | Styled `<table>` with built-in `<thead>` / row styles, sort headers, and skeleton/empty body states |
 | `<Toolbar>` | Filter / action row: `search?` (left), `filters?` (centre), `actions?` (right, `ml-auto`). Replaces hand-rolled `flex flex-wrap items-center gap-2` blocks |
 | `<EmptyState>` | Icon + heading + CTA |
