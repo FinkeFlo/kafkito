@@ -9,7 +9,15 @@ export interface JsonInteractiveProps {
   ) => void;
 }
 
-export const SIZE_LIMIT_BYTES = 1_000_000;
+/**
+ * Ceiling on the value size that gets the interactive, per-node tree.
+ *
+ * Expressed in binary units on purpose: it is rendered next to the value's
+ * own size, which `fmt.bytes` formats as KiB/MiB. A decimal 1,000,000 showed
+ * up as an arbitrary-looking "977 KiB" and forced the reader to convert units
+ * before they could tell whether their value was over the line.
+ */
+export const SIZE_LIMIT_BYTES = 1024 * 1024;
 export const ARRAY_COLLAPSE_THRESHOLD = 100;
 
 function approximateSize(v: unknown): number {

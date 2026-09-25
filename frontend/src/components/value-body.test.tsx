@@ -178,6 +178,24 @@ describe("ValueBody", () => {
     expect(fetchMessageRawBase64).not.toHaveBeenCalled();
   });
 
+  it("states the size and the limit in the same unit, so they can be compared", () => {
+    renderValueBody(message({ value_size_bytes: 8 * 1024 * 1024 }));
+
+    const button = screen.getByRole("button", { name: LOAD_BUTTON });
+    const reason = document.getElementById(
+      button.getAttribute("aria-describedby") as string,
+    );
+
+    // A decimal limit rendered by a binary formatter produced "977 KiB"
+    // against a size in MiB, which reads as arbitrary and forces the reader
+    // to convert units before the sentence means anything.
+    const units = [...(reason?.textContent ?? "").matchAll(/\d\s*([KMG]iB)/g)].map(
+      (m) => m[1],
+    );
+    expect(units.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(units).size).toBe(1);
+  });
+
   it("does not offer the button for Schema Registry values, whose raw bytes are not JSON", () => {
     renderValueBody(
       message({
