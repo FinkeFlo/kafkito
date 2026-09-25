@@ -1,5 +1,5 @@
-# Tested with golangci-lint v2.13; keep in sync with the version pinned in
-# .github/workflows/ci.yml (golangci-lint-action).
+# golangci-lint version is pinned by GOLANGCI_LINT_VERSION in the Makefile;
+# .github/workflows/ci.yml must use the same value (`make lint-version-check`).
 version: "2"
 
 run:

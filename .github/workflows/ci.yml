@@ -23,10 +23,14 @@ jobs:
           go-version: "1.26"
       - run: go build -tags "${{ matrix.tags }}" ./...
       - run: go test -race -tags "${{ matrix.tags }}" ./...
-      - if: matrix.tags == ''
-        uses: golangci/golangci-lint-action@v9
+      # Must equal GOLANGCI_LINT_VERSION in the Makefile (checked below).
+      # Build tags change the compiled file set, so lint every matrix entry.
+      - uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.13
+          version: v2.14.0
+          args: ${{ matrix.tags && format('--build-tags={0}', matrix.tags) || '' }}
+      - if: matrix.tags == ''
+        run: make lint-version-check
       # Validates .goreleaser.yaml (the release pipeline) on every PR.
       - if: matrix.tags == ''
         uses: goreleaser/goreleaser-action@v7
