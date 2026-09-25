@@ -36,7 +36,9 @@ staged files:
 - `gitleaks` — blocks credentials (see [Secret scanning](#secret-scanning)).
 - `golangci-lint-fmt` — gofmt/goimports via the pinned golangci-lint in
   `./bin` (installed on first use, like `make lint`).
-- `biome-check` — Biome for `frontend/src`; needs `make frontend-install`.
+- `biome-check` — Biome lint and format check for the frontend sources
+  (`frontend/src`, `frontend/e2e`, config files); needs
+  `make frontend-install`.
 
 Enable them once per clone:
 
