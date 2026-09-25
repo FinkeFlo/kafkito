@@ -1,4 +1,4 @@
-.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev frontend-check api-generate api-lint api-check check e2e e2e-up e2e-test e2e-down e2e-clean help
+.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev frontend-check api-generate api-lint api-check check release-check e2e e2e-up e2e-test e2e-down e2e-clean help
 
 BIN := bin/kafkito
 PKG := ./...
@@ -31,6 +31,7 @@ help:
 	@echo "  docker-build       - docker build -t $(IMAGE)"
 	@echo "  compose-up/down    - docker compose lifecycle"
 	@echo "  e2e                - opt-in Playwright walks against a local fixture stack"
+	@echo "  release-check      - release gate: VERSION=vX.Y.Z must have a dated changelog.ts entry"
 
 frontend-install:
 	cd frontend && bun install
@@ -88,6 +89,14 @@ lint:
 
 tidy:
 	go mod tidy
+
+# --- Release -------------------------------------------------------------
+# release-check is the gate the release workflow runs first:
+# it fails unless frontend/src/content/changelog.ts has a dated entry for
+# normalizeVersion(VERSION).
+release-check:
+	@if [ -z "$(filter v%,$(VERSION))" ]; then echo "usage: make release-check VERSION=vX.Y.Z" >&2; exit 1; fi
+	cd frontend && KAFKITO_RELEASE_VERSION=$(VERSION) bunx vitest run src/content/release-gate.test.ts
 
 docker-build:
 	docker build --build-arg VERSION=$(VERSION) -t $(IMAGE) .

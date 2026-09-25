@@ -43,7 +43,8 @@ export const MAX_CHANGELOG_DESCRIPTION_LENGTH = 160;
 
 /**
  * Curated release notes, newest first. Add a new entry as part of the
- * release checklist BEFORE tagging; `version` must equal the normalized
+ * release checklist BEFORE tagging (the release workflow fails otherwise, see
+ * release-gate.test.ts); `version` must equal the normalized
  * runtime version (see lib/whats-new.ts `normalizeVersion`).
  *
  * Keep titles and descriptions within the length budget above.
