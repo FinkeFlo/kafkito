@@ -5,8 +5,18 @@
 
 package auth
 
-// init registers the modes that are always part of the default (no-tag) build:
+import (
+	"context"
+	"errors"
+	"fmt"
+)
+
+// init registers the modes that are part of every build (default, btp and
+// devauth):
 //   - "mock": generic OIDC validator + in-process JWKS fixture
+//   - "oidc": generic OIDC validator against an external issuer (issuer,
+//     audience and optional JWKS URL from ModeConfig.OIDC; the JWKS URL is
+//     discovered via /.well-known/openid-configuration when unset)
 //   - "off":  unavailable in default builds; the devauth build tag re-registers
 //     "off" with a synthetic-principal validator (see mode_devauth.go)
 //
@@ -15,6 +25,7 @@ package auth
 // import cycle).
 func init() {
 	Register("mock", newMockMode)
+	Register("oidc", newOIDCMode)
 	Register("off", newOffMode)
 }
 
@@ -48,4 +59,32 @@ func newMockMode(_ ModeConfig) (Validator, func(), error) {
 		return nil, nil, err
 	}
 	return v, mock.Close, nil
+}
+
+// newOIDCMode constructs a generic OIDCValidator for an external issuer. When
+// no JWKS URL is configured it is discovered from the issuer's OpenID Provider
+// metadata, bounded by DiscoveryTimeout, so a misconfigured or unreachable
+// issuer fails startup instead of the first request.
+func newOIDCMode(cfg ModeConfig) (Validator, func(), error) {
+	c := cfg.OIDC
+	if c.IssuerURL == "" {
+		return nil, nil, errors.New("oidc mode: issuer URL required (auth.oidc.issuer_url / KAFKITO_AUTH_OIDC_ISSUER_URL)")
+	}
+	if c.Audience == "" {
+		return nil, nil, errors.New("oidc mode: audience required (auth.oidc.audience / KAFKITO_AUTH_OIDC_AUDIENCE)")
+	}
+	if c.JWKSEndpoint == "" {
+		ctx, cancel := context.WithTimeout(context.Background(), DiscoveryTimeout)
+		defer cancel()
+		jwksURL, err := DiscoverJWKSURL(ctx, nil, c.IssuerURL)
+		if err != nil {
+			return nil, nil, fmt.Errorf("oidc mode: %w (set auth.oidc.jwks_url to skip discovery)", err)
+		}
+		c.JWKSEndpoint = jwksURL
+	}
+	v, err := NewOIDCValidator(c)
+	if err != nil {
+		return nil, nil, fmt.Errorf("oidc mode: %w", err)
+	}
+	return v, func() {}, nil
 }

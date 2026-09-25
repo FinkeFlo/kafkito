@@ -21,8 +21,9 @@ import (
 )
 
 // MockOIDC is an in-process JWKS+token issuer used in tests. It signs RS256
-// tokens with a freshly generated key, exposes the public key at /jwks, and
-// lets callers mint tokens with arbitrary claims via Issue().
+// tokens with a freshly generated key, exposes the public key at /jwks and
+// OpenID Provider metadata at /.well-known/openid-configuration (issuer =
+// Server.URL), and lets callers mint tokens with arbitrary claims via Issue().
 //
 // By default the mock emits a generic OIDC token: scopes are written to the
 // "scope" claim verbatim, and no tenant/zone claim is added. Callers that need
@@ -81,8 +82,16 @@ func NewMockOIDC(opts ...MockOIDCOption) (*MockOIDC, error) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(set)
 	})
-	srv := httptest.NewServer(mux)
-	m := &MockOIDC{Server: srv, priv: priv, pubJWK: pub, keyID: keyID}
+	m := &MockOIDC{priv: priv, pubJWK: pub, keyID: keyID}
+	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"issuer":   m.Server.URL,
+			"jwks_uri": m.JKU(),
+		})
+	})
+	m.Server = httptest.NewUnstartedServer(mux)
+	m.Server.Start()
 	for _, opt := range opts {
 		opt(m)
 	}
