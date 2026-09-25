@@ -556,7 +556,6 @@ Copy this into the PR description and tick each box.
 - [ ] npm run lint passes
 - [ ] npm run build passes
 - [ ] npm run check:palette passes
-- [ ] npm run check:strings passes
 - [ ] npm run check:tokens passes
 - [ ] npm run check:routes passes
 - [ ] npm run check:dates passes
