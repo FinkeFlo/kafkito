@@ -9,14 +9,14 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDefaultsLoad(t *testing.T) {
-	t.Setenv("KAFKITO_CONFIG", "")
-	t.Setenv("KAFKITO_KAFKA_BROKERS", "")
+	isolateEnv(t)
 
 	cfg, err := Load("")
 	require.NoError(t, err)
@@ -35,6 +35,7 @@ func TestEnvShortcutSynthesizesCluster(t *testing.T) {
 }
 
 func TestYAMLConfigLoads(t *testing.T) {
+	isolateEnv(t)
 	dir := t.TempDir()
 	p := filepath.Join(dir, "config.yaml")
 	require.NoError(t, os.WriteFile(p, []byte(`
@@ -61,6 +62,7 @@ clusters:
 }
 
 func TestEnvOverridesYAML(t *testing.T) {
+	isolateEnv(t)
 	dir := t.TempDir()
 	p := filepath.Join(dir, "config.yaml")
 	require.NoError(t, os.WriteFile(p, []byte(`server:
@@ -291,4 +293,250 @@ func TestLogInvalidEnvRejectedOnLoad(t *testing.T) {
 	_, err := Load("")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "log.level")
+}
+
+// isolateEnv unsets every variable Load consults so tests start from the
+// built-in defaults regardless of the developer's shell (.env.dev sets PORT
+// and KAFKITO_KAFKA_BROKERS). Unset, not empty: an empty KAFKITO_* variable
+// still overrides the YAML file.
+func isolateEnv(t *testing.T) {
+	t.Helper()
+	for _, k := range []string{
+		"KAFKITO_CONFIG", "KAFKITO_KAFKA_BROKERS", "PORT", "KAFKITO_SERVER_ADDR",
+		"KAFKITO_TEST_CONNECTION_TIMEOUT", "KAFKITO_SERVER_FRAME_ANCESTORS",
+	} {
+		t.Setenv(k, "") // registers the restore
+		require.NoError(t, os.Unsetenv(k))
+	}
+}
+
+func writeYAML(t *testing.T, body string) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(p, []byte(body), 0o600))
+	return p
+}
+
+func TestServerDefaults(t *testing.T) {
+	isolateEnv(t)
+
+	cfg, err := Load("")
+	require.NoError(t, err)
+	assert.Equal(t, ":37421", cfg.Server.Addr)
+	assert.Equal(t, 15*time.Second, cfg.Server.TestConnectionTimeout)
+	assert.Equal(t, "'none'", cfg.Server.FrameAncestors)
+}
+
+func TestListenAddressPrecedence(t *testing.T) {
+	yamlAddr := "server:\n  addr: \"127.0.0.1:1111\"\n"
+	cases := []struct {
+		name    string
+		yaml    string
+		envAddr string
+		port    string
+		want    string
+	}{
+		{name: "default", want: ":37421"},
+		{name: "yaml", yaml: yamlAddr, want: "127.0.0.1:1111"},
+		{name: "env beats yaml", yaml: yamlAddr, envAddr: "127.0.0.1:2222", want: "127.0.0.1:2222"},
+		{name: "PORT beats default", port: "3333", want: ":3333"},
+		{name: "PORT beats yaml", yaml: yamlAddr, port: "3333", want: ":3333"},
+		{name: "PORT beats env", yaml: yamlAddr, envAddr: "127.0.0.1:2222", port: "3333", want: ":3333"},
+		{name: "PORT=0 picks a free port", port: "0", want: ":0"},
+		{name: "named PORT accepted like net.Listen", port: "http", want: ":http"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			isolateEnv(t)
+			if tc.envAddr != "" {
+				t.Setenv("KAFKITO_SERVER_ADDR", tc.envAddr)
+			}
+			if tc.port != "" {
+				t.Setenv("PORT", tc.port)
+			}
+			path := ""
+			if tc.yaml != "" {
+				path = writeYAML(t, tc.yaml)
+			}
+
+			cfg, err := Load(path)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, cfg.Server.Addr)
+		})
+	}
+}
+
+func TestEmptyServerAddrFallsBackToDefault(t *testing.T) {
+	isolateEnv(t)
+	// Set but empty overrides the YAML value in koanf; the effective
+	// address is then the default, as before.
+	t.Setenv("KAFKITO_SERVER_ADDR", "")
+
+	cfg, err := Load(writeYAML(t, "server:\n  addr: \"127.0.0.1:1111\"\n"))
+	require.NoError(t, err)
+	assert.Equal(t, ":37421", cfg.Server.Addr)
+}
+
+func TestEmptyPortIgnored(t *testing.T) {
+	isolateEnv(t)
+	t.Setenv("PORT", "")
+	t.Setenv("KAFKITO_SERVER_ADDR", "127.0.0.1:2222")
+
+	cfg, err := Load("")
+	require.NoError(t, err)
+	assert.Equal(t, "127.0.0.1:2222", cfg.Server.Addr)
+}
+
+func TestPortPrefixedVariablesIgnored(t *testing.T) {
+	isolateEnv(t)
+	t.Setenv("PORTAL_URL", "https://example.com")
+
+	cfg, err := Load("")
+	require.NoError(t, err)
+	assert.Equal(t, ":37421", cfg.Server.Addr)
+}
+
+func TestInvalidListenAddressRejected(t *testing.T) {
+	cases := []struct {
+		name, port, envAddr string
+	}{
+		{name: "PORT not a port", port: "abc"},
+		{name: "PORT out of range", port: "65536"},
+		{name: "PORT with colon", port: "80:90"},
+		{name: "addr without port", envAddr: "localhost"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			isolateEnv(t)
+			if tc.port != "" {
+				t.Setenv("PORT", tc.port)
+			}
+			if tc.envAddr != "" {
+				t.Setenv("KAFKITO_SERVER_ADDR", tc.envAddr)
+			}
+
+			_, err := Load("")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "server.addr")
+		})
+	}
+}
+
+func TestTestConnectionTimeout(t *testing.T) {
+	cases := []struct {
+		name string
+		yaml string
+		env  string
+		want time.Duration
+	}{
+		{name: "env", env: "30s", want: 30 * time.Second},
+		{name: "env trimmed", env: " 2m ", want: 2 * time.Minute},
+		{name: "empty env keeps default", env: "", want: 15 * time.Second},
+		{name: "zero means default", env: "0s", want: 15 * time.Second},
+		{name: "yaml", yaml: "server:\n  test_connection_timeout: 45s\n", want: 45 * time.Second},
+		{name: "env beats yaml", yaml: "server:\n  test_connection_timeout: 45s\n", env: "5s", want: 5 * time.Second},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			isolateEnv(t)
+			t.Setenv("KAFKITO_TEST_CONNECTION_TIMEOUT", tc.env)
+			path := ""
+			if tc.yaml != "" {
+				path = writeYAML(t, tc.yaml)
+			}
+
+			cfg, err := Load(path)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, cfg.Server.TestConnectionTimeout)
+		})
+	}
+}
+
+func TestInvalidTestConnectionTimeoutRejected(t *testing.T) {
+	for _, v := range []string{"abc", "30", "-5s"} {
+		t.Run(v, func(t *testing.T) {
+			isolateEnv(t)
+			t.Setenv("KAFKITO_TEST_CONNECTION_TIMEOUT", v)
+
+			_, err := Load("")
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestFrameAncestors(t *testing.T) {
+	cases := []struct {
+		name string
+		yaml string
+		env  string
+		want string
+	}{
+		{name: "empty env keeps default", want: "'none'"},
+		{name: "env", env: "'self' https://*.launchpad.example.com", want: "'self' https://*.launchpad.example.com"},
+		{name: "whitespace normalised", env: "  'self'   https://a.example  ", want: "'self' https://a.example"},
+		{name: "yaml", yaml: "server:\n  frame_ancestors: \"'self'\"\n", want: "'self'"},
+		{name: "env beats yaml", yaml: "server:\n  frame_ancestors: \"'self'\"\n", env: "https://b.example", want: "https://b.example"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			isolateEnv(t)
+			t.Setenv("KAFKITO_SERVER_FRAME_ANCESTORS", tc.env)
+			path := ""
+			if tc.yaml != "" {
+				path = writeYAML(t, tc.yaml)
+			}
+
+			cfg, err := Load(path)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, cfg.Server.FrameAncestors)
+		})
+	}
+}
+
+func TestFrameAncestorsDirectiveInjectionRejected(t *testing.T) {
+	for _, v := range []string{"'self'; script-src *", "'self', https://evil.example"} {
+		t.Run(v, func(t *testing.T) {
+			isolateEnv(t)
+			t.Setenv("KAFKITO_SERVER_FRAME_ANCESTORS", v)
+
+			_, err := Load("")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "server.frame_ancestors")
+		})
+	}
+}
+
+func TestBrokersShortcutIsEnvOnly(t *testing.T) {
+	isolateEnv(t)
+	path := writeYAML(t, "kafka:\n  brokers: \"yaml-host:9092\"\n")
+
+	cfg, err := Load(path)
+	require.NoError(t, err)
+	assert.Empty(t, cfg.Clusters, "kafka.brokers in YAML must not synthesize a cluster")
+}
+
+func TestBrokersShortcutIgnoredWhenClustersConfigured(t *testing.T) {
+	isolateEnv(t)
+	t.Setenv("KAFKITO_KAFKA_BROKERS", "env-host:9092")
+	path := writeYAML(t, "clusters:\n  - name: dev\n    brokers: [\"yaml-host:9092\"]\n")
+
+	cfg, err := Load(path)
+	require.NoError(t, err)
+	require.Len(t, cfg.Clusters, 1)
+	assert.Equal(t, "dev", cfg.Clusters[0].Name)
+}
+
+func TestBrokersShortcutTrimsAndDropsEmpty(t *testing.T) {
+	isolateEnv(t)
+	t.Setenv("KAFKITO_KAFKA_BROKERS", " a:9092 ,, b:9092 ,")
+
+	cfg, err := Load("")
+	require.NoError(t, err)
+	require.Len(t, cfg.Clusters, 1)
+	assert.Equal(t, []string{"a:9092", "b:9092"}, cfg.Clusters[0].Brokers)
+
+	t.Setenv("KAFKITO_KAFKA_BROKERS", " , ")
+	cfg, err = Load("")
+	require.NoError(t, err)
+	assert.Empty(t, cfg.Clusters)
 }

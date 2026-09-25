@@ -81,8 +81,8 @@ Corrections to match the implementation:
    planned. This aligns with the IETF "OAuth 2.0 for Browser-Based Apps"
    recommendation to keep tokens out of the browser via a BFF/proxy.
 2. **Port fallback** is `:37421`, not `:8080`. Order: `$PORT`, then
-   `server.addr` from config, then `:37421` (`listenAddress` in
-   `cmd/kafkito/main.go`).
+   `server.addr` from config, then `:37421` (resolved by `config.Load` in
+   `internal/config`).
 3. **Reverse-proxy headers:** `chi/middleware.RealIP` is not used;
    `X-Forwarded-*` headers are not interpreted by kafkito.
 4. **XSUAA adapter** lives at `internal/auth/xsuaa` and is compiled only with
