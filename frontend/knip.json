@@ -1,0 +1,10 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["src/routes/**/*.tsx"],
+  "project": ["src/**/*.{ts,tsx,css}", "e2e/**/*.ts", "scripts/**/*.mjs"],
+  "ignore": ["src/lib/api.gen.ts"],
+  "ignoreExportsUsedInFile": { "interface": true, "type": true },
+  "vite": true,
+  "vitest": true,
+  "playwright": true
+}
