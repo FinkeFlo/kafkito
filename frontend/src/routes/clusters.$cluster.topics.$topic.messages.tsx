@@ -1166,7 +1166,16 @@ function MessagesPanel({
         </div>
       )}
 
-      {displayMessages.length === 0 && !searching && (
+      {displayMessages.length === 0 && !searching && msgsQuery.isLoading && (
+        <div className="p-8 text-center text-sm text-[var(--color-text-subtle)]">
+          Loading messages…
+        </div>
+      )}
+
+      {/* `isLoading` (not `isPending`) is the right guard: the query is
+          disabled while a search result is on screen, and a disabled query
+          stays `pending` forever — which would hide the "No matches." state. */}
+      {displayMessages.length === 0 && !searching && !msgsQuery.isLoading && (
         <div className="p-8 text-center text-sm text-[var(--color-text-subtle)]">
           {searchResult ? "No matches." : "No messages."}
         </div>
