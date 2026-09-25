@@ -124,7 +124,16 @@ supports OpenAPI 3.1 (including `type: [T, "null"]` and `const`).
   `$ref`, such as `ClusterConfig`, fail to compile there, and kin-openapi
   silently falls back to its built-in validator. The fallback also handles
   `type: [T, "null"]` and `const`. The error sanitiser handles both error
-  forms, and both are tested.
+  forms and gives the same rule text for both. Tests send real requests
+  through the real validator, against the embedded spec and a small
+  `$ref`-free 3.1 spec, and pin the exact texts for enum, type, bounds,
+  `minItems`, required, `const` and nullable fields. A kin-openapi upgrade
+  that changes its messages therefore fails CI.
+- **Rules that stay in Go.** Only rules the spec can express live in the
+  spec. Blank broker addresses, the SSRF policy and the credentials a
+  SASL mechanism needs are checked in `validateClusterPolicy`, for both
+  the `_test` body and the `X-Kafkito-Cluster` header. The header is
+  decoded by `privateClusterMiddleware` and is not schema-validated.
 - **Streaming.** oapi-codegen v2.8.0 streams `text/event-stream` responses
   natively (the strict response type takes an `io.Reader` and flushes).
   The SSE endpoints (live consume, topic copy progress) can therefore be
@@ -155,9 +164,15 @@ supports OpenAPI 3.1 (including `type: [T, "null"]` and `const`).
 - Moving validation into the spec makes some errors stricter or reworded:
   JSON request bodies need `Content-Type: application/json`, and
   validation errors have the code `invalid_request` with generated
-  messages. When the spec is corrected to describe existing server
-  behaviour and oasdiff still reports that as breaking, the change is
-  listed with a justification in `.github/oasdiff-err-ignore.txt`.
+  messages. `POST /api/v1/clusters/_test` bodies must use the documented
+  lowercase `auth.type` values: `PLAIN` or `" plain "` used to be
+  normalised and now returns `400` `invalid_request`. The frontend
+  always sends the lowercase values. The `X-Kafkito-Cluster` header is
+  unchanged and still accepts `auth.type` case-insensitively and trimmed,
+  so private clusters stored by older versions keep working.
+- The spec stays the contract. It is not loosened to match lenient
+  server behaviour, and `api-breaking` (oasdiff) runs without an ignore
+  list.
 - `openapi-typescript` needs the TypeScript 5 JS API, which the project's
   TypeScript 7 does not provide. It therefore runs through a pinned `bunx`
   instead of as a devDependency.

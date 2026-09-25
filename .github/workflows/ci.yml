@@ -80,8 +80,6 @@ jobs:
           base: .oasdiff-base/openapi.yaml
           revision: api/openapi.yaml
           fail-on: ERR
-          # Acknowledged spec corrections that match existing server behaviour.
-          err-ignore: .github/oasdiff-err-ignore.txt
           # Keep the specs inside CI: no upload to oasdiff.com, no PR comment.
           review: "false"
           github-token: ""

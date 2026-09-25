@@ -409,6 +409,11 @@ func TestMigratedOps_Requests(t *testing.T) {
 	hNoKafka := New(Options{Version: "v-test", Logger: slog.Default()})
 
 	unreachableHeader := encodeHeader(t, config.ClusterConfig{Brokers: []string{unreachableBroker}})
+	// The header is not schema-validated: its auth.type stays
+	// case-insensitive and trimmed for configs saved by older versions.
+	upperAuthHeader := encodeHeader(t, config.ClusterConfig{Brokers: []string{unreachableBroker}, Auth: config.AuthConfig{Type: "PLAIN", Username: "u", Password: "p"}})
+	paddedAuthHeader := encodeHeader(t, config.ClusterConfig{Brokers: []string{unreachableBroker}, Auth: config.AuthConfig{Type: " plain ", Username: "u", Password: "p"}})
+	blankBrokerHeader := encodeHeader(t, config.ClusterConfig{Brokers: []string{unreachableBroker, " "}})
 	jsonCT := "application/json"
 
 	cases := []struct {
@@ -439,13 +444,19 @@ func TestMigratedOps_Requests(t *testing.T) {
 		{h, requestCase{name: "clusters wrong method", method: http.MethodDelete, path: "/api/v1/clusters", wantStatus: 405, notAnOperation: true}},
 		// testCluster
 		{h, requestCase{name: "test via header", method: http.MethodPost, path: "/api/v1/clusters/_test", header: map[string]string{PrivateClusterHeader: unreachableHeader}, wantStatus: 200, wantBody: `"reachable":false`}},
-		{h, requestCase{name: "test via body", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":["` + unreachableBroker + `"],"auth":{"type":" PLAIN ","username":"u","password":"p"}}`, wantStatus: 200, wantBody: `"auth_type":"plain"`}},
+		{h, requestCase{name: "test via header upper-case auth type", method: http.MethodPost, path: "/api/v1/clusters/_test", header: map[string]string{PrivateClusterHeader: upperAuthHeader}, wantStatus: 200, wantBody: `"auth_type":"plain"`}},
+		{h, requestCase{name: "test via header padded auth type", method: http.MethodPost, path: "/api/v1/clusters/_test", header: map[string]string{PrivateClusterHeader: paddedAuthHeader}, wantStatus: 200, wantBody: `"auth_type":"plain"`}},
+		{h, requestCase{name: "test via header blank broker", method: http.MethodPost, path: "/api/v1/clusters/_test", header: map[string]string{PrivateClusterHeader: blankBrokerHeader}, wantStatus: 400, wantBody: `{"error":"X-Kafkito-Cluster: broker address must not be empty"}`}},
+		{h, requestCase{name: "test via body", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":["` + unreachableBroker + `"],"auth":{"type":"plain","username":"u","password":"p"}}`, wantStatus: 200, wantBody: `"auth_type":"plain"`}},
+		{h, requestCase{name: "test body upper-case auth type", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":["` + unreachableBroker + `"],"auth":{"type":"PLAIN","username":"u","password":"p"}}`, wantStatus: 400, wantBody: `{"code":"invalid_request","error":"request body \"/auth/type\": must be one of the allowed values"}`}},
+		{h, requestCase{name: "test body padded auth type", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":["` + unreachableBroker + `"],"auth":{"type":" plain ","username":"u","password":"p"}}`, wantStatus: 400, wantBody: `{"code":"invalid_request","error":"request body \"/auth/type\": must be one of the allowed values"}`}},
 		{h, requestCase{name: "test body with charset", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: "application/json; charset=utf-8", body: `{"brokers":["` + unreachableBroker + `"],"auth":{"type":"scram-sha-512","username":"u","password":"p"}}`, wantStatus: 200}},
 		{h, requestCase{name: "test without config", method: http.MethodPost, path: "/api/v1/clusters/_test", wantStatus: 400, wantBody: `{"error":"cluster config required in body or X-Kafkito-Cluster header"}`}},
 		{h, requestCase{name: "test no brokers", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":[]}`, wantStatus: 400, wantBody: `{"code":"invalid_request","error":"request body \"/brokers\": must have at least 1 items"}`}},
 		{h, requestCase{name: "test brokers missing", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{}`, wantStatus: 400, wantBody: `"error":"request body \"/brokers\": is required"`}},
-		{h, requestCase{name: "test blank broker", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":["h:1"," "]}`, wantStatus: 400, wantBody: `"error":"request body \"/brokers/1\": must match pattern '\\S'"`}},
-		{h, requestCase{name: "test unsupported auth type", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":["h:1"],"auth":{"type":"kerberos"}}`, wantStatus: 400, wantBody: `"error":"request body \"/auth/type\": must match pattern`}},
+		{h, requestCase{name: "test blank broker", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":["` + unreachableBroker + `"," "]}`, wantStatus: 400, wantBody: `{"error":"broker address must not be empty"}`}},
+		{h, requestCase{name: "test empty broker", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":[""]}`, wantStatus: 400, wantBody: `{"error":"broker address must not be empty"}`}},
+		{h, requestCase{name: "test unsupported auth type", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":["h:1"],"auth":{"type":"kerberos"}}`, wantStatus: 400, wantBody: `{"code":"invalid_request","error":"request body \"/auth/type\": must be one of the allowed values"}`}},
 		{h, requestCase{name: "test plain without password", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":["` + unreachableBroker + `"],"auth":{"type":"plain","username":"u"}}`, wantStatus: 400, wantBody: `{"error":"auth \"plain\" requires username and password"}`}},
 		{h, requestCase{name: "test SSRF-blocked broker", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":["127.0.0.1:9092"]}`, wantStatus: 400, wantBody: `"error":"broker \"127.0.0.1:9092\": `}},
 		{h, requestCase{name: "test wrong type", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":["h:1"],"tls":{"enabled":"yes"}}`, wantStatus: 400, wantBody: `"error":"request body \"/tls/enabled\": must be of type boolean"`}},
