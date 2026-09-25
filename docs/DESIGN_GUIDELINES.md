@@ -317,7 +317,7 @@ scaffolding, button styles, etc.
 | `danger` | `bg-danger text-accent-foreground hover:bg-danger/90` (with `focus-visible:[outline-color:var(--color-focus-on-accent)]`) | destructive only |
 | `ghost` | `text-muted hover:text-text hover:bg-hover` | inline, icon-only, overflow menus |
 
-The variant union is exactly `primary | secondary | danger | ghost`. The `destructive` alias was removed at the end of Phase 3 — do not reintroduce it.
+The variant union is exactly `primary | secondary | danger | ghost`. The `destructive` alias was removed — do not reintroduce it.
 
 One primary button per page. Multiple primaries signal unclear hierarchy.
 
@@ -613,7 +613,7 @@ a review, treat it as drift and bring it in line.
 |---|---|---|
 | initial | Guidelines established alongside Direction A redesign | — |
 | 2026-04-26 | Direction-A delivery: WCAG-AA token sweep (focus-on-accent, accent-foreground, border-hover, dark overlay); new primitives (Toolbar, Modal, Input, Notice); kebab/PascalCase consolidation; Button variant rename destructive→danger; PageHeader eyebrow; Incidents-(24h) → Unreachable now semantic fix; outline-based focus indicator | (this PR — link added by author) |
-| 2026-05-02 | Phase 1 hardening: German strings stripped (English-only), `confirmPhrase` parity on Reset-Offsets and Delete-Records, ErrorState retry migrated to canonical `<Button>`, focus-indicator escapes removed (TimezoneToggle/SearchInput/CommandPalette), Radix headless-primitive carve-out in § 1 | (this PR — link added by author) |
+| 2026-05-02 | Hardening: German strings stripped (English-only), `confirmPhrase` parity on Reset-Offsets and Delete-Records, ErrorState retry migrated to canonical `<Button>`, focus-indicator escapes removed (TimezoneToggle/SearchInput/CommandPalette), Radix headless-primitive carve-out in § 1 | (this PR — link added by author) |
 
 Add a row on every change. Small tweaks to tokens or primitives are
 fine; major shifts (new visual language, new nav model) require a design

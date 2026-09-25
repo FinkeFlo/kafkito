@@ -40,7 +40,7 @@ func newSampleTestHandler(t *testing.T) http.Handler {
 // Kafka the broker call returns 502, which still proves the route resolves
 // and the handler runs.
 //
-// Phase-2 follow-up: with no in-process Kafka mock, ConsumeMessages always
+// Limitation: with no in-process Kafka mock, ConsumeMessages always
 // returns a connection error and the handler responds with 502, so we cannot
 // assert the 200-path response shape (cluster/topic echo, sampled_at presence,
 // len(messages) <= 5). When a kfake-backed fixture lands, extend this test to

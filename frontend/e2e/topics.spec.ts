@@ -5,7 +5,7 @@ const FIXTURE_TOPIC = "e2e-walk-target";
 const FIXTURE_TOPIC_LARGE = "e2e-walk-large";
 const CREATE_DRAFT_NAME = "e2e-create-walk";
 
-test.describe("Topics (Phase 3)", () => {
+test.describe("Topics", () => {
   test("list page renders fixture topics with name and partition count", async ({ page }) => {
     await page.goto(`/clusters/${encodeURIComponent(CLUSTER)}/topics`);
 

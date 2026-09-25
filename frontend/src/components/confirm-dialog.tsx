@@ -13,8 +13,7 @@ export interface ConfirmDialogProps {
   cancelLabel?: ReactNode;
   /**
    * Color of the confirm button. Default `"danger"`. The legacy alias
-   * `"destructive"` is still accepted so route callsites compile while
-   * Phase 3 migrates them.
+   * `"destructive"` is still accepted and maps to `"danger"`.
    */
   variant?: "danger" | "destructive" | "primary";
   /** Async-aware: prevents double clicks while resolving. */

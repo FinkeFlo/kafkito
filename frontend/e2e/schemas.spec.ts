@@ -2,7 +2,7 @@ import { test, expect, SR_CLUSTER_NAME } from "./fixtures/private-cluster";
 
 const PRIMARY = process.env.KAFKITO_E2E_CLUSTER ?? "local";
 
-test.describe("Schemas tab (Phase 3, capability-driven)", () => {
+test.describe("Schemas tab (capability-driven)", () => {
   test("schemas link shows '(—)' suffix and aria-disabled when active cluster has no SR", async ({
     page,
   }) => {

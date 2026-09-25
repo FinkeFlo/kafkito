@@ -19,7 +19,7 @@ const FIXTURE_SLOT_COUNT = 7;
 const FIXTURE_LARGEST_SLOT_COUNT = 6;
 const FIXTURE_NON_EMPTY_SLOT_COUNT = 4;
 
-test.describe("Message timeline (Phase 3)", () => {
+test.describe("Message timeline", () => {
   test("shows traffic spread across multiple days", async ({ page }) => {
     await page.goto(`/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}/timeline`);
 

@@ -4,8 +4,7 @@ import { cn } from "@/lib/utils";
 /**
  * Canonical variant union per `DESIGN_GUIDELINES.md` § 6.2:
  * `primary | secondary | danger | ghost`. The deprecated `destructive`
- * alias was removed at the end of Phase 3 once every route callsite
- * migrated to `danger`.
+ * alias was removed once every route callsite migrated to `danger`.
  */
 export type ButtonVariant =
   | "primary"
