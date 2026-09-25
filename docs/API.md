@@ -17,8 +17,8 @@ endpoints that back the web UI — stable, documented, scriptable.
 
 ## Live docs
 
-- **Swagger UI**: `GET /api/v1/docs` — interactive, try-it-out enabled.
-- **Raw OpenAPI 3.1**: `GET /api/v1/openapi.yaml`.
+- **Raw OpenAPI 3.1**: `GET /api/v1/openapi.yaml`. Open it in any OpenAPI
+  viewer (e.g. Swagger Editor, Redocly, or your IDE's OpenAPI plugin).
 
 ## Meta
 
