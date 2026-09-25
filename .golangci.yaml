@@ -1,3 +1,5 @@
+# Tested with golangci-lint v2.13; keep in sync with the version pinned in
+# .github/workflows/ci.yml (golangci-lint-action).
 version: "2"
 
 run:

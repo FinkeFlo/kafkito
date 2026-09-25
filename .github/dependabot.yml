@@ -75,6 +75,10 @@ updates:
       docker-all:
         patterns:
           - "*"
+    # Go minor bumps are deliberate and done together with go.mod.
+    ignore:
+      - dependency-name: "golang"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   - package-ecosystem: "pip"
     directory: "/"
