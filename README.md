@@ -68,8 +68,8 @@ make dev              # Compose + backend (air) + frontend (Vite), one command
 ```
 
 Open the Vite URL printed in the `[frontend]` stream
-(default `http://localhost:37422`). Backend changes under `cmd/` or
-`internal/` rebuild automatically; frontend changes hot-reload
+(default `http://localhost:37422`). Backend changes under `cmd/`,
+`internal/`, or `api/` rebuild automatically; frontend changes hot-reload
 through Vite. Press Ctrl-C in the `make dev` terminal to stop both
 processes (the Compose stack stays up — tear it down with `make dev-down`).
 

@@ -1,0 +1,2142 @@
+openapi: 3.1.0
+info:
+  title: kafkito REST API
+  version: "1"
+  summary: Read/write access to Kafka clusters managed by kafkito.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+  description: |
+    JSON surface that backs the kafkito web UI. It is primarily a UI
+    contract, but stable enough for scripting with `curl`.
+
+    This document is the single source of truth for the HTTP contract
+    (ADR-0005). The frontend TypeScript types are generated from it and a Go
+    test asserts that every registered route is described here.
+
+    Authentication: every `/api/v1/*` request is validated by kafkito's auth
+    middleware. Depending on `KAFKITO_AUTH_MODE` it expects an
+    `Authorization: Bearer <JWT>` header (`oidc`, `xsuaa`) or injects a
+    synthetic principal (`off`, `mock`). kafkito has no login flow of its own:
+    interactive login is handled by an upstream auth proxy (for example the
+    SAP approuter), which forwards the bearer token. The validated principal
+    feeds the optional RBAC policy. `/healthz` and `/readyz` are never
+    authenticated.
+
+    Private (browser-stored) clusters: use the cluster path segment
+    `__private__` and send the cluster definition base64-encoded in the
+    `X-Kafkito-Cluster` header. Such requests bypass RBAC; only the broker's
+    own ACLs apply.
+
+    Conventions:
+    - List endpoints return objects (`{ "<resource>": [...] }`), never bare
+      arrays, so new top-level fields can be added without breaking clients.
+    - Timestamps are Unix milliseconds (int64) unless noted otherwise.
+    - Error responses use the `Error` schema: `{ "error": "<message>" }`,
+      optionally with a machine-readable `code`.
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+tags:
+  - name: meta
+    description: Build info, readiness, identity.
+  - name: clusters
+    description: Cluster inventory, brokers and capabilities.
+  - name: topics
+    description: Topic listing, describe, create, delete, configs.
+  - name: messages
+    description: Consume, produce, search, count and copy records.
+  - name: groups
+    description: Consumer groups, members, offsets, reset.
+  - name: schemas
+    description: Schema Registry subjects and versions.
+  - name: acls
+    description: Kafka ACLs.
+  - name: users
+    description: SCRAM users.
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      tags: [meta]
+      summary: Liveness probe.
+      security: []
+      responses:
+        "200":
+          description: Service is alive.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthResponse" }
+  /readyz:
+    get:
+      operationId: getReadiness
+      tags: [meta]
+      summary: Readiness probe. 503 if any configured cluster is unreachable.
+      security: []
+      responses:
+        "200":
+          description: All clusters reachable, or no clusters configured.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReadinessResponse" }
+        "503":
+          description: At least one configured cluster is unreachable.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReadinessResponse" }
+  /api/v1/info:
+    get:
+      operationId: getInfo
+      tags: [meta]
+      summary: Build info.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InfoResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/v1/me:
+    get:
+      operationId: getMe
+      tags: [meta]
+      summary: Resolved caller identity and effective permissions.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MeResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/v1/openapi.yaml:
+    get:
+      operationId: getOpenApiSpec
+      tags: [meta]
+      summary: This OpenAPI document.
+      responses:
+        "200":
+          description: The raw OpenAPI 3.1 document.
+          content:
+            application/yaml:
+              schema: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/v1/clusters:
+    get:
+      operationId: listClusters
+      tags: [clusters]
+      summary: List configured clusters with reachability, capabilities and metrics.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListClustersResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/v1/clusters/_test:
+    post:
+      operationId: testCluster
+      tags: [clusters]
+      summary: Probe an ad-hoc cluster definition without storing it.
+      description: |
+        Validates a user-supplied cluster definition, pings the brokers and
+        runs a short capability probe. The definition is taken from the
+        request body or, when the body is empty, from the `X-Kafkito-Cluster`
+        header (the body wins). A failed ping is **not** an HTTP error: the
+        response is 200 with `reachable: false` and the raw connection error
+        in `error`, because diagnosing the caller's own broker is the point of
+        this endpoint. The probe budget defaults to 15 s
+        (`KAFKITO_TEST_CONNECTION_TIMEOUT`).
+      parameters:
+        - $ref: "#/components/parameters/PrivateClusterHeader"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ClusterConfig" }
+      responses:
+        "200":
+          description: Probe finished (see `reachable`).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClusterInfo" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/v1/clusters/{cluster}/capabilities:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    get:
+      operationId: getCapabilities
+      tags: [clusters]
+      summary: Cached capabilities (permissions probed against the broker).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CapabilitiesResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/capabilities/refresh:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    post:
+      operationId: refreshCapabilities
+      tags: [clusters]
+      summary: Re-probe capabilities (clears the cache).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CapabilitiesResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/brokers:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    get:
+      operationId: listBrokers
+      tags: [clusters]
+      summary: List the brokers of a cluster.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListBrokersResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/topics:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    get:
+      operationId: listTopics
+      tags: [topics]
+      summary: List topics (filtered by RBAC view permission).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListTopicsResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+    post:
+      operationId: createTopic
+      tags: [topics]
+      summary: Create a topic.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTopicRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreatedResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/topics/{topic}:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/Topic"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    get:
+      operationId: describeTopic
+      tags: [topics]
+      summary: Describe a single topic (partitions, offsets, configs).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DescribeTopicResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+    delete:
+      operationId: deleteTopic
+      tags: [topics]
+      summary: Delete a topic.
+      parameters:
+        - $ref: "#/components/parameters/ProdConfirmHeader"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeletedNameResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "428": { $ref: "#/components/responses/ProdConfirmationRequired" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/topics/{topic}/consumers:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/Topic"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    get:
+      operationId: listTopicConsumers
+      tags: [topics]
+      summary: Consumer groups that have committed offsets on, or are assigned to, this topic.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListTopicConsumersResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+        "504":
+          description: 'Listing consumers timed out (`code: topic_consumers_timeout`).'
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/v1/clusters/{cluster}/topics/{topic}/configs:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/Topic"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    patch:
+      operationId: alterTopicConfigs
+      tags: [topics]
+      summary: Incrementally set and/or delete topic config entries.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AlterTopicConfigsRequest" }
+      responses:
+        "200":
+          description: Per-entry results.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AlterTopicConfigsResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/topics/{topic}/records:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/Topic"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    delete:
+      operationId: deleteRecords
+      tags: [topics]
+      summary: Delete records up to an offset per partition (low-watermark bump).
+      parameters:
+        - $ref: "#/components/parameters/ProdConfirmHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DeleteRecordsRequest" }
+      responses:
+        "200":
+          description: Per-partition results.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeleteRecordsResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "428": { $ref: "#/components/responses/ProdConfirmationRequired" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/topics/{topic}/messages:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/Topic"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    get:
+      operationId: consumeMessages
+      tags: [messages]
+      summary: Browse a bounded page of messages.
+      description: |
+        Reads at most `limit` messages (capped at 500 server-side). Values are
+        decoded into `value` when printable; binary values are rendered as a
+        hex preview with the raw bytes in `value_b64`. Schema-Registry encoded
+        records are decoded transparently when a Schema Registry is configured
+        for the cluster. Large values are truncated for the list view
+        (`value_truncated`); fetch the full bytes via the raw endpoint.
+
+        Paging: pass the returned `next_cursor` back as `cursor`. A cursor
+        forces the seek mode to its direction (backward → `from=end`, forward
+        → `from=offset`); an explicit contradicting `from` returns 400.
+      parameters:
+        - $ref: "#/components/parameters/PartitionQuery"
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, default: 50 }
+          description: Page size. Values above 500 are clamped to 500.
+        - in: query
+          name: from
+          schema: { type: string, enum: [end, start, offset, timestamp], default: end }
+          description: >
+            Seek mode. `end` = newest records, `start` = oldest, `offset` =
+            from `offset` (single partition) or `partition_offsets`,
+            `timestamp` = first record at or after `from_ts_ms`.
+        - in: query
+          name: offset
+          schema: { type: integer, format: int64 }
+          description: Required when `from=offset` and `partition_offsets` is not set.
+        - in: query
+          name: partition_offsets
+          schema: { type: string, example: "0:120,1:98" }
+          description: >
+            Per-partition seek offsets as `p:o,p:o` (max 1024 entries). Only
+            valid with `from=offset`.
+        - $ref: "#/components/parameters/FromTsMsQuery"
+        - $ref: "#/components/parameters/ToTsMsQuery"
+        - in: query
+          name: cursor
+          schema: { type: string }
+          description: Opaque continuation token from a previous `next_cursor`.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessagesPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+    post:
+      operationId: produceMessage
+      tags: [messages]
+      summary: Produce a single record.
+      description: |
+        `key_encoding` / `value_encoding` select how `key` / `value` are turned
+        into record bytes:
+        - `text` (default): the string is sent as UTF-8 bytes. An **empty**
+          `text` value produces a **nil** payload, i.e. a tombstone — which
+          deletes the key on a compacted topic.
+        - `base64`: the string is base64-decoded (standard, URL-safe or raw
+          standard are all accepted), for arbitrary binary payloads. An empty
+          string produces a nil payload here too.
+        - `empty`: the string is ignored and a non-nil **zero-length** payload
+          is produced. Needed because `text` cannot express a zero-length
+          payload (see the tombstone semantics above).
+
+        Header values that are not valid UTF-8 cannot round-trip through
+        `headers`; pass them as base64 raw bytes in `headers_b64` instead. A key
+        present in both maps wins in `headers_b64` and is emitted exactly once.
+        An undecodable `headers_b64` value fails the request with 400.
+
+        kafkito always injects the provenance headers `X-Kafkito-Source: true`
+        and, when an identity is available, `X-Kafkito-User: <subject>`,
+        overwriting those keys if the request supplied them.
+
+        The body may be sent gzip-compressed with `Content-Encoding: gzip`.
+        The decompressed body is capped at 15 MiB either way; unknown JSON
+        fields are rejected.
+      parameters:
+        - $ref: "#/components/parameters/ProdConfirmHeader"
+        - in: header
+          name: Content-Encoding
+          required: false
+          schema: { type: string, enum: [gzip] }
+          description: Set to `gzip` when the JSON body is gzip-compressed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProduceRequest" }
+      responses:
+        "200":
+          description: Produced
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProduceResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "428": { $ref: "#/components/responses/ProdConfirmationRequired" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/topics/{topic}/messages/count:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/Topic"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    get:
+      operationId: countMessages
+      tags: [messages]
+      summary: Approximate message volume for a topic range.
+      description: |
+        Resolves the selected timestamp window to per-partition offset deltas
+        and returns an approximate count without consuming any records.
+      parameters:
+        - $ref: "#/components/parameters/PartitionQuery"
+        - $ref: "#/components/parameters/FromTsMsQuery"
+        - $ref: "#/components/parameters/ToTsMsQuery"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageCountResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/topics/{topic}/messages/timeline:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/Topic"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    get:
+      operationId: getMessageTimeline
+      tags: [messages]
+      summary: Time-sliced message volume over a time range for a topic.
+      description: |
+        Resolves the selected timestamp window into fixed-width time slots and
+        returns an approximate message count per slot, without consuming
+        any records. At most 400 slots per request.
+      parameters:
+        - $ref: "#/components/parameters/PartitionQuery"
+        - in: query
+          name: from_ts_ms
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+          description: Inclusive lower timestamp bound in Unix milliseconds.
+        - in: query
+          name: to_ts_ms
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+          description: Exclusive upper timestamp bound in Unix milliseconds. Must be greater than `from_ts_ms`.
+        - in: query
+          name: slot_ms
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+          description: Time-slot width in milliseconds (e.g. 3600000 for hourly, 86400000 for daily).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageTimelineResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/topics/{topic}/messages/{partition}/{offset}/raw:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/Topic"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+      - in: path
+        name: partition
+        required: true
+        schema: { type: integer, format: int32 }
+      - in: path
+        name: offset
+        required: true
+        schema: { type: integer, format: int64, minimum: 0 }
+    get:
+      operationId: downloadMessageRaw
+      tags: [messages]
+      summary: Download the raw value bytes of a single record.
+      description: |
+        Streams the untouched value bytes as an attachment
+        (`<topic>-p<partition>-o<offset>.<ext>`). The content type is sniffed:
+        `application/json` for valid JSON, `text/plain` for other UTF-8 and
+        `application/octet-stream` otherwise. Values above 15 MB are rejected
+        with 413.
+      responses:
+        "200":
+          description: Raw value bytes.
+          headers:
+            Content-Disposition:
+              description: '`attachment; filename="<topic>-p<partition>-o<offset>.<ext>"`'
+              schema: { type: string }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+            application/json:
+              schema: { type: string, format: binary }
+            text/plain:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/topics/{topic}/sample:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/Topic"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    get:
+      operationId: sampleMessages
+      tags: [messages]
+      summary: Sample the last n decoded messages from a topic.
+      description: |
+        Returns up to `n` most recent decoded messages. Used by the search
+        path-picker to build a structural sample of the topic payload. Reuses
+        the consume permission for RBAC.
+      parameters:
+        - in: query
+          name: n
+          schema: { type: integer, default: 5 }
+          description: Sample size; clamped to 1..25.
+        - $ref: "#/components/parameters/PartitionQuery"
+      responses:
+        "200":
+          description: Sample fetched.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SampleResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/topics/{topic}/messages/search:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/Topic"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    post:
+      operationId: searchMessages
+      tags: [messages]
+      summary: Bounded, budget-limited content search across partitions.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SearchRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SearchResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/topics/{topic}/copy:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/Topic"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    post:
+      operationId: copyMessages
+      tags: [messages]
+      summary: Bulk-copy messages into another topic (SSE progress stream).
+      description: |
+        Server-side copy: reads records from the source topic — the
+        `{cluster}`/`{topic}` in the URL — and re-produces them into
+        `dest_topic` on the destination cluster named in the request body.
+        The destination topic must already exist; kafkito never creates it.
+
+        Exactly one destination cluster field must be set: `dest_cluster` for a
+        server-configured cluster, or `dest_cluster_config` for an ad-hoc
+        ("private") cluster passed inline — the same payload the
+        `X-Kafkito-Cluster` header carries.
+
+        The response is **not** JSON: it is a `text/event-stream` of
+        `CopyProgressEvent` objects, because a copy can run far longer than a
+        normal request.
+
+        When `to_ts_ms` is omitted the server substitutes the job's start time,
+        so copying a live topic terminates instead of tailing it forever:
+        records produced after the copy started are not included.
+
+        Records that cannot be reproduced byte-for-byte are left out and
+        counted in `skipped` instead of being copied approximately:
+        Schema-Registry-decoded payloads (`avro` / `json_schema` /
+        `protobuf`), for which only the decoded JSON rendering is available and
+        the original wire-format bytes are gone, and masked records, whose
+        value the source cluster's `data_masking` rules replaced with a
+        redacted rendering.
+
+        Copied records carry the same provenance headers the produce endpoint
+        injects — `X-Kafkito-Source: true` and `X-Kafkito-User: <subject>` —
+        overwriting those keys if the source record already had them.
+
+        Authorization: the source needs `topic:consume` (checked by the RBAC
+        middleware from the URL) and the destination needs `topic:produce`
+        (checked by the handler against the cluster/topic named in the body).
+        An ad-hoc `dest_cluster_config` destination **bypasses RBAC** — the
+        caller supplies their own broker credentials and only that broker's own
+        ACLs apply, so a user holding nothing but `topic:consume` can stream a
+        readable topic to a broker of their choosing. This is a deliberate,
+        pre-existing property of private clusters.
+
+        The copy is neither transactional nor resumable: on error the records
+        copied so far stay in the destination topic, and re-running the copy
+        duplicates them.
+      parameters:
+        - $ref: "#/components/parameters/ProdConfirmHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CopyRequest" }
+      responses:
+        "200":
+          description: |
+            Copy job started; progress is streamed as Server-Sent Events. A
+            failure *during* the copy also arrives here with status 200 — the
+            SSE headers are already sent — as a final event carrying `error`.
+            Clients must inspect the events, not just the status code.
+
+            Wire format: one `data: <CopyProgressEvent JSON>` line per event,
+            separated by a blank line, e.g.
+            `data: {"copied":500,"skipped":3}`.
+          content:
+            text/event-stream:
+              schema: { $ref: "#/components/schemas/CopyProgressEvent" }
+              example: { copied: 812, skipped: 5, done: true }
+        "400":
+          description: >
+            Invalid body, missing `dest_topic`, both or neither destination
+            field set, destination equal to the source cluster+topic (the copy
+            would never terminate), unknown `dest_cluster`, `dest_topic` does
+            not exist on the destination (the destination is never
+            auto-created), or `preserve_partition` with too few partitions on
+            the destination topic.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "428": { $ref: "#/components/responses/ProdConfirmationRequired" }
+        "429":
+          description: >
+            Too many concurrent copy jobs server-wide (limit 4). The body
+            carries `code: copy_concurrency_limit`. Copies are long-running and
+            each holds broker connections, so the server sheds load rather than
+            queueing.
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying.
+              schema: { type: integer }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/groups:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    get:
+      operationId: listGroups
+      tags: [groups]
+      summary: List consumer groups (filtered by RBAC view permission).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListGroupsResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+    post:
+      operationId: createGroup
+      tags: [groups]
+      summary: Create a consumer group bound to a topic.
+      description: |
+        Creates a new consumer group by committing initial offsets for all
+        partitions of `topic` under the chosen strategy. Fails with 409 if the
+        group already exists. `shift-by` is not accepted. Set `dry_run=true` to
+        preview the resulting offsets without creating the group.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateGroupRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResetOffsetsResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Group already exists.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/groups/{group}:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/Group"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    get:
+      operationId: describeGroup
+      tags: [groups]
+      summary: Describe a consumer group (members, offsets, lag).
+      description: |
+        Returns full membership and per-partition committed offsets.
+        `offsets[].assigned_to` is `<client_id>@<host>` of the current partition
+        owner, or absent if the group is rebalancing.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GroupDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+    delete:
+      operationId: deleteGroup
+      tags: [groups]
+      summary: Delete a consumer group. Must be empty.
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeletedNameResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/groups/{group}/reset-offsets:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/Group"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    post:
+      operationId: resetGroupOffsets
+      tags: [groups]
+      summary: Reset committed offsets of a group.
+      description: |
+        Group must have no active members. Set `dry_run=true` to preview the
+        resulting offsets without committing.
+      parameters:
+        - $ref: "#/components/parameters/ProdConfirmHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResetOffsetsRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResetOffsetsResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "428": { $ref: "#/components/responses/ProdConfirmationRequired" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/schemas/subjects:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    get:
+      operationId: listSubjects
+      tags: [schemas]
+      summary: List Schema Registry subjects with their versions.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListSubjectsResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/schemas/subjects/{subject}:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/Subject"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    delete:
+      operationId: deleteSubject
+      tags: [schemas]
+      summary: Delete a subject (soft by default).
+      parameters:
+        - in: query
+          name: permanent
+          schema: { type: boolean, default: false }
+          description: "`true` performs a hard delete."
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeleteSubjectResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/Subject"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    get:
+      operationId: listSchemaVersions
+      tags: [schemas]
+      summary: List versions of a subject.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListSchemaVersionsResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+    post:
+      operationId: registerSchema
+      tags: [schemas]
+      summary: Register a new version for a subject.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterSchemaRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RegisterSchemaResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions/{version}:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/Subject"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+      - in: path
+        name: version
+        required: true
+        schema: { type: string }
+        description: Integer version or `latest`.
+    get:
+      operationId: getSchemaVersion
+      tags: [schemas]
+      summary: Get a specific subject version (or `latest`).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SchemaVersion" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/acls:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    get:
+      operationId: listAcls
+      tags: [acls]
+      summary: List ACLs.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListACLsResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+    post:
+      operationId: createAcl
+      tags: [acls]
+      summary: Create an ACL.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ACLEntry" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreateACLResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+    delete:
+      operationId: deleteAcl
+      tags: [acls]
+      summary: Delete ACL(s) matching a filter.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ACLEntry" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeleteACLResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/users:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+    get:
+      operationId: listScramUsers
+      tags: [users]
+      summary: List SCRAM users.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListSCRAMUsersResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+    post:
+      operationId: upsertScramUser
+      tags: [users]
+      summary: Create or update a SCRAM user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertSCRAMUserRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UpsertSCRAMUserResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+  /api/v1/clusters/{cluster}/users/{user}:
+    parameters:
+      - $ref: "#/components/parameters/Cluster"
+      - $ref: "#/components/parameters/PrivateClusterHeader"
+      - in: path
+        name: user
+        required: true
+        schema: { type: string }
+    delete:
+      operationId: deleteScramUser
+      tags: [users]
+      summary: Delete a SCRAM user's credentials.
+      parameters:
+        - in: query
+          name: mechanism
+          schema: { type: string, enum: [SCRAM-SHA-256, SCRAM-SHA-512] }
+          description: Mechanism to delete. Omitted = both mechanisms are tried.
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeleteSCRAMUserResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        JWT validated by kafkito (auth modes `oidc` / `xsuaa`). In modes `off`
+        and `mock` no token is required and a synthetic principal is used.
+  parameters:
+    Cluster:
+      in: path
+      name: cluster
+      required: true
+      schema: { type: string }
+      description: >
+        Cluster name from the kafkito config, or `__private__` together with
+        the `X-Kafkito-Cluster` header for a browser-stored cluster.
+    Topic:
+      in: path
+      name: topic
+      required: true
+      schema: { type: string }
+    Group:
+      in: path
+      name: group
+      required: true
+      schema: { type: string }
+    Subject:
+      in: path
+      name: subject
+      required: true
+      schema: { type: string }
+    PrivateClusterHeader:
+      in: header
+      name: X-Kafkito-Cluster
+      required: false
+      schema: { type: string, contentEncoding: base64 }
+      description: >
+        Base64-encoded JSON `ClusterConfig` of a private (browser-stored)
+        cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment
+        is `__private__` (required then). RBAC is bypassed for private
+        clusters. A malformed header is rejected with 400.
+    ProdConfirmHeader:
+      in: header
+      name: X-Kafkito-Confirm-Prod
+      required: false
+      schema: { type: string, enum: ["true"] }
+      description: >
+        Must be `true` when the target cluster is marked `is_prod`; the request
+        is rejected with 428 otherwise. Send only after explicit user
+        confirmation.
+    PartitionQuery:
+      in: query
+      name: partition
+      schema: { type: integer, format: int32, default: -1 }
+      description: "Partition number; -1 = all partitions."
+    FromTsMsQuery:
+      in: query
+      name: from_ts_ms
+      schema: { type: integer, format: int64, minimum: 0 }
+      description: Optional inclusive lower timestamp bound in Unix milliseconds.
+    ToTsMsQuery:
+      in: query
+      name: to_ts_ms
+      schema: { type: integer, format: int64, minimum: 0 }
+      description: Optional exclusive upper timestamp bound in Unix milliseconds.
+  responses:
+    BadRequest:
+      description: Invalid request (parameters, body, or private-cluster header).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Missing or invalid bearer token.
+      headers:
+        WWW-Authenticate:
+          description: Always `Bearer realm="kafkito"`.
+          schema: { type: string }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: >
+        RBAC denied the action (`error: forbidden` plus `resource` and
+        `action`, or `code: rbac_denied`), or the broker rejected the
+        credential's ACLs (`code: kafka_not_authorized`).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Unknown cluster, topic, or Schema Registry not configured.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    PayloadTooLarge:
+      description: Request body or record value exceeds the server-side limit.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ProdConfirmationRequired:
+      description: >
+        Cluster is marked `is_prod` and the `X-Kafkito-Confirm-Prod: true`
+        header is missing (`code: production_confirmation_required`).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    BadGateway:
+      description: >
+        Upstream Kafka / Schema Registry error. Details are logged
+        server-side only (`code: kafka_upstream`).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      description: Error body emitted by all JSON error paths.
+      properties:
+        error:
+          type: string
+          description: Human-readable message (`unauthorized`, `forbidden`, `not found`, ...).
+        code:
+          type: string
+          description: >
+            Machine-readable code where one exists, e.g. `kafka_upstream`,
+            `production_confirmation_required`, `copy_concurrency_limit`,
+            `kafka_message_too_large`, `kafka_not_authorized`, `rbac_denied`,
+            `topic_consumers_timeout`.
+        message:
+          type: string
+          description: Detail for 401 responses from the auth middleware.
+        resource:
+          type: string
+          description: RBAC-denied resource as `<type>:<name>` (403 only).
+        action:
+          type: string
+          description: RBAC-denied action (403 only).
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, const: ok }
+    ReadinessResponse:
+      type: object
+      required: [status, clusters]
+      properties:
+        status: { type: string, enum: [ok, ready, degraded] }
+        clusters:
+          type: array
+          items: { $ref: "#/components/schemas/ClusterInfo" }
+        note:
+          type: string
+          description: Set when no clusters are configured.
+    InfoResponse:
+      type: object
+      required: [name, version]
+      properties:
+        name: { type: string }
+        version: { type: string }
+    MeResponse:
+      type: object
+      required: [user, email, tenant, scopes, roles, permissions, anonymous, jwt, rbac_enabled]
+      properties:
+        user: { type: string, description: Resolved RBAC subject; empty when anonymous. }
+        email: { type: string }
+        tenant: { type: string }
+        scopes:
+          type: [array, "null"]
+          items: { type: string }
+        roles:
+          type: [array, "null"]
+          items: { type: string }
+        permissions:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+          description: Map of resource type (or `*`) to allowed actions.
+        anonymous: { type: boolean }
+        jwt: { type: boolean, description: True when a validated principal is present. }
+        rbac_enabled: { type: boolean }
+    ListClustersResponse:
+      type: object
+      required: [clusters]
+      properties:
+        clusters:
+          type: array
+          items: { $ref: "#/components/schemas/ClusterInfo" }
+    ClusterInfo:
+      type: object
+      required: [name, reachable, is_prod, auth_type, tls, schema_registry]
+      properties:
+        name: { type: string }
+        reachable: { type: boolean }
+        error: { type: string }
+        is_prod: { type: boolean }
+        auth_type: { type: string }
+        tls: { type: boolean }
+        schema_registry: { type: boolean }
+        capabilities: { $ref: "#/components/schemas/Capabilities" }
+        brokers:
+          type: integer
+          description: Aggregate metrics below are best-effort and absent until known.
+        topics: { type: integer }
+        groups: { type: integer }
+        total_messages: { type: integer, format: int64 }
+        total_lag: { type: integer, format: int64 }
+        total_rate_per_sec: { type: number, format: double }
+    Capabilities:
+      type: object
+      required: [describe_cluster, list_topics, describe_configs, list_groups, create_topic, delete_topic, alter_configs, probed_at]
+      properties:
+        describe_cluster: { type: boolean }
+        list_topics: { type: boolean }
+        describe_configs: { type: boolean }
+        list_groups: { type: boolean }
+        create_topic: { type: boolean }
+        delete_topic: { type: boolean }
+        alter_configs: { type: boolean }
+        errors:
+          type: object
+          additionalProperties: { type: string }
+        probed_at: { type: string, format: date-time }
+    CapabilitiesResponse:
+      type: object
+      required: [cluster, capabilities]
+      properties:
+        cluster: { type: string }
+        capabilities: { $ref: "#/components/schemas/Capabilities" }
+    BrokerInfo:
+      type: object
+      required: [node_id, host, port, is_controller]
+      properties:
+        node_id: { type: integer, format: int32 }
+        host: { type: string }
+        port: { type: integer, format: int32 }
+        rack: { type: string }
+        is_controller: { type: boolean }
+    ListBrokersResponse:
+      type: object
+      required: [cluster, brokers]
+      properties:
+        cluster: { type: string }
+        brokers:
+          type: array
+          items: { $ref: "#/components/schemas/BrokerInfo" }
+    TopicInfo:
+      type: object
+      required: [name, partitions, replication_factor, is_internal]
+      properties:
+        name: { type: string }
+        partitions: { type: integer }
+        replication_factor: { type: integer }
+        is_internal: { type: boolean }
+        messages:
+          type: integer
+          format: int64
+          description: Metric fields are best-effort and absent until known.
+        size_bytes: { type: integer, format: int64 }
+        retention_ms: { type: integer, format: int64, description: "-1 means infinite." }
+        rate_per_sec: { type: number, format: double }
+        lag: { type: integer, format: int64 }
+    ListTopicsResponse:
+      type: object
+      required: [cluster, topics]
+      properties:
+        cluster: { type: string }
+        topics:
+          type: array
+          items: { $ref: "#/components/schemas/TopicInfo" }
+    CreateTopicRequest:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        partitions: { type: integer, format: int32, description: "0 or -1 = broker default." }
+        replication_factor: { type: integer, format: int32, description: "0 or -1 = broker default." }
+        configs:
+          type: object
+          additionalProperties: { type: string }
+    CreatedResponse:
+      type: object
+      required: [created]
+      properties:
+        created: { type: string }
+    DeletedNameResponse:
+      type: object
+      required: [deleted]
+      properties:
+        deleted: { type: string }
+    DescribeTopicResponse:
+      type: object
+      required: [cluster, topic]
+      properties:
+        cluster: { type: string }
+        topic: { $ref: "#/components/schemas/TopicDetail" }
+    TopicDetail:
+      type: object
+      required: [name, is_internal, partitions, replication_factor, messages, configs]
+      properties:
+        name: { type: string }
+        is_internal: { type: boolean }
+        partitions:
+          type: array
+          items: { $ref: "#/components/schemas/PartitionInfo" }
+        replication_factor: { type: integer }
+        messages: { type: integer, format: int64 }
+        configs:
+          type: array
+          items: { $ref: "#/components/schemas/TopicConfigEntry" }
+        configs_error:
+          type: string
+          description: >
+            Non-empty when DescribeConfigs failed for this topic and the
+            `configs` array is incomplete. Known codes: `unauthorized`
+            (missing DescribeConfigs ACL on the topic / cluster),
+            `unavailable` (any other broker-side error).
+        size_bytes: { type: integer, format: int64 }
+    PartitionInfo:
+      type: object
+      required: [partition, leader, replicas, isr, start_offset, end_offset, messages]
+      properties:
+        partition: { type: integer, format: int32 }
+        leader: { type: integer, format: int32 }
+        replicas: { type: array, items: { type: integer, format: int32 } }
+        isr: { type: array, items: { type: integer, format: int32 } }
+        start_offset: { type: integer, format: int64 }
+        end_offset: { type: integer, format: int64 }
+        messages: { type: integer, format: int64 }
+    TopicConfigEntry:
+      type: object
+      required: [name, value, is_default, sensitive]
+      properties:
+        name: { type: string }
+        value: { type: string }
+        is_default: { type: boolean }
+        source: { type: string }
+        sensitive: { type: boolean }
+    AlterTopicConfigsRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        set:
+          type: object
+          additionalProperties: { type: string }
+        delete:
+          type: array
+          items: { type: string }
+    AlterTopicConfigsResult:
+      type: object
+      required: [name, op]
+      properties:
+        name: { type: string }
+        op: { type: string, enum: [set, delete] }
+        value: { type: string }
+        error: { type: string }
+    AlterTopicConfigsResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items: { $ref: "#/components/schemas/AlterTopicConfigsResult" }
+    TopicConsumer:
+      type: object
+      required: [group_id, state, members, partitions_assigned, lag, lag_known]
+      properties:
+        group_id: { type: string }
+        state: { type: string }
+        members: { type: integer }
+        partitions_assigned:
+          type: array
+          items: { type: integer, format: int32 }
+        lag: { type: integer, format: int64 }
+        lag_known: { type: boolean }
+        error: { type: string }
+    ListTopicConsumersResponse:
+      type: object
+      required: [cluster, topic, consumers]
+      properties:
+        cluster: { type: string }
+        topic: { type: string }
+        consumers:
+          type: array
+          items: { $ref: "#/components/schemas/TopicConsumer" }
+    DeleteRecordsRequest:
+      type: object
+      required: [partitions]
+      additionalProperties: false
+      properties:
+        partitions:
+          type: object
+          additionalProperties: { type: integer, format: int64 }
+          description: Map of partition id → offset to delete up to (-1 = high watermark).
+    DeleteRecordsResult:
+      type: object
+      required: [partition, low_watermark, requested_offset]
+      properties:
+        partition: { type: integer, format: int32 }
+        low_watermark: { type: integer, format: int64 }
+        requested_offset: { type: integer, format: int64 }
+        error: { type: string }
+    DeleteRecordsResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items: { $ref: "#/components/schemas/DeleteRecordsResult" }
+    SRDecodedMeta:
+      type: object
+      properties:
+        format: { type: string, description: "`avro`, `protobuf` or `json_schema`." }
+        schema_id: { type: integer }
+        subject: { type: string }
+        version: { type: integer }
+    Message:
+      type: object
+      required: [partition, offset, timestamp_ms, key_encoding, value_encoding]
+      properties:
+        partition: { type: integer, format: int32 }
+        offset: { type: integer, format: int64 }
+        timestamp_ms: { type: integer, format: int64 }
+        key: { type: string }
+        key_encoding:
+          type: string
+          description: >
+            How `key` is rendered: `null`, `empty`, `json`, `text`, `binary`
+            (hex preview, raw bytes in `key_b64`) or a Schema Registry format
+            (`avro`, `protobuf`, `json_schema`).
+        key_b64: { type: string }
+        value: { type: string }
+        value_encoding:
+          type: string
+          description: Same values as `key_encoding`.
+        value_b64: { type: string }
+        headers:
+          type: object
+          additionalProperties: { type: string }
+          description: >
+            Header values as text. A value that is not valid UTF-8 is rendered
+            as `0x…` hex here for display only — its raw bytes are in
+            `headers_b64`.
+        headers_b64:
+          type: object
+          additionalProperties: { type: string }
+          description: >
+            Standard-base64 raw bytes of header values that are not valid
+            UTF-8. Only the affected keys appear; they also remain in `headers`
+            with the hex rendering. Use this map to reproduce a header
+            byte-for-byte (see the produce endpoint's `headers_b64`).
+        masked: { type: boolean }
+        value_size_bytes:
+          type: integer
+          format: int64
+          description: Untruncated byte length of the raw value; absent for nil/empty values.
+        value_truncated:
+          type: boolean
+          description: True when `value` holds only a preview; use the raw endpoint for the full bytes.
+        key_sr: { $ref: "#/components/schemas/SRDecodedMeta" }
+        value_sr: { $ref: "#/components/schemas/SRDecodedMeta" }
+    MessagesPage:
+      type: object
+      required: [cluster, topic, messages, has_more]
+      properties:
+        cluster: { type: string }
+        topic: { type: string }
+        messages:
+          type: array
+          items: { $ref: "#/components/schemas/Message" }
+        has_more: { type: boolean }
+        next_cursor: { type: string, description: Opaque cursor for the next page. }
+        partial:
+          type: boolean
+          description: >
+            True when a `from=end` page could not fully collect its tail window
+            before the server-side timeout; the newest record(s) may be missing.
+    ProduceRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        partition:
+          type: integer
+          format: int32
+          description: Explicit partition. Absent = key-based partitioning.
+        key: { type: string }
+        value: { type: string }
+        key_encoding: { type: string, enum: [text, base64, empty], default: text }
+        value_encoding: { type: string, enum: [text, base64, empty], default: text }
+        headers:
+          type: object
+          additionalProperties: { type: string }
+          description: Header values as UTF-8 text.
+        headers_b64:
+          type: object
+          additionalProperties: { type: string }
+          description: >
+            Header values as standard-base64 raw bytes, for headers
+            whose value is not valid UTF-8. Wins over `headers` for the
+            same key.
+    ProduceResult:
+      type: object
+      required: [topic, partition, offset, timestamp_ms]
+      properties:
+        topic: { type: string }
+        partition: { type: integer, format: int32 }
+        offset: { type: integer, format: int64 }
+        timestamp_ms: { type: integer, format: int64 }
+    MessageCountPartition:
+      type: object
+      required: [partition, from_offset, to_offset, approx_count]
+      properties:
+        partition: { type: integer, format: int32 }
+        from_offset: { type: integer, format: int64 }
+        to_offset: { type: integer, format: int64 }
+        approx_count: { type: integer, format: int64 }
+    MessageCountResponse:
+      type: object
+      required: [cluster, topic, total_approx_count, partitions]
+      properties:
+        cluster: { type: string }
+        topic: { type: string }
+        from_ts_ms: { type: integer, format: int64 }
+        to_ts_ms: { type: integer, format: int64 }
+        total_approx_count: { type: integer, format: int64 }
+        partitions:
+          type: array
+          items: { $ref: "#/components/schemas/MessageCountPartition" }
+    MessageTimelineSlot:
+      type: object
+      required: [from_ts_ms, to_ts_ms, approx_count]
+      properties:
+        from_ts_ms: { type: integer, format: int64 }
+        to_ts_ms: { type: integer, format: int64 }
+        approx_count: { type: integer, format: int64 }
+    MessageTimelineResponse:
+      type: object
+      required: [cluster, topic, from_ts_ms, to_ts_ms, slot_ms, slots]
+      properties:
+        cluster: { type: string }
+        topic: { type: string }
+        from_ts_ms: { type: integer, format: int64 }
+        to_ts_ms: { type: integer, format: int64 }
+        slot_ms: { type: integer, format: int64 }
+        slots:
+          type: array
+          items: { $ref: "#/components/schemas/MessageTimelineSlot" }
+    SampleResponse:
+      type: object
+      required: [cluster, topic, messages, sampled_at]
+      properties:
+        cluster: { type: string }
+        topic: { type: string }
+        messages:
+          type: array
+          items: { $ref: "#/components/schemas/Message" }
+        sampled_at: { type: integer, format: int64 }
+    SearchRequest:
+      type: object
+      description: All fields are optional; server-side defaults apply.
+      properties:
+        partition: { type: integer, format: int32, description: "Absent or -1 = all partitions." }
+        limit: { type: integer, description: Maximum matches to return. }
+        budget: { type: integer, description: Maximum records to scan. }
+        direction: { type: string, enum: [newest_first, oldest_first] }
+        stop_on_limit: { type: boolean, default: true }
+        mode: { type: string, enum: [contains, jsonpath, xpath, js] }
+        path: { type: string, maxLength: 2048, description: JSONPath / XPath expression or JS filter source. }
+        op: { type: string, enum: [exists, eq, ne, contains, regex, gt, lt, gte, lte] }
+        value: { type: string }
+        zones:
+          type: array
+          items: { type: string, enum: [value, key, headers] }
+        from_ts_ms: { type: integer, format: int64 }
+        to_ts_ms: { type: integer, format: int64 }
+        cursors:
+          type: object
+          additionalProperties: { type: integer, format: int64 }
+          description: Per-partition continuation offsets from `next_cursors`, keyed by partition id.
+    PartitionRange:
+      type: object
+      required: [start, end]
+      properties:
+        start: { type: integer, format: int64 }
+        end: { type: integer, format: int64 }
+    ParseErrorOffset:
+      type: object
+      required: [partition, offset, error]
+      properties:
+        partition: { type: integer, format: int32 }
+        offset: { type: integer, format: int64 }
+        error: { type: string }
+    SearchStats:
+      type: object
+      required: [scanned, matched, budget_exhausted, timed_out, more_available, direction, parse_errors]
+      properties:
+        scanned: { type: integer }
+        matched: { type: integer }
+        budget_exhausted: { type: boolean }
+        timed_out: { type: boolean }
+        more_available: { type: boolean }
+        direction: { type: string, enum: [newest_first, oldest_first] }
+        next_cursors:
+          type: object
+          additionalProperties: { type: integer, format: int64 }
+        resolved_range:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/PartitionRange" }
+        parse_errors: { type: integer }
+        parse_error_offsets:
+          type: array
+          items: { $ref: "#/components/schemas/ParseErrorOffset" }
+        durations_ms:
+          type: object
+          additionalProperties: { type: integer, format: int64 }
+    SearchResponse:
+      type: object
+      required: [cluster, topic, messages, search]
+      properties:
+        cluster: { type: string }
+        topic: { type: string }
+        messages:
+          type: [array, "null"]
+          items: { $ref: "#/components/schemas/Message" }
+        search: { $ref: "#/components/schemas/SearchStats" }
+    CopyRequest:
+      type: object
+      required: [dest_topic]
+      additionalProperties: false
+      description: >
+        Body of the topic copy endpoint. Exactly one of `dest_cluster` /
+        `dest_cluster_config` must be set.
+      properties:
+        dest_cluster:
+          type: string
+          description: >
+            Name of a server-configured destination cluster. Mutually exclusive
+            with `dest_cluster_config`.
+        dest_cluster_config:
+          $ref: "#/components/schemas/ClusterConfig"
+          description: >
+            Ad-hoc ("private") destination cluster, same shape the
+            `X-Kafkito-Cluster` header carries. Mutually exclusive with
+            `dest_cluster`. Bypasses RBAC on the destination.
+        dest_topic:
+          type: string
+          description: Destination topic. Must already exist.
+        partition:
+          type: integer
+          format: int32
+          description: Single source partition. Absent = all partitions.
+        from_ts_ms:
+          type: integer
+          format: int64
+          description: Inclusive lower bound on source record timestamps.
+        to_ts_ms:
+          type: integer
+          format: int64
+          description: >
+            Exclusive upper bound on source record timestamps. When omitted the
+            server substitutes the job's start time, so a copy of a live topic
+            terminates instead of tailing it forever.
+        limit:
+          type: integer
+          format: int64
+          description: Maximum number of records to copy. Absent = no limit.
+        preserve_partition:
+          type: boolean
+          description: >
+            Produce each record to the same partition number it came from.
+            Requires the destination topic to have at least as many partitions
+            as the highest source partition, otherwise the request is rejected
+            with 400.
+    CopyProgressEvent:
+      type: object
+      required: [copied]
+      description: >
+        One SSE event of the copy stream, sent as a `data: {json}` line pair.
+        Progress events arrive periodically — one right after the stream opens
+        and at least one per fetched page — and the final event has
+        `done: true`.
+      properties:
+        copied:
+          type: integer
+          format: int64
+          description: Records produced to the destination topic so far.
+        skipped:
+          type: integer
+          format: int64
+          description: >
+            Source records deliberately left out because they cannot be
+            reproduced byte-for-byte (Schema-Registry-decoded or masked
+            values). Omitted while 0.
+        done:
+          type: boolean
+          description: True on the final event only; omitted otherwise.
+        error:
+          type: string
+          description: >
+            Set on the final event when the job aborted. Omitted when empty.
+            Errors after the stream opened still carry HTTP status 200.
+    ClusterConfig:
+      type: object
+      required: [brokers]
+      description: >
+        Ad-hoc ("private") cluster definition supplied per request instead of
+        from the server config — the same JSON the `X-Kafkito-Cluster` header
+        carries (base64-encoded there). Broker and Schema Registry hosts are
+        subject to the server's outbound-host (SSRF) policy.
+      properties:
+        name: { type: string }
+        is_prod: { type: boolean }
+        brokers:
+          type: array
+          minItems: 1
+          items: { type: string }
+        auth:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: ["", none, plain, scram-sha-256, scram-sha-512]
+              description: Case-insensitive. `plain` / `scram-*` require `username` and `password`.
+            username: { type: string }
+            password: { type: string, format: password }
+        tls:
+          type: object
+          properties:
+            enabled: { type: boolean }
+            insecure_skip_verify: { type: boolean }
+        schema_registry:
+          type: object
+          properties:
+            url: { type: string }
+            username: { type: string }
+            password: { type: string, format: password }
+            insecure_skip_verify: { type: boolean }
+        data_masking:
+          type: [array, "null"]
+          items: { $ref: "#/components/schemas/MaskingRule" }
+    MaskingRule:
+      type: object
+      properties:
+        topics: { type: array, items: { type: string } }
+        fields:
+          type: array
+          items: { type: string }
+          description: JSONPath expressions whose values are replaced.
+        regex:
+          type: array
+          items:
+            type: object
+            properties:
+              match: { type: string }
+              replacement: { type: string }
+        replacement: { type: string, description: 'Replacement for `fields`; empty = "***".' }
+    GroupInfo:
+      type: object
+      required: [group_id, state, protocol_type, coordinator_id, members, lag, lag_known]
+      properties:
+        group_id: { type: string }
+        state:
+          type: string
+          description: Broker-reported state, e.g. Stable, PreparingRebalance, CompletingRebalance, Empty, Dead.
+        protocol_type: { type: string }
+        protocol: { type: string, description: "e.g. range, roundrobin, cooperative-sticky." }
+        coordinator_id: { type: integer, format: int32 }
+        members: { type: integer, description: Member count. }
+        topics: { type: integer }
+        lag: { type: integer, format: int64 }
+        lag_known: { type: boolean }
+        error: { type: string }
+    ListGroupsResponse:
+      type: object
+      required: [cluster, groups]
+      properties:
+        cluster: { type: string }
+        groups:
+          type: array
+          items: { $ref: "#/components/schemas/GroupInfo" }
+    MemberAssignment:
+      type: object
+      required: [topic, partitions]
+      properties:
+        topic: { type: string }
+        partitions: { type: array, items: { type: integer, format: int32 } }
+    GroupMember:
+      type: object
+      required: [member_id, client_id, client_host, assignments]
+      properties:
+        member_id: { type: string }
+        instance_id: { type: string, description: "Static-membership group.instance.id, if configured." }
+        client_id: { type: string }
+        client_host: { type: string }
+        assignments:
+          type: array
+          items: { $ref: "#/components/schemas/MemberAssignment" }
+    GroupOffset:
+      type: object
+      required: [topic, partition, offset, log_end, lag]
+      properties:
+        topic: { type: string }
+        partition: { type: integer, format: int32 }
+        offset: { type: integer, format: int64 }
+        log_end: { type: integer, format: int64 }
+        lag: { type: integer, format: int64 }
+        metadata: { type: string }
+        assigned_to:
+          type: string
+          description: "Current owner as `<client_id>@<host>`, absent during rebalance."
+    GroupDetail:
+      type: object
+      description: >
+        GroupInfo fields plus membership and offsets. `members` is the member
+        list here, not the count from GroupInfo.
+      required: [group_id, state, protocol_type, coordinator_id, members, offsets, lag, lag_known]
+      properties:
+        group_id: { type: string }
+        state: { type: string }
+        protocol_type: { type: string }
+        protocol: { type: string }
+        coordinator_id: { type: integer, format: int32 }
+        topics: { type: integer }
+        lag: { type: integer, format: int64 }
+        lag_known: { type: boolean }
+        error: { type: string }
+        members:
+          type: array
+          items: { $ref: "#/components/schemas/GroupMember" }
+        offsets:
+          type: array
+          items: { $ref: "#/components/schemas/GroupOffset" }
+    CreateGroupRequest:
+      type: object
+      required: [group_id, topic, strategy]
+      additionalProperties: false
+      properties:
+        group_id: { type: string }
+        topic: { type: string }
+        strategy:
+          type: string
+          enum: [earliest, latest, offset, timestamp]
+        offset: { type: integer, format: int64, description: "Used with strategy=offset." }
+        timestamp_ms: { type: integer, format: int64, description: "Used with strategy=timestamp." }
+        dry_run: { type: boolean }
+    ResetOffsetsRequest:
+      type: object
+      required: [topic, strategy]
+      additionalProperties: false
+      properties:
+        topic: { type: string }
+        partitions:
+          type: array
+          items: { type: integer, format: int32 }
+          description: Absent or empty = all partitions of `topic`.
+        strategy:
+          type: string
+          enum: [earliest, latest, offset, timestamp, shift-by]
+        offset: { type: integer, format: int64, description: "Used with strategy=offset." }
+        timestamp_ms: { type: integer, format: int64, description: "Used with strategy=timestamp." }
+        shift: { type: integer, format: int64, description: "Used with strategy=shift-by." }
+        dry_run: { type: boolean }
+    ResetOffsetResult:
+      type: object
+      required: [partition, old_offset, new_offset, end_offset]
+      properties:
+        partition: { type: integer, format: int32 }
+        old_offset: { type: integer, format: int64, description: "-1 if no prior commit." }
+        new_offset: { type: integer, format: int64 }
+        end_offset: { type: integer, format: int64, description: "Log-end offset, -1 if unknown." }
+        error: { type: string }
+    ResetOffsetsResponse:
+      type: object
+      required: [group, topic, dry_run, results]
+      properties:
+        group: { type: string }
+        topic: { type: string }
+        dry_run: { type: boolean }
+        results:
+          type: array
+          items: { $ref: "#/components/schemas/ResetOffsetResult" }
+    Subject:
+      type: object
+      required: [name, versions]
+      properties:
+        name: { type: string }
+        versions: { type: array, items: { type: integer } }
+        latest_schema_type: { type: string }
+    ListSubjectsResponse:
+      type: object
+      required: [cluster, subjects]
+      properties:
+        cluster: { type: string }
+        subjects:
+          type: array
+          items: { $ref: "#/components/schemas/Subject" }
+    ListSchemaVersionsResponse:
+      type: object
+      required: [subject, versions]
+      properties:
+        subject: { type: string }
+        versions:
+          type: array
+          items: { type: integer }
+    SchemaReference:
+      type: object
+      required: [name, subject, version]
+      properties:
+        name: { type: string }
+        subject: { type: string }
+        version: { type: integer }
+    SchemaVersion:
+      type: object
+      required: [subject, id, version, schemaType, schema]
+      properties:
+        subject: { type: string }
+        id: { type: integer }
+        version: { type: integer }
+        schemaType: { type: string, description: "AVRO, JSON or PROTOBUF (may be empty for AVRO)." }
+        schema: { type: string }
+        references:
+          type: array
+          items: { $ref: "#/components/schemas/SchemaReference" }
+        config:
+          type: object
+          properties:
+            compatibilityLevel: { type: string }
+    RegisterSchemaRequest:
+      type: object
+      required: [schema]
+      additionalProperties: false
+      properties:
+        schema: { type: string }
+        schemaType: { type: string, enum: [AVRO, JSON, PROTOBUF], description: Defaults to AVRO. }
+        references:
+          type: array
+          items: { $ref: "#/components/schemas/SchemaReference" }
+    RegisterSchemaResponse:
+      type: object
+      required: [id]
+      properties:
+        id: { type: integer }
+    DeleteSubjectResponse:
+      type: object
+      required: [deleted, versions, permanent]
+      properties:
+        deleted: { type: string }
+        versions:
+          type: array
+          items: { type: integer }
+        permanent: { type: boolean }
+    ACLEntry:
+      type: object
+      required: [principal, host, resource_type, resource_name, pattern_type, operation, permission_type]
+      description: >
+        ACL binding. As a request body it is a create spec or a delete filter.
+        Enum-like fields are parsed case-insensitively by franz-go (`kmsg`).
+      properties:
+        principal: { type: string, example: "User:alice" }
+        host: { type: string, example: "*" }
+        resource_type: { type: string, example: TOPIC, description: "e.g. TOPIC, GROUP, CLUSTER, TRANSACTIONAL_ID, DELEGATION_TOKEN (ANY for filters)." }
+        resource_name: { type: string }
+        pattern_type: { type: string, example: LITERAL, description: "e.g. LITERAL, PREFIXED (ANY / MATCH for filters)." }
+        operation: { type: string, example: READ, description: "e.g. READ, WRITE, CREATE, DELETE, ALTER, DESCRIBE, CLUSTER_ACTION, ALTER_CONFIGS, DESCRIBE_CONFIGS, IDEMPOTENT_WRITE, ALL." }
+        permission_type: { type: string, example: ALLOW, description: "ALLOW or DENY (ANY for filters)." }
+    ListACLsResponse:
+      type: object
+      required: [cluster, acls]
+      properties:
+        cluster: { type: string }
+        acls:
+          type: array
+          items: { $ref: "#/components/schemas/ACLEntry" }
+    CreateACLResponse:
+      type: object
+      required: [ok, acl]
+      properties:
+        ok: { type: boolean }
+        acl: { $ref: "#/components/schemas/ACLEntry" }
+    DeleteACLResponse:
+      type: object
+      required: [ok, deleted]
+      properties:
+        ok: { type: boolean }
+        deleted: { type: integer, description: Number of deleted ACL bindings. }
+    SCRAMCredential:
+      type: object
+      required: [mechanism, iterations]
+      properties:
+        mechanism: { type: string }
+        iterations: { type: integer, format: int32 }
+    SCRAMUser:
+      type: object
+      required: [user, credentials]
+      properties:
+        user: { type: string }
+        credentials:
+          type: array
+          items: { $ref: "#/components/schemas/SCRAMCredential" }
+    ListSCRAMUsersResponse:
+      type: object
+      required: [cluster, users]
+      properties:
+        cluster: { type: string }
+        users:
+          type: array
+          items: { $ref: "#/components/schemas/SCRAMUser" }
+    UpsertSCRAMUserRequest:
+      type: object
+      required: [user, mechanism, password]
+      properties:
+        user: { type: string }
+        mechanism: { type: string, enum: [SCRAM-SHA-256, SCRAM-SHA-512] }
+        password: { type: string, format: password }
+        iterations: { type: integer, format: int32, description: "0 = server default." }
+    UpsertSCRAMUserResponse:
+      type: object
+      required: [ok, user, mechanism]
+      properties:
+        ok: { type: boolean }
+        user: { type: string }
+        mechanism: { type: string }
+    DeleteSCRAMUserResponse:
+      type: object
+      required: [ok, user, deleted]
+      properties:
+        ok: { type: boolean }
+        user: { type: string }
+        deleted: { type: integer, description: Number of mechanisms deleted. }
