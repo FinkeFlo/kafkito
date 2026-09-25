@@ -6,21 +6,33 @@ run:
   timeout: 5m
 
 linters:
-  default: none
+  # standard = errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
   enable:
-    - errcheck
+    - copyloopvar
+    - errorlint
+    - gocritic
     - gosec
-    - govet
-    - ineffassign
     - misspell
     - revive
-    - staticcheck
-    - unused
+    - testifylint
+    - unparam
 
   settings:
     revive:
       rules:
         - name: exported
+
+  exclusions:
+    rules:
+      # pending review, see #100
+      - path: ^internal/auth/
+        linters:
+          - copyloopvar
+          - errorlint
+          - gocritic
+          - testifylint
+          - unparam
 
 formatters:
   enable:
