@@ -1,4 +1,4 @@
-.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev frontend-check api-generate api-lint api-check check release-check release-snapshot e2e e2e-up e2e-test e2e-down e2e-clean help
+.PHONY: build build-go run run-dev dev dev-down worktree-init test test-integration lint lint-install lint-version-check tidy clean compose-up compose-down compose-logs compose-app compose-auth docker-build frontend-install frontend-build frontend-dev frontend-check api-generate api-lint api-check check release-check release-snapshot e2e e2e-up e2e-test e2e-down e2e-clean help
 
 BIN := bin/kafkito
 PKG := ./...
@@ -9,7 +9,7 @@ AIR_VERSION ?= v1.65.1
 
 help:
 	@echo "Targets:"
-	@echo "  check              - canonical local gate: test lint api-check frontend-check"
+	@echo "  check              - canonical local gate: test lint lint-version-check api-check frontend-check"
 	@echo "  build              - build frontend then Go binary into $(BIN)"
 	@echo "  build-go           - build only the Go binary (skip frontend)"
 	@echo "  run                - build and run the binary"
@@ -19,7 +19,9 @@ help:
 	@echo "  worktree-init      - write per-worktree .env.dev with a free port pair"
 	@echo "  test               - go test -race ./..."
 	@echo "  test-integration   - integration tests (requires Docker)"
-	@echo "  lint               - golangci-lint run"
+	@echo "  lint               - golangci-lint run (default + btp build tags, pinned version in ./bin)"
+	@echo "  lint-install       - install golangci-lint $(GOLANGCI_LINT_VERSION) into ./bin if missing or outdated"
+	@echo "  lint-version-check - fail if ci.yml pins a different golangci-lint version"
 	@echo "  tidy               - go mod tidy"
 	@echo "  frontend-install   - bun install in frontend/"
 	@echo "  frontend-build     - bun run build in frontend/"
@@ -61,7 +63,7 @@ api-check: api-lint api-generate
 	git diff --exit-code -- frontend/src/lib/api.gen.ts
 
 # Canonical local gate. Run before opening a PR.
-check: test lint api-check frontend-check
+check: test lint lint-version-check api-check frontend-check
 
 build: frontend-build
 	mkdir -p bin
@@ -85,8 +87,35 @@ test:
 test-integration:
 	go test -race -count=1 -tags=integration -timeout=10m ./internal/kafka/...
 
-lint:
-	golangci-lint run
+# --- Lint ----------------------------------------------------------------
+# Single source of truth for the golangci-lint version. CI's
+# golangci-lint-action must pin the same value (enforced by
+# lint-version-check, which CI runs). `make lint` installs the official
+# release binary into ./bin on demand via the upstream install script (taken
+# from the same tag), which verifies the archive's SHA-256 against the
+# release checksums. golangci-lint upstream advises against `go install` and
+# `go tool` installs, so neither is used.
+GOLANGCI_LINT_VERSION := v2.14.0
+GOLANGCI_LINT := bin/golangci-lint
+GOLANGCI_LINT_INSTALL_URL := https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_LINT_VERSION)/install.sh
+
+lint-install:
+	@if ! $(GOLANGCI_LINT) version --short 2>/dev/null | grep -qx '$(patsubst v%,%,$(GOLANGCI_LINT_VERSION))'; then \
+		echo "installing golangci-lint $(GOLANGCI_LINT_VERSION) into ./bin"; \
+		curl -sSfL $(GOLANGCI_LINT_INSTALL_URL) | sh -s -- -b bin $(GOLANGCI_LINT_VERSION); \
+	fi
+
+# Build tags change the compiled file set, so lint both variants CI builds.
+lint: lint-install
+	./$(GOLANGCI_LINT) run
+	./$(GOLANGCI_LINT) run --build-tags=btp
+
+lint-version-check:
+	@ci=$$(grep -A2 'golangci/golangci-lint-action@' .github/workflows/ci.yml | sed -n 's/^ *version: *//p' | sort -u); \
+	if [ "$$ci" != "$(GOLANGCI_LINT_VERSION)" ]; then \
+		echo "golangci-lint version drift: Makefile=$(GOLANGCI_LINT_VERSION) ci.yml=$$ci" >&2; exit 1; \
+	fi; \
+	echo "golangci-lint version in sync: $(GOLANGCI_LINT_VERSION)"
 
 tidy:
 	go mod tidy

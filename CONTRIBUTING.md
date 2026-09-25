@@ -14,7 +14,12 @@ GitHub Actions.
 1. Fork, branch, code.
 2. `make check` — runs Go tests, golangci-lint, the OpenAPI lint and
    generated-types drift check (`make api-check`) and all frontend checks.
-   Requires Go, Bun and golangci-lint on your PATH.
+   Requires Go, Bun and curl on your PATH. `make lint` downloads the pinned
+   golangci-lint release (`GOLANGCI_LINT_VERSION` in the `Makefile`, the same
+   version CI uses) into `./bin` on first use and lints both the default and
+   the `btp` build. To bump it, change the Makefile variable and the
+   `golangci-lint-action` version in `.github/workflows/ci.yml` together
+   (`make lint-version-check` enforces this).
 3. Changing the HTTP API? Edit `api/openapi.yaml` (the contract, see ADR-0005)
    and run `make api-generate` to refresh the generated frontend types.
 4. Open a PR with a clear description and a Test plan.
