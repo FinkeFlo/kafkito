@@ -17,13 +17,13 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.26"
+          go-version-file: go.mod
       - run: go build -tags "${{ matrix.tags }}" ./...
-      - run: go test -tags "${{ matrix.tags }}" ./...
+      - run: go test -race -tags "${{ matrix.tags }}" ./...
       - if: matrix.tags == ''
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.11
+          version: v2.13
 
   frontend:
     runs-on: ubuntu-24.04
