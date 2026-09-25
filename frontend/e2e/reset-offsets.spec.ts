@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 const CLUSTER = process.env.KAFKITO_E2E_CLUSTER ?? "local";
 const GROUP = "e2e-idle-group";
 
-test.describe("Reset Offsets walk (Q-001 fixture)", () => {
+test.describe("Reset Offsets walk (idle group fixture)", () => {
   test("opens, requires partition, requires confirm phrase, aborts cleanly", async ({ page }) => {
     await page.goto(`/clusters/${encodeURIComponent(CLUSTER)}/groups`);
 

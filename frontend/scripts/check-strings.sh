@@ -1,21 +1,18 @@
 #!/usr/bin/env bash
-# English-only linter for kafkito frontend UI strings (CLAUDE.md "UI strings
-# and code comments are English only" rule).
+# English-only linter for kafkito frontend UI strings (CONTRIBUTING.md "UI
+# strings and code comments are English only" rule).
 #
 # Two-stage scan over `frontend/src/**/*.{ts,tsx}`:
 #
-#   Stage 1 — known-German-token blocklist. The wordlist is the canonical set
-#             from PLAN.md § 1.1 plus the residuals surfaced by the
-#             1.1-followup commit (557c3c2). Case-insensitive, word-boundary
-#             anchored. Any hit fails the lint.
+#   Stage 1 — known-German-token blocklist. Case-insensitive,
+#             word-boundary anchored. Any hit fails the lint.
 #
 #   Stage 2 — German-letter regex `[äöüßÄÖÜ]`. Catches German words the
 #             wordlist missed without false-positiving on the legitimate
 #             Unicode glyphs used elsewhere in the codebase
 #             (· … — › – ± − ≠ ≤ ≥ ∞ × ÷ → ↓ ↑ ↵ ↔ ▲ ▼ ▸ ▾ ⌘ § • ⚠ ✕ ⌕,
-#             plus curly quotes), per Q-003 lessons-learned. ß is German-only;
-#             umlauts are German-or-loanword — accept the negligible
-#             false-positive risk and log to OPEN_QUESTIONS.md if it bites.
+#             plus curly quotes). ß is German-only; umlauts are
+#             German-or-loanword — accept the negligible false-positive risk.
 #
 # Same triple-mode CLI as `check-palette.sh`:
 #   frontend/scripts/check-strings.sh                # diff vs origin/main
@@ -86,7 +83,7 @@ FAIL=0
 # Stage 1 — wordlist hits (case-insensitive, word-boundary).
 HITS_WORDS=$(printf '%s' "${EXISTING}" | tr '\n' '\0' | xargs -0 grep -EHniw "${WORDLIST}" 2>/dev/null || true)
 if [ -n "${HITS_WORDS}" ]; then
-  echo "check-strings: German UI tokens in ${SCOPE} (CLAUDE.md 'English only' rule):" >&2
+  echo "check-strings: German UI tokens in ${SCOPE} (CONTRIBUTING.md 'English only' rule):" >&2
   echo "${HITS_WORDS}" >&2
   FAIL=1
 fi
@@ -94,7 +91,7 @@ fi
 # Stage 2 — German letters [äöüßÄÖÜ].
 HITS_LETTERS=$(printf '%s' "${EXISTING}" | tr '\n' '\0' | xargs -0 grep -EHn "${LETTER_PATTERN}" 2>/dev/null || true)
 if [ -n "${HITS_LETTERS}" ]; then
-  echo "check-strings: German letters [äöüßÄÖÜ] in ${SCOPE} (CLAUDE.md 'English only' rule):" >&2
+  echo "check-strings: German letters [äöüßÄÖÜ] in ${SCOPE} (CONTRIBUTING.md 'English only' rule):" >&2
   echo "${HITS_LETTERS}" >&2
   FAIL=1
 fi

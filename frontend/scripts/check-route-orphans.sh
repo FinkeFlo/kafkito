@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fails if any flat-named child route file under frontend/src/routes/ has no
 # parent layout file. TanStack file-based routing is permissive (the build
-# does not error on orphans, see Q-005 and Context7 research 2026-05-03), so
+# does not error on orphans), so
 # this static check is the cheap fast-fail counterpart to the route-tree
 # Vitest smoke test (frontend/src/routes/route-tree.test.ts).
 #
@@ -45,7 +45,7 @@ if [ ${#orphans[@]} -ne 0 ]; then
   echo "check-route-orphans: orphaned routes (no parent layout):" >&2
   printf '  %s\n' "${orphans[@]}" >&2
   echo "TanStack does not error on these; child renders under __root.tsx," >&2
-  echo "which usually breaks the visual layout chain. See specs Q-005." >&2
+  echo "which usually breaks the visual layout chain." >&2
   exit 1
 fi
 

@@ -1,7 +1,7 @@
 # Local dev stack for kafkito.
 #
-# Ports are deliberately non-standard to avoid clashes with other local tooling
-# (see plan.md "Lokale Ports" table). Always prefer these:
+# Ports are deliberately non-standard to avoid clashes with other local tooling.
+# Always prefer these:
 #   - kafkito:         http://localhost:37421
 #   - Kafka broker:    localhost:39092   (external PLAINTEXT)
 #   - Schema Registry: http://localhost:38081
