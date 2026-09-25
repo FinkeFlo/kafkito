@@ -2,7 +2,7 @@ import { test, expect, SECOND_CLUSTER_NAME } from "./fixtures/private-cluster";
 
 const PRIMARY = process.env.KAFKITO_E2E_CLUSTER ?? "local";
 
-test.describe("Cluster lifecycle (Phase 3)", () => {
+test.describe("Cluster lifecycle", () => {
   test("picker opens, lists configured clusters, closes on Escape with focus restored", async ({
     page,
   }) => {

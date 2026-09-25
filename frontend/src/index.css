@@ -14,9 +14,9 @@
    * that paint a hover-affordance border (secondary `<Button>`,
    * `<IconButton>`, `<Pill>`, segmented controls). § 2.1 reserves
    * `--color-border-strong` for focused / selected states only — that
-   * token is therefore lifted to ≥3:1 against `--color-panel`. Phase 3
-   * needs to migrate hover-affordance callsites from
-   * `border-border-strong` to `border-border-hover`. */
+   * token is therefore lifted to ≥3:1 against `--color-panel`.
+   * Hover-affordance callsites that still use `border-border-strong`
+   * should move to `border-border-hover`. */
   --color-border-hover:   oklch(0.84  0.01  247);
   --color-border-strong:  oklch(0.62  0.012 247);
 
@@ -37,14 +37,13 @@
   /* Foreground that always lives on top of `--color-accent` /
    * `--color-accent-hover`. Pure white passes 4.5:1 against both light-
    * mode accent values; the dark-mode override below pins a near-black
-   * value for the lighter dark accent. Phase 2 primitives (`<Button>`)
-   * should consume this token instead of `--color-text-on-accent`. */
+   * value for the lighter dark accent. Primitives (`<Button>`) consume
+   * this token instead of `--color-text-on-accent`. */
   --color-accent-foreground: oklch(1 0 0);
 
   /* Semantic — light values lifted from 0.72/0.62/0.58 so they clear
-   * 4.5:1 against `*-subtle` tinted surfaces (E1#2). Dark variants are
-   * untouched (already pass on dark `*-subtle`). NOTE for Phase 3:
-   * non-text uses (`bg-success` / `bg-warning` / `bg-danger` swatches
+   * 4.5:1 against `*-subtle` tinted surfaces. Dark variants are
+   * untouched (already pass on dark `*-subtle`). Note: non-text uses (`bg-success` / `bg-warning` / `bg-danger` swatches
    * in `StatusDot.tsx:14`, `health-dot.tsx`, `Gauge.tsx:25`) now sit
    * on darker fills than before; if they read visually dim, switch
    * those callsites to a brighter shade or, longer-term, introduce
@@ -113,7 +112,7 @@ html.dark {
    * dark canvas (accent vs panel ≈ 6.5:1). The companion foreground
    * therefore has to be dark, not white — `oklch(0.18 …)` clears
    * 6.92:1 against `--color-accent` and 8.12:1 against
-   * `--color-accent-hover`. Phase 2 must consume `text-accent-foreground`
+   * `--color-accent-hover`. Components must consume `text-accent-foreground`
    * (or the alias `text-text-on-accent`) on `bg-accent` surfaces; using
    * `text-text` there fails AA (callsite bug, see allow-list). */
   --color-accent-foreground: oklch(0.18 0.02 252);
@@ -139,7 +138,7 @@ html.dark {
    * canvas surface; primary / danger buttons override the
    * outline-color to `--color-focus-on-accent` (the dark accent
    * foreground) so the indicator stays visible against the accent
-   * fill — Phase 2's `<Button variant="primary">` and
+   * fill — `<Button variant="primary">` and
    * `<Button variant="danger">` own that override. */
   --color-focus:          var(--color-accent);
   --color-focus-on-accent: var(--color-accent-foreground);
@@ -178,7 +177,7 @@ body {
  *     tooltips) keep their elevation on focus.
  *
  * The 1.0:1 dark-mode primary button focus ring is
- * resolved at the *primitive* level: Phase 2's
+ * resolved at the *primitive* level:
  * `<Button variant="primary">` and `<Button variant="danger">` add an
  * explicit `focus-visible:outline-color: var(--color-focus-on-accent)`
  * so the indicator carves out of the accent / danger fill. The default

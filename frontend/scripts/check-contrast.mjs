@@ -508,7 +508,7 @@ function main() {
 
       // Synthesize the global focus-ring pair (`--color-accent` outline,
       // see `index.css:99-102`) for any class string on a likely-interactive
-      // element. The accent-on-accent failure (E1#1) falls out naturally
+      // element. The accent-on-accent failure falls out naturally
       // because pairs are deduplicated by (fg, bg, sizeKind, kind).
       if (interactiveFile) {
         for (const b of bg) {
@@ -528,7 +528,7 @@ function main() {
   // Always include the global focus-ring against the canvas surfaces, even
   // if no class string above happened to mention them - this catches the
   // dark-mode `--color-accent` outline on a `--color-accent` filled button
-  // (E1#1) plus the standard panel/bg surfaces.
+  // plus the standard panel/bg surfaces.
   for (const surface of ["--color-bg", "--color-panel", "--color-subtle", "--color-accent"]) {
     const key = `--color-accent|${surface}|non-text|focus-ring`;
     if (!pairs.has(key)) {

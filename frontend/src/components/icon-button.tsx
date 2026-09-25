@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 /**
  * Icon-only button. Variant naming mirrors `<Button>` (`ghost`/
  * `secondary`/`danger`). The deprecated `destructive` alias was removed
- * at the end of Phase 3 once every route callsite migrated to `danger`.
+ * once every route callsite migrated to `danger`.
  */
 export type IconButtonVariant = "ghost" | "secondary" | "danger";
 export type IconButtonSize = "sm" | "md";

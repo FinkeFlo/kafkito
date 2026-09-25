@@ -264,7 +264,7 @@ function DataTableColumnView<Row>({
                         // `role="button"` (not `link`): we accept Enter
                         // AND Space for activation (button semantics) and
                         // there is no URL to expose for middle/right
-                        // click. Phase 3 may wrap rows in `<Link>` once
+                        // click. Rows may be wrapped in `<Link>` once
                         // each route knows the canonical row URL — at
                         // which point the role drops back to default.
                         role={onActivate ? "button" : undefined}
