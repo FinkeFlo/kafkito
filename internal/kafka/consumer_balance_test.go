@@ -25,7 +25,6 @@ func TestFairShare(t *testing.T) {
 		{"limit 100 / 100 partitions", 100, 100, 1 + balanceBuffer},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			require.Equal(t, tc.wantPerPart, fairShare(tc.limit, tc.partitions))

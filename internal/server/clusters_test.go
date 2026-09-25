@@ -35,7 +35,6 @@ func TestIsACLClientErr(t *testing.T) {
 		{name: "timeout", msg: "context deadline exceeded", want: false},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tc.want, isACLClientErr(tc.msg), "isACLClientErr(%q)", tc.msg)
@@ -59,7 +58,6 @@ func TestIsSCRAMClientErr(t *testing.T) {
 		{name: "sasl auth failure", msg: "SASL authentication failed", want: false},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tc.want, isSCRAMClientErr(tc.msg), "isSCRAMClientErr(%q)", tc.msg)
@@ -87,7 +85,6 @@ func TestIsSearchClientErr(t *testing.T) {
 		{name: "topic not found", msg: "topic does not exist", want: false},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tc.want, isSearchClientErr(tc.msg), "isSearchClientErr(%q)", tc.msg)

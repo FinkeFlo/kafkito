@@ -33,7 +33,6 @@ func TestGuardAuthMode(t *testing.T) {
 			env: map[string]string{"KAFKITO_INSECURE_AUTH_OFF": "true"}, wantErr: false},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			err := guardAuthMode(tc.mode, tc.addr, env(tc.env))

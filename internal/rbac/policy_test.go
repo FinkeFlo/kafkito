@@ -61,7 +61,6 @@ func TestAllow_GrantsWildcardAdminAcrossResources(t *testing.T) {
 		{name: "admin_user_resource", resource: "user", name_: "x", action: "admin"},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			assert.True(t, p.Allow("alice", "c1", tc.resource, tc.name_, tc.action),
@@ -228,7 +227,6 @@ func TestMatchName(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -256,7 +254,6 @@ func TestEnabled_ReflectsCompiledPolicyConfig(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

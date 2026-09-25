@@ -65,7 +65,6 @@ func TestCursor_Decode_Errors(t *testing.T) {
 		{"bad_partition_key", base64Std(`{"p":{"x":1},"d":"backward"}`), "invalid partition key"},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			_, err := DecodeCursor(tc.raw)

@@ -73,7 +73,6 @@ func TestDecodePrivateClusterHeader_RejectsInvalidEncoding(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -232,7 +231,6 @@ func TestConfigValidateRejectsReservedNames(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
