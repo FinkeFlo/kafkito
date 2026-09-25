@@ -6,12 +6,7 @@ import { fetchBrokers, type BrokerInfo } from "@/lib/api";
 import { KpiCard } from "@/components/KpiCard";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
-import {
-  DataTable,
-  DataTableHead,
-  DataTableRow,
-  DataTableTh,
-} from "@/components/DataTable";
+import { DataTable, DataTableHead, DataTableRow, DataTableTh } from "@/components/DataTable";
 import { Tag } from "@/components/Tag";
 import { StatusDot } from "@/components/StatusDot";
 
@@ -39,9 +34,7 @@ function BrokersPage() {
           <span>Brokers</span>
         </div>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">Brokers</h1>
-        <p className="mt-1 text-sm text-muted">
-          Per-broker metadata for the active cluster.
-        </p>
+        <p className="mt-1 text-sm text-muted">Per-broker metadata for the active cluster.</p>
       </div>
 
       {!cluster && (
@@ -58,10 +51,10 @@ function BrokersPage() {
           title="DESCRIBE on CLUSTER:* missing"
           description={
             <span className="block">
-              Kafkito cannot list brokers for this cluster. The connection user
-              is missing <span className="font-mono">DESCRIBE</span> on{" "}
-              <span className="font-mono">CLUSTER:*</span>, or the broker
-              rejected the metadata probe.
+              Kafkito cannot list brokers for this cluster. The connection user is missing{" "}
+              <span className="font-mono">DESCRIBE</span> on{" "}
+              <span className="font-mono">CLUSTER:*</span>, or the broker rejected the metadata
+              probe.
             </span>
           }
         />
@@ -130,11 +123,7 @@ function BrokerTable({ brokers }: { brokers: BrokerInfo[] }) {
             <td className="px-3 py-2 text-right font-mono tabular-nums text-muted">{b.port}</td>
             <td className="px-3 py-2 font-mono text-muted">{b.rack || "—"}</td>
             <td className="px-3 py-2">
-              {b.is_controller ? (
-                <Tag variant="info">controller</Tag>
-              ) : (
-                <Tag>broker</Tag>
-              )}
+              {b.is_controller ? <Tag variant="info">controller</Tag> : <Tag>broker</Tag>}
             </td>
           </DataTableRow>
         ))}

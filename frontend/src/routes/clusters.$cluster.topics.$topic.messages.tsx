@@ -67,12 +67,7 @@ const PRESETS: ReadonlyArray<{ key: string; label: string }> = [
   { key: "yesterday", label: "Yesterday" },
 ];
 
-function rangeLabel(
-  mode: RangeMode,
-  preset: string,
-  from: string,
-  to: string,
-): string {
+function rangeLabel(mode: RangeMode, preset: string, from: string, to: string): string {
   if (mode === "off") return "Any time";
   if (mode === "preset") {
     return PRESETS.find((p) => p.key === preset)?.label ?? `Last ${preset}`;
@@ -150,11 +145,7 @@ function MessagesTab() {
 
   return (
     <div className="space-y-4">
-      <MessagesPanel
-        cluster={cluster}
-        topic={topic}
-        partitions={detailQuery.data.partitions}
-      />
+      <MessagesPanel cluster={cluster} topic={topic} partitions={detailQuery.data.partitions} />
 
       {/* Bulk copy section */}
       <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm">
@@ -168,11 +159,7 @@ function MessagesTab() {
         </button>
         {copyOpen && (
           <div className="border-t border-[var(--color-border)] p-4">
-            <BulkCopyPanel
-              srcCluster={cluster}
-              srcTopic={topic}
-              partitions={partitionNumbers}
-            />
+            <BulkCopyPanel srcCluster={cluster} srcTopic={topic} partitions={partitionNumbers} />
           </div>
         )}
       </div>
@@ -194,22 +181,16 @@ function MessagesPanel({
   const navigate = Route.useNavigate();
   const { partition, limit, from, msgOffset } = search;
 
-  const setPartition = (v: number) =>
-    navigate({ search: (prev) => ({ ...prev, partition: v }) });
-  const setLimit = (v: number) =>
-    navigate({ search: (prev) => ({ ...prev, limit: v }) });
+  const setPartition = (v: number) => navigate({ search: (prev) => ({ ...prev, partition: v }) });
+  const setLimit = (v: number) => navigate({ search: (prev) => ({ ...prev, limit: v }) });
   const setFrom = (v: "end" | "start" | "offset") =>
     navigate({ search: (prev) => ({ ...prev, from: v }) });
-  const setMsgOffset = (v: number) =>
-    navigate({ search: (prev) => ({ ...prev, msgOffset: v }) });
+  const setMsgOffset = (v: number) => navigate({ search: (prev) => ({ ...prev, msgOffset: v }) });
 
   // Valid offset range for the current partition selection (single partition
   // or all). Used to hint the input and clamp committed values.
   const offsetBounds = useMemo(() => {
-    const sel =
-      partition >= 0
-        ? partitions.filter((p) => p.partition === partition)
-        : partitions;
+    const sel = partition >= 0 ? partitions.filter((p) => p.partition === partition) : partitions;
     if (sel.length === 0) return null;
     const min = Math.min(...sel.map((p) => p.start_offset));
     const maxEnd = Math.max(...sel.map((p) => p.end_offset));
@@ -251,9 +232,7 @@ function MessagesPanel({
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
 
   // Browse-level time-range filter (separate state from the search panel below)
-  const [browseRangeMode, setBrowseRangeMode] = useState<
-    "off" | "preset" | "custom"
-  >("off");
+  const [browseRangeMode, setBrowseRangeMode] = useState<"off" | "preset" | "custom">("off");
   const [browsePreset, setBrowsePreset] = useState<string>("24h");
   const [browseCustomFrom, setBrowseCustomFrom] = useState<string>("");
   const [browseCustomTo, setBrowseCustomTo] = useState<string>("");
@@ -273,10 +252,11 @@ function MessagesPanel({
   const [budget, setBudget] = useState(50000);
   const [budgetUnlimited, setBudgetUnlimited] = useState(false);
   const [searching, setSearching] = useState(false);
-  const [searchResult, setSearchResult] = useState<
-    | { messages: Message[]; stats: SearchStats; req: SearchRequest }
-    | null
-  >(null);
+  const [searchResult, setSearchResult] = useState<{
+    messages: Message[];
+    stats: SearchStats;
+    req: SearchRequest;
+  } | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   // Why the most recent (auto-chained) search stopped. Drives the result banner.
   const [searchStopReason, setSearchStopReason] = useState<
@@ -351,10 +331,10 @@ function MessagesPanel({
     return buildXmlPathTree(values);
   }, [sampleQuery.data]);
 
-  const [undoToast, setUndoToast] = useState<
-    | { previous: { path: string; op: SearchOp; needle: string }; until: number }
-    | null
-  >(null);
+  const [undoToast, setUndoToast] = useState<{
+    previous: { path: string; op: SearchOp; needle: string };
+    until: number;
+  } | null>(null);
 
   const finalizePick = (trail: Token[], leafValue: unknown) => {
     const previous = { path, op, needle };
@@ -409,13 +389,7 @@ function MessagesPanel({
   }, []);
 
   const browseRange = useMemo(
-    () =>
-      computeTimeRange(
-        browseRangeMode,
-        browsePreset,
-        browseCustomFrom,
-        browseCustomTo,
-      ),
+    () => computeTimeRange(browseRangeMode, browsePreset, browseCustomFrom, browseCustomTo),
     [browseRangeMode, browsePreset, browseCustomFrom, browseCustomTo],
   );
 
@@ -435,15 +409,7 @@ function MessagesPanel({
       from_ts_ms: browseRange.from_ts_ms,
       to_ts_ms: browseRange.to_ts_ms,
     }),
-    [
-      partition,
-      limit,
-      from,
-      msgOffset,
-      partitions,
-      browseRange.from_ts_ms,
-      browseRange.to_ts_ms,
-    ],
+    [partition, limit, from, msgOffset, partitions, browseRange.from_ts_ms, browseRange.to_ts_ms],
   );
 
   const msgsQuery = useQuery({
@@ -492,8 +458,7 @@ function MessagesPanel({
     }
   };
 
-  const resolvedRange = () =>
-    computeTimeRange(rangeMode, preset, customFrom, customTo);
+  const resolvedRange = () => computeTimeRange(rangeMode, preset, customFrom, customTo);
 
   const runSearch = async (continueChain = false) => {
     stopSearchRef.current = false;
@@ -528,9 +493,7 @@ function MessagesPanel({
     let accMessages: Message[] = prior ? [...prior.messages] : [];
     let accScanned = prior ? prior.stats.scanned : 0;
     let accMatched = prior ? prior.stats.matched : 0;
-    let cursors: Record<string, number> | undefined = prior
-      ? prior.stats.next_cursors
-      : undefined;
+    let cursors: Record<string, number> | undefined = prior ? prior.stats.next_cursors : undefined;
 
     const budgetTarget = budgetUnlimited ? 0 : budget;
     // Budget 0 / empty means "scan the entire topic": keep chaining until the
@@ -619,8 +582,7 @@ function MessagesPanel({
     // Dedupe after sort: real duplicates are byte-identical (same timestamp), so survivor choice is stable.
     return dedupeMessages(
       [...rawMessages].sort((a, b) => {
-        if (b.timestamp_ms !== a.timestamp_ms)
-          return b.timestamp_ms - a.timestamp_ms;
+        if (b.timestamp_ms !== a.timestamp_ms) return b.timestamp_ms - a.timestamp_ms;
         if (b.partition !== a.partition) return b.partition - a.partition;
         return b.offset - a.offset;
       }),
@@ -791,16 +753,12 @@ function MessagesPanel({
         >
           Refresh
         </button>
-        <span
-          data-testid="messages-count"
-          className="text-xs text-[var(--color-text-muted)]"
-        >
+        <span data-testid="messages-count" className="text-xs text-[var(--color-text-muted)]">
           {inSearchMode
             ? fmt.number(searchResult?.stats.matched ?? 0)
             : fmt.number(displayMessages.length)}
           {!inSearchMode && msgsQuery.isFetching && " · fetching…"}
-          {searching &&
-            ` · ${fmt.number(searchResult?.stats.scanned ?? 0)} scanned · searching…`}
+          {searching && ` · ${fmt.number(searchResult?.stats.scanned ?? 0)} scanned · searching…`}
         </span>
       </div>
 
@@ -851,11 +809,7 @@ function MessagesPanel({
                     tree={mode === "xpath" ? xmlPathTree : pathTree}
                     value={path}
                     onChange={setPath}
-                    placeholder={
-                      mode === "xpath"
-                        ? "//order/@status"
-                        : "Type or ↓ for top fields"
-                    }
+                    placeholder={mode === "xpath" ? "//order/@status" : "Type or ↓ for top fields"}
                     emptyMessage={
                       sampleTooLargeToScan
                         ? `Sample is larger than ${fmt.bytes(MAX_HYDRATE_VALUE_BYTES)} — too large to scan for field names. Enter path manually.`
@@ -930,8 +884,7 @@ function MessagesPanel({
           </div>
           {mode === "js" && (
             <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-2 text-[11px] text-[var(--color-text-muted)]">
-              Variables:{" "}
-              <code className="font-mono">key</code>,{" "}
+              Variables: <code className="font-mono">key</code>,{" "}
               <code className="font-mono">value</code> (string),{" "}
               <code className="font-mono">parsed</code> (JSON),{" "}
               <code className="font-mono">headers</code>,{" "}
@@ -939,8 +892,7 @@ function MessagesPanel({
               <code className="font-mono">offset</code>,{" "}
               <code className="font-mono">timestampMs</code>. Example:{" "}
               <code className="font-mono">
-                parsed &amp;&amp; parsed.currency === "EUR" &amp;&amp;
-                parsed.amount &gt; 500
+                parsed &amp;&amp; parsed.currency === "EUR" &amp;&amp; parsed.amount &gt; 500
               </code>
               . Limit 100 ms per message.
             </div>
@@ -1042,11 +994,7 @@ function MessagesPanel({
                 disabled={budgetUnlimited}
                 placeholder="50000"
                 title="Max number of messages to scan per search. Enable 'Scan whole topic' to scan everything."
-                onChange={(e) =>
-                  setBudget(
-                    e.target.value === "" ? 0 : Number(e.target.value) || 0,
-                  )
-                }
+                onChange={(e) => setBudget(e.target.value === "" ? 0 : Number(e.target.value) || 0)}
                 className="w-24 rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1 disabled:opacity-50"
               />
             </div>
@@ -1155,8 +1103,8 @@ function MessagesPanel({
 
       {!msgsQuery.error && !searchResult && msgsQuery.data?.partial && (
         <div className="m-3 rounded-md border border-[var(--color-warning)]/30 bg-[var(--color-warning-subtle)] p-3 text-sm text-[var(--color-warning)]">
-          This page may be incomplete — a very large record delayed loading past the
-          server's timeout, so the newest message(s) might be missing. Try Refresh.
+          This page may be incomplete — a very large record delayed loading past the server's
+          timeout, so the newest message(s) might be missing. Try Refresh.
         </div>
       )}
 
@@ -1195,11 +1143,7 @@ function MessagesPanel({
 
       <div className="divide-y divide-[var(--color-border)]">
         {displayMessages.map((m) => (
-          <MessageRow
-            key={`${m.partition}-${m.offset}`}
-            m={m}
-            onPick={handlePick}
-          />
+          <MessageRow key={`${m.partition}-${m.offset}`} m={m} onPick={handlePick} />
         ))}
       </div>
 
@@ -1213,16 +1157,13 @@ function MessagesPanel({
             {loadingMore ? "Loading…" : "Load more"}
           </button>
           {loadMoreError && (
-            <div className="text-xs text-[var(--color-danger)]">
-              {loadMoreError}
-            </div>
+            <div className="text-xs text-[var(--color-danger)]">{loadMoreError}</div>
           )}
         </div>
       )}
     </div>
   );
 }
-
 
 function MessageRow({
   m,
@@ -1285,10 +1226,7 @@ function MessageRow({
       }}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <span
-          className="font-mono text-[var(--color-text-subtle)]"
-          aria-hidden="true"
-        >
+        <span className="font-mono text-[var(--color-text-subtle)]" aria-hidden="true">
           {open ? "▾" : "▸"}
         </span>
         <span className="rounded bg-[var(--color-surface-subtle)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--color-text-muted)]">
@@ -1318,7 +1256,9 @@ function MessageRow({
         <Timestamp value={m.timestamp_ms} className="text-[10px] text-[var(--color-text-subtle)]" />
         {m.key && (
           <span className="font-mono text-[var(--color-text-muted)]">
-            <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-subtle)]">key</span>{" "}
+            <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-subtle)]">
+              key
+            </span>{" "}
             {m.key.length > 40 ? m.key.slice(0, 40) + "…" : m.key}
           </span>
         )}
@@ -1350,7 +1290,10 @@ function MessageRow({
             action={
               <div className="flex items-center gap-1.5">
                 <button
-                  onClick={(e) => { e.stopPropagation(); setReplayOpen(true); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setReplayOpen(true);
+                  }}
                   className="rounded border border-[var(--color-border)] px-2 py-1 text-[11px] hover:border-[var(--color-border-strong)]"
                   title="Replay to another cluster/topic"
                 >
@@ -1417,20 +1360,14 @@ function DetailSection({
         <pre
           className={
             "max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-md bg-[var(--color-surface-subtle)] p-3 font-mono text-[11px] leading-relaxed " +
-            (empty
-              ? "italic text-[var(--color-text-subtle)]"
-              : "text-[var(--color-text)]")
+            (empty ? "italic text-[var(--color-text-subtle)]" : "text-[var(--color-text)]")
           }
         >
           {body}
         </pre>
       ) : (
         <div
-          className={
-            empty
-              ? "italic text-[var(--color-text-subtle)]"
-              : "text-[var(--color-text)]"
-          }
+          className={empty ? "italic text-[var(--color-text-subtle)]" : "text-[var(--color-text)]"}
         >
           {body}
         </div>
@@ -1460,7 +1397,11 @@ function EncodingBadge({ enc }: { enc: string }) {
   );
 }
 
-function SRBadge({ meta }: { meta: { format?: string; schema_id?: number; subject?: string; version?: number } }) {
+function SRBadge({
+  meta,
+}: {
+  meta: { format?: string; schema_id?: number; subject?: string; version?: number };
+}) {
   const label = meta.subject
     ? `${meta.subject}${meta.version ? `:v${meta.version}` : ""}`
     : meta.schema_id
@@ -1500,12 +1441,7 @@ function RangePicker({
   preset: string;
   customFrom: string;
   customTo: string;
-  onChange: (
-    mode: RangeMode,
-    preset: string,
-    customFrom: string,
-    customTo: string,
-  ) => void;
+  onChange: (mode: RangeMode, preset: string, customFrom: string, customTo: string) => void;
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);

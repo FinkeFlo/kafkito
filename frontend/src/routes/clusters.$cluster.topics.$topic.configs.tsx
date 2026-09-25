@@ -24,9 +24,7 @@ function ConfigsTab() {
     queryFn: fetchClusters,
   });
   const caps = useMemo(
-    () =>
-      clustersQuery.data?.find((c) => c.name === cluster)?.capabilities ??
-      undefined,
+    () => clustersQuery.data?.find((c) => c.name === cluster)?.capabilities ?? undefined,
     [clustersQuery.data, cluster],
   );
 
@@ -47,9 +45,7 @@ function ConfigsTab() {
   const configsError = detailQuery.data.configs_error;
   const noticeIntent = configsError === "unauthorized" ? "warning" : "danger";
   const noticeTitle =
-    configsError === "unauthorized"
-      ? "Permission missing"
-      : "Configs unavailable";
+    configsError === "unauthorized" ? "Permission missing" : "Configs unavailable";
   const noticeBody =
     configsError === "unauthorized"
       ? "kafkito cannot read this topic's configuration because the broker denied DescribeConfigs. Ask the cluster admin to grant DescribeConfigs on this topic (or topic prefix) to the API key in use."
@@ -124,38 +120,37 @@ function ConfigsTable({
           )}
         </div>
         <div className="flex items-center gap-3">
-        <label
-          className={[
-            "flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]",
-            disabled ? "pointer-events-none opacity-50" : "",
-          ].join(" ")}
-        >
-          <input
-            type="checkbox"
-            checked={showDefaults}
-            onChange={(e) => setShowDefaults(e.target.checked)}
-            className="h-3.5 w-3.5"
-            disabled={disabled}
-          />
-          Show defaults ({configs.length})
-        </label>
-        <button
-          type="button"
-          onClick={() => setEditOpen(true)}
-          disabled={disabled || !canAlter}
-          title={!canAlter && !disabled ? alterReason : undefined}
-          className="rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] px-2 py-1 text-xs hover:border-[var(--color-border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Edit…
-        </button>
+          <label
+            className={[
+              "flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]",
+              disabled ? "pointer-events-none opacity-50" : "",
+            ].join(" ")}
+          >
+            <input
+              type="checkbox"
+              checked={showDefaults}
+              onChange={(e) => setShowDefaults(e.target.checked)}
+              className="h-3.5 w-3.5"
+              disabled={disabled}
+            />
+            Show defaults ({configs.length})
+          </label>
+          <button
+            type="button"
+            onClick={() => setEditOpen(true)}
+            disabled={disabled || !canAlter}
+            title={!canAlter && !disabled ? alterReason : undefined}
+            className="rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] px-2 py-1 text-xs hover:border-[var(--color-border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Edit…
+          </button>
         </div>
       </div>
       {disabled ? (
         <div className="p-6 text-center text-sm text-[var(--color-text-muted)]">
-          Topic configuration is hidden because the configured Kafka user
-          lacks the{" "}
-          <code className="font-mono text-xs">DESCRIBE_CONFIGS</code>{" "}
-          permission on topics on this cluster.
+          Topic configuration is hidden because the configured Kafka user lacks the{" "}
+          <code className="font-mono text-xs">DESCRIBE_CONFIGS</code> permission on topics on this
+          cluster.
           {caps?.errors?.describe_configs && (
             <div className="mt-2 font-mono text-[11px] text-[var(--color-text-subtle)]">
               {caps.errors.describe_configs}
@@ -222,18 +217,17 @@ function EditConfigsModal({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
-  const overrides = useMemo(
-    () => configs.filter((c) => !c.is_default && !c.sensitive),
-    [configs],
-  );
-  const [rows, setRows] = useState<Array<{ name: string; value: string; op: "set" | "delete" | "keep" }>>(
-    () => overrides.map((c) => ({ name: c.name, value: c.value, op: "keep" })),
-  );
+  const overrides = useMemo(() => configs.filter((c) => !c.is_default && !c.sensitive), [configs]);
+  const [rows, setRows] = useState<
+    Array<{ name: string; value: string; op: "set" | "delete" | "keep" }>
+  >(() => overrides.map((c) => ({ name: c.name, value: c.value, op: "keep" })));
   const [newKey, setNewKey] = useState("");
   const [newValue, setNewValue] = useState("");
-  const [results, setResults] = useState<Array<{ name: string; op: string; error?: string }> | null>(
-    null,
-  );
+  const [results, setResults] = useState<Array<{
+    name: string;
+    op: string;
+    error?: string;
+  }> | null>(null);
 
   const mut = useMutation({
     mutationFn: async () => {
@@ -255,15 +249,17 @@ function EditConfigsModal({
     },
   });
 
-  const hasChanges =
-    rows.some((r) => r.op !== "keep") || (newKey.trim() !== "" && newValue !== "");
+  const hasChanges = rows.some((r) => r.op !== "keep") || (newKey.trim() !== "" && newValue !== "");
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-[var(--color-accent)]/40 p-6">
       <div className="w-full max-w-3xl rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-xl">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Edit configuration — {topic}</h2>
-          <button onClick={onClose} className="text-[var(--color-text-subtle)] hover:text-[var(--color-text)]">
+          <button
+            onClick={onClose}
+            className="text-[var(--color-text-subtle)] hover:text-[var(--color-text)]"
+          >
             ✕
           </button>
         </div>
@@ -305,7 +301,10 @@ function EditConfigsModal({
                         onChange={(e) =>
                           setRows((prev) => {
                             const next = [...prev];
-                            next[i] = { ...next[i], op: e.target.value as "set" | "delete" | "keep" };
+                            next[i] = {
+                              ...next[i],
+                              op: e.target.value as "set" | "delete" | "keep",
+                            };
                             return next;
                           })
                         }

@@ -6,16 +6,12 @@ import { normalizeVersion } from "@/lib/whats-new";
 // release-gate job in .github/workflows/release.yml before anything is built
 // or published. Skipped in normal test runs (env unset). In Vitest,
 // import.meta.env carries the process environment.
-const releaseVersion: string | undefined =
-  import.meta.env.KAFKITO_RELEASE_VERSION || undefined;
+const releaseVersion: string | undefined = import.meta.env.KAFKITO_RELEASE_VERSION || undefined;
 
 function isRealIsoDate(date: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
   const parsed = new Date(`${date}T00:00:00Z`);
-  return (
-    !Number.isNaN(parsed.getTime()) &&
-    parsed.toISOString().slice(0, 10) === date
-  );
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date;
 }
 
 describe("release gate", () => {

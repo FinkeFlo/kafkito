@@ -49,15 +49,8 @@ export function KpiCard({
   const needsPrefix = hasDelta && !isReactNodeWithExplicitSign(delta);
 
   return (
-    <div
-      className={clsx(
-        "rounded-xl border border-border bg-panel p-4",
-        className,
-      )}
-    >
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-        {label}
-      </div>
+    <div className={clsx("rounded-xl border border-border bg-panel p-4", className)}>
+      <div className="text-[11px] font-semibold uppercase tracking-wider text-muted">{label}</div>
       <div className="mt-2 flex items-baseline gap-2">
         <div className="text-2xl font-semibold tabular-nums">{value}</div>
         {unit !== undefined && unit !== null && (

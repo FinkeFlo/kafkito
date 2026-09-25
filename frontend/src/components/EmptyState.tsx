@@ -23,8 +23,7 @@ function renderIcon(icon: EmptyStateIcon | undefined): ReactNode {
   // Lucide icons are `forwardRef` objects — `typeof` returns `"object"`,
   // not `"function"`. Both shapes are valid React component types.
   const isComponentType =
-    typeof icon === "function" ||
-    (typeof icon === "object" && icon !== null && "$$typeof" in icon);
+    typeof icon === "function" || (typeof icon === "object" && icon !== null && "$$typeof" in icon);
   if (isComponentType) {
     const Icon = icon as ComponentType<LucideProps>;
     return <Icon className="h-7 w-7 text-accent" />;
@@ -32,13 +31,7 @@ function renderIcon(icon: EmptyStateIcon | undefined): ReactNode {
   return icon as ReactNode;
 }
 
-export function EmptyState({
-  icon,
-  title,
-  description,
-  action,
-  className,
-}: EmptyStateProps) {
+export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
   const iconNode = renderIcon(icon);
   return (
     <div
@@ -53,9 +46,7 @@ export function EmptyState({
         </div>
       ) : null}
       <h2 className="mt-5 text-lg font-semibold tracking-tight">{title}</h2>
-      {description && (
-        <p className="mt-2 max-w-md text-sm text-muted">{description}</p>
-      )}
+      {description && <p className="mt-2 max-w-md text-sm text-muted">{description}</p>}
       {action && <div className="mt-6 flex justify-center gap-2">{action}</div>}
     </div>
   );

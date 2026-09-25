@@ -1,42 +1,42 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
-	"vcs": {
-		"enabled": true,
-		"clientKind": "git",
-		"useIgnoreFile": true
-	},
-	"files": {
-		"includes": [
-			"src/**/*.{ts,tsx}",
-			"e2e/**/*.ts",
-			"*.ts",
-			"!src/routeTree.gen.ts",
-			"!src/lib/api.gen.ts"
-		]
-	},
-	"formatter": {
-		"enabled": true,
-		"useEditorconfig": true,
-		"lineWidth": 100
-	},
-	"assist": {
-		"enabled": false
-	},
-	"linter": {
-		"enabled": true,
-		"rules": {
-			"recommended": true,
-			"correctness": {
-				"noUnusedVariables": "off",
-				"noUnusedImports": "off"
-			},
-			"suspicious": {
-				"noExplicitAny": "off",
-				"noArrayIndexKey": "warn"
-			},
-			"a11y": {
-				"recommended": false
-			}
-		}
-	}
+  "$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "src/**/*.{ts,tsx}",
+      "e2e/**/*.ts",
+      "*.ts",
+      "!src/routeTree.gen.ts",
+      "!src/lib/api.gen.ts"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "useEditorconfig": true,
+    "lineWidth": 100
+  },
+  "assist": {
+    "enabled": false
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "correctness": {
+        "noUnusedVariables": "off",
+        "noUnusedImports": "off"
+      },
+      "suspicious": {
+        "noExplicitAny": "off",
+        "noArrayIndexKey": "warn"
+      },
+      "a11y": {
+        "recommended": false
+      }
+    }
+  }
 }

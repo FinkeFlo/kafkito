@@ -10,7 +10,14 @@ export interface PillProps extends ButtonHTMLAttributes<HTMLButtonElement> {
  * Filter chip / segmented control item. Used for cluster switcher items,
  * tag filters etc.
  */
-export function Pill({ active, leadingIcon, className, children, type = "button", ...rest }: PillProps) {
+export function Pill({
+  active,
+  leadingIcon,
+  className,
+  children,
+  type = "button",
+  ...rest
+}: PillProps) {
   return (
     <button
       type={type}

@@ -115,7 +115,9 @@ export async function fetchClusters(): Promise<ClusterInfo[]> {
 }
 
 export async function fetchTopics(cluster: string): Promise<TopicInfo[]> {
-  const r = await getJSONForCluster<Schemas["ListTopicsResponse"]>(cluster, clusterPath(cluster, `/topics`),
+  const r = await getJSONForCluster<Schemas["ListTopicsResponse"]>(
+    cluster,
+    clusterPath(cluster, `/topics`),
   );
   return r.topics;
 }
@@ -128,11 +130,10 @@ export async function fetchBrokers(cluster: string): Promise<BrokerInfo[]> {
   return r.brokers;
 }
 
-export async function fetchTopicDetail(
-  cluster: string,
-  topic: string,
-): Promise<TopicDetail> {
-  const r = await getJSONForCluster<Schemas["DescribeTopicResponse"]>(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}`),
+export async function fetchTopicDetail(cluster: string, topic: string): Promise<TopicDetail> {
+  const r = await getJSONForCluster<Schemas["DescribeTopicResponse"]>(
+    cluster,
+    clusterPath(cluster, `/topics/${encodeURIComponent(topic)}`),
   );
   return r.topic;
 }
@@ -141,7 +142,9 @@ export async function fetchTopicConsumers(
   cluster: string,
   topic: string,
 ): Promise<TopicConsumer[]> {
-  const r = await getJSONForCluster<Schemas["ListTopicConsumersResponse"]>(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/consumers`),
+  const r = await getJSONForCluster<Schemas["ListTopicConsumersResponse"]>(
+    cluster,
+    clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/consumers`),
   );
   return r.consumers ?? [];
 }
@@ -181,8 +184,7 @@ export async function fetchMessageCount(
   const qs = new URLSearchParams();
   if (params.partition !== undefined && params.partition >= 0)
     qs.set("partition", String(params.partition));
-  if (params.from_ts_ms !== undefined)
-    qs.set("from_ts_ms", String(params.from_ts_ms));
+  if (params.from_ts_ms !== undefined) qs.set("from_ts_ms", String(params.from_ts_ms));
   if (params.to_ts_ms !== undefined) qs.set("to_ts_ms", String(params.to_ts_ms));
   const q = qs.toString();
   return await getJSONForCluster<MessageCountResponse>(
@@ -249,7 +251,9 @@ const GZIP_PRODUCE_THRESHOLD_BYTES = 256 * 1024;
  * whenever CompressionStream is unavailable or compression fails for any
  * reason; correctness never depends on this succeeding.
  */
-async function maybeGzipBody(json: string): Promise<{ body: BodyInit; headers: Record<string, string> }> {
+async function maybeGzipBody(
+  json: string,
+): Promise<{ body: BodyInit; headers: Record<string, string> }> {
   if (json.length < GZIP_PRODUCE_THRESHOLD_BYTES || typeof CompressionStream === "undefined") {
     return { body: json, headers: {} };
   }
@@ -270,7 +274,9 @@ export async function produceMessage(
 ): Promise<ProduceResult> {
   const json = JSON.stringify(req);
   const { body, headers } = await maybeGzipBody(json);
-  const res = await fetchAPI(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/messages`),
+  const res = await fetchAPI(
+    cluster,
+    clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/messages`),
     {
       method: "POST",
       headers: {
@@ -345,7 +351,9 @@ export function copyMessages(
       try {
         const b = (await res.json()) as Partial<ApiError>;
         detail = b.error ? `: ${b.error}` : "";
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       onProgress({ copied: 0, done: true, error: `HTTP ${res.status}${detail}` });
       return;
     }
@@ -370,7 +378,9 @@ export function copyMessages(
             try {
               const ev = JSON.parse(line.slice(6)) as CopyProgressEvent;
               onProgress(ev);
-            } catch { /* skip malformed */ }
+            } catch {
+              /* skip malformed */
+            }
           }
         }
       }
@@ -385,16 +395,17 @@ export function copyMessages(
 }
 
 export async function fetchGroups(cluster: string): Promise<GroupInfo[]> {
-  const r = await getJSONForCluster<Schemas["ListGroupsResponse"]>(cluster, clusterPath(cluster, `/groups`),
+  const r = await getJSONForCluster<Schemas["ListGroupsResponse"]>(
+    cluster,
+    clusterPath(cluster, `/groups`),
   );
   return r.groups ?? [];
 }
 
-export async function fetchGroupDetail(
-  cluster: string,
-  group: string,
-): Promise<GroupDetail> {
-  return getJSONForCluster<GroupDetail>(cluster, clusterPath(cluster, `/groups/${encodeURIComponent(group)}`),
+export async function fetchGroupDetail(cluster: string, group: string): Promise<GroupDetail> {
+  return getJSONForCluster<GroupDetail>(
+    cluster,
+    clusterPath(cluster, `/groups/${encodeURIComponent(group)}`),
   );
 }
 
@@ -436,25 +447,31 @@ export function resetGroupOffsets(
   req: ResetOffsetsRequest,
   confirmProd = false,
 ): Promise<ResetOffsetsResult> {
-  return sendJSONForCluster<ResetOffsetsResult>(cluster, clusterPath(cluster, `/groups/${encodeURIComponent(group)}/reset-offsets`),
+  return sendJSONForCluster<ResetOffsetsResult>(
+    cluster,
+    clusterPath(cluster, `/groups/${encodeURIComponent(group)}/reset-offsets`),
     "POST",
     req,
     confirmProd,
   );
 }
 
-export function createGroup(
-  cluster: string,
-  req: CreateGroupRequest,
-): Promise<ResetOffsetsResult> {
-  return sendJSONForCluster<ResetOffsetsResult>(cluster, clusterPath(cluster, `/groups`),
+export function createGroup(cluster: string, req: CreateGroupRequest): Promise<ResetOffsetsResult> {
+  return sendJSONForCluster<ResetOffsetsResult>(
+    cluster,
+    clusterPath(cluster, `/groups`),
     "POST",
     req,
   );
 }
 
-export function deleteGroup(cluster: string, group: string): Promise<Schemas["DeletedNameResponse"]> {
-  return sendJSONForCluster<Schemas["DeletedNameResponse"]>(cluster, clusterPath(cluster, `/groups/${encodeURIComponent(group)}`),
+export function deleteGroup(
+  cluster: string,
+  group: string,
+): Promise<Schemas["DeletedNameResponse"]> {
+  return sendJSONForCluster<Schemas["DeletedNameResponse"]>(
+    cluster,
+    clusterPath(cluster, `/groups/${encodeURIComponent(group)}`),
     "DELETE",
   );
 }
@@ -463,7 +480,9 @@ export function createTopic(
   cluster: string,
   req: CreateTopicRequest,
 ): Promise<Schemas["CreatedResponse"]> {
-  return sendJSONForCluster<Schemas["CreatedResponse"]>(cluster, clusterPath(cluster, `/topics`),
+  return sendJSONForCluster<Schemas["CreatedResponse"]>(
+    cluster,
+    clusterPath(cluster, `/topics`),
     "POST",
     req,
   );
@@ -474,7 +493,9 @@ export function deleteTopic(
   topic: string,
   confirmProd = false,
 ): Promise<Schemas["DeletedNameResponse"]> {
-  return sendJSONForCluster<Schemas["DeletedNameResponse"]>(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}`),
+  return sendJSONForCluster<Schemas["DeletedNameResponse"]>(
+    cluster,
+    clusterPath(cluster, `/topics/${encodeURIComponent(topic)}`),
     "DELETE",
     undefined,
     confirmProd,
@@ -487,7 +508,9 @@ export function deleteRecords(
   partitions: Record<number, number>,
   confirmProd = false,
 ): Promise<Schemas["DeleteRecordsResponse"]> {
-  return sendJSONForCluster<Schemas["DeleteRecordsResponse"]>(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/records`),
+  return sendJSONForCluster<Schemas["DeleteRecordsResponse"]>(
+    cluster,
+    clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/records`),
     "DELETE",
     { partitions },
     confirmProd,
@@ -497,8 +520,7 @@ export function deleteRecords(
 // --- Schema Registry ---
 
 export async function listSubjects(cluster: string): Promise<Subject[]> {
-  const r = await fetchAPI(cluster, clusterPath(cluster, `/schemas/subjects`),
-  );
+  const r = await fetchAPI(cluster, clusterPath(cluster, `/schemas/subjects`));
   if (!r.ok) throw new Error(await r.text());
   const data = (await r.json()) as Schemas["ListSubjectsResponse"];
   return data.subjects ?? [];
@@ -509,7 +531,12 @@ export async function getSchemaVersion(
   subject: string,
   version: string | number,
 ): Promise<SchemaVersion> {
-  const r = await fetchAPI(cluster, clusterPath(cluster, `/schemas/subjects/${encodeURIComponent(subject)}/versions/${encodeURIComponent(String(version))}`),
+  const r = await fetchAPI(
+    cluster,
+    clusterPath(
+      cluster,
+      `/schemas/subjects/${encodeURIComponent(subject)}/versions/${encodeURIComponent(String(version))}`,
+    ),
   );
   if (!r.ok) throw new Error(await r.text());
   return (await r.json()) as SchemaVersion;
@@ -520,7 +547,12 @@ export function deleteSubject(
   subject: string,
   permanent = false,
 ): Promise<Schemas["DeleteSubjectResponse"]> {
-  return sendJSONForCluster<Schemas["DeleteSubjectResponse"]>(cluster, clusterPath(cluster, `/schemas/subjects/${encodeURIComponent(subject)}${permanent ? "?permanent=true" : ""}`),
+  return sendJSONForCluster<Schemas["DeleteSubjectResponse"]>(
+    cluster,
+    clusterPath(
+      cluster,
+      `/schemas/subjects/${encodeURIComponent(subject)}${permanent ? "?permanent=true" : ""}`,
+    ),
     "DELETE",
   );
 }
@@ -531,7 +563,9 @@ export function alterTopicConfigs(
   topic: string,
   req: AlterTopicConfigsRequest,
 ): Promise<Schemas["AlterTopicConfigsResponse"]> {
-  return sendJSONForCluster<Schemas["AlterTopicConfigsResponse"]>(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/configs`),
+  return sendJSONForCluster<Schemas["AlterTopicConfigsResponse"]>(
+    cluster,
+    clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/configs`),
     "PATCH",
     req,
   );
@@ -584,7 +618,9 @@ export async function searchMessages(
   topic: string,
   req: SearchRequest,
 ): Promise<SearchResponse> {
-  const r = await fetchAPI(cluster, clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/messages/search`),
+  const r = await fetchAPI(
+    cluster,
+    clusterPath(cluster, `/topics/${encodeURIComponent(topic)}/messages/search`),
     {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -624,9 +660,15 @@ export async function upsertSCRAMUser(
     }
   }
 }
-export async function deleteSCRAMUser(cluster: string, user: string, mechanism?: string): Promise<void> {
+export async function deleteSCRAMUser(
+  cluster: string,
+  user: string,
+  mechanism?: string,
+): Promise<void> {
   const qs = mechanism ? `?mechanism=${encodeURIComponent(mechanism)}` : "";
-  const r = await fetchAPI(cluster, clusterPath(cluster, `/users/${encodeURIComponent(user)}${qs}`),
+  const r = await fetchAPI(
+    cluster,
+    clusterPath(cluster, `/users/${encodeURIComponent(user)}${qs}`),
     { method: "DELETE" },
   );
   if (!r.ok) {
@@ -709,14 +751,19 @@ export async function downloadMessageRaw(
   partition: number,
   offset: number,
 ): Promise<void> {
-  const path = clusterPath(cluster, `topics/${encodeURIComponent(topic)}/messages/${partition}/${offset}/raw`);
+  const path = clusterPath(
+    cluster,
+    `topics/${encodeURIComponent(topic)}/messages/${partition}/${offset}/raw`,
+  );
   const res = await fetchAPI(cluster, path);
   if (!res.ok) {
     let detail = "";
     try {
       const b = (await res.json()) as Partial<ApiError>;
       detail = b.error ? `: ${b.error}` : "";
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     throw new Error(`HTTP ${res.status}${detail}`);
   }
   const disposition = res.headers.get("content-disposition") ?? "";
@@ -775,17 +822,21 @@ export async function fetchMessageRawBase64(
   offset: number,
   signal?: AbortSignal,
 ): Promise<string> {
-  const path = clusterPath(cluster, `topics/${encodeURIComponent(topic)}/messages/${partition}/${offset}/raw`);
+  const path = clusterPath(
+    cluster,
+    `topics/${encodeURIComponent(topic)}/messages/${partition}/${offset}/raw`,
+  );
   const res = await fetchAPI(cluster, path, { signal });
   if (!res.ok) {
     let detail = "";
     try {
       const b = (await res.json()) as Partial<ApiError>;
       detail = b.error ? `: ${b.error}` : "";
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     if (res.status === 413) throw new RawValueTooLargeError(`HTTP 413${detail}`);
     throw new Error(`HTTP ${res.status}${detail}`);
   }
   return arrayBufferToBase64(await res.arrayBuffer());
 }
-

@@ -1,10 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   resetGroupOffsets,
   type GroupDetail,
@@ -21,9 +16,7 @@ import { LagBadge } from "@/components/lag-badge";
 import { localInputToMs, msToLocalInput } from "@/lib/datetime";
 
 function partitionsForTopic(detail: GroupDetail, topic: string): number[] {
-  return detail.offsets
-    .filter((o) => o.topic === topic)
-    .map((o) => o.partition);
+  return detail.offsets.filter((o) => o.topic === topic).map((o) => o.partition);
 }
 
 function selectAll(parts: number[]): Record<number, boolean> {
@@ -75,21 +68,15 @@ export function ResetOffsetsModal({
 
   const timestampNum = Number(timestampMs);
   const timestampValid =
-    timestampMs.trim() !== "" &&
-    Number.isFinite(timestampNum) &&
-    timestampNum > 0;
+    timestampMs.trim() !== "" && Number.isFinite(timestampNum) && timestampNum > 0;
   const localValue = timestampValid ? msToLocalInput(timestampNum) : "";
 
   const offsetValid =
-    strategy !== "offset" ||
-    (offset.trim() !== "" && Number.isFinite(Number(offset)));
+    strategy !== "offset" || (offset.trim() !== "" && Number.isFinite(Number(offset)));
   const shiftValid =
-    strategy !== "shift-by" ||
-    (shift.trim() !== "" && Number.isFinite(Number(shift)));
+    strategy !== "shift-by" || (shift.trim() !== "" && Number.isFinite(Number(shift)));
   const strategyReady =
-    (strategy === "timestamp" ? timestampValid : true) &&
-    offsetValid &&
-    shiftValid;
+    (strategy === "timestamp" ? timestampValid : true) && offsetValid && shiftValid;
 
   const setRelativeHours = (hours: number) => {
     setTimestampMs(String(Date.now() - hours * 3600_000));
@@ -118,10 +105,15 @@ export function ResetOffsetsModal({
   const previewQuery = useQuery({
     queryKey: ["reset-offsets-preview", cluster, detail.group_id, debouncedBody],
     queryFn: () =>
-      resetGroupOffsets(cluster, detail.group_id, {
-        ...debouncedBody,
-        dry_run: true,
-      }, isProd),
+      resetGroupOffsets(
+        cluster,
+        detail.group_id,
+        {
+          ...debouncedBody,
+          dry_run: true,
+        },
+        isProd,
+      ),
     enabled: !!topic && strategyReady,
     placeholderData: keepPreviousData,
     staleTime: 10_000,
@@ -167,9 +159,7 @@ export function ResetOffsetsModal({
           <Button
             variant="primary"
             size="sm"
-            disabled={
-              commitMut.isPending || selectedParts.length === 0 || !strategyReady
-            }
+            disabled={commitMut.isPending || selectedParts.length === 0 || !strategyReady}
             onClick={() => setCommitOpen(true)}
           >
             {commitMut.isPending ? "Committing…" : "Commit reset"}
@@ -193,9 +183,7 @@ export function ResetOffsetsModal({
       <div className="space-y-4 text-sm">
         <div className="grid grid-cols-2 gap-4">
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Topic
-            </span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted">Topic</span>
             <select
               value={topic}
               onChange={(e) => {
@@ -285,9 +273,7 @@ export function ResetOffsetsModal({
                 Resolves to <Timestamp value={timestampNum} zone="utc" /> (UTC)
               </p>
             ) : (
-              <Notice intent="warning">
-                Pick a valid date and time.
-              </Notice>
+              <Notice intent="warning">Pick a valid date and time.</Notice>
             )}
           </div>
         )}
@@ -305,15 +291,11 @@ export function ResetOffsetsModal({
         )}
         <div>
           <div className="mb-1 flex items-center justify-between text-xs">
-            <span className="font-semibold uppercase tracking-wider text-muted">
-              Partitions
-            </span>
+            <span className="font-semibold uppercase tracking-wider text-muted">Partitions</span>
             <div className="flex gap-2 text-xs">
               <button
                 type="button"
-                onClick={() =>
-                  setPartSel(Object.fromEntries(topicParts.map((p) => [p, true])))
-                }
+                onClick={() => setPartSel(Object.fromEntries(topicParts.map((p) => [p, true])))}
                 className="text-muted hover:text-text"
               >
                 all
@@ -345,9 +327,7 @@ export function ResetOffsetsModal({
                     id={partitionId}
                     type="checkbox"
                     checked={!!partSel[p]}
-                    onChange={(e) =>
-                      setPartSel((s) => ({ ...s, [p]: e.target.checked }))
-                    }
+                    onChange={(e) => setPartSel((s) => ({ ...s, [p]: e.target.checked }))}
                     className="sr-only"
                   />
                   p{p}
@@ -368,9 +348,7 @@ export function ResetOffsetsModal({
 
         <div className="rounded-md border border-border bg-subtle p-2 text-xs">
           <div className="mb-1 flex items-center justify-between">
-            <span className="font-semibold">
-              {result ? "Committed" : "Lag preview"}
-            </span>
+            <span className="font-semibold">{result ? "Committed" : "Lag preview"}</span>
             {!result && previewQuery.isFetching && (
               <span className="text-[10px] text-subtle-text">updating…</span>
             )}
@@ -387,35 +365,25 @@ export function ResetOffsetsModal({
               );
             }
             if (!committed && previewQuery.isError) {
-              return (
-                <p className="text-danger">
-                  {(previewQuery.error as Error).message}
-                </p>
-              );
+              return <p className="text-danger">{(previewQuery.error as Error).message}</p>;
             }
             if (!rows) {
               return <p className="text-subtle-text">Calculating preview…</p>;
             }
             if (rows.length === 0) {
-              return (
-                <p className="text-subtle-text">No partitions to preview.</p>
-              );
+              return <p className="text-subtle-text">No partitions to preview.</p>;
             }
 
             // Lag after the operation for a partition: selected (or committed)
             // partitions move to the new offset, everything else keeps its
             // current committed offset.
             const lagAfter = (r: ResetOffsetResult): number | null => {
-              const base =
-                committed || partSel[r.partition] ? r.new_offset : r.old_offset;
+              const base = committed || partSel[r.partition] ? r.new_offset : r.old_offset;
               if (r.error || base < 0 || r.end_offset < 0) return null;
               return Math.max(0, r.end_offset - base);
             };
-            const known = rows
-              .map(lagAfter)
-              .filter((l): l is number => l !== null);
-            const totalLag =
-              known.length > 0 ? known.reduce((a, b) => a + b, 0) : null;
+            const known = rows.map(lagAfter).filter((l): l is number => l !== null);
+            const totalLag = known.length > 0 ? known.reduce((a, b) => a + b, 0) : null;
 
             return (
               <>
@@ -435,25 +403,16 @@ export function ResetOffsetsModal({
                       const lag = lagAfter(r);
                       const active = committed || !!partSel[r.partition];
                       return (
-                        <tr
-                          key={r.partition}
-                          className={active ? "" : "text-subtle-text"}
-                        >
-                          <td className={active ? "text-accent" : undefined}>
-                            p{r.partition}
-                          </td>
+                        <tr key={r.partition} className={active ? "" : "text-subtle-text"}>
+                          <td className={active ? "text-accent" : undefined}>p{r.partition}</td>
                           <td className="text-right text-muted">
                             {r.old_offset >= 0 ? r.old_offset : "—"}
                           </td>
-                          <td className="text-right">
-                            {r.new_offset >= 0 ? r.new_offset : "—"}
-                          </td>
+                          <td className="text-right">{r.new_offset >= 0 ? r.new_offset : "—"}</td>
                           <td className="text-right pl-4 text-muted">
                             {r.end_offset >= 0 ? r.end_offset : "—"}
                           </td>
-                          <td className="text-right pl-4">
-                            {lag !== null ? lag : "—"}
-                          </td>
+                          <td className="text-right pl-4">{lag !== null ? lag : "—"}</td>
                           <td className="pl-4 text-danger">{r.error ?? ""}</td>
                         </tr>
                       );
@@ -473,11 +432,7 @@ export function ResetOffsetsModal({
             );
           })()}
         </div>
-        {err && (
-          <Notice intent="danger">
-            {err}
-          </Notice>
-        )}
+        {err && <Notice intent="danger">{err}</Notice>}
       </div>
     </Modal>
   );

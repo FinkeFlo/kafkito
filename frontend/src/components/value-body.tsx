@@ -40,9 +40,7 @@ function ClickToFilterHint() {
 
 function ValuePre({ m }: { m: Message }) {
   return (
-    <pre className="overflow-auto text-xs">
-      {prettyValue(m.value ?? "", m.value_encoding)}
-    </pre>
+    <pre className="overflow-auto text-xs">{prettyValue(m.value ?? "", m.value_encoding)}</pre>
   );
 }
 
@@ -119,9 +117,8 @@ export function ValueBody({
         <div className="mt-2 flex flex-col gap-2">
           {isSchemaRegistry ? (
             <p className="text-[11px] text-muted">
-              Click to filter is not available for Schema Registry values — the
-              full record is only downloadable in its encoded wire format. Enter
-              the path manually instead.
+              Click to filter is not available for Schema Registry values — the full record is only
+              downloadable in its encoded wire format. Enter the path manually instead.
             </p>
           ) : tooLargeForTree ? (
             <>
@@ -139,8 +136,8 @@ export function ValueBody({
                 id={`value-too-large-${m.partition}-${m.offset}`}
                 className="text-[11px] text-muted"
               >
-                Full value is {sizeLabel} — above the {limitLabel} interactive
-                limit. Enter the path manually instead.
+                Full value is {sizeLabel} — above the {limitLabel} interactive limit. Enter the path
+                manually instead.
               </p>
             </>
           ) : (
@@ -161,11 +158,7 @@ export function ValueBody({
                 <Notice
                   intent="danger"
                   actions={
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => void rawQuery.refetch()}
-                    >
+                    <Button variant="secondary" size="sm" onClick={() => void rawQuery.refetch()}>
                       Retry
                     </Button>
                   }

@@ -21,12 +21,7 @@
 // preview via a checkbox — never silently.
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  fetchTopics,
-  produceMessage,
-  RawValueTooLargeError,
-  type Message,
-} from "@/lib/api";
+import { fetchTopics, produceMessage, RawValueTooLargeError, type Message } from "@/lib/api";
 import { produceEncodingFor, replayBlocker } from "@/lib/produce-encoding";
 import { useCluster, type ClusterListItem } from "@/lib/use-cluster";
 import { useFormatters } from "@/lib/use-formatters";
@@ -106,7 +101,13 @@ function resolveFullValue(args: {
   return { status: "ready", base64: args.base64 };
 }
 
-export function ReplayModal({ open, onClose, message, sourceCluster, sourceTopic }: ReplayModalProps) {
+export function ReplayModal({
+  open,
+  onClose,
+  message,
+  sourceCluster,
+  sourceTopic,
+}: ReplayModalProps) {
   const { clusters } = useCluster();
   const fmt = useFormatters();
 
@@ -162,7 +163,6 @@ export function ReplayModal({ open, onClose, message, sourceCluster, sourceTopic
   });
 
   const isProdDest = !!clusterList.find((c) => c.name === effectiveCluster)?.is_prod;
-
 
   // Fidelity check. Non-null means the original bytes cannot be reproduced, so
   // nothing is sent at all; `keyPayload`/`valuePayload` are then unusable.
@@ -234,7 +234,8 @@ export function ReplayModal({ open, onClose, message, sourceCluster, sourceTopic
   };
 
   const labelCls = "text-[11px] font-semibold uppercase tracking-wider text-muted";
-  const canReplay = !!effectiveCluster && !!destTopic.trim() && !busy && !blocker && !truncatedNotResolved;
+  const canReplay =
+    !!effectiveCluster && !!destTopic.trim() && !busy && !blocker && !truncatedNotResolved;
 
   return (
     <>
@@ -262,8 +263,8 @@ export function ReplayModal({ open, onClose, message, sourceCluster, sourceTopic
       >
         <div className="space-y-4">
           <p className="text-xs text-muted">
-            Reproduces this message (key&thinsp;+&thinsp;value&thinsp;+&thinsp;headers) to
-            the selected destination cluster and topic.
+            Reproduces this message (key&thinsp;+&thinsp;value&thinsp;+&thinsp;headers) to the
+            selected destination cluster and topic.
           </p>
 
           {blocker && (
@@ -282,8 +283,8 @@ export function ReplayModal({ open, onClose, message, sourceCluster, sourceTopic
 
           {!blocker && message.value_truncated && fullValue.status === "ready" && (
             <div className="rounded-md border border-success/30 bg-success-subtle p-2 text-xs text-success">
-              Full value ({fmt.bytes(message.value_size_bytes ?? 0)}) loaded — replay will send
-              the complete record, not just the 64&nbsp;KB preview.
+              Full value ({fmt.bytes(message.value_size_bytes ?? 0)}) loaded — replay will send the
+              complete record, not just the 64&nbsp;KB preview.
             </div>
           )}
 
@@ -291,9 +292,8 @@ export function ReplayModal({ open, onClose, message, sourceCluster, sourceTopic
             <div className="rounded-md border border-warning/30 bg-warning-subtle p-2 text-xs text-warning">
               <div className="font-semibold">Only a 64&nbsp;KB preview is available</div>
               <p className="mt-0.5">
-                Could not recover the full value ({fmt.bytes(message.value_size_bytes ?? 0)}
-                {" "}
-                total): {fullValue.message}.
+                Could not recover the full value ({fmt.bytes(message.value_size_bytes ?? 0)} total):{" "}
+                {fullValue.message}.
               </p>
               <label className="mt-2 flex cursor-pointer items-center gap-2">
                 <input

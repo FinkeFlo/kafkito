@@ -41,9 +41,7 @@ test.describe("Topics", () => {
     await expect(dialog).toBeHidden();
 
     await expect(page.getByRole("row")).toHaveCount(initialRowCount);
-    await expect(
-      page.getByRole("row", { name: new RegExp(CREATE_DRAFT_NAME) }),
-    ).toHaveCount(0);
+    await expect(page.getByRole("row", { name: new RegExp(CREATE_DRAFT_NAME) })).toHaveCount(0);
   });
 
   test("topic detail loads with KPIs and sub-tab navigation", async ({ page }) => {
@@ -51,9 +49,7 @@ test.describe("Topics", () => {
       `/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(FIXTURE_TOPIC)}`,
     );
 
-    await expect(
-      page.getByRole("heading", { level: 1, name: FIXTURE_TOPIC }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: FIXTURE_TOPIC })).toBeVisible();
 
     for (const tab of ["Overview", "Messages", "Produce", "Configs", "Consumers", "Schema"]) {
       await expect(page.getByRole("link", { name: tab, exact: true })).toBeVisible();
@@ -67,4 +63,3 @@ test.describe("Topics", () => {
     await expect(page).toHaveURL(new RegExp(`/clusters/${CLUSTER}/topics$`));
   });
 });
-

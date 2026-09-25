@@ -17,11 +17,16 @@ const variantMap: Record<BadgeVariant, string> = {
     "bg-[var(--color-danger-subtle)] text-[var(--color-danger)] ring-[var(--color-danger)]/30",
   neutral:
     "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)] ring-[var(--color-border)]",
-  info:
-    "bg-[var(--color-info-subtle)] text-[var(--color-info)] ring-[var(--color-info)]/30",
+  info: "bg-[var(--color-info-subtle)] text-[var(--color-info)] ring-[var(--color-info)]/30",
 };
 
-export function Badge({ variant = "neutral", leadingIcon, className, children, ...rest }: BadgeProps) {
+export function Badge({
+  variant = "neutral",
+  leadingIcon,
+  className,
+  children,
+  ...rest
+}: BadgeProps) {
   return (
     <span
       className={cn(

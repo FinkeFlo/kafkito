@@ -19,19 +19,10 @@ export interface ToolbarProps {
  */
 export function Toolbar({ search, filters, actions, className }: ToolbarProps) {
   return (
-    <div
-      className={cn(
-        "flex flex-wrap items-center gap-2",
-        className,
-      )}
-    >
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
       {search ? <div className="flex min-w-[260px] flex-1 items-center">{search}</div> : null}
-      {filters ? (
-        <div className="flex flex-wrap items-center gap-2">{filters}</div>
-      ) : null}
-      {actions ? (
-        <div className="ml-auto flex flex-wrap items-center gap-2">{actions}</div>
-      ) : null}
+      {filters ? <div className="flex flex-wrap items-center gap-2">{filters}</div> : null}
+      {actions ? <div className="ml-auto flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
   );
 }

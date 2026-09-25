@@ -45,8 +45,8 @@ function SchemaTab() {
         title="No schema registered for this topic"
         description={
           <>
-            Register <span className="font-mono">{subject}</span> with the schema
-            registry to get inline validation on produce.
+            Register <span className="font-mono">{subject}</span> with the schema registry to get
+            inline validation on produce.
           </>
         }
         action={

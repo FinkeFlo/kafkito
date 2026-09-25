@@ -15,10 +15,7 @@ export function Gauge({
   const isHot = v >= hot;
   return (
     <div className={clsx("flex items-center gap-2", className)}>
-      <div
-        className="h-1.5 rounded-full bg-subtle"
-        style={{ width: `${width}px` }}
-      >
+      <div className="h-1.5 rounded-full bg-subtle" style={{ width: `${width}px` }}>
         <div
           className={clsx(
             "h-full rounded-full transition-[width] duration-150",

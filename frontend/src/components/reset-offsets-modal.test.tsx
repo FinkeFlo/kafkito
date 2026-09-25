@@ -53,37 +53,30 @@ describe("ResetOffsetsModal partition picker a11y", () => {
       results: [],
     });
   });
-  it.each([0, 1, 2])(
-    "renders partition %i checkbox with a discoverable accessible name",
-    (p) => {
-      renderModal([0, 1, 2]);
+  it.each([0, 1, 2])("renders partition %i checkbox with a discoverable accessible name", (p) => {
+    renderModal([0, 1, 2]);
 
-      const checkbox = screen.getByRole("checkbox", {
-        name: new RegExp(`^p${p}$`),
-      });
+    const checkbox = screen.getByRole("checkbox", {
+      name: new RegExp(`^p${p}$`),
+    });
 
-      expect(checkbox).toBeInTheDocument();
-      // The id+htmlFor binding is the WCAG 4.1.2 fix: a label must reference
-      // the input via htmlFor for assistive tech to compute the accessible name.
-      expect(checkbox.id).toBe(`reset-offsets-partition-${p}`);
-      // The checkbox must remain in the a11y tree. Tailwind's `hidden`
-      // (display:none) removes it; `sr-only` keeps it visible to AT.
-      expect(checkbox).not.toHaveClass("hidden");
-    },
-  );
+    expect(checkbox).toBeInTheDocument();
+    // The id+htmlFor binding is the WCAG 4.1.2 fix: a label must reference
+    // the input via htmlFor for assistive tech to compute the accessible name.
+    expect(checkbox.id).toBe(`reset-offsets-partition-${p}`);
+    // The checkbox must remain in the a11y tree. Tailwind's `hidden`
+    // (display:none) removes it; `sr-only` keeps it visible to AT.
+    expect(checkbox).not.toHaveClass("hidden");
+  });
 
   it("selects every partition by default and enables Commit reset", () => {
     renderModal([0, 1, 2]);
 
     for (const p of [0, 1, 2]) {
-      expect(
-        screen.getByRole("checkbox", { name: new RegExp(`^p${p}$`) }),
-      ).toBeChecked();
+      expect(screen.getByRole("checkbox", { name: new RegExp(`^p${p}$`) })).toBeChecked();
     }
     expect(screen.getByText(/3 of 3 selected/i)).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /commit reset/i }),
-    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: /commit reset/i })).toBeEnabled();
   });
 });
 
@@ -102,14 +95,9 @@ describe("ResetOffsetsModal timestamp strategy", () => {
     const user = userEvent.setup();
     const { container } = renderModal([0]);
 
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: /strategy/i }),
-      "timestamp",
-    );
+    await user.selectOptions(screen.getByRole("combobox", { name: /strategy/i }), "timestamp");
 
-    const picker = container.querySelector<HTMLInputElement>(
-      'input[type="datetime-local"]',
-    );
+    const picker = container.querySelector<HTMLInputElement>('input[type="datetime-local"]');
     expect(picker).not.toBeNull();
     expect(picker!.value).not.toBe("");
     expect(screen.getByRole("button", { name: "-1h" })).toBeInTheDocument();
@@ -125,22 +113,14 @@ describe("ResetOffsetsModal timestamp strategy", () => {
     const user = userEvent.setup();
     const { container } = renderModal([0]);
 
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: /strategy/i }),
-      "timestamp",
-    );
-    const picker = container.querySelector<HTMLInputElement>(
-      'input[type="datetime-local"]',
-    )!;
+    await user.selectOptions(screen.getByRole("combobox", { name: /strategy/i }), "timestamp");
+    const picker = container.querySelector<HTMLInputElement>('input[type="datetime-local"]')!;
     await user.clear(picker);
     await user.type(picker, "2026-06-15T14:45:00");
 
     // No Preview button: the dry-run fires automatically (debounced).
     await waitFor(
-      () =>
-        expect(resetGroupOffsets.mock.calls.at(-1)?.[2]?.strategy).toBe(
-          "timestamp",
-        ),
+      () => expect(resetGroupOffsets.mock.calls.at(-1)?.[2]?.strategy).toBe("timestamp"),
       { timeout: 2000 },
     );
     const body = resetGroupOffsets.mock.calls.at(-1)![2];
@@ -165,9 +145,7 @@ describe("ResetOffsetsModal timestamp strategy", () => {
     // immediately without toggling anything.
     // p0 lag = 100 - 80 = 20, p1 lag = 100 - 30 = 70, total = 90.
     await waitFor(() =>
-      expect(
-        screen.getByText(/total group lag after reset/i),
-      ).toBeInTheDocument(),
+      expect(screen.getByText(/total group lag after reset/i)).toBeInTheDocument(),
     );
     expect(screen.getByText("20")).toBeInTheDocument();
     expect(screen.getByText("70")).toBeInTheDocument();

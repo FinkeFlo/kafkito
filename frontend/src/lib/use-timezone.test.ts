@@ -20,16 +20,14 @@ describe("getTimeZone", () => {
     expect(getTimeZone()).toBe("utc");
   });
 
-  it.each<[string]>([
-    ["UTC"],
-    ["America/New_York"],
-    ["garbage"],
-    [""],
-  ])("falls back to 'local' for any non-'utc' stored value (%p) (C3 / M-strict mutation-guard)", (raw) => {
-    window.localStorage.setItem(tzKey, raw);
+  it.each<[string]>([["UTC"], ["America/New_York"], ["garbage"], [""]])(
+    "falls back to 'local' for any non-'utc' stored value (%p) (C3 / M-strict mutation-guard)",
+    (raw) => {
+      window.localStorage.setItem(tzKey, raw);
 
-    expect(getTimeZone()).toBe("local");
-  });
+      expect(getTimeZone()).toBe("local");
+    },
+  );
 });
 
 describe("setTimeZone", () => {

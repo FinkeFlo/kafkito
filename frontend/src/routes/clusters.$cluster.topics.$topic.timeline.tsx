@@ -141,9 +141,7 @@ function TopicTimelinePage() {
             {!timelineQuery.isLoading && !timelineQuery.isError && (
               <>
                 approx total:{" "}
-                <span className="font-semibold text-[var(--color-text)]">
-                  {fmt.number(total)}
-                </span>
+                <span className="font-semibold text-[var(--color-text)]">{fmt.number(total)}</span>
               </>
             )}
           </div>
@@ -174,11 +172,7 @@ function TopicTimelinePage() {
         </div>
 
         {slots.length > 0 && (
-          <TimelineDetailTable
-            slots={slots}
-            highlighted={selected}
-            onSelect={setSelected}
-          />
+          <TimelineDetailTable slots={slots} highlighted={selected} onSelect={setSelected} />
         )}
       </div>
     </div>

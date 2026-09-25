@@ -5,12 +5,7 @@
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Square, Play } from "lucide-react";
-import {
-  copyMessages,
-  fetchTopics,
-  type CopyProgressEvent,
-  type CopyRequest,
-} from "@/lib/api";
+import { copyMessages, fetchTopics, type CopyProgressEvent, type CopyRequest } from "@/lib/api";
 import { useCluster, type ClusterListItem } from "@/lib/use-cluster";
 import { Button } from "./button";
 import { Input } from "./Input";
@@ -122,19 +117,13 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
       if (n > 0) req.limit = n;
     }
 
-    abortRef.current = copyMessages(
-      srcCluster,
-      srcTopic,
-      req,
-      confirmedProd,
-      (ev) => {
-        setProgress(ev);
-        if (ev.done) {
-          setRunning(false);
-          abortRef.current = null;
-        }
-      },
-    );
+    abortRef.current = copyMessages(srcCluster, srcTopic, req, confirmedProd, (ev) => {
+      setProgress(ev);
+      if (ev.done) {
+        setRunning(false);
+        abortRef.current = null;
+      }
+    });
   };
 
   const handleStart = () => {
@@ -230,7 +219,10 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
             ))}
             <button
               type="button"
-              onClick={() => { setFromTs(""); setToTs(""); }}
+              onClick={() => {
+                setFromTs("");
+                setToTs("");
+              }}
               disabled={running}
               className="rounded border border-border px-2 py-0.5 text-[11px] hover:border-border-strong disabled:opacity-50"
             >

@@ -39,11 +39,7 @@ function ProduceTab() {
   }
 
   return (
-    <ProduceSection
-      cluster={cluster}
-      topic={topic}
-      partitions={detailQuery.data.partitions}
-    />
+    <ProduceSection cluster={cluster} topic={topic} partitions={detailQuery.data.partitions} />
   );
 }
 
@@ -72,8 +68,7 @@ function ProduceSection({
   const isProdCluster = !!clusters?.find((c) => c.name === cluster)?.is_prod;
 
   const addHeader = () => setHeaders((h) => [...h, { k: "", v: "" }]);
-  const removeHeader = (i: number) =>
-    setHeaders((h) => h.filter((_, idx) => idx !== i));
+  const removeHeader = (i: number) => setHeaders((h) => h.filter((_, idx) => idx !== i));
   const updateHeader = (i: number, field: "k" | "v", val: string) =>
     setHeaders((h) => h.map((row, idx) => (idx === i ? { ...row, [field]: val } : row)));
   const { me } = useAuth();
@@ -89,8 +84,7 @@ function ProduceSection({
     enabled: !!cluster && rbacAllowsConsume,
     staleTime: 5_000,
   });
-  const latestProbeAvailable =
-    !!latestProbeQuery.data && latestProbeQuery.data.messages.length > 0;
+  const latestProbeAvailable = !!latestProbeQuery.data && latestProbeQuery.data.messages.length > 0;
 
   const looksLikeJSON = (s: string): boolean => {
     const trimmed = s.trim();
@@ -180,8 +174,7 @@ function ProduceSection({
       for (const { k, v } of headers) {
         if (k.trim()) hdrMap[k.trim()] = v;
       }
-      const partNum =
-        partition === "auto" ? undefined : Number.parseInt(partition, 10);
+      const partNum = partition === "auto" ? undefined : Number.parseInt(partition, 10);
       const res = await produceMessage(
         cluster,
         topic,
@@ -224,8 +217,7 @@ function ProduceSection({
     setTemplateError(null);
   };
 
-  const labelCls =
-    "text-[11px] font-semibold uppercase tracking-wider text-muted";
+  const labelCls = "text-[11px] font-semibold uppercase tracking-wider text-muted";
 
   // RBAC reasons are load-bearing — surface via `aria-describedby`, not
   // hover-only `title=`.
@@ -240,8 +232,7 @@ function ProduceSection({
   } else if (latestProbeQuery.data && !latestProbeAvailable) {
     templateDisabledReason = "No messages in this topic yet.";
   }
-  const templateDisabled =
-    templating || busy || templateDisabledReason !== null;
+  const templateDisabled = templating || busy || templateDisabledReason !== null;
 
   return (
     <Card>
@@ -254,9 +245,7 @@ function ProduceSection({
           onClick={useLatestAsTemplate}
           loading={templating}
           disabled={templateDisabled}
-          aria-describedby={
-            templateDisabledReason ? templateReasonId : undefined
-          }
+          aria-describedby={templateDisabledReason ? templateReasonId : undefined}
         >
           {templating ? "Loading…" : "Use latest message"}
         </Button>

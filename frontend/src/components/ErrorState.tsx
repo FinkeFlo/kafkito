@@ -27,9 +27,7 @@ export function ErrorState({
         <AlertTriangle className="h-6 w-6" />
       </div>
       <h2 className="mt-4 text-base font-semibold text-tint-red-fg">{title}</h2>
-      {detail && (
-        <p className="mt-1 max-w-md text-xs text-tint-red-fg/80">{detail}</p>
-      )}
+      {detail && <p className="mt-1 max-w-md text-xs text-tint-red-fg/80">{detail}</p>}
       {onRetry && (
         <div className="mt-5">
           <Button

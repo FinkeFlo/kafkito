@@ -15,9 +15,30 @@ import {
 // variable under test.
 vi.mock("./api", () => ({
   fetchClusters: vi.fn(async () => [
-    { name: "seeded", reachable: true, is_prod: false, auth_type: "none", tls: false, schema_registry: false },
-    { name: "from-other-tab", reachable: true, is_prod: false, auth_type: "none", tls: false, schema_registry: false },
-    { name: "prod", reachable: true, is_prod: true, auth_type: "none", tls: false, schema_registry: false },
+    {
+      name: "seeded",
+      reachable: true,
+      is_prod: false,
+      auth_type: "none",
+      tls: false,
+      schema_registry: false,
+    },
+    {
+      name: "from-other-tab",
+      reachable: true,
+      is_prod: false,
+      auth_type: "none",
+      tls: false,
+      schema_registry: false,
+    },
+    {
+      name: "prod",
+      reachable: true,
+      is_prod: true,
+      auth_type: "none",
+      tls: false,
+      schema_registry: false,
+    },
   ]),
 }));
 

@@ -60,9 +60,7 @@ export function MonoId({
 
   return (
     <Tooltip
-      content={
-        <span className="break-all font-mono text-[11px] leading-snug">{value}</span>
-      }
+      content={<span className="break-all font-mono text-[11px] leading-snug">{value}</span>}
     >
       <span
         className={cn(
@@ -78,18 +76,18 @@ export function MonoId({
           <button
             type="button"
             onClick={onCopy}
-            aria-label={
-              copied
-                ? "Copied"
-                : `Copy to clipboard ${value}`
-            }
+            aria-label={copied ? "Copied" : `Copy to clipboard ${value}`}
             className={cn(
               "ml-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-[var(--color-text-subtle)]",
               "opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100",
               "hover:text-[var(--color-text)]",
             )}
           >
-            {copied ? <Check className="h-3 w-3 text-[var(--color-success)]" /> : <Copy className="h-3 w-3" />}
+            {copied ? (
+              <Check className="h-3 w-3 text-[var(--color-success)]" />
+            ) : (
+              <Copy className="h-3 w-3" />
+            )}
           </button>
         ) : null}
       </span>

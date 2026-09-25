@@ -43,9 +43,7 @@ function isVisible(el: HTMLElement): boolean {
 }
 
 function focusableInside(panel: HTMLElement): HTMLElement[] {
-  return Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-    isVisible,
-  );
+  return Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(isVisible);
 }
 
 /**
@@ -194,11 +192,7 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 z-40">
-      <div
-        aria-hidden="true"
-        className="fixed inset-0 z-40 bg-overlay"
-        onClick={onBackdropClick}
-      />
+      <div aria-hidden="true" className="fixed inset-0 z-40 bg-overlay" onClick={onBackdropClick} />
       <div
         ref={panelRef}
         role="dialog"
@@ -221,10 +215,7 @@ export function Modal({
         )}
       >
         <div className="shrink-0 border-b border-border px-5 py-4">
-          <h2
-            id={titleId}
-            className="text-base font-semibold tracking-tight text-text"
-          >
+          <h2 id={titleId} className="text-base font-semibold tracking-tight text-text">
             {title}
           </h2>
         </div>

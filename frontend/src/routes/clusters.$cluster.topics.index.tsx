@@ -3,13 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Boxes, ChevronDown } from "lucide-react";
 import { clsx } from "clsx";
-import {
-  fetchTopics,
-  createTopic,
-  can,
-  type ClusterInfo,
-  type TopicInfo,
-} from "@/lib/api";
+import { fetchTopics, createTopic, can, type ClusterInfo, type TopicInfo } from "@/lib/api";
 import { useAuth } from "@/auth/hooks";
 import { useCluster } from "@/lib/use-cluster";
 import { Tag } from "@/components/Tag";
@@ -33,10 +27,7 @@ export const Route = createFileRoute("/clusters/$cluster/topics/")({
 
 function TopicsPage() {
   const { cluster, clusters } = useCluster();
-  const clusterInfo = useMemo(
-    () => clusters?.find((c) => c.name === cluster),
-    [clusters, cluster],
-  );
+  const clusterInfo = useMemo(() => clusters?.find((c) => c.name === cluster), [clusters, cluster]);
 
   const topicsQuery = useQuery({
     queryKey: ["topics", cluster],
@@ -91,16 +82,14 @@ function TopicsPageInner({
 
   const visible = topics?.filter((t) => !t.is_internal) ?? [];
   const partitionSum = visible.reduce((s, t) => s + t.partitions, 0);
-  const totalSize = visible.reduce(
-    (s, t) => (t.size_bytes != null ? s + t.size_bytes : s),
-    0,
-  );
+  const totalSize = visible.reduce((s, t) => (t.size_bytes != null ? s + t.size_bytes : s), 0);
   const anySize = visible.some((t) => t.size_bytes != null);
-  const subtitle = !topics || !cluster
-    ? "—"
-    : anySize
-      ? `${visible.length} topics · ${partitionSum} partitions · ${fmt.bytes(totalSize)} retained`
-      : `${visible.length} topics · ${partitionSum} partitions`;
+  const subtitle =
+    !topics || !cluster
+      ? "—"
+      : anySize
+        ? `${visible.length} topics · ${partitionSum} partitions · ${fmt.bytes(totalSize)} retained`
+        : `${visible.length} topics · ${partitionSum} partitions`;
 
   const createReasonId = "topics-create-disabled-reason";
   return (
@@ -143,11 +132,7 @@ function TopicsPageInner({
       )}
 
       {cluster && isError && (
-        <ErrorState
-          title="Failed to load topics"
-          detail={error?.message}
-          onRetry={onRetry}
-        />
+        <ErrorState title="Failed to load topics" detail={error?.message} onRetry={onRetry} />
       )}
 
       {cluster && !isError && (
@@ -173,7 +158,14 @@ interface BodyProps {
   createDisabledReason: string | undefined;
 }
 
-function TopicsBody({ cluster, topics, isLoading, createOpen, setCreateOpen, createDisabledReason }: BodyProps) {
+function TopicsBody({
+  cluster,
+  topics,
+  isLoading,
+  createOpen,
+  setCreateOpen,
+  createDisabledReason,
+}: BodyProps) {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [showInternal, setShowInternal] = useState(false);
@@ -193,10 +185,7 @@ function TopicsBody({ cluster, topics, isLoading, createOpen, setCreateOpen, cre
     [visibleTopics],
   );
   const showRetention = useMemo(
-    () =>
-      visibleTopics.some(
-        (t) => t.retention_ms !== null && t.retention_ms !== undefined,
-      ),
+    () => visibleTopics.some((t) => t.retention_ms !== null && t.retention_ms !== undefined),
     [visibleTopics],
   );
 
@@ -276,9 +265,7 @@ function TopicsBody({ cluster, topics, isLoading, createOpen, setCreateOpen, cre
         </DataTable>
       )}
 
-      {createOpen && (
-        <CreateTopicModal cluster={cluster} onClose={() => setCreateOpen(false)} />
-      )}
+      {createOpen && <CreateTopicModal cluster={cluster} onClose={() => setCreateOpen(false)} />}
     </>
   );
 }
@@ -318,14 +305,10 @@ function TopicRow({
       </td>
       {/* TODO(backend): per-topic msg rate (rate_per_sec aggregated server-side) */}
       <MetricCell align="right" value={topic.messages} format={fmt.count} />
-      {showSize && (
-        <MetricCell align="right" value={topic.size_bytes} format={fmt.bytes} />
-      )}
+      {showSize && <MetricCell align="right" value={topic.size_bytes} format={fmt.bytes} />}
       <MetricCell align="right" value={topic.rate_per_sec} format={fmt.rate} />
       <MetricCell align="right" value={topic.lag} format={fmt.count} />
-      {showRetention && (
-        <MetricCell value={topic.retention_ms} format={fmt.duration} />
-      )}
+      {showRetention && <MetricCell value={topic.retention_ms} format={fmt.duration} />}
     </DataTableRow>
   );
 }
@@ -374,7 +357,10 @@ function TopicsSkeleton() {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-panel">
       {[0, 1, 2, 3, 4, 5].map((i) => (
-        <div key={i} className="flex items-center gap-4 border-t border-border px-4 py-3 first:border-t-0">
+        <div
+          key={i}
+          className="flex items-center gap-4 border-t border-border px-4 py-3 first:border-t-0"
+        >
           <div className="h-3 w-48 animate-pulse rounded bg-subtle" />
           <div className="h-3 w-20 animate-pulse rounded bg-subtle" />
           <div className="ml-auto h-3 w-16 animate-pulse rounded bg-subtle" />
@@ -385,13 +371,7 @@ function TopicsSkeleton() {
   );
 }
 
-function CreateTopicModal({
-  cluster,
-  onClose,
-}: {
-  cluster: string;
-  onClose: () => void;
-}) {
+function CreateTopicModal({ cluster, onClose }: { cluster: string; onClose: () => void }) {
   const qc = useQueryClient();
   const fmt = useFormatters();
   const [name, setName] = useState("");
@@ -458,9 +438,7 @@ function CreateTopicModal({
     >
       <div className="space-y-4">
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-            Name
-          </span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted">Name</span>
           <Input
             autoFocus
             value={name}

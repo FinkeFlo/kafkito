@@ -74,11 +74,9 @@ export function CreateGroupModal({
 
   const groupIdValid = groupId.trim() !== "";
   const offsetValid =
-    strategy !== "offset" ||
-    (offset.trim() !== "" && Number.isInteger(Number(offset)));
+    strategy !== "offset" || (offset.trim() !== "" && Number.isInteger(Number(offset)));
   const timestampValid =
-    strategy !== "timestamp" ||
-    (timestampMs.trim() !== "" && Number.isFinite(Number(timestampMs)));
+    strategy !== "timestamp" || (timestampMs.trim() !== "" && Number.isFinite(Number(timestampMs)));
   const ready = groupIdValid && offsetValid && timestampValid;
 
   async function onPreview() {
@@ -130,9 +128,7 @@ export function CreateGroupModal({
             disabled={!ready || mutation.isPending}
             onClick={onPreview}
           >
-            {mutation.isPending && mutation.variables === true
-              ? "Working…"
-              : "Preview"}
+            {mutation.isPending && mutation.variables === true ? "Working…" : "Preview"}
           </Button>
           <Button
             variant="primary"
@@ -161,9 +157,7 @@ export function CreateGroupModal({
             {groupHints.length > 0 ? (
               <span className="mt-1 block text-xs text-muted">
                 Allowed by ACLs:{" "}
-                <span className="font-mono text-subtle-text">
-                  {groupHints.join(", ")}
-                </span>
+                <span className="font-mono text-subtle-text">{groupHints.join(", ")}</span>
               </span>
             ) : null}
           </label>
@@ -252,9 +246,7 @@ export function CreateGroupModal({
                   {preview.map((r) => (
                     <tr key={r.partition}>
                       <td>p{r.partition}</td>
-                      <td className="text-right">
-                        {r.new_offset >= 0 ? r.new_offset : "—"}
-                      </td>
+                      <td className="text-right">{r.new_offset >= 0 ? r.new_offset : "—"}</td>
                       <td className="pl-4 text-danger">{r.error ?? ""}</td>
                     </tr>
                   ))}

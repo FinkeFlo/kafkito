@@ -93,8 +93,7 @@ export function UserMenu() {
   if (isLoading) return <span className="text-xs text-muted">…</span>;
   if (!currentUser) return null;
 
-  const display =
-    currentUser.displayName || currentUser.name || currentUser.email;
+  const display = currentUser.displayName || currentUser.name || currentUser.email;
 
   return (
     <div className="relative">
@@ -132,9 +131,7 @@ export function UserMenu() {
           <div className="px-2 pb-1 pt-1">
             <div className="text-[12px] font-semibold text-text">{display}</div>
             {me?.scopes?.length ? (
-              <div className="mt-0.5 truncate text-[11px] text-muted">
-                {me.scopes.join(", ")}
-              </div>
+              <div className="mt-0.5 truncate text-[11px] text-muted">{me.scopes.join(", ")}</div>
             ) : null}
           </div>
 
@@ -180,7 +177,11 @@ function ThemeRow() {
     <SettingRow
       label="Theme"
       control={
-        <div role="radiogroup" aria-label="Theme" className="inline-flex rounded-md border border-border bg-bg p-0.5">
+        <div
+          role="radiogroup"
+          aria-label="Theme"
+          className="inline-flex rounded-md border border-border bg-bg p-0.5"
+        >
           {THEME_OPTIONS.map((opt) => {
             const Icon = THEME_ICON[opt.value];
             const active = preference === opt.value;
@@ -194,9 +195,7 @@ function ThemeRow() {
                 title={opt.label}
                 className={clsx(
                   "inline-flex h-6 w-7 items-center justify-center rounded transition-colors",
-                  active
-                    ? "bg-panel text-text"
-                    : "text-muted hover:text-text",
+                  active ? "bg-panel text-text" : "text-muted hover:text-text",
                 )}
               >
                 <Icon className="h-3.5 w-3.5" aria-hidden />
@@ -224,7 +223,11 @@ function TimezoneRow() {
       label="Timezone"
       hint={hint}
       control={
-        <div role="radiogroup" aria-label="Timezone" className="inline-flex rounded-md border border-border bg-bg p-0.5 text-[11px] font-semibold uppercase tracking-wide">
+        <div
+          role="radiogroup"
+          aria-label="Timezone"
+          className="inline-flex rounded-md border border-border bg-bg p-0.5 text-[11px] font-semibold uppercase tracking-wide"
+        >
           {TIMEZONE_OPTIONS.map((opt) => {
             const active = mode === opt.value;
             return (
@@ -236,9 +239,7 @@ function TimezoneRow() {
                 onClick={() => setMode(opt.value)}
                 className={clsx(
                   "inline-flex h-6 items-center justify-center rounded px-2 transition-colors",
-                  active
-                    ? "bg-panel text-text"
-                    : "text-muted hover:text-text",
+                  active ? "bg-panel text-text" : "text-muted hover:text-text",
                 )}
               >
                 {opt.label}
@@ -268,7 +269,11 @@ function NumberFormatRow() {
       label="Numbers"
       hint={hint}
       control={
-        <div role="radiogroup" aria-label="Number format" className="inline-flex rounded-md border border-border bg-bg p-0.5 text-[11px] font-semibold uppercase tracking-wide">
+        <div
+          role="radiogroup"
+          aria-label="Number format"
+          className="inline-flex rounded-md border border-border bg-bg p-0.5 text-[11px] font-semibold uppercase tracking-wide"
+        >
           {NUMBER_FORMAT_OPTIONS.map((opt) => {
             const active = preference === opt.value;
             return (
@@ -280,9 +285,7 @@ function NumberFormatRow() {
                 onClick={() => setPreference(opt.value)}
                 className={clsx(
                   "inline-flex h-6 items-center justify-center rounded px-2 transition-colors",
-                  active
-                    ? "bg-panel text-text"
-                    : "text-muted hover:text-text",
+                  active ? "bg-panel text-text" : "text-muted hover:text-text",
                 )}
               >
                 {opt.label}
@@ -323,12 +326,8 @@ const CONFIRM_OPTIONS: { value: ConfirmDestructiveMode; label: string }[] = [
 ];
 
 function ConfirmDestructiveRow() {
-  const [value, setValue] = useStoredString(
-    CONFIRM_DESTRUCTIVE_KEY,
-    CONFIRM_DESTRUCTIVE_DEFAULT,
-  );
-  const safe: ConfirmDestructiveMode =
-    value === "cluster" || value === "never" ? value : "always";
+  const [value, setValue] = useStoredString(CONFIRM_DESTRUCTIVE_KEY, CONFIRM_DESTRUCTIVE_DEFAULT);
+  const safe: ConfirmDestructiveMode = value === "cluster" || value === "never" ? value : "always";
   return (
     <SettingRow
       label="Confirm destructive"

@@ -41,7 +41,8 @@ describe("color tokens", () => {
         .split("\n")
         .forEach((line, i) => {
           for (const m of line.matchAll(/var\((--color-[a-z0-9-]+)/g)) {
-            if (!declared.has(m[1])) unknown.push(`src/${file.slice(SRC_DIR.length + 1)}:${i + 1}: var(${m[1]})`);
+            if (!declared.has(m[1]))
+              unknown.push(`src/${file.slice(SRC_DIR.length + 1)}:${i + 1}: var(${m[1]})`);
           }
         });
     }

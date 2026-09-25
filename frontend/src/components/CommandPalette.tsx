@@ -16,25 +16,9 @@ import {
 import { useCluster } from "../lib/use-cluster";
 import { useFuzzy } from "../lib/fuzzy";
 import { latestVersion } from "../lib/schema-version";
-import {
-  Boxes,
-  FileJson,
-  Home,
-  Search,
-  Server,
-  Shield,
-  UserCog,
-  Users,
-} from "lucide-react";
+import { Boxes, FileJson, Home, Search, Server, Shield, UserCog, Users } from "lucide-react";
 
-type ItemKind =
-  | "nav"
-  | "cluster"
-  | "topic"
-  | "group"
-  | "broker"
-  | "subject"
-  | "user";
+type ItemKind = "nav" | "cluster" | "topic" | "group" | "broker" | "subject" | "user";
 
 const CATEGORY_LABELS: Record<ItemKind, string> = {
   nav: "NAV",
@@ -142,9 +126,7 @@ export function CommandPalette() {
   }, [open]);
 
   const { cluster: activeCluster, clusters } = useCluster();
-  const activeInfo = activeCluster
-    ? clusters?.find((c) => c.name === activeCluster)
-    : undefined;
+  const activeInfo = activeCluster ? clusters?.find((c) => c.name === activeCluster) : undefined;
   const hasSR = activeInfo ? activeInfo.schema_registry : undefined;
 
   const topicsQ = useQuery({
@@ -185,11 +167,36 @@ export function CommandPalette() {
     if (activeCluster) {
       const c = encodeURIComponent(activeCluster);
       base.push(
-        { kind: "nav", label: "Topics", to: `/clusters/${c}/topics`, icon: <Boxes className="h-3.5 w-3.5" /> },
-        { kind: "nav", label: "Groups", to: `/clusters/${c}/groups`, icon: <Users className="h-3.5 w-3.5" /> },
-        { kind: "nav", label: "Schemas", to: `/clusters/${c}/schemas`, icon: <FileJson className="h-3.5 w-3.5" /> },
-        { kind: "nav", label: "ACLs", to: `/clusters/${c}/security/acls`, icon: <Shield className="h-3.5 w-3.5" /> },
-        { kind: "nav", label: "SCRAM Users", to: `/clusters/${c}/security/users`, icon: <UserCog className="h-3.5 w-3.5" /> },
+        {
+          kind: "nav",
+          label: "Topics",
+          to: `/clusters/${c}/topics`,
+          icon: <Boxes className="h-3.5 w-3.5" />,
+        },
+        {
+          kind: "nav",
+          label: "Groups",
+          to: `/clusters/${c}/groups`,
+          icon: <Users className="h-3.5 w-3.5" />,
+        },
+        {
+          kind: "nav",
+          label: "Schemas",
+          to: `/clusters/${c}/schemas`,
+          icon: <FileJson className="h-3.5 w-3.5" />,
+        },
+        {
+          kind: "nav",
+          label: "ACLs",
+          to: `/clusters/${c}/security/acls`,
+          icon: <Shield className="h-3.5 w-3.5" />,
+        },
+        {
+          kind: "nav",
+          label: "SCRAM Users",
+          to: `/clusters/${c}/security/users`,
+          icon: <UserCog className="h-3.5 w-3.5" />,
+        },
       );
     }
     const clusterItems: Item[] = (clusters ?? []).map((c) => ({
@@ -374,7 +381,9 @@ export function CommandPalette() {
         </div>
         <div className="max-h-[60vh] overflow-y-auto py-1">
           {renderItems.length === 0 && (
-            <div className="p-6 text-center text-sm text-[var(--color-text-muted)]">No results.</div>
+            <div className="p-6 text-center text-sm text-[var(--color-text-muted)]">
+              No results.
+            </div>
           )}
           {renderItems.map((it, i) => (
             <button
@@ -383,26 +392,40 @@ export function CommandPalette() {
               onClick={() => pick(it)}
               className={[
                 "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm",
-                i === sel ? "bg-[var(--color-surface-subtle)]" : "hover:bg-[var(--color-surface-subtle)]",
+                i === sel
+                  ? "bg-[var(--color-surface-subtle)]"
+                  : "hover:bg-[var(--color-surface-subtle)]",
               ].join(" ")}
             >
               <span className="w-16 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
                 {CATEGORY_LABELS[it.kind]}
               </span>
               {it.kind === "nav" && it.icon}
-              {it.kind === "group" && <Users className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />}
-              {it.kind === "broker" && <Server className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />}
-              {it.kind === "subject" && <FileJson className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />}
-              {it.kind === "user" && <UserCog className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />}
+              {it.kind === "group" && (
+                <Users className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />
+              )}
+              {it.kind === "broker" && (
+                <Server className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />
+              )}
+              {it.kind === "subject" && (
+                <FileJson className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />
+              )}
+              {it.kind === "user" && (
+                <UserCog className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />
+              )}
               <span className="font-mono">{it.label}</span>
               {it.kind === "cluster" && !it.reachable && (
                 <span className="ml-auto text-[10px] text-[var(--color-danger)]">unreachable</span>
               )}
               {it.kind === "topic" && (
-                <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">on {it.cluster}</span>
+                <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">
+                  on {it.cluster}
+                </span>
               )}
               {it.kind === "group" && (
-                <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">{it.state}</span>
+                <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">
+                  {it.state}
+                </span>
               )}
               {it.kind === "broker" && (
                 <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">
@@ -424,7 +447,8 @@ export function CommandPalette() {
         </div>
         <div className="flex items-center justify-between border-t border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-1.5 text-[10px] text-[var(--color-text-muted)]">
           <span>
-            <kbd className="rounded bg-[var(--color-surface-raised)] px-1 font-mono">↑↓</kbd> Navigate ·{" "}
+            <kbd className="rounded bg-[var(--color-surface-raised)] px-1 font-mono">↑↓</kbd>{" "}
+            Navigate ·{" "}
             <kbd className="rounded bg-[var(--color-surface-raised)] px-1 font-mono">↵</kbd> Open
           </span>
           <span>

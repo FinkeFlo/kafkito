@@ -9,13 +9,13 @@ export async function getCsrfToken(): Promise<string> {
   if (cachedToken) return cachedToken;
   if (inFlight) return inFlight;
   inFlight = (async () => {
-    const res = await fetch('/', {
-      method: 'HEAD',
-      credentials: 'include',
-      headers: { 'x-csrf-token': 'fetch' },
+    const res = await fetch("/", {
+      method: "HEAD",
+      credentials: "include",
+      headers: { "x-csrf-token": "fetch" },
     });
-    const tok = res.headers.get('x-csrf-token');
-    if (!tok) throw new Error('no csrf token in response');
+    const tok = res.headers.get("x-csrf-token");
+    if (!tok) throw new Error("no csrf token in response");
     cachedToken = tok;
     return tok;
   })();

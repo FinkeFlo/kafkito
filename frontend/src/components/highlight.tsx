@@ -20,10 +20,7 @@ export function Highlight({ text, ranges, className }: HighlightProps): ReactNod
   merged.forEach(([start, end], i) => {
     if (start > cursor) out.push(text.slice(cursor, start));
     out.push(
-      <mark
-        key={i}
-        className="rounded-[2px] bg-accent-subtle px-0.5 text-accent"
-      >
+      <mark key={i} className="rounded-[2px] bg-accent-subtle px-0.5 text-accent">
         {text.slice(start, end + 1)}
       </mark>,
     );

@@ -30,13 +30,7 @@ describe("getNumberFormat", () => {
     },
   );
 
-  it.each<[string]>([
-    ["DE"],
-    ["de-DE"],
-    ["fr"],
-    ["garbage"],
-    [""],
-  ])(
+  it.each<[string]>([["DE"], ["de-DE"], ["fr"], ["garbage"], [""]])(
     "falls back to 'auto' for any non-whitelisted value (%p) (C3 / M-strict mutation-guard)",
     (raw) => {
       window.localStorage.setItem(nfKey, raw);

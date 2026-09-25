@@ -15,7 +15,11 @@ import { dirname, join } from "node:path";
 
 const SRC_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-const ALLOWED_FILES = new Set(["lib/format.ts", "components/timestamp.tsx", "components/relative-time.tsx"]);
+const ALLOWED_FILES = new Set([
+  "lib/format.ts",
+  "components/timestamp.tsx",
+  "components/relative-time.tsx",
+]);
 
 const RAW_DATE =
   /\.toLocale(Date|Time)String\(|new Date\([^)]*\)\.toLocaleString\(|new Date\([^)]*\)\.(toString|toISOString|toDateString|toTimeString)\(/;

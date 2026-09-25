@@ -30,9 +30,7 @@ describe("WhatsNewButton", () => {
     renderButton();
     expect(await screen.findByText("What's new")).toBeInTheDocument();
     await waitFor(() =>
-      expect(window.localStorage.getItem("kafkito.whatsnew.lastSeen.v1")).toBe(
-        "1.0.0",
-      ),
+      expect(window.localStorage.getItem("kafkito.whatsnew.lastSeen.v1")).toBe("1.0.0"),
     );
   });
 

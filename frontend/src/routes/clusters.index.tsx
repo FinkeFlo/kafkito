@@ -3,10 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Network } from "lucide-react";
 import { clsx } from "clsx";
 import { useEffect, useMemo, useState } from "react";
-import {
-  fetchClusters,
-  type ClusterInfo,
-} from "@/lib/api";
+import { fetchClusters, type ClusterInfo } from "@/lib/api";
 import {
   listPrivateClusters,
   subscribePrivateClusters,
@@ -69,9 +66,7 @@ function HomePage() {
     listPrivateClusters(),
   );
   useEffect(() => {
-    const unsub = subscribePrivateClusters(() =>
-      setPrivateClusters(listPrivateClusters()),
-    );
+    const unsub = subscribePrivateClusters(() => setPrivateClusters(listPrivateClusters()));
     return unsub;
   }, []);
 
@@ -109,10 +104,7 @@ function HomePage() {
           title="Welcome to kafkito"
           description="No clusters are connected yet. Add your first bootstrap server and kafkito will enumerate topics, groups, and schemas."
           action={
-            <Link
-              to="/settings/clusters"
-              search={{ cluster: undefined }}
-            >
+            <Link to="/settings/clusters" search={{ cluster: undefined }}>
               <Button variant="primary">+ Connect cluster</Button>
             </Link>
           }
@@ -163,12 +155,7 @@ function Header({
       subtitle={`Last health check · ${relative}`}
       actions={
         <>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled
-            aria-describedby={exportReasonId}
-          >
+          <Button variant="secondary" size="sm" disabled aria-describedby={exportReasonId}>
             Export
           </Button>
           <span id={exportReasonId} className="sr-only">
@@ -260,15 +247,10 @@ function ClustersTable({ clusters }: { clusters: ClusterRowInfo[] }) {
     `${clusters.filter((c) => c.reachable).length} reachable`,
   ];
   if (privateCount > 0) {
-    subtitleParts.push(
-      `${privateCount} private (browser-local)`,
-    );
+    subtitleParts.push(`${privateCount} private (browser-local)`);
   }
   return (
-    <DataTable
-      title="Clusters"
-      subtitle={subtitleParts.join(" · ")}
-    >
+    <DataTable title="Clusters" subtitle={subtitleParts.join(" · ")}>
       <DataTableHead>
         <tr>
           <DataTableTh>Cluster</DataTableTh>
@@ -318,9 +300,7 @@ function ClusterRow({ cluster }: { cluster: ClusterRowInfo }) {
       <td className="px-4 py-3">
         <div className="flex flex-wrap gap-1">
           {cluster.tls && <Tag>TLS</Tag>}
-          {cluster.auth_type && cluster.auth_type !== "none" && (
-            <Tag>{cluster.auth_type}</Tag>
-          )}
+          {cluster.auth_type && cluster.auth_type !== "none" && <Tag>{cluster.auth_type}</Tag>}
           {cluster.schema_registry && <Tag variant="info">SR</Tag>}
         </div>
       </td>

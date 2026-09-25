@@ -21,8 +21,7 @@ export function useMessageRawValue(params: {
   const { cluster, topic, partition, offset, enabled } = params;
   return useQuery({
     queryKey: ["message-raw", cluster, topic, partition, offset],
-    queryFn: ({ signal }) =>
-      fetchMessageRawBase64(cluster, topic, partition, offset, signal),
+    queryFn: ({ signal }) => fetchMessageRawBase64(cluster, topic, partition, offset, signal),
     enabled: enabled && !!cluster && !!topic,
     staleTime: 5 * 60_000,
     // Deliberately short: these entries are megabyte-sized base64 strings,

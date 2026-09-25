@@ -95,7 +95,11 @@ describe("private-clusters", () => {
     expect(res.added).toBe(2);
     expect(res.updated).toBe(0);
     expect(res.skipped).toBe(0);
-    expect(listPrivateClusters().map((c) => c.name).sort()).toEqual(["one", "two"]);
+    expect(
+      listPrivateClusters()
+        .map((c) => c.name)
+        .sort(),
+    ).toEqual(["one", "two"]);
   });
 
   it("export with id filter only includes selected clusters", () => {
@@ -140,7 +144,15 @@ describe("private-clusters", () => {
       schema: "kafkito.private-clusters/v1",
       exported_at: new Date().toISOString(),
       clusters: [
-        { id: "x", name: "ok", brokers: ["h:1"], auth: { type: "none" }, tls: { enabled: false }, created_at: 1, updated_at: 1 },
+        {
+          id: "x",
+          name: "ok",
+          brokers: ["h:1"],
+          auth: { type: "none" },
+          tls: { enabled: false },
+          created_at: 1,
+          updated_at: 1,
+        },
         { id: "y" }, // malformed
         "garbage",
       ],

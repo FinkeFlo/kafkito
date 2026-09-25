@@ -2,10 +2,7 @@ import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Users } from "lucide-react";
-import {
-  fetchTopicConsumers,
-  type TopicConsumer,
-} from "@/lib/api";
+import { fetchTopicConsumers, type TopicConsumer } from "@/lib/api";
 import { Section } from "@/components/section";
 import { DataTable, type DataTableColumn } from "@/components/DataTable";
 import { Badge, type BadgeVariant } from "@/components/badge";
@@ -94,7 +91,8 @@ function ConsumersPanel({ cluster, topic }: { cluster: string; topic: string }) 
       header: "Lag",
       sortValue: (r) => (r.lag_known ? r.lag : -1),
       align: "right",
-      cell: (r) => (r.lag_known ? <LagBadge value={r.lag} /> : <span className="text-subtle-text">—</span>),
+      cell: (r) =>
+        r.lag_known ? <LagBadge value={r.lag} /> : <span className="text-subtle-text">—</span>,
     },
   ];
 
@@ -137,11 +135,7 @@ function ConsumersPanel({ cluster, topic }: { cluster: string; topic: string }) 
         />
       )}
       {createOpen && (
-        <CreateGroupModal
-          cluster={cluster}
-          topic={topic}
-          onClose={() => setCreateOpen(false)}
-        />
+        <CreateGroupModal cluster={cluster} topic={topic} onClose={() => setCreateOpen(false)} />
       )}
     </Section>
   );

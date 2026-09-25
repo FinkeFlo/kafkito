@@ -34,10 +34,7 @@ export function MessageRangeCountPreview({
   const [debouncedRequest, setDebouncedRequest] = useState(request);
 
   useEffect(() => {
-    const timer = setTimeout(
-      () => setDebouncedRequest(request),
-      MESSAGE_RANGE_COUNT_DEBOUNCE_MS,
-    );
+    const timer = setTimeout(() => setDebouncedRequest(request), MESSAGE_RANGE_COUNT_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [request]);
 
@@ -133,15 +130,9 @@ export function MessageRangeCountPreview({
                 {rows.map((row) => (
                   <tr key={row.partition}>
                     <td className="text-accent">p{row.partition}</td>
-                    <td className="text-right text-muted">
-                      {fmt.number(row.from_offset)}
-                    </td>
-                    <td className="pl-3 text-right text-muted">
-                      {fmt.number(row.to_offset)}
-                    </td>
-                    <td className="pl-3 text-right">
-                      {fmt.number(row.approx_count)}
-                    </td>
+                    <td className="text-right text-muted">{fmt.number(row.from_offset)}</td>
+                    <td className="pl-3 text-right text-muted">{fmt.number(row.to_offset)}</td>
+                    <td className="pl-3 text-right">{fmt.number(row.approx_count)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -22,12 +22,7 @@ function renderModal(onCreated?: () => void, onClose: () => void = () => {}) {
     invalidateQueries,
     ...render(
       <QueryClientProvider client={qc}>
-        <CreateGroupModal
-          cluster="C"
-          topic="t1"
-          onClose={onClose}
-          onCreated={onCreated}
-        />
+        <CreateGroupModal cluster="C" topic="t1" onClose={onClose} onCreated={onCreated} />
       </QueryClientProvider>,
     ),
   };
@@ -43,9 +38,7 @@ describe("CreateGroupModal", () => {
   it("renders with strategy defaulting to latest", () => {
     renderModal();
 
-    expect(
-      screen.getByRole("combobox", { name: /strategy/i }),
-    ).toHaveValue("latest");
+    expect(screen.getByRole("combobox", { name: /strategy/i })).toHaveValue("latest");
   });
 
   it("shows allowed group prefixes from ACLs when the key can read them", async () => {
@@ -71,9 +64,7 @@ describe("CreateGroupModal", () => {
       group: "g1",
       topic: "t1",
       dry_run: true,
-      results: [
-        { partition: 0, old_offset: -1, new_offset: 42, end_offset: 42 },
-      ],
+      results: [{ partition: 0, old_offset: -1, new_offset: 42, end_offset: 42 }],
     });
     renderModal();
 
@@ -101,9 +92,7 @@ describe("CreateGroupModal", () => {
       group: "g1",
       topic: "t1",
       dry_run: false,
-      results: [
-        { partition: 0, old_offset: -1, new_offset: 42, end_offset: 42 },
-      ],
+      results: [{ partition: 0, old_offset: -1, new_offset: 42, end_offset: 42 }],
     });
     const { invalidateQueries } = renderModal(onCreated, onClose);
 
@@ -145,14 +134,9 @@ describe("CreateGroupModal", () => {
     const { container } = renderModal();
 
     await user.type(screen.getByLabelText(/group name/i), "g1");
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: /strategy/i }),
-      "timestamp",
-    );
+    await user.selectOptions(screen.getByRole("combobox", { name: /strategy/i }), "timestamp");
 
-    const picker = container.querySelector<HTMLInputElement>(
-      'input[type="datetime-local"]',
-    )!;
+    const picker = container.querySelector<HTMLInputElement>('input[type="datetime-local"]')!;
     await user.clear(picker);
     await user.type(picker, "2026-06-15T14:45:00");
 
@@ -176,10 +160,7 @@ describe("CreateGroupModal", () => {
     renderModal();
 
     await user.type(screen.getByLabelText(/group name/i), "g1");
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: /strategy/i }),
-      "offset",
-    );
+    await user.selectOptions(screen.getByRole("combobox", { name: /strategy/i }), "offset");
 
     const offsetInput = screen.getByLabelText(/offset/i);
     await user.clear(offsetInput);

@@ -52,9 +52,7 @@ describe("buildJsonPath", () => {
   });
 
   it("escapes single quotes in bracket-notation keys", () => {
-    expect(
-      buildJsonPath([{ kind: "key", name: "it's" }]),
-    ).toBe("$['it\\'s']");
+    expect(buildJsonPath([{ kind: "key", name: "it's" }])).toBe("$['it\\'s']");
   });
 });
 

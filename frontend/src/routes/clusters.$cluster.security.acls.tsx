@@ -2,13 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ChevronDown, Shield, Trash2 } from "lucide-react";
-import {
-  createACL,
-  deleteACL,
-  listACLs,
-  type ACLEntry,
-  type ACLSpec,
-} from "@/lib/api";
+import { createACL, deleteACL, listACLs, type ACLEntry, type ACLSpec } from "@/lib/api";
 import { Tag } from "@/components/Tag";
 import { KpiCard } from "@/components/KpiCard";
 import { DataTable, DataTableHead, DataTableRow, DataTableTh } from "@/components/DataTable";
@@ -96,8 +90,7 @@ function ACLsBody({ cluster }: { cluster: string }) {
   // message body. Anything else (timeout, 5xx, network) keeps the red
   // ErrorState path so the user is prompted to retry.
   const isPermissionDenied =
-    !!errorMessage &&
-    /authoriz|not\s+authorized|permission|forbidden|describe/i.test(errorMessage);
+    !!errorMessage && /authoriz|not\s+authorized|permission|forbidden|describe/i.test(errorMessage);
   const limited = q.isError && isPermissionDenied;
   const aclsCapDisabledId = "acls-capability-disabled-reason";
 
@@ -112,19 +105,14 @@ function ACLsBody({ cluster }: { cluster: string }) {
       </div>
 
       {limited && (
-        <Notice
-          intent="warning"
-          title="Limited capability"
-        >
+        <Notice intent="warning" title="Limited capability">
           <span id={aclsCapDisabledId} className="block">
-            The configured Kafka user lacks{" "}
-            <code className="font-mono">DESCRIBE</code> on{" "}
-            <code className="font-mono">CLUSTER:*</code>, so ACL rules cannot
-            be listed on this cluster. Granting it will enable this view.
+            The configured Kafka user lacks <code className="font-mono">DESCRIBE</code> on{" "}
+            <code className="font-mono">CLUSTER:*</code>, so ACL rules cannot be listed on this
+            cluster. Granting it will enable this view.
             {errorMessage ? (
               <span className="mt-1 block text-xs text-muted">
-                Broker response:{" "}
-                <span className="font-mono">{errorMessage}</span>
+                Broker response: <span className="font-mono">{errorMessage}</span>
               </span>
             ) : null}
           </span>
@@ -164,22 +152,14 @@ function ACLsBody({ cluster }: { cluster: string }) {
       {banner && (
         <Notice intent={banner.kind === "ok" ? "success" : "danger"}>
           {banner.msg}{" "}
-          <button
-            type="button"
-            className="ml-2 underline"
-            onClick={() => setBanner(null)}
-          >
+          <button type="button" className="ml-2 underline" onClick={() => setBanner(null)}>
             dismiss
           </button>
         </Notice>
       )}
 
       {q.isError && !limited && (
-        <ErrorState
-          title="Failed to load ACLs"
-          detail={errorMessage}
-          onRetry={() => q.refetch()}
-        />
+        <ErrorState title="Failed to load ACLs" detail={errorMessage} onRetry={() => q.refetch()} />
       )}
 
       {!q.isError && (
@@ -208,17 +188,25 @@ function ACLsBody({ cluster }: { cluster: string }) {
               </DataTableHead>
               <tbody>
                 {filtered.map((r, i) => (
-                  <DataTableRow key={`${r.principal}|${r.resource_type}:${r.resource_name}|${r.operation}|${i}`}>
+                  <DataTableRow
+                    key={`${r.principal}|${r.resource_type}:${r.resource_name}|${r.operation}|${i}`}
+                  >
                     <td className="px-4 py-2.5 font-mono text-[13px] tabular-nums">
                       <Highlight text={r.principal} ranges={fuzzy.rangesFor(r, "principal")} />
                     </td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-1.5">
                         <Tag>
-                          <Highlight text={r.resource_type} ranges={fuzzy.rangesFor(r, "resource_type")} />
+                          <Highlight
+                            text={r.resource_type}
+                            ranges={fuzzy.rangesFor(r, "resource_type")}
+                          />
                         </Tag>
                         <span className="font-mono text-[13px] tabular-nums">
-                          <Highlight text={r.resource_name} ranges={fuzzy.rangesFor(r, "resource_name")} />
+                          <Highlight
+                            text={r.resource_name}
+                            ranges={fuzzy.rangesFor(r, "resource_name")}
+                          />
                         </span>
                         {r.pattern_type !== "LITERAL" && (
                           <span className="text-[10px] text-muted">({r.pattern_type})</span>
@@ -233,7 +221,9 @@ function ACLsBody({ cluster }: { cluster: string }) {
                         {r.permission_type}
                       </Tag>
                     </td>
-                    <td className="px-4 py-2.5 font-mono text-[13px] tabular-nums text-muted">{r.host}</td>
+                    <td className="px-4 py-2.5 font-mono text-[13px] tabular-nums text-muted">
+                      {r.host}
+                    </td>
                     <td className="px-4 py-2.5 text-right">
                       <button
                         type="button"
@@ -309,7 +299,10 @@ function TableSkeleton() {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-panel">
       {[0, 1, 2, 3, 4].map((i) => (
-        <div key={i} className="flex items-center gap-4 border-t border-border px-4 py-3 first:border-t-0">
+        <div
+          key={i}
+          className="flex items-center gap-4 border-t border-border px-4 py-3 first:border-t-0"
+        >
           <div className="h-3 w-48 animate-pulse rounded bg-subtle" />
           <div className="h-3 w-24 animate-pulse rounded bg-subtle" />
           <div className="ml-auto h-3 w-16 animate-pulse rounded bg-subtle" />

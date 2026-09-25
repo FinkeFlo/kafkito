@@ -1,11 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildPathTree,
-  MAX_DEPTH,
-  MAX_PATHS,
-  type PathInfo,
-  type PathType,
-} from "./path-tree";
+import { buildPathTree, MAX_DEPTH, MAX_PATHS, type PathInfo, type PathType } from "./path-tree";
 
 describe("buildPathTree", () => {
   it("returns an empty tree for no samples", () => {
@@ -25,11 +19,7 @@ describe("buildPathTree", () => {
   it("indexes field names only, carrying no sample data", () => {
     const tree = buildPathTree([{ id: "secret-value", nested: { n: 42 } }]);
 
-    expect([...tree.keys()].sort()).toEqual([
-      "$.id",
-      "$.nested",
-      "$.nested.n",
-    ]);
+    expect([...tree.keys()].sort()).toEqual(["$.id", "$.nested", "$.nested.n"]);
     // The dropdown lists paths, not data: nothing from the payload may be
     // retained, or a multi-megabyte field would be kept alive by the tree.
     for (const info of tree.values()) {
@@ -45,11 +35,7 @@ describe("buildPathTree", () => {
   });
 
   it("unions paths across multiple samples", () => {
-    const tree = buildPathTree([
-      { a: 1, b: "x" },
-      { a: 2 },
-      { a: 3, b: "y" },
-    ]);
+    const tree = buildPathTree([{ a: 1, b: "x" }, { a: 2 }, { a: 3, b: "y" }]);
 
     expect([...tree.keys()].sort()).toEqual(["$.a", "$.b"]);
     expect(tree.get("$.a")?.type).toBe("number");

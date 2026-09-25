@@ -16,10 +16,10 @@ const STORAGE_KEY = "kafkito.theme";
  */
 test.describe("Native control appearance follows the app theme", () => {
   async function pinTheme(page: Page, theme: "light" | "dark") {
-    await page.addInitScript(
-      ([key, value]) => window.localStorage.setItem(key, value),
-      [STORAGE_KEY, theme] as const,
-    );
+    await page.addInitScript(([key, value]) => window.localStorage.setItem(key, value), [
+      STORAGE_KEY,
+      theme,
+    ] as const);
   }
 
   const colorScheme = (page: Page) =>

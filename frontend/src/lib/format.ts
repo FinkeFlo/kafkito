@@ -44,10 +44,7 @@ function fixed(locale: string, digits: number): Intl.NumberFormat {
 }
 
 /** Format an integer count with locale-appropriate thousands separators. */
-export function formatNumber(
-  n: number | bigint,
-  locale: string = DEFAULT_LOCALE,
-): string {
+export function formatNumber(n: number | bigint, locale: string = DEFAULT_LOCALE): string {
   if (typeof n === "bigint") return grouped(locale).format(n);
   if (!Number.isFinite(n)) return "—";
   return grouped(locale).format(n);

@@ -4,9 +4,7 @@ const CLUSTER = process.env.KAFKITO_E2E_CLUSTER ?? "local";
 const TOPIC = "e2e-walk-large";
 
 test.describe("Messages list loading state", () => {
-  test("shows a loading hint instead of claiming the topic is empty", async ({
-    page,
-  }) => {
+  test("shows a loading hint instead of claiming the topic is empty", async ({ page }) => {
     // Hold the first /messages response open so the pre-resolve render is
     // observable. Without this the fetch resolves too quickly to assert on.
     let release: (() => void) | undefined;

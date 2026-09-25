@@ -1,10 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  getLastSeen,
-  hasUnseen,
-  markSeen,
-  normalizeVersion,
-} from "./whats-new";
+import { getLastSeen, hasUnseen, markSeen, normalizeVersion } from "./whats-new";
 
 describe("normalizeVersion", () => {
   it("strips a leading v and -btp/-local/-dev suffixes", () => {

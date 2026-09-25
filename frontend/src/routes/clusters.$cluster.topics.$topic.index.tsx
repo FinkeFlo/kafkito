@@ -44,7 +44,12 @@ function SummaryCards({
   detail,
   fmt,
 }: {
-  detail: { partitions: PartitionInfo[]; replication_factor: number; messages: number; is_internal: boolean };
+  detail: {
+    partitions: PartitionInfo[];
+    replication_factor: number;
+    messages: number;
+    is_internal: boolean;
+  };
   fmt: Formatters;
 }) {
   const items = [
@@ -70,13 +75,7 @@ function SummaryCards({
   );
 }
 
-function PartitionsTable({
-  partitions,
-  fmt,
-}: {
-  partitions: PartitionInfo[];
-  fmt: Formatters;
-}) {
+function PartitionsTable({ partitions, fmt }: { partitions: PartitionInfo[]; fmt: Formatters }) {
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm">
       <div className="border-b border-[var(--color-border)] p-3 text-sm font-semibold">

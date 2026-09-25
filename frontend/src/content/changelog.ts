@@ -58,7 +58,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         type: "fix",
         title: "Field-path suggestions for messages that are a JSON array",
         description:
-          "A value like [{...},{...}] produced no suggestions and the misleading hint \"Sample isn't JSON\". Its fields are now offered under the $[*] prefix.",
+          'A value like [{...},{...}] produced no suggestions and the misleading hint "Sample isn\'t JSON". Its fields are now offered under the $[*] prefix.',
       },
       {
         type: "fix",
@@ -70,7 +70,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         type: "fix",
         title: "Honest hint when a sample is too large for suggestions",
         description:
-          "Values above the 4 MB scan limit were reported as \"Sample isn't JSON\", which was untrue. The hint now names the size limit as the reason.",
+          'Values above the 4 MB scan limit were reported as "Sample isn\'t JSON", which was untrue. The hint now names the size limit as the reason.',
       },
       {
         type: "fix",
@@ -82,7 +82,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         type: "fix",
         title: "Message list no longer claims an empty topic while loading",
         description:
-          "\"No messages.\" appeared while the first page was still loading. The list now says it is loading until the result is actually known.",
+          '"No messages." appeared while the first page was still loading. The list now says it is loading until the result is actually known.',
       },
       {
         type: "fix",
@@ -94,7 +94,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         type: "fix",
         title: "Click-to-filter size limit stated in a comparable unit",
         description:
-          "The limit read \"977 KiB\" next to a value size in MiB, so it took mental arithmetic to tell them apart. It is now a round 1 MiB.",
+          'The limit read "977 KiB" next to a value size in MiB, so it took mental arithmetic to tell them apart. It is now a round 1 MiB.',
       },
     ],
   },
@@ -112,7 +112,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         type: "fix",
         title: "Click-to-filter works for large (truncated) messages",
         description:
-          "Values over 64 KB fell back to plain text. A \"Load full value\" button now fetches the record first. Covers JSON up to 1 MB; not Schema Registry topics.",
+          'Values over 64 KB fell back to plain text. A "Load full value" button now fetches the record first. Covers JSON up to 1 MB; not Schema Registry topics.',
       },
       {
         type: "fix",
@@ -124,7 +124,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         type: "feature",
         title: "Substring matching and highlighting in the field-path suggestion list",
         description:
-          "Typing \"pric\" now matches \"$.order.items[*].price\", with the hits highlighted. Several words match in any order, so \"order price\" finds it too.",
+          'Typing "pric" now matches "$.order.items[*].price", with the hits highlighted. Several words match in any order, so "order price" finds it too.',
       },
       {
         type: "feature",
@@ -142,7 +142,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         type: "fix",
         title: "Large XML values are now labeled correctly",
         description:
-          "An XML value over 64 KB is only a truncated preview, which used to be labeled \"text\". Encoding detection is now truncation-tolerant for XML too.",
+          'An XML value over 64 KB is only a truncated preview, which used to be labeled "text". Encoding detection is now truncation-tolerant for XML too.',
       },
       {
         type: "fix",
@@ -184,7 +184,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         type: "fix",
         title: "Clear error when a produced message is too large",
         description:
-          "An oversized message failed with a generic \"upstream kafka error\". The limit is now explicitly 10 MB and the error states that size limit.",
+          'An oversized message failed with a generic "upstream kafka error". The limit is now explicitly 10 MB and the error states that size limit.',
       },
     ],
   },
@@ -214,7 +214,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         type: "fix",
         title: "Replay/produce now reports Kafka ACL denials clearly",
         description:
-          "Writing to a topic the cluster credential isn't authorized for now returns a clear 403 instead of a generic \"upstream kafka error\".",
+          'Writing to a topic the cluster credential isn\'t authorized for now returns a clear 403 instead of a generic "upstream kafka error".',
       },
       {
         type: "feature",
@@ -268,7 +268,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         type: "fix",
         title: "Large message values are now safely previewed",
         description:
-          "Values larger than 64 KB are truncated before decoding. The row shows a \"preview\" badge and the expanded view notes the original size.",
+          'Values larger than 64 KB are truncated before decoding. The row shows a "preview" badge and the expanded view notes the original size.',
       },
     ],
   },

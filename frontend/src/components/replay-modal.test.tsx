@@ -45,7 +45,10 @@ function truncatedMessage(overrides: Partial<Message> = {}): Message {
   };
 }
 
-function renderModal(message: Message, props: Partial<React.ComponentProps<typeof ReplayModal>> = {}) {
+function renderModal(
+  message: Message,
+  props: Partial<React.ComponentProps<typeof ReplayModal>> = {},
+) {
   useCluster.mockReturnValue({
     clusters: [cluster("dest-a")],
   });
@@ -77,9 +80,7 @@ describe("ReplayModal truncated value handling", () => {
     const user = userEvent.setup();
     renderModal(truncatedMessage());
 
-    await waitFor(() =>
-      expect(screen.getByText(/full value .* loaded/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/full value .* loaded/i)).toBeInTheDocument());
     await user.type(screen.getByPlaceholderText("topic-name"), "dest-topic");
     expect(screen.getByRole("button", { name: /^replay$/i })).toBeEnabled();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
@@ -98,9 +99,7 @@ describe("ReplayModal truncated value handling", () => {
 
     await user.click(screen.getByRole("checkbox", { name: /replay the truncated/i }));
 
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /^replay$/i })).toBeEnabled(),
-    );
+    await waitFor(() => expect(screen.getByRole("button", { name: /^replay$/i })).toBeEnabled());
   });
 
   it("without sourceCluster/sourceTopic, falls straight to the opt-in-required state", async () => {

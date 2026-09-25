@@ -51,9 +51,7 @@ function renderPanel(clusters: ClusterListItem[] = [cluster("dest-a")]) {
 
 /** Pushes an SSE progress event through the `onProgress` callback the panel handed to copyMessages. */
 function emit(ev: CopyProgressEvent) {
-  const onProgress = copyMessages.mock.calls.at(-1)?.[4] as (
-    e: CopyProgressEvent,
-  ) => void;
+  const onProgress = copyMessages.mock.calls.at(-1)?.[4] as (e: CopyProgressEvent) => void;
   act(() => onProgress(ev));
 }
 
@@ -130,9 +128,7 @@ describe("BulkCopyPanel errors", () => {
     expect(msg).toBeInTheDocument();
     // The raw status line is kept as detail, not shown as the message.
     expect(screen.queryByText(/HTTP 429/)).not.toBeInTheDocument();
-    expect(msg.getAttribute("title")).toBe(
-      "HTTP 429: too many concurrent copy jobs",
-    );
+    expect(msg.getAttribute("title")).toBe("HTTP 429: too many concurrent copy jobs");
   });
 
   it("still surfaces other errors verbatim", async () => {
@@ -142,9 +138,7 @@ describe("BulkCopyPanel errors", () => {
 
     emit({ copied: 0, done: true, error: "HTTP 500: broker unavailable" });
 
-    expect(
-      screen.getByText(/Error: HTTP 500: broker unavailable/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Error: HTTP 500: broker unavailable/)).toBeInTheDocument();
   });
 });
 
@@ -164,9 +158,7 @@ describe("BulkCopyPanel controls while running", () => {
     expect(screen.getByRole("button", { name: /last 1h/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /^clear$/i })).toBeDisabled();
     expect(screen.getByRole("checkbox")).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: /stop/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
 
     emit({ copied: 5, done: true });
 
@@ -250,8 +242,6 @@ describe("BulkCopyPanel production destination", () => {
 
     expect(copyMessages).toHaveBeenCalledTimes(1);
     expect(copyMessages.mock.calls[0][3]).toBe(false);
-    expect(
-      screen.queryByText(/production cluster warning/i),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/production cluster warning/i)).not.toBeInTheDocument();
   });
 });

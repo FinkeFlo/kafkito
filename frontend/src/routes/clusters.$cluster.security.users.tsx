@@ -42,7 +42,9 @@ function UsersBody({ cluster }: { cluster: string }) {
     user: "",
     mechanism: "SCRAM-SHA-256",
   });
-  const [pendingDelete, setPendingDelete] = useState<{ user: string; mechanism: string } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ user: string; mechanism: string } | null>(
+    null,
+  );
   const [banner, setBanner] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
 
   const q = useQuery({
@@ -51,7 +53,8 @@ function UsersBody({ cluster }: { cluster: string }) {
   });
 
   const delMut = useMutation({
-    mutationFn: (p: { user: string; mechanism: string }) => deleteSCRAMUser(cluster, p.user, p.mechanism),
+    mutationFn: (p: { user: string; mechanism: string }) =>
+      deleteSCRAMUser(cluster, p.user, p.mechanism),
     onSuccess: (_, p) => {
       setBanner({ kind: "ok", msg: `Credential deleted: ${p.user} / ${p.mechanism}` });
       setPendingDelete(null);
@@ -65,7 +68,11 @@ function UsersBody({ cluster }: { cluster: string }) {
     return users.flatMap((u) =>
       u.credentials.length === 0
         ? [{ user: u.user, mechanism: "—", iterations: 0 }]
-        : u.credentials.map((c) => ({ user: u.user, mechanism: c.mechanism, iterations: c.iterations })),
+        : u.credentials.map((c) => ({
+            user: u.user,
+            mechanism: c.mechanism,
+            iterations: c.iterations,
+          })),
     );
   }, [users]);
 
@@ -160,18 +167,12 @@ function UsersBody({ cluster }: { cluster: string }) {
       {banner && (
         <Notice intent={banner.kind === "ok" ? "success" : "danger"}>
           {banner.msg}{" "}
-          <button
-            type="button"
-            className="ml-2 underline"
-            onClick={() => setBanner(null)}
-          >
+          <button type="button" className="ml-2 underline" onClick={() => setBanner(null)}>
             dismiss
           </button>
         </Notice>
       )}
-      {q.error && (
-        <Notice intent="danger">{(q.error as Error).message}</Notice>
-      )}
+      {q.error && <Notice intent="danger">{(q.error as Error).message}</Notice>}
       <DataTable<Row>
         columns={columns}
         rows={rows}
@@ -205,7 +206,10 @@ function UsersBody({ cluster }: { cluster: string }) {
               <span className="block font-mono text-[13px] tabular-nums">
                 {pendingDelete.user} / {pendingDelete.mechanism}
               </span>
-              <span className="block">The user will no longer be able to authenticate with this mechanism. Other mechanisms remain.</span>
+              <span className="block">
+                The user will no longer be able to authenticate with this mechanism. Other
+                mechanisms remain.
+              </span>
             </span>
           ) : undefined
         }
@@ -241,8 +245,7 @@ function UpsertModal({
 
   const mut = useMutation({
     mutationFn: () => upsertSCRAMUser(cluster, { user, mechanism, password, iterations }),
-    onSuccess: () =>
-      onDone(`SCRAM credential set: ${user} / ${mechanism} (${iterations} it.)`),
+    onSuccess: () => onDone(`SCRAM credential set: ${user} / ${mechanism} (${iterations} it.)`),
     onError: (e: Error) => onError(e.message),
   });
 
@@ -263,7 +266,9 @@ function UpsertModal({
             variant="primary"
             size="sm"
             onClick={() => mut.mutate()}
-            disabled={mut.isPending || !user.trim() || !password || iterations < 4096 || iterations > 16384}
+            disabled={
+              mut.isPending || !user.trim() || !password || iterations < 4096 || iterations > 16384
+            }
           >
             {mut.isPending ? "Saving…" : rotating ? "Rotate" : "Create"}
           </Button>

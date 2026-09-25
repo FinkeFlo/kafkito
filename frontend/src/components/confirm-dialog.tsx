@@ -90,9 +90,7 @@ export function ConfirmDialog({
         </>
       }
     >
-      {description ? (
-        <p className="text-sm text-muted">{description}</p>
-      ) : null}
+      {description ? <p className="text-sm text-muted">{description}</p> : null}
       {confirmPhrase ? (
         <label className="mt-4 block space-y-1.5 text-xs font-medium text-muted">
           <span>
