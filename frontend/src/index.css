@@ -146,6 +146,16 @@ html.dark {
   color-scheme: dark;
 }
 
+/* Native controls — select popups, scrollbars, date pickers, form widgets —
+ * are painted by the OS and follow `color-scheme`, not our tokens. With no
+ * explicit value they follow the *system* appearance, so a Mac in dark mode
+ * renders a dark select popup on our light canvas (and vice versa). The
+ * `html.dark` block above sets `dark`; this pins the light counterpart so the
+ * app theme, not the OS, decides. */
+html {
+  color-scheme: light;
+}
+
 html,
 body,
 #root {
