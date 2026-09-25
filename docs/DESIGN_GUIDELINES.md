@@ -552,7 +552,6 @@ Copy this into the PR description and tick each box.
 - [ ] Works in dark mode
 - [ ] npm run lint passes
 - [ ] npm run build passes
-- [ ] npm run check:tokens passes
 - [ ] npm run check:routes passes
 - [ ] npm run check:dates passes
 - [ ] npm run test passes

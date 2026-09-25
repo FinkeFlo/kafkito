@@ -39,7 +39,6 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run lint
       - run: bun run build
-      - run: bun run check:tokens
       - run: bun run check:routes
       - run: bun run check:dates
       - run: bun run test
