@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useTranslation } from "react-i18next";
 import { Users } from "lucide-react";
 import {
   fetchTopicConsumers,
@@ -27,7 +26,6 @@ function ConsumersTab() {
 }
 
 function ConsumersPanel({ cluster, topic }: { cluster: string; topic: string }) {
-  const { t } = useTranslation("topics");
   const fmt = useFormatters();
   const [createOpen, setCreateOpen] = useState(false);
   const query = useQuery({
@@ -56,7 +54,7 @@ function ConsumersPanel({ cluster, topic }: { cluster: string; topic: string }) 
   const columns: DataTableColumn<TopicConsumer>[] = [
     {
       id: "group_id",
-      header: t("consumers.columns.groupId"),
+      header: "Group",
       sortValue: (r) => r.group_id,
       cell: (r) => (
         <Link
@@ -71,13 +69,13 @@ function ConsumersPanel({ cluster, topic }: { cluster: string; topic: string }) 
     },
     {
       id: "state",
-      header: t("consumers.columns.state"),
+      header: "State",
       sortValue: (r) => r.state,
       cell: (r) => <Badge variant={stateVariant(r.state)}>{r.state || "—"}</Badge>,
     },
     {
       id: "members",
-      header: t("consumers.columns.members"),
+      header: "Members",
       sortValue: (r) => r.members,
       align: "right",
       className: "tabular-nums",
@@ -85,7 +83,7 @@ function ConsumersPanel({ cluster, topic }: { cluster: string; topic: string }) 
     },
     {
       id: "partitions",
-      header: t("consumers.columns.partitions"),
+      header: "Partitions",
       sortValue: (r) => r.partitions_assigned.length,
       align: "right",
       className: "tabular-nums",
@@ -93,7 +91,7 @@ function ConsumersPanel({ cluster, topic }: { cluster: string; topic: string }) 
     },
     {
       id: "lag",
-      header: t("consumers.columns.lag"),
+      header: "Lag",
       sortValue: (r) => (r.lag_known ? r.lag : -1),
       align: "right",
       cell: (r) => (r.lag_known ? <LagBadge value={r.lag} /> : <span className="text-subtle-text">—</span>),
@@ -104,19 +102,19 @@ function ConsumersPanel({ cluster, topic }: { cluster: string; topic: string }) 
   if (query.isError) {
     const msg = (query.error as Error).message ?? "";
     if (msg.includes("topic_consumers_timeout")) {
-      errorBanner = t("consumers.errorTimeout");
+      errorBanner = "Listing consumers for this topic took too long. Try again in a moment.";
     } else {
-      errorBanner = t("consumers.errorGeneric", { detail: msg });
+      errorBanner = `Failed to load consumers: ${msg}`;
     }
   }
 
   return (
     <Section
-      title={t("consumers.title")}
-      description={t("consumers.description")}
+      title="Consumers"
+      description="Consumer groups currently reading from this topic."
       actions={
         <Button variant="secondary" onClick={() => setCreateOpen(true)}>
-          {t("consumers.createGroup")}
+          Create consumer group
         </Button>
       }
     >
@@ -132,8 +130,8 @@ function ConsumersPanel({ cluster, topic }: { cluster: string; topic: string }) 
           emptyState={
             <EmptyState
               icon={<Users className="h-6 w-6" />}
-              title={t("consumers.empty.title")}
-              description={t("consumers.empty.description")}
+              title="No consumers"
+              description="No consumer group is currently reading from this topic."
             />
           }
         />

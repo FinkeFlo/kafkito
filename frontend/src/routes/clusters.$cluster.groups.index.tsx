@@ -25,7 +25,6 @@ import { SearchInput } from "@/components/search-input";
 import { Highlight } from "@/components/highlight";
 import { useFuzzy } from "@/lib/fuzzy";
 import { useFormatters } from "@/lib/use-formatters";
-import { useTranslation } from "react-i18next";
 import { Users } from "lucide-react";
 
 export const Route = createFileRoute("/clusters/$cluster/groups/")({
@@ -36,7 +35,6 @@ export const Route = createFileRoute("/clusters/$cluster/groups/")({
 });
 
 function GroupsPage() {
-  const { t } = useTranslation(["groups", "common"]);
   const { group } = Route.useSearch();
   const navigate = Route.useNavigate();
   const { cluster, clusters } = useCluster();
@@ -79,7 +77,7 @@ function GroupsPage() {
         title="Consumer groups"
         subtitle={
           groupsQuery.isLoading
-            ? t("groups:subtitle")
+            ? "Offsets and membership for Kafka consumer groups in the active cluster."
             : `${groups.length} ${groups.length === 1 ? "group" : "groups"} · ${counts.stable} stable · ${counts.rebalancing} rebalancing · ${counts.dead} dead`
         }
       />
@@ -131,7 +129,6 @@ function GroupsTable({
   selectedGroup: string | undefined;
   onSelect: (g: string | undefined) => void;
 }) {
-  const { t } = useTranslation(["groups", "common"]);
   const [q, setQ] = useState("");
   const [lagOnly, setLagOnly] = useState(false);
   const preFiltered = useMemo(() => {
@@ -148,7 +145,7 @@ function GroupsTable({
     () => [
       {
         id: "group_id",
-        header: t("groups:columns.groupId"),
+        header: "Group ID",
         sortValue: (r) => r.group_id,
         cell: (r) => {
           const ranges = fuzzy.rangesFor(r, "group_id");
@@ -161,14 +158,14 @@ function GroupsTable({
       },
       {
         id: "state",
-        header: t("groups:columns.state"),
+        header: "State",
         sortValue: (r) => r.state,
         cell: (r) => <StateBadge state={r.state} />,
         className: "w-36",
       },
       {
         id: "members",
-        header: t("groups:columns.members"),
+        header: "Members",
         align: "right",
         className: "tabular-nums w-24",
         sortValue: (r) => r.members,
@@ -176,7 +173,7 @@ function GroupsTable({
       },
       {
         id: "topics",
-        header: t("groups:columns.topics"),
+        header: "Topics",
         align: "right",
         className: "tabular-nums w-20",
         sortValue: (r) => r.topics ?? 0,
@@ -184,7 +181,7 @@ function GroupsTable({
       },
       {
         id: "lag",
-        header: t("groups:columns.lag"),
+        header: "Lag",
         align: "right",
         className: "w-28",
         sortValue: (r) => (r.lag_known ? r.lag : -1),
@@ -209,13 +206,13 @@ function GroupsTable({
       },
       {
         id: "coordinator",
-        header: t("groups:columns.coordinator"),
+        header: "Coordinator",
         className: "w-28 font-mono text-[13px] tabular-nums",
         sortValue: (r) => r.coordinator_id,
         cell: (r) => <span className="text-muted">{r.coordinator_id}</span>,
       },
     ],
-    [t, fuzzy],
+    [fuzzy],
   );
 
   if (!cluster) return null;
@@ -238,16 +235,16 @@ function GroupsTable({
   const empty = (
     <EmptyState
       icon={<Users className="h-5 w-5" />}
-      title={q ? t("groups:empty.noMatch") : t("groups:empty.title")}
-      description={q ? undefined : t("groups:empty.description")}
+      title={q ? "No groups match your filter." : "No consumer groups"}
+      description={q ? undefined : "Consumer groups appear automatically once a client subscribes."}
     />
   );
 
   return (
     <>
       {limited && (
-        <Notice intent="warning" title={t("groups:limited.title")} className="mb-3">
-          {t("groups:limited.description")}
+        <Notice intent="warning" title="No visible groups — possibly limited permissions" className="mb-3">
+          Grant at least DESCRIBE on GROUP:* to see groups.
         </Notice>
       )}
       <Toolbar
@@ -255,8 +252,8 @@ function GroupsTable({
           <SearchInput
             value={q}
             onChange={setQ}
-            placeholder={t("groups:filter.placeholder")}
-            ariaLabel={t("groups:filter.placeholder")}
+            placeholder="Filter groups…"
+            ariaLabel="Filter groups…"
             count={{ visible: filtered.length, total: preFiltered.length }}
           />
         }
@@ -268,7 +265,7 @@ function GroupsTable({
               onChange={(e) => setLagOnly(e.target.checked)}
               className="h-4 w-4"
             />
-            {t("groups:filter.lagOnly")}
+            Lag &gt; 0 only
           </label>
         }
       />
@@ -279,7 +276,7 @@ function GroupsTable({
         rowKey={(r) => r.group_id}
         isLoading={isLoading}
         emptyState={empty}
-        caption={t("common:filters.showingOf", { count: filtered.length, total })}
+        caption={`Showing ${filtered.length} of ${total}`}
         onRowClick={(r) => onSelect(r.group_id === selectedGroup ? undefined : r.group_id)}
       />
     </>
