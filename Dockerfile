@@ -28,6 +28,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY cmd ./cmd
+COPY api ./api
 COPY internal ./internal
 COPY frontend ./frontend
 # Overwrite placeholder dist/ with freshly built frontend assets.

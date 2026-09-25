@@ -1,0 +1,7 @@
+# Redocly lint exceptions for api/openapi.yaml.
+# /healthz and /readyz are unauthenticated probes without any 4xx outcome
+# (readiness failure is 503), so operation-4xx-response does not apply.
+api/openapi.yaml:
+  operation-4xx-response:
+    - '#/paths/~1healthz/get/responses'
+    - '#/paths/~1readyz/get/responses'
