@@ -87,7 +87,7 @@ compose-down:
 clean:
 	rm -rf bin frontend/dist/assets
 
-# --- e2e harness (Q-001 / PLAN.md § 3.14) -------------------------------
+# --- e2e harness ---------------------------------------------------------
 # `make e2e` runs Playwright walks against a hermetic local stack:
 # Kafka via docker compose (existing kafkito-kafka container) +
 # kafkito as a Go subprocess on a non-default port (E2E_PORT, default

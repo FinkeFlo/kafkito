@@ -165,7 +165,7 @@ export function CommandPalette() {
     queryKey: ["schemas", activeCluster],
     queryFn: () => listSubjects(activeCluster!),
     // Only probe the registry when we know the cluster has one; avoids a
-    // guaranteed-404 flood for SR-less clusters like QAS.
+    // guaranteed-404 flood for clusters without a Schema Registry.
     enabled: open && !!activeCluster && hasSR === true,
   });
   const usersQ = useQuery({

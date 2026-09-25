@@ -5,13 +5,6 @@ opt-in via `make e2e` from the repo root; **not** part of the canonical
 hard gate (too slow for per-commit) but expected on the CI workflow for
 PR builds (`.github/workflows/e2e.yml`).
 
-## Why
-
-QAS — the team's primary live cluster — forbids destructive operations
-and rarely lands in the cluster states we need to walk (e.g. an idle
-consumer group for Reset-Offsets). This harness gives deterministic
-fixture-on-demand for those flows.
-
 ## Topology — hermetic by design
 
 `make e2e` does NOT collide with a running `make dev` stack. It uses:
@@ -68,8 +61,7 @@ Makefile :: e2e, e2e-up, e2e-test, e2e-down
 
 ## What is NOT here yet
 
-Out of scope for the current iteration; tracked in
-`kafkito-deploy/specs/2026-05-02-ux-refactor/PLAN.md` § 3.14 follow-ups:
+Out of scope for the current iteration:
 
 - ACL grant/revoke walks — needs Keycloak (compose `auth` profile)
 - SCRAM rotate walks — same

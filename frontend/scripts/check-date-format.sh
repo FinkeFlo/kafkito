@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Forbids bypassing the canonical <Timestamp> render path for Date display.
-# Q-002 (2026-05-03) replaced the last two bypassing callsites in produce.tsx
-# and messages.tsx; this lint prevents regression.
+# All callsites go through <Timestamp>; this lint prevents regression.
 #
 # Forbidden pattern: any call to Date#toLocaleString | toLocaleDateString |
 # toLocaleTimeString | toString | toISOString | toDateString | toTimeString
@@ -107,7 +106,7 @@ while IFS= read -r hit; do
 done <<< "${RAW_HITS}"
 
 if [ "${FAIL}" -eq 1 ]; then
-  echo "check-date-format: raw Date formatters bypass <Timestamp> (Q-002):" >&2
+  echo "check-date-format: raw Date formatters bypass <Timestamp>:" >&2
   printf '%s' "${FILTERED}" >&2
   echo "" >&2
   echo "Fix: import { Timestamp } from '@/components/timestamp' and use" >&2

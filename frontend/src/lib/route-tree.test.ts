@@ -20,7 +20,7 @@ function parentLayoutFor(file: string): string | null {
   return segments.join(".") + ".tsx";
 }
 
-describe("route tree integrity (Q-005 guard)", () => {
+describe("route tree integrity", () => {
   it("every nested route file has a parent layout file", () => {
     const orphans: string[] = [];
     for (const file of listRouteFiles()) {
