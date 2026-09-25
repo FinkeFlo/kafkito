@@ -63,7 +63,7 @@ func TestGuardedDialContext_RefusesLoopbackLiteral(t *testing.T) {
 	_, err := dial(context.Background(), "tcp", "127.0.0.1:0")
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, netguard.ErrBlockedAddress),
+	assert.ErrorIs(t, err, netguard.ErrBlockedAddress,
 		"expected ErrBlockedAddress, got: %v", err)
 }
 
@@ -74,7 +74,7 @@ func TestGuardedDialContext_RefusesMetadataLiteral(t *testing.T) {
 	_, err := dial(context.Background(), "tcp", "169.254.169.254:80")
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, netguard.ErrBlockedAddress),
+	assert.ErrorIs(t, err, netguard.ErrBlockedAddress,
 		"expected ErrBlockedAddress, got: %v", err)
 }
 

@@ -43,10 +43,10 @@ func TestBlockedIP(t *testing.T) {
 func TestValidateOutboundURL(t *testing.T) {
 	t.Parallel()
 
-	assert.Error(t, validateOutboundURL("http://127.0.0.1:8081"), "loopback must be blocked")
-	assert.Error(t, validateOutboundURL("http://169.254.169.254/latest/meta-data/"), "metadata must be blocked")
-	assert.Error(t, validateOutboundURL("ftp://example.com"), "non-http(s) scheme must be blocked")
-	assert.Error(t, validateOutboundURL("://nonsense"), "unparseable url must be blocked")
+	require.Error(t, validateOutboundURL("http://127.0.0.1:8081"), "loopback must be blocked")
+	require.Error(t, validateOutboundURL("http://169.254.169.254/latest/meta-data/"), "metadata must be blocked")
+	require.Error(t, validateOutboundURL("ftp://example.com"), "non-http(s) scheme must be blocked")
+	require.Error(t, validateOutboundURL("://nonsense"), "unparseable url must be blocked")
 	assert.NoError(t, validateOutboundURL("https://203.0.113.10:8081"), "public host must pass")
 }
 

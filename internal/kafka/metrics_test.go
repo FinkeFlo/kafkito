@@ -85,7 +85,7 @@ func TestClusterStateRate_MatchesRefreshOneSemantics(t *testing.T) {
 
 	rate := (endSumNew - endSumPrev) / dtSeconds
 
-	assert.Equal(t, 15.0, rate)
+	assert.InDelta(t, 15.0, rate, 1e-9)
 }
 
 func TestClusterMetricsSnapshot_ReturnsFalse_WhenCollectorNotStarted(t *testing.T) {

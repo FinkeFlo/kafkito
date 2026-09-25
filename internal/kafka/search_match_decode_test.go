@@ -105,7 +105,7 @@ func TestRecordToMatchMessage_CarriesMatcherFields(t *testing.T) {
 	assert.Equal(t, int32(3), match.Partition)
 	assert.Equal(t, int64(42), match.Offset)
 	assert.Equal(t, "order-1", match.Key)
-	assert.Equal(t, `{"status":"shipped"}`, match.Value)
+	assert.Equal(t, `{"status":"shipped"}`, match.Value) //nolint:testifylint // raw value passthrough must be byte-exact, not just JSON-equivalent
 	assert.Equal(t, "abc", match.Headers["trace"])
 	assert.Equal(t, "0xff00", match.Headers["raw"])
 	assert.Equal(t, recordToMessage(rec).Headers["raw"], match.Headers["raw"])

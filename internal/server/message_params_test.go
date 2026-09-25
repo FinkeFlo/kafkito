@@ -359,7 +359,7 @@ func TestParseSearchBody_RejectsOversizedBody(t *testing.T) {
 
 	require.Error(t, err, "a body larger than the cap must be rejected")
 	var pe *paramError
-	assert.True(t, errors.As(err, &pe), "over-cap body must surface as a client paramError, got %T", err)
+	assert.ErrorAs(t, err, &pe, "over-cap body must surface as a client paramError, got %T", err)
 }
 
 func TestParseSearchBody_AcceptsSmallValidBody(t *testing.T) {

@@ -69,7 +69,7 @@ func TestCursor_Decode_Errors(t *testing.T) {
 			t.Parallel()
 			_, err := DecodeCursor(tc.raw)
 			require.Error(t, err)
-			require.Truef(t, strings.Contains(err.Error(), tc.want),
+			require.Containsf(t, err.Error(), tc.want,
 				"err = %q, want substring %q", err.Error(), tc.want)
 		})
 	}

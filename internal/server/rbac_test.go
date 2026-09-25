@@ -353,7 +353,7 @@ func TestRBACMiddleware_BodyEchoIsPreservedForDownstreamHandler(t *testing.T) {
 	var seen []byte
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		buf, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		seen = buf
 		w.WriteHeader(http.StatusNoContent)
 	})
@@ -367,7 +367,7 @@ func TestRBACMiddleware_BodyEchoIsPreservedForDownstreamHandler(t *testing.T) {
 	r.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusNoContent, rec.Code, "body=%s", rec.Body.String())
-	assert.Equal(t, payload, string(seen),
+	assert.Equal(t, payload, string(seen), //nolint:testifylint // byte-exact echo is under test, not JSON equivalence
 		"middleware must re-wrap the consumed body so downstream still sees it")
 }
 

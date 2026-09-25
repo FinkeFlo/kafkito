@@ -41,7 +41,7 @@ func TestJSMatcher_RecoversAfterTimeout(t *testing.T) {
 
 	// First call hits the per-call interrupt and errors.
 	_, err = m.match(&Message{Value: "loop"})
-	assert.Error(t, err, "runaway script must be interrupted")
+	require.Error(t, err, "runaway script must be interrupted")
 
 	// SAME runtime, normal input: the matcher must reuse the interrupted runtime
 	// and complete normally on the next message.
