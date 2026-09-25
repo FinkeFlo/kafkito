@@ -208,12 +208,19 @@ export function Modal({
         tabIndex={-1}
         className={cn(
           "fixed left-1/2 top-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2",
+          // Cap the panel to the viewport and make it a column so the
+          // header/footer stay pinned and only the body scrolls. Without
+          // this, tall content (e.g. the What's-new changelog) overflows
+          // past the top and bottom edges — and because the body scroll is
+          // locked while a modal is open, that content is unreachable,
+          // including the footer actions.
+          "flex max-h-[calc(100dvh-2rem)] flex-col",
           "rounded-xl border border-border bg-panel shadow-xl",
           sizeMap[size],
           className,
         )}
       >
-        <div className="border-b border-border px-5 py-4">
+        <div className="shrink-0 border-b border-border px-5 py-4">
           <h2
             id={titleId}
             className="text-base font-semibold tracking-tight text-text"
@@ -221,9 +228,11 @@ export function Modal({
             {title}
           </h2>
         </div>
-        <div className="px-5 py-4 text-sm text-text">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 text-sm text-text">
+          {children}
+        </div>
         {actions ? (
-          <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-3">
             {actions}
           </div>
         ) : null}
