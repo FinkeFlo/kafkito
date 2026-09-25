@@ -1,0 +1,8 @@
+# Biome (formatter.useEditorconfig) only reads an .editorconfig next to
+# biome.json and ignores the repository root one, so the formatting-relevant
+# settings are repeated here. Keep them in sync with ../.editorconfig.
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+insert_final_newline = true

@@ -6,10 +6,18 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"includes": ["src/**/*.{ts,tsx}", "!src/routeTree.gen.ts", "!src/lib/api.gen.ts"]
+		"includes": [
+			"src/**/*.{ts,tsx}",
+			"e2e/**/*.ts",
+			"*.ts",
+			"!src/routeTree.gen.ts",
+			"!src/lib/api.gen.ts"
+		]
 	},
 	"formatter": {
-		"enabled": false
+		"enabled": true,
+		"useEditorconfig": true,
+		"lineWidth": 100
 	},
 	"assist": {
 		"enabled": false

@@ -17,7 +17,7 @@ repos:
       - id: biome-check
         name: biome check (frontend)
         language: system
-        files: ^frontend/src/.*\.(ts|tsx)$
+        files: ^frontend/(src/.*|e2e/.*|[^/]+)\.(ts|tsx)$
         entry: >-
           bash -c 'cd frontend &&
           { [ -x node_modules/.bin/biome ] || { echo "biome missing: run make frontend-install" >&2; exit 1; }; } &&
