@@ -11,9 +11,9 @@ endpoints that back the web UI — stable, documented, scriptable.
 - No built-in login. Login and sessions are handled by an upstream auth
   proxy (e.g. SAP Approuter on BTP, oauth2-proxy elsewhere), which forwards
   requests with `Authorization: Bearer <JWT>`. kafkito validates that token
-  on every `/api/v1/*` request according to `KAFKITO_AUTH_MODE` (`mock`,
-  `xsuaa` in `-tags btp` builds, `off` only in `-tags devauth` builds) and
-  answers `401` when it is missing or invalid.
+  on every `/api/v1/*` request according to `KAFKITO_AUTH_MODE` (`oidc`,
+  `mock`, `xsuaa` in `-tags btp` builds, `off` only in `-tags devauth`
+  builds) and answers `401` when it is missing or invalid.
 - The verified JWT principal is the RBAC identity. The identity header
   (`X-Kafkito-User` by default, configurable via `rbac.identity.header`) is
   only consulted when no principal is present on the request; a

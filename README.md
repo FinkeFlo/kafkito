@@ -30,14 +30,21 @@ container alongside it on a shared docker network.
 
 ```sh
 docker run --rm -p 37421:37421 \
-  -e KAFKITO_AUTH_MODE=mock \
+  -e KAFKITO_AUTH_MODE=oidc \
+  -e KAFKITO_AUTH_OIDC_ISSUER_URL=https://idp.example.com/realms/kafkito \
+  -e KAFKITO_AUTH_OIDC_AUDIENCE=kafkito \
   -e KAFKITO_KAFKA_BROKERS=host.docker.internal:9092 \
   ghcr.io/finkeflo/kafkito:latest
 ```
 
-The default image enforces auth. Use `KAFKITO_AUTH_MODE=mock` for
-JWT-validation testing, or wire in your own OIDC issuer for
-real-world deploys.
+The default image enforces auth. kafkito has no login flow: put an auth
+proxy (e.g. oauth2-proxy) in front of it that handles login and forwards
+`Authorization: Bearer <access token>`. kafkito validates the token's
+signature, `iss` and `aud`. The JWKS URL is discovered from
+`<issuer>/.well-known/openid-configuration` at startup; set
+`KAFKITO_AUTH_OIDC_JWKS_URL` to skip discovery. Issuer and JWKS URLs must be
+`https` (plain `http` only for `localhost`). For JWT-validation testing
+without an IdP, use `KAFKITO_AUTH_MODE=mock`.
 
 ### SAP BTP / XSUAA
 
