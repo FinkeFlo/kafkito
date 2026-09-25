@@ -19,15 +19,9 @@ export function WhatsNewButton() {
     queryFn: fetchInfo,
     staleTime: 5 * 60_000,
   });
-  const current = infoQuery.data?.version
-    ? normalizeVersion(infoQuery.data.version)
-    : undefined;
+  const current = infoQuery.data?.version ? normalizeVersion(infoQuery.data.version) : undefined;
 
-  const lastSeen = useSyncExternalStore(
-    subscribeWhatsNew,
-    getLastSeen,
-    () => null,
-  );
+  const lastSeen = useSyncExternalStore(subscribeWhatsNew, getLastSeen, () => null);
   // Only surface the indicator when the running version actually has notes.
   // Unknown versions (dev builds, the e2e harness, or a missing changelog
   // entry) show no dot and never auto-open — so automation is not blocked
@@ -70,10 +64,7 @@ export function WhatsNewButton() {
         ) : null}
       </button>
       {open ? (
-        <WhatsNewModal
-          currentVersion={infoQuery.data?.version}
-          onClose={() => setOpen(false)}
-        />
+        <WhatsNewModal currentVersion={infoQuery.data?.version} onClose={() => setOpen(false)} />
       ) : null}
     </>
   );

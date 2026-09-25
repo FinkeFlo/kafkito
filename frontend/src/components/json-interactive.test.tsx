@@ -1,11 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import {
-  ARRAY_COLLAPSE_THRESHOLD,
-  JsonInteractive,
-  SIZE_LIMIT_BYTES,
-} from "./json-interactive";
+import { ARRAY_COLLAPSE_THRESHOLD, JsonInteractive, SIZE_LIMIT_BYTES } from "./json-interactive";
 
 describe("JsonInteractive", () => {
   it("renders scalar values clickably and reports trail + literal on click", async () => {
@@ -15,10 +11,7 @@ describe("JsonInteractive", () => {
 
     await user.click(screen.getByText('"A1"'));
 
-    expect(onPick).toHaveBeenCalledWith(
-      [{ kind: "key", name: "orderId" }],
-      "A1",
-    );
+    expect(onPick).toHaveBeenCalledWith([{ kind: "key", name: "orderId" }], "A1");
   });
 
   it("clicking a key reports trail with undefined leaf", async () => {
@@ -28,21 +21,13 @@ describe("JsonInteractive", () => {
 
     await user.click(screen.getByText(/orderId/));
 
-    expect(onPick).toHaveBeenCalledWith(
-      [{ kind: "key", name: "orderId" }],
-      undefined,
-    );
+    expect(onPick).toHaveBeenCalledWith([{ kind: "key", name: "orderId" }], undefined);
   });
 
   it("clicking inside an array fires a trail with a concrete index token", async () => {
     const onPick = vi.fn();
     const user = userEvent.setup();
-    render(
-      <JsonInteractive
-        value={{ prices: [{ x: 1 }, { x: 2 }] }}
-        onPick={onPick}
-      />,
-    );
+    render(<JsonInteractive value={{ prices: [{ x: 1 }, { x: 2 }] }} onPick={onPick} />);
 
     await user.click(screen.getByText("1"));
 
@@ -97,13 +82,9 @@ describe("JsonInteractive", () => {
     const small = Array.from({ length: smallLength }, (_, i) => i);
     const large = Array.from({ length: largeLength }, (_, i) => i);
 
-    const { rerender } = render(
-      <JsonInteractive value={{ items: small }} onPick={() => {}} />,
-    );
+    const { rerender } = render(<JsonInteractive value={{ items: small }} onPick={() => {}} />);
     // Below threshold: fully expanded, no collapse control.
-    expect(
-      screen.queryByRole("button", { name: /Show all/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Show all/i })).not.toBeInTheDocument();
 
     // Same React position, larger dataset crossing the threshold: must remount
     // and re-derive expanded so the collapse control reappears.

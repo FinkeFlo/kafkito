@@ -3,12 +3,7 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { FileJson, Trash2 } from "lucide-react";
 import { clsx } from "clsx";
-import {
-  listSubjects,
-  getSchemaVersion,
-  deleteSubject,
-  type Subject,
-} from "@/lib/api";
+import { listSubjects, getSchemaVersion, deleteSubject, type Subject } from "@/lib/api";
 import { useCluster } from "@/lib/use-cluster";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Tag } from "@/components/Tag";
@@ -32,10 +27,7 @@ function SchemasPage() {
   const { subject, version } = Route.useSearch();
   const navigate = Route.useNavigate();
   const { cluster, clusters } = useCluster();
-  const active = useMemo(
-    () => clusters?.find((c) => c.name === cluster),
-    [cluster, clusters],
-  );
+  const active = useMemo(() => clusters?.find((c) => c.name === cluster), [cluster, clusters]);
 
   return (
     <div className="space-y-5 p-6">
@@ -43,8 +35,8 @@ function SchemasPage() {
 
       {active && !active.schema_registry && (
         <Notice intent="info" title="Schemas not configured">
-          Cluster <span className="font-mono">{active.name}</span> has no
-          Schema Registry URL. Add one in{" "}
+          Cluster <span className="font-mono">{active.name}</span> has no Schema Registry URL. Add
+          one in{" "}
           <Link
             to="/settings/clusters"
             search={{ cluster: undefined }}
@@ -61,9 +53,7 @@ function SchemasPage() {
           cluster={active.name}
           subject={subject}
           version={version}
-          onSelect={(s, v) =>
-            navigate({ search: { subject: s, version: v } })
-          }
+          onSelect={(s, v) => navigate({ search: { subject: s, version: v } })}
         />
       )}
     </div>
@@ -92,12 +82,7 @@ function Header({ cluster, hasSR }: { cluster: string | null; hasSR: boolean }) 
       }
       actions={
         <>
-          <Button
-            variant="primary"
-            size="sm"
-            disabled
-            aria-describedby={reasonId}
-          >
+          <Button variant="primary" size="sm" disabled aria-describedby={reasonId}>
             + Register schema
           </Button>
           <span id={reasonId} className="sr-only">
@@ -156,14 +141,10 @@ function SchemasBody({
             className="min-w-0"
           />
         </div>
-        {subjectsQuery.isLoading && (
-          <div className="p-4 text-sm text-muted">Loading subjects…</div>
-        )}
+        {subjectsQuery.isLoading && <div className="p-4 text-sm text-muted">Loading subjects…</div>}
         {subjectsQuery.error && (
           <div className="m-3">
-            <Notice intent="danger">
-              {(subjectsQuery.error as Error).message}
-            </Notice>
+            <Notice intent="danger">{(subjectsQuery.error as Error).message}</Notice>
           </div>
         )}
         {!subjectsQuery.isLoading && filtered.length === 0 && !subjectsQuery.error && (
@@ -185,11 +166,7 @@ function SchemasBody({
 
       <div>
         {subject ? (
-          <SchemaDetail
-            cluster={cluster}
-            subject={subject}
-            version={version ?? "latest"}
-          />
+          <SchemaDetail cluster={cluster} subject={subject} version={version ?? "latest"} />
         ) : (
           <EmptyState
             icon={FileJson}
@@ -318,9 +295,7 @@ function SchemaDetail({
     );
   }
   if (versionQuery.error) {
-    return (
-      <Notice intent="danger">{(versionQuery.error as Error).message}</Notice>
-    );
+    return <Notice intent="danger">{(versionQuery.error as Error).message}</Notice>;
   }
   if (!s) return null;
 
@@ -339,9 +314,7 @@ function SchemaDetail({
                   <span>·</span>
                   <span>
                     Compatibility:{" "}
-                    <span className="font-semibold text-text">
-                      {s.config.compatibilityLevel}
-                    </span>
+                    <span className="font-semibold text-text">{s.config.compatibilityLevel}</span>
                   </span>
                 </>
               )}

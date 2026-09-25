@@ -22,10 +22,7 @@
  * @param newClusterName the un-encoded display name of the target cluster
  * @returns the new path; URL-encoded, no query string
  */
-export function computeSwitchTarget(
-  currentPath: string,
-  newClusterName: string,
-): string {
+export function computeSwitchTarget(currentPath: string, newClusterName: string): string {
   const segments = currentPath.split("/").filter(Boolean);
   // Expected shape: ["clusters", "<currentClusterEncoded>", "<section>", ...]
   // For non-cluster routes this function should not be called.

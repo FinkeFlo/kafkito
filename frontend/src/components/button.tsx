@@ -6,11 +6,7 @@ import { cn } from "@/lib/utils";
  * `primary | secondary | danger | ghost`. The deprecated `destructive`
  * alias was removed once every route callsite migrated to `danger`.
  */
-export type ButtonVariant =
-  | "primary"
-  | "secondary"
-  | "danger"
-  | "ghost";
+export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 
 export type ButtonSize = "sm" | "md";
 

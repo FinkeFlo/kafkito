@@ -23,10 +23,7 @@ export type HydratableEncoding = "json" | "xml";
  * "isn't JSON": the value is perfectly valid, it is only too large to scan.
  */
 export function isTooLargeToScan(m: Message): boolean {
-  return (
-    m.value_truncated === true &&
-    (m.value_size_bytes ?? 0) > MAX_HYDRATE_VALUE_BYTES
-  );
+  return m.value_truncated === true && (m.value_size_bytes ?? 0) > MAX_HYDRATE_VALUE_BYTES;
 }
 
 /**
@@ -64,13 +61,7 @@ export async function hydrateTruncatedSampleMessages(
         (m.value_size_bytes ?? 0) <= MAX_HYDRATE_VALUE_BYTES;
       if (!needsHydration) return m;
       try {
-        const base64 = await fetchMessageRawBase64(
-          cluster,
-          topic,
-          m.partition,
-          m.offset,
-          signal,
-        );
+        const base64 = await fetchMessageRawBase64(cluster, topic, m.partition, m.offset, signal);
         return { ...m, value: base64ToUtf8(base64), value_truncated: false };
       } catch {
         return m;

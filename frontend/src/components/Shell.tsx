@@ -1,15 +1,6 @@
 import { Link, Outlet } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Boxes,
-  FileJson,
-  Moon,
-  Search,
-  Server,
-  Shield,
-  Sun,
-  Users,
-} from "lucide-react";
+import { Boxes, FileJson, Moon, Search, Server, Shield, Sun, Users } from "lucide-react";
 import { ClusterPill } from "./ClusterPill";
 import { openCommandPalette } from "./CommandPalette";
 import { Tooltip } from "./tooltip";
@@ -33,9 +24,33 @@ function Logo() {
         </linearGradient>
       </defs>
       <rect width="48" height="48" rx="10" fill="#ffffff" />
-      <line x1="13" y1="9" x2="13" y2="39" stroke="url(#app-k-cyan)" strokeWidth="6.5" strokeLinecap="round" />
-      <line x1="16.5" y1="24" x2="33" y2="9" stroke="url(#app-k-orange)" strokeWidth="6.5" strokeLinecap="round" />
-      <line x1="18.5" y1="22.5" x2="34.5" y2="38.5" stroke="url(#app-k-cyan)" strokeWidth="6.5" strokeLinecap="round" />
+      <line
+        x1="13"
+        y1="9"
+        x2="13"
+        y2="39"
+        stroke="url(#app-k-cyan)"
+        strokeWidth="6.5"
+        strokeLinecap="round"
+      />
+      <line
+        x1="16.5"
+        y1="24"
+        x2="33"
+        y2="9"
+        stroke="url(#app-k-orange)"
+        strokeWidth="6.5"
+        strokeLinecap="round"
+      />
+      <line
+        x1="18.5"
+        y1="22.5"
+        x2="34.5"
+        y2="38.5"
+        stroke="url(#app-k-cyan)"
+        strokeWidth="6.5"
+        strokeLinecap="round"
+      />
       <circle cx="17" cy="24" r="5.5" fill="#1E293B" />
       <circle cx="17" cy="24" r="2" fill="#FFFFFF" />
     </svg>
@@ -79,7 +94,6 @@ function ThemeButton() {
   );
 }
 
-
 function VersionBadge() {
   const infoQuery = useQuery({
     queryKey: ["info"],
@@ -97,9 +111,7 @@ function VersionBadge() {
 
 export function Shell() {
   const { cluster, clusters } = useCluster();
-  const activeInfo = cluster
-    ? clusters?.find((c) => c.name === cluster)
-    : undefined;
+  const activeInfo = cluster ? clusters?.find((c) => c.name === cluster) : undefined;
   // hasSR is `true` when we know the cluster has a Schema Registry, `false`
   // when we know it doesn't, `undefined` while clusters are loading. Treat
   // unknown as "assume yes" so the tab doesn't briefly suffix `(—)` on cold
@@ -130,11 +142,7 @@ export function Shell() {
         <nav className="flex items-center gap-1 px-6 pb-0 pt-3">
           {cluster ? (
             <>
-              <Link
-                to="/clusters/$cluster/topics"
-                params={{ cluster }}
-                className={navLinkBase}
-              >
+              <Link to="/clusters/$cluster/topics" params={{ cluster }} className={navLinkBase}>
                 <Boxes className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
                 Topics
               </Link>
@@ -148,11 +156,7 @@ export function Shell() {
                 Consumer groups
               </Link>
               <Tooltip
-                content={
-                  hasSR === false
-                    ? "Configure Schema Registry to enable"
-                    : ""
-                }
+                content={hasSR === false ? "Configure Schema Registry to enable" : ""}
                 side="bottom"
               >
                 <Link
@@ -171,29 +175,17 @@ export function Shell() {
                   ) : null}
                 </Link>
               </Tooltip>
-              <Link
-                to="/clusters/$cluster/security"
-                params={{ cluster }}
-                className={navLinkBase}
-              >
+              <Link to="/clusters/$cluster/security" params={{ cluster }} className={navLinkBase}>
                 <Shield className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
                 Security
               </Link>
-              <Link
-                to="/clusters/$cluster/brokers"
-                params={{ cluster }}
-                className={navLinkBase}
-              >
+              <Link to="/clusters/$cluster/brokers" params={{ cluster }} className={navLinkBase}>
                 <Server className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
                 Brokers
               </Link>
             </>
           ) : (
-            <Link
-              to="/clusters"
-              search={{ cluster: undefined }}
-              className={navLinkBase}
-            >
+            <Link to="/clusters" search={{ cluster: undefined }} className={navLinkBase}>
               <Boxes className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px" />
               Clusters
             </Link>

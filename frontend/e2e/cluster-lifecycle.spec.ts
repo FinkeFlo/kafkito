@@ -51,9 +51,7 @@ test.describe("Cluster lifecycle", () => {
       .getByRole("option", { name: new RegExp(SECOND_CLUSTER_NAME) })
       .click();
 
-    await expect(page).toHaveURL(
-      new RegExp(`/clusters/${SECOND_CLUSTER_NAME}/security/users$`),
-    );
+    await expect(page).toHaveURL(new RegExp(`/clusters/${SECOND_CLUSTER_NAME}/security/users$`));
   });
 
   test("switching cluster from a deep topic URL drops the resource id", async ({ page }) => {

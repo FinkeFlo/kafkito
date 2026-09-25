@@ -23,7 +23,7 @@ export default defineConfig({
   server: {
     port: FRONTEND_PORT,
     proxy: {
-      "/api":      BACKEND_URL,
+      "/api": BACKEND_URL,
       "/user-api": BACKEND_URL,
     },
   },

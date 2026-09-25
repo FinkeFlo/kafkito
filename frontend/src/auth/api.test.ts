@@ -11,10 +11,7 @@ import { clearCsrfToken, getCsrfToken } from "./csrf";
 const mockedGetCsrfToken = vi.mocked(getCsrfToken);
 const mockedClearCsrfToken = vi.mocked(clearCsrfToken);
 
-function makeResponse(
-  status: number,
-  headers: Record<string, string> = {},
-): Response {
+function makeResponse(status: number, headers: Record<string, string> = {}): Response {
   return new Response(null, { status, headers });
 }
 
@@ -25,9 +22,7 @@ function getFetchInit(callIndex = 0): RequestInit {
 
 function getFetchHeaders(callIndex = 0): Headers {
   const init = getFetchInit(callIndex);
-  return init.headers instanceof Headers
-    ? init.headers
-    : new Headers(init.headers);
+  return init.headers instanceof Headers ? init.headers : new Headers(init.headers);
 }
 
 beforeEach(() => {
@@ -44,9 +39,7 @@ afterEach(() => {
 
 describe("apiFetch — method handling and CSRF header injection", () => {
   it("defaults to GET when no method is provided and does not inject x-csrf-token", async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      makeResponse(200),
-    );
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(makeResponse(200));
 
     await apiFetch("/x");
 
@@ -61,9 +54,7 @@ describe("apiFetch — method handling and CSRF header injection", () => {
     "always sets x-requested-with: XMLHttpRequest (method=%s) so @sap/approuter answers expired sessions with 401 instead of 200 + login HTML",
     async (method) => {
       mockedGetCsrfToken.mockResolvedValue("tok");
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        makeResponse(200),
-      );
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(makeResponse(200));
 
       await apiFetch("/x", { method });
 
@@ -73,9 +64,7 @@ describe("apiFetch — method handling and CSRF header injection", () => {
   );
 
   it("preserves a caller-provided x-requested-with override is not a concern; the helper always sets XMLHttpRequest to keep approuter behavior predictable", async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      makeResponse(200),
-    );
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(makeResponse(200));
 
     await apiFetch("/x", { headers: { "x-requested-with": "Something" } });
 
@@ -86,9 +75,7 @@ describe("apiFetch — method handling and CSRF header injection", () => {
   it.each([["GET"], ["HEAD"], ["get"], ["head"]])(
     "read method %s does not inject x-csrf-token (negative control)",
     async (method) => {
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        makeResponse(200),
-      );
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(makeResponse(200));
 
       await apiFetch("/x", { method });
 
@@ -103,9 +90,7 @@ describe("apiFetch — method handling and CSRF header injection", () => {
     async (method) => {
       const writeToken = "tok-abc";
       mockedGetCsrfToken.mockResolvedValueOnce(writeToken);
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        makeResponse(200),
-      );
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(makeResponse(200));
 
       await apiFetch("/x", { method });
 
@@ -118,9 +103,7 @@ describe("apiFetch — method handling and CSRF header injection", () => {
   it("normalises lower-case 'post' to upper-case so write-method detection still triggers CSRF injection", async () => {
     const writeToken = "tok-lower";
     mockedGetCsrfToken.mockResolvedValueOnce(writeToken);
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      makeResponse(200),
-    );
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(makeResponse(200));
 
     await apiFetch("/x", { method: "post" });
 
@@ -132,9 +115,7 @@ describe("apiFetch — method handling and CSRF header injection", () => {
 
   it("swallows getCsrfToken() rejection on the write path and proceeds without the header", async () => {
     mockedGetCsrfToken.mockRejectedValueOnce(new Error("csrf endpoint down"));
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      makeResponse(200),
-    );
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(makeResponse(200));
 
     const res = await apiFetch("/x", { method: "POST" });
 
@@ -153,9 +134,7 @@ describe("apiFetch — method handling and CSRF header injection", () => {
     "always sets credentials: 'include' (method=%s, expectsCsrf=%s)",
     async (method, expectsCsrf) => {
       if (expectsCsrf) mockedGetCsrfToken.mockResolvedValueOnce("tok");
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        makeResponse(200),
-      );
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(makeResponse(200));
 
       await apiFetch("/x", { method });
 
@@ -167,9 +146,7 @@ describe("apiFetch — method handling and CSRF header injection", () => {
   it("merges caller-provided headers with the injected CSRF header on writes", async () => {
     const writeToken = "tok-merge";
     mockedGetCsrfToken.mockResolvedValueOnce(writeToken);
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      makeResponse(200),
-    );
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(makeResponse(200));
 
     await apiFetch("/x", {
       method: "POST",
@@ -185,9 +162,7 @@ describe("apiFetch — method handling and CSRF header injection", () => {
 describe("apiFetch — 401 auth-loss redirect", () => {
   it("on 401 clears the CSRF cache, navigates to '/', and throws SessionExpiredError", async () => {
     __resetRedirectForTests();
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      makeResponse(401),
-    );
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(makeResponse(401));
 
     await expect(apiFetch("/x")).rejects.toThrow(SessionExpiredError);
 
@@ -201,11 +176,7 @@ describe("apiFetch — 401 auth-loss redirect", () => {
     const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
     fetchMock.mockResolvedValue(makeResponse(401));
 
-    const results = await Promise.allSettled([
-      apiFetch("/a"),
-      apiFetch("/b"),
-      apiFetch("/c"),
-    ]);
+    const results = await Promise.allSettled([apiFetch("/a"), apiFetch("/b"), apiFetch("/c")]);
 
     // Every call still rejects with SessionExpiredError…
     for (const r of results) {
@@ -217,9 +188,7 @@ describe("apiFetch — 401 auth-loss redirect", () => {
   });
 
   it("on 200 (negative control) does NOT call window.location.assign and does NOT throw", async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      makeResponse(200),
-    );
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(makeResponse(200));
 
     const res = await apiFetch("/x");
 
@@ -233,15 +202,11 @@ describe("apiFetch — 403 CSRF retry semantics", () => {
   it("on 403 with x-csrf-token: Required, clears the cache, retries once with a fresh token, and returns the second response", async () => {
     const firstToken = "tok-stale";
     const secondToken = "tok-fresh";
-    mockedGetCsrfToken
-      .mockResolvedValueOnce(firstToken)
-      .mockResolvedValueOnce(secondToken);
+    mockedGetCsrfToken.mockResolvedValueOnce(firstToken).mockResolvedValueOnce(secondToken);
 
     const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
     fetchMock
-      .mockResolvedValueOnce(
-        makeResponse(403, { "x-csrf-token": "Required" }),
-      )
+      .mockResolvedValueOnce(makeResponse(403, { "x-csrf-token": "Required" }))
       .mockResolvedValueOnce(makeResponse(200));
 
     const requestBody = JSON.stringify({ payload: "p" });
@@ -270,9 +235,7 @@ describe("apiFetch — 403 CSRF retry semantics", () => {
   it("on 403 with x-csrf-token != 'Required' (negative control) does NOT retry and returns the 403", async () => {
     mockedGetCsrfToken.mockResolvedValueOnce("tok");
     const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
-    fetchMock.mockResolvedValueOnce(
-      makeResponse(403, { "x-csrf-token": "Forbidden" }),
-    );
+    fetchMock.mockResolvedValueOnce(makeResponse(403, { "x-csrf-token": "Forbidden" }));
 
     const res = await apiFetch("/x", { method: "POST" });
 
@@ -297,9 +260,7 @@ describe("apiFetch — 403 CSRF retry semantics", () => {
     mockedGetCsrfToken.mockResolvedValue("tok");
     const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
     // Always answer 403 Required — a naive retry would recurse forever.
-    fetchMock.mockResolvedValue(
-      makeResponse(403, { "x-csrf-token": "Required" }),
-    );
+    fetchMock.mockResolvedValue(makeResponse(403, { "x-csrf-token": "Required" }));
 
     const res = await apiFetch("/x", { method: "POST" });
 

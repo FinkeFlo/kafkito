@@ -27,13 +27,7 @@ const styles: Record<KnownState, string> = {
   unknown: "bg-subtle text-muted",
 };
 
-export function StateBadge({
-  state,
-  className,
-}: {
-  state: string;
-  className?: string;
-}) {
+export function StateBadge({ state, className }: { state: string; className?: string }) {
   const key = normalize(state);
   return (
     <span

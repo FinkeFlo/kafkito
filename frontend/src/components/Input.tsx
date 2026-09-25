@@ -20,15 +20,7 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
  * focus indicator.
  */
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  {
-    className,
-    wrapperClassName,
-    invalid,
-    leadingIcon,
-    trailingIcon,
-    type = "text",
-    ...rest
-  },
+  { className, wrapperClassName, invalid, leadingIcon, trailingIcon, type = "text", ...rest },
   ref,
 ) {
   const base = cn(

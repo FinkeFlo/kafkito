@@ -73,7 +73,9 @@ function coldDNSHint(msg: string): string {
   return "";
 }
 
-function toPrivateCluster(f: FormState): Omit<PrivateCluster, "id" | "created_at" | "updated_at"> & { id?: string } {
+function toPrivateCluster(
+  f: FormState,
+): Omit<PrivateCluster, "id" | "created_at" | "updated_at"> & { id?: string } {
   const brokers = f.brokersCSV
     .split(",")
     .map((b) => b.trim())
@@ -204,16 +206,13 @@ function ClusterSettingsPage() {
     URL.revokeObjectURL(url);
   };
 
-  const exportLabel =
-    selected.size > 0 ? `Export ${selected.size} selected` : "Export JSON";
+  const exportLabel = selected.size > 0 ? `Export ${selected.size} selected` : "Export JSON";
 
   const onImportFile = async (file: File) => {
     try {
       const text = await file.text();
       const res = importBundle(text);
-      toast.success(
-        `Imported: ${res.added} added, ${res.updated} updated, ${res.skipped} skipped`,
-      );
+      toast.success(`Imported: ${res.added} added, ${res.updated} updated, ${res.skipped} skipped`);
       forceRefresh();
     } catch (e) {
       toast.error(`Import failed: ${(e as Error).message}`);
@@ -303,9 +302,7 @@ function ClusterSettingsPage() {
                     checked={allSelected}
                     onChange={toggleAll}
                     aria-label={
-                      allSelected
-                        ? "Deselect all clusters"
-                        : "Select all clusters for export"
+                      allSelected ? "Deselect all clusters" : "Select all clusters for export"
                     }
                     className="h-4 w-4 cursor-pointer accent-accent"
                   />
@@ -321,10 +318,7 @@ function ClusterSettingsPage() {
             </thead>
             <tbody>
               {filtered.map((c) => (
-                <tr
-                  key={c.id}
-                  className="border-t border-border"
-                >
+                <tr key={c.id} className="border-t border-border">
                   <td className="px-4 py-2">
                     <input
                       type="checkbox"
@@ -334,18 +328,26 @@ function ClusterSettingsPage() {
                       className="h-4 w-4 cursor-pointer accent-accent"
                     />
                   </td>
-                  <td className="px-4 py-2 font-mono text-[13px] tabular-nums font-medium">{c.name}</td>
+                  <td className="px-4 py-2 font-mono text-[13px] tabular-nums font-medium">
+                    {c.name}
+                  </td>
                   <td className="px-4 py-2">
-                    {c.is_prod ? <Badge variant="danger">PROD</Badge> : <span className="text-muted">—</span>}
+                    {c.is_prod ? (
+                      <Badge variant="danger">PROD</Badge>
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
                   </td>
-                  <td className="px-4 py-2 text-muted">
-                    {c.brokers.join(", ")}
-                  </td>
+                  <td className="px-4 py-2 text-muted">{c.brokers.join(", ")}</td>
                   <td className="px-4 py-2">
                     <Badge variant="neutral">{c.auth.type}</Badge>
                   </td>
                   <td className="px-4 py-2">
-                    {c.tls.enabled ? <Badge variant="neutral">on</Badge> : <span className="text-muted">off</span>}
+                    {c.tls.enabled ? (
+                      <Badge variant="neutral">on</Badge>
+                    ) : (
+                      <span className="text-muted">off</span>
+                    )}
                   </td>
                   <td className="px-4 py-2">
                     {c.schema_registry?.url ? (
@@ -438,8 +440,7 @@ function ClusterForm({
     return () => window.clearInterval(id);
   }, [testing]);
 
-  const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
-    setF((s) => ({ ...s, [k]: v }));
+  const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setF((s) => ({ ...s, [k]: v }));
 
   const canSave =
     f.name.trim().length > 0 &&
@@ -450,7 +451,12 @@ function ClusterForm({
     setTesting(true);
     setTestResult(null);
     try {
-      const draft = { ...toPrivateCluster(f), id: f.id ?? "__draft__", created_at: 0, updated_at: 0 } as PrivateCluster;
+      const draft = {
+        ...toPrivateCluster(f),
+        id: f.id ?? "__draft__",
+        created_at: 0,
+        updated_at: 0,
+      } as PrivateCluster;
       const info = await testCluster(draft);
       if (info.reachable) {
         setTestResult(`OK — reachable (${info.auth_type}, TLS: ${info.tls ? "yes" : "no"})`);
@@ -484,31 +490,21 @@ function ClusterForm({
       title={f.id ? "Edit private cluster" : "Add private cluster"}
       actions={
         <>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={onTest}
-            disabled={testing || !canSave}
-          >
+          <Button variant="secondary" size="sm" onClick={onTest} disabled={testing || !canSave}>
             {testing ? "Testing…" : "Test connection"}
           </Button>
           <Button variant="ghost" size="sm" onClick={onClose}>
             Cancel
           </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={onSave}
-            disabled={!canSave}
-          >
+          <Button variant="primary" size="sm" onClick={onSave} disabled={!canSave}>
             Save
           </Button>
         </>
       }
     >
       <p className="text-sm text-muted">
-        Credentials are stored in this browser's localStorage in plaintext.
-        Use Export/Import to migrate between devices.
+        Credentials are stored in this browser's localStorage in plaintext. Use Export/Import to
+        migrate between devices.
       </p>
 
       <div className="mt-4 grid gap-4">
@@ -643,10 +639,7 @@ function ClusterForm({
         </Notice>
       )}
       {!testing && testResult && (
-        <Notice
-          intent={testResult.startsWith("OK") ? "success" : "danger"}
-          className="mt-4"
-        >
+        <Notice intent={testResult.startsWith("OK") ? "success" : "danger"} className="mt-4">
           {testResult}
         </Notice>
       )}

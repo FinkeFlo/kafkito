@@ -21,8 +21,12 @@ const XML_TOPIC = "e2e-large-message-xml";
 const ROOT_ARRAY_TOPIC = "e2e-root-array";
 
 test.describe("Large messages (truncation-tolerant search & click-to-filter)", () => {
-  test("text-contains search finds a needle past the 64 KB truncation boundary", async ({ page }) => {
-    await page.goto(`/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}/messages`);
+  test("text-contains search finds a needle past the 64 KB truncation boundary", async ({
+    page,
+  }) => {
+    await page.goto(
+      `/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}/messages`,
+    );
 
     await page.getByRole("button", { name: "Search", exact: true }).click();
     await page.getByLabel("Value", { exact: true }).fill(NEEDLE_TEXT);
@@ -39,7 +43,9 @@ test.describe("Large messages (truncation-tolerant search & click-to-filter)", (
   });
 
   test("truncated-but-JSON message is badged json, not text", async ({ page }) => {
-    await page.goto(`/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}/messages`);
+    await page.goto(
+      `/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}/messages`,
+    );
 
     const row = page.getByTestId("message-row");
     // consumer.go's decodeBytes sniffs only the first non-whitespace byte
@@ -51,7 +57,9 @@ test.describe("Large messages (truncation-tolerant search & click-to-filter)", (
   });
 
   test("truncated-but-XML message is badged xml, not text", async ({ page }) => {
-    await page.goto(`/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(XML_TOPIC)}/messages`);
+    await page.goto(
+      `/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(XML_TOPIC)}/messages`,
+    );
 
     const row = page.getByTestId("message-row");
     // Same truncation-tolerant heuristic as JSON, but for looksXML (first
@@ -62,8 +70,12 @@ test.describe("Large messages (truncation-tolerant search & click-to-filter)", (
     await expect(row.getByText("preview", { exact: true })).toBeVisible();
   });
 
-  test("click-to-filter: load full value, click a needle in an array, path is wildcarded", async ({ page }) => {
-    await page.goto(`/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}/messages`);
+  test("click-to-filter: load full value, click a needle in an array, path is wildcarded", async ({
+    page,
+  }) => {
+    await page.goto(
+      `/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}/messages`,
+    );
 
     await page.getByTestId("message-row").click();
 
@@ -88,7 +100,9 @@ test.describe("Large messages (truncation-tolerant search & click-to-filter)", (
   });
 
   test("PathSense suggests fields hydrated from the full (untruncated) value", async ({ page }) => {
-    await page.goto(`/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}/messages`);
+    await page.goto(
+      `/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}/messages`,
+    );
 
     await page.getByRole("button", { name: "Search", exact: true }).click();
     await page.getByLabel("Mode", { exact: true }).selectOption("jsonpath");
@@ -139,7 +153,9 @@ test.describe("Large messages (truncation-tolerant search & click-to-filter)", (
   test("XPath PathSense suggests XML element and attribute paths from the hydrated value", async ({
     page,
   }) => {
-    await page.goto(`/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(XML_TOPIC)}/messages`);
+    await page.goto(
+      `/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(XML_TOPIC)}/messages`,
+    );
 
     await page.getByRole("button", { name: "Search", exact: true }).click();
     await page.getByLabel("Mode", { exact: true }).selectOption("xpath");
@@ -154,9 +170,7 @@ test.describe("Large messages (truncation-tolerant search & click-to-filter)", (
 
     // Attributes surface as `@name` …
     await pathInput.fill("sku");
-    await expect(
-      page.getByText("//root/order/items/item/@sku", { exact: true }),
-    ).toBeVisible();
+    await expect(page.getByText("//root/order/items/item/@sku", { exact: true })).toBeVisible();
 
     // … and picking a scalar prefills the operator, but not the value: the
     // tree carries element and attribute names only.

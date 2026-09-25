@@ -1,12 +1,12 @@
-import { clearCsrfToken, getCsrfToken } from './csrf';
+import { clearCsrfToken, getCsrfToken } from "./csrf";
 
 export class SessionExpiredError extends Error {
   constructor() {
-    super('session expired');
+    super("session expired");
   }
 }
 
-const writeMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const writeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 let redirecting = false;
 
@@ -25,13 +25,17 @@ export function __resetRedirectForTests(): void {
 //   approuter can run the OAuth code flow against XSUAA, throws
 //   SessionExpiredError so callers do not consume an undefined Response
 // - on 403 with "x-csrf-token: Required": single retry with a fresh token
-export async function apiFetch(input: RequestInfo, init: RequestInit = {}, retried = false): Promise<Response> {
-  const method = (init.method ?? 'GET').toUpperCase();
+export async function apiFetch(
+  input: RequestInfo,
+  init: RequestInit = {},
+  retried = false,
+): Promise<Response> {
+  const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers);
-  headers.set('x-requested-with', 'XMLHttpRequest');
+  headers.set("x-requested-with", "XMLHttpRequest");
   if (writeMethods.has(method)) {
     try {
-      headers.set('x-csrf-token', await getCsrfToken());
+      headers.set("x-csrf-token", await getCsrfToken());
     } catch {
       // CSRF endpoint unreachable (e.g., devauth backend without approuter, or
       // approuter not yet deployed). Send the write anyway; in production the
@@ -39,16 +43,16 @@ export async function apiFetch(input: RequestInfo, init: RequestInit = {}, retri
       // no CSRF enforcement so the write succeeds as-is.
     }
   }
-  const res = await fetch(input, { ...init, method, headers, credentials: 'include' });
+  const res = await fetch(input, { ...init, method, headers, credentials: "include" });
   if (res.status === 401) {
     clearCsrfToken();
     if (!redirecting) {
       redirecting = true;
-      window.location.assign('/');
+      window.location.assign("/");
     }
     throw new SessionExpiredError();
   }
-  if (res.status === 403 && res.headers.get('x-csrf-token') === 'Required' && !retried) {
+  if (res.status === 403 && res.headers.get("x-csrf-token") === "Required" && !retried) {
     clearCsrfToken();
     return apiFetch(input, init, true);
   }

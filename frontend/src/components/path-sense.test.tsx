@@ -101,8 +101,7 @@ describe("PathSense", () => {
     expect(
       screen.getByText(
         (_, el) =>
-          el?.classList.contains("font-mono") === true &&
-          el.textContent === "$.customerName",
+          el?.classList.contains("font-mono") === true && el.textContent === "$.customerName",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText(/orderId/)).not.toBeInTheDocument();
@@ -188,14 +187,7 @@ describe("PathSense", () => {
 
   it("shows an empty-state hint when the tree is empty", async () => {
     const user = userEvent.setup();
-    render(
-      <PathSense
-        tree={makeTree([])}
-        value=""
-        onChange={() => {}}
-        onPick={() => {}}
-      />,
-    );
+    render(<PathSense tree={makeTree([])} value="" onChange={() => {}} onPick={() => {}} />);
 
     await user.click(screen.getByRole("combobox"));
 
@@ -239,9 +231,7 @@ describe("PathSense", () => {
 
   it("Tab toggles the array segment based on the freshly typed query, not the lagging value prop", () => {
     const onChange = vi.fn();
-    render(
-      <PathSense tree={emptyTree} value="a[0].b" onChange={onChange} onPick={vi.fn()} />,
-    );
+    render(<PathSense tree={emptyTree} value="a[0].b" onChange={onChange} onPick={vi.fn()} />);
     const input = screen.getByRole("combobox");
     // Simulate the user typing a new array path that the parent has not yet echoed back.
     fireEvent.change(input, { target: { value: "items[2].sku" } });
@@ -300,13 +290,7 @@ describe("PathSense", () => {
     render(
       <>
         <label htmlFor="search-path">Path</label>
-        <PathSense
-          id="search-path"
-          tree={emptyTree}
-          value=""
-          onChange={vi.fn()}
-          onPick={vi.fn()}
-        />
+        <PathSense id="search-path" tree={emptyTree} value="" onChange={vi.fn()} onPick={vi.fn()} />
       </>,
     );
 

@@ -21,11 +21,15 @@ const FIXTURE_NON_EMPTY_SLOT_COUNT = 4;
 
 test.describe("Message timeline", () => {
   test("shows traffic spread across multiple days", async ({ page }) => {
-    await page.goto(`/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}/timeline`);
+    await page.goto(
+      `/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}/timeline`,
+    );
 
     await expect(page.getByRole("heading", { level: 1, name: TOPIC })).toBeVisible();
     await expect(page.getByRole("img", { name: /message count per time slot/i })).toBeVisible();
-    await expect(page.getByText(new RegExp(`approx total:\\s*${FIXTURE_TOTAL_MESSAGES}`, "i"))).toBeVisible();
+    await expect(
+      page.getByText(new RegExp(`approx total:\\s*${FIXTURE_TOTAL_MESSAGES}`, "i")),
+    ).toBeVisible();
 
     const barHeights = await page
       .getByTestId("timeline-bar")
@@ -37,10 +41,14 @@ test.describe("Message timeline", () => {
   });
 
   test("labels each non-empty bar with its message count", async ({ page }) => {
-    await page.goto(`/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}/timeline`);
+    await page.goto(
+      `/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}/timeline`,
+    );
 
     const countLabels = page.getByTestId("timeline-bar-count");
     await expect(countLabels).toHaveCount(FIXTURE_NON_EMPTY_SLOT_COUNT);
-    await expect(countLabels.filter({ hasText: new RegExp(`^${FIXTURE_LARGEST_SLOT_COUNT}$`) })).toBeVisible();
+    await expect(
+      countLabels.filter({ hasText: new RegExp(`^${FIXTURE_LARGEST_SLOT_COUNT}$`) }),
+    ).toBeVisible();
   });
 });

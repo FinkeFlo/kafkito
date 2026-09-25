@@ -62,8 +62,12 @@ describe("fuzzyFilter", () => {
       .map((t) => t.name)
       .sort();
 
-    const a = run(topics, "sales qas").results.map((r) => r.name).sort();
-    const b = run(topics, "qas sales").results.map((r) => r.name).sort();
+    const a = run(topics, "sales qas")
+      .results.map((r) => r.name)
+      .sort();
+    const b = run(topics, "qas sales")
+      .results.map((r) => r.name)
+      .sort();
 
     expect(a.length).toBeGreaterThan(0);
     expect(a).toEqual(expected);
@@ -89,9 +93,15 @@ describe("fuzzyFilter", () => {
   });
 
   it("ignores leading Fuse extended-search operators pasted by users", () => {
-    const a = run(topics, "qas").results.map((r) => r.name).sort();
-    const b = run(topics, "'qas").results.map((r) => r.name).sort();
-    const c = run(topics, "!qas").results.map((r) => r.name).sort();
+    const a = run(topics, "qas")
+      .results.map((r) => r.name)
+      .sort();
+    const b = run(topics, "'qas")
+      .results.map((r) => r.name)
+      .sort();
+    const c = run(topics, "!qas")
+      .results.map((r) => r.name)
+      .sort();
     expect(b).toEqual(a);
     expect(c).toEqual(a);
   });

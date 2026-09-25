@@ -78,19 +78,12 @@ describe("ValueBody", () => {
       }),
     );
 
-    expect(
-      screen.queryByRole("button", { name: LOAD_BUTTON }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByText("not json at all, just a long log line"),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: LOAD_BUTTON })).not.toBeInTheDocument();
+    expect(screen.getByText("not json at all, just a long log line")).toBeInTheDocument();
   });
 
   it("fetches the full value on click and renders the interactive tree", async () => {
-    const base64 = Buffer.from(
-      JSON.stringify({ orderId: "A1" }),
-      "utf8",
-    ).toString("base64");
+    const base64 = Buffer.from(JSON.stringify({ orderId: "A1" }), "utf8").toString("base64");
     fetchMessageRawBase64.mockResolvedValue(base64);
     const user = userEvent.setup();
     const { onPick } = renderValueBody(message());
@@ -113,37 +106,27 @@ describe("ValueBody", () => {
   });
 
   it("shows an alert and keeps the manual-entry hint when the full value exceeds the download limit", async () => {
-    fetchMessageRawBase64.mockRejectedValue(
-      new RawValueTooLargeError("too large"),
-    );
+    fetchMessageRawBase64.mockRejectedValue(new RawValueTooLargeError("too large"));
     const user = userEvent.setup();
     renderValueBody(message());
 
     await user.click(screen.getByRole("button", { name: LOAD_BUTTON }));
 
     await waitFor(() =>
-      expect(screen.getByRole("alert")).toHaveTextContent(
-        /exceeds the download limit/i,
-      ),
+      expect(screen.getByRole("alert")).toHaveTextContent(/exceeds the download limit/i),
     );
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      /enter the path manually instead/i,
-    );
+    expect(screen.getByRole("alert")).toHaveTextContent(/enter the path manually instead/i);
   });
 
   it("shows a parse error when the fetched full value is not valid JSON", async () => {
-    fetchMessageRawBase64.mockResolvedValue(
-      Buffer.from("not json", "utf8").toString("base64"),
-    );
+    fetchMessageRawBase64.mockResolvedValue(Buffer.from("not json", "utf8").toString("base64"));
     const user = userEvent.setup();
     renderValueBody(message());
 
     await user.click(screen.getByRole("button", { name: LOAD_BUTTON }));
 
     await waitFor(() =>
-      expect(screen.getByRole("alert")).toHaveTextContent(
-        /could not be parsed as json/i,
-      ),
+      expect(screen.getByRole("alert")).toHaveTextContent(/could not be parsed as json/i),
     );
   });
 
@@ -156,9 +139,7 @@ describe("ValueBody", () => {
     renderValueBody(message());
 
     await user.click(screen.getByRole("button", { name: LOAD_BUTTON }));
-    await waitFor(() =>
-      expect(screen.getByRole("alert")).toHaveTextContent(/network down/i),
-    );
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/network down/i));
 
     await user.click(screen.getByRole("button", { name: /retry/i }));
     await waitFor(() => expect(screen.getByText('"A1"')).toBeInTheDocument());
@@ -182,16 +163,12 @@ describe("ValueBody", () => {
     renderValueBody(message({ value_size_bytes: 8 * 1024 * 1024 }));
 
     const button = screen.getByRole("button", { name: LOAD_BUTTON });
-    const reason = document.getElementById(
-      button.getAttribute("aria-describedby") as string,
-    );
+    const reason = document.getElementById(button.getAttribute("aria-describedby") as string);
 
     // A decimal limit rendered by a binary formatter produced "977 KiB"
     // against a size in MiB, which reads as arbitrary and forces the reader
     // to convert units before the sentence means anything.
-    const units = [...(reason?.textContent ?? "").matchAll(/\d\s*([KMG]iB)/g)].map(
-      (m) => m[1],
-    );
+    const units = [...(reason?.textContent ?? "").matchAll(/\d\s*([KMG]iB)/g)].map((m) => m[1]);
     expect(units.length).toBeGreaterThanOrEqual(2);
     expect(new Set(units).size).toBe(1);
   });
@@ -203,12 +180,8 @@ describe("ValueBody", () => {
       } as Partial<Message>),
     );
 
-    expect(
-      screen.queryByRole("button", { name: LOAD_BUTTON }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByText(/not available for schema registry values/i),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: LOAD_BUTTON })).not.toBeInTheDocument();
+    expect(screen.getByText(/not available for schema registry values/i)).toBeInTheDocument();
     expect(fetchMessageRawBase64).not.toHaveBeenCalled();
   });
 });

@@ -18,11 +18,7 @@ describe("getCsrfToken", () => {
       new Response(null, { status: 200, headers: { "x-csrf-token": "tok-1" } }),
     );
 
-    const [a, b, c] = await Promise.all([
-      getCsrfToken(),
-      getCsrfToken(),
-      getCsrfToken(),
-    ]);
+    const [a, b, c] = await Promise.all([getCsrfToken(), getCsrfToken(), getCsrfToken()]);
 
     expect(a).toBe("tok-1");
     expect(b).toBe("tok-1");

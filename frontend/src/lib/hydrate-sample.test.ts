@@ -58,9 +58,7 @@ describe("hydrateTruncatedSampleMessages", () => {
 
   it("hydrates a truncated XML value, so XPath PathSense sees the full document", async () => {
     const full = "<order><id>A1</id><status>shipped</status></order>";
-    fetchMessageRawBase64.mockResolvedValue(
-      Buffer.from(full, "utf-8").toString("base64"),
-    );
+    fetchMessageRawBase64.mockResolvedValue(Buffer.from(full, "utf-8").toString("base64"));
     const msgs = [
       message({
         value: "<order><id>A1</id><sta",
@@ -69,13 +67,7 @@ describe("hydrateTruncatedSampleMessages", () => {
       }),
     ];
 
-    const result = await hydrateTruncatedSampleMessages(
-      "c",
-      "t",
-      msgs,
-      undefined,
-      "xml",
-    );
+    const result = await hydrateTruncatedSampleMessages("c", "t", msgs, undefined, "xml");
 
     expect(result[0].value).toBe(full);
     expect(result[0].value_truncated).toBe(false);
@@ -90,9 +82,7 @@ describe("hydrateTruncatedSampleMessages", () => {
 
     // JSONPath mode: the XML sample would be discarded by JSON.parse anyway,
     // so downloading up to MAX_HYDRATE_VALUE_BYTES for it is pure waste.
-    fetchMessageRawBase64.mockResolvedValue(
-      Buffer.from('{"a":1}', "utf-8").toString("base64"),
-    );
+    fetchMessageRawBase64.mockResolvedValue(Buffer.from('{"a":1}', "utf-8").toString("base64"));
 
     await hydrateTruncatedSampleMessages("c", "t", msgs, undefined, "json");
 
@@ -102,9 +92,7 @@ describe("hydrateTruncatedSampleMessages", () => {
 
   it("hydrates a truncated JSON value", async () => {
     const full = JSON.stringify({ order: { id: "A1", price: 9.99 } });
-    fetchMessageRawBase64.mockResolvedValue(
-      Buffer.from(full, "utf8").toString("base64"),
-    );
+    fetchMessageRawBase64.mockResolvedValue(Buffer.from(full, "utf8").toString("base64"));
     const msgs = [
       message({
         partition: 2,
@@ -114,31 +102,15 @@ describe("hydrateTruncatedSampleMessages", () => {
       }),
     ];
 
-    const result = await hydrateTruncatedSampleMessages(
-      "my-cluster",
-      "my-topic",
-      msgs,
-    );
+    const result = await hydrateTruncatedSampleMessages("my-cluster", "my-topic", msgs);
 
-    expect(result).toEqual([
-      { ...msgs[0], value: full, value_truncated: false },
-    ]);
-    expect(fetchMessageRawBase64).toHaveBeenCalledWith(
-      "my-cluster",
-      "my-topic",
-      2,
-      55,
-      undefined,
-    );
+    expect(result).toEqual([{ ...msgs[0], value: full, value_truncated: false }]);
+    expect(fetchMessageRawBase64).toHaveBeenCalledWith("my-cluster", "my-topic", 2, 55, undefined);
   });
 
   it("falls back to the truncated preview when the full value can't be fetched", async () => {
-    fetchMessageRawBase64.mockRejectedValue(
-      new RawValueTooLargeError("too large"),
-    );
-    const msgs = [
-      message({ value: '{"a":1', value_truncated: true }),
-    ];
+    fetchMessageRawBase64.mockRejectedValue(new RawValueTooLargeError("too large"));
+    const msgs = [message({ value: '{"a":1', value_truncated: true })];
 
     const result = await hydrateTruncatedSampleMessages("c", "t", msgs);
 
@@ -147,9 +119,7 @@ describe("hydrateTruncatedSampleMessages", () => {
 
   it("hydrates multiple messages independently and preserves order", async () => {
     fetchMessageRawBase64
-      .mockResolvedValueOnce(
-        Buffer.from(JSON.stringify({ a: 1 }), "utf8").toString("base64"),
-      )
+      .mockResolvedValueOnce(Buffer.from(JSON.stringify({ a: 1 }), "utf8").toString("base64"))
       .mockRejectedValueOnce(new Error("boom"));
     const msgs = [
       message({ offset: 1, value: '{"a":1', value_truncated: true }),
@@ -221,21 +191,13 @@ describe("hydrateTruncatedSampleMessages", () => {
   });
 
   it("forwards the abort signal to the fetch layer", async () => {
-    fetchMessageRawBase64.mockResolvedValue(
-      Buffer.from("{}", "utf8").toString("base64"),
-    );
+    fetchMessageRawBase64.mockResolvedValue(Buffer.from("{}", "utf8").toString("base64"));
     const controller = new AbortController();
     const msgs = [message({ value: '{"a":1', value_truncated: true })];
 
     await hydrateTruncatedSampleMessages("c", "t", msgs, controller.signal);
 
-    expect(fetchMessageRawBase64).toHaveBeenCalledWith(
-      "c",
-      "t",
-      0,
-      1,
-      controller.signal,
-    );
+    expect(fetchMessageRawBase64).toHaveBeenCalledWith("c", "t", 0, 1, controller.signal);
   });
 });
 

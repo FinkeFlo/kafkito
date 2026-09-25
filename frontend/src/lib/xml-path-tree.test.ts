@@ -29,15 +29,9 @@ describe("buildXmlPathTree", () => {
   });
 
   it("indexes element names only, carrying no document text", () => {
-    const tree = buildXmlPathTree([
-      '<order id="7"><status>shipped</status></order>',
-    ]);
+    const tree = buildXmlPathTree(['<order id="7"><status>shipped</status></order>']);
 
-    expect([...tree.keys()].sort()).toEqual([
-      "//order",
-      "//order/@id",
-      "//order/status",
-    ]);
+    expect([...tree.keys()].sort()).toEqual(["//order", "//order/@id", "//order/status"]);
     for (const info of tree.values()) {
       expect(Object.keys(info)).toEqual(["type"]);
     }
@@ -69,11 +63,7 @@ describe("buildXmlPathTree", () => {
       "<order><a>3</a><b>y</b></order>",
     ]);
 
-    expect([...tree.keys()].sort()).toEqual([
-      "//order",
-      "//order/a",
-      "//order/b",
-    ]);
+    expect([...tree.keys()].sort()).toEqual(["//order", "//order/a", "//order/b"]);
   });
 
   it(`caps depth at ${MAX_DEPTH} levels`, () => {
@@ -154,10 +144,7 @@ describe("buildXmlPathTree", () => {
     // starting it at all. Asserting on the resulting tree would prove
     // nothing — recordNode rejects surplus paths either way — so count the
     // parses instead.
-    const children = Array.from(
-      { length: MAX_PATHS + 50 },
-      (_, i) => `<f${i}>v</f${i}>`,
-    ).join("");
+    const children = Array.from({ length: MAX_PATHS + 50 }, (_, i) => `<f${i}>v</f${i}>`).join("");
 
     const Original = globalThis.DOMParser;
     let parses = 0;

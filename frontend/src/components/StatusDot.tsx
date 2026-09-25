@@ -73,28 +73,19 @@ export function StatusDot({
     resolved === "warning" ? (
       <span
         aria-hidden="true"
-        className={clsx(
-          "inline-block h-2 w-2 rounded-full border",
-          ringByIntent[resolved],
-        )}
+        className={clsx("inline-block h-2 w-2 rounded-full border", ringByIntent[resolved])}
       />
     ) : resolved === "danger" ? (
       <span
         aria-hidden="true"
-        className={clsx(
-          "relative inline-block h-2 w-2 rounded-full",
-          fillByIntent[resolved],
-        )}
+        className={clsx("relative inline-block h-2 w-2 rounded-full", fillByIntent[resolved])}
       >
         <span className="absolute inset-x-0 top-1/2 mx-auto block h-px w-1.5 -translate-y-1/2 bg-panel" />
       </span>
     ) : resolved === "neutral" ? (
       <span
         aria-hidden="true"
-        className={clsx(
-          "inline-block h-2 w-2 rounded-full border",
-          ringByIntent[resolved],
-        )}
+        className={clsx("inline-block h-2 w-2 rounded-full border", ringByIntent[resolved])}
       />
     ) : (
       <span

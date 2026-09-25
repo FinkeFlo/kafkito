@@ -39,8 +39,7 @@ function GroupsPage() {
   const navigate = Route.useNavigate();
   const { cluster, clusters } = useCluster();
   const selected = cluster;
-  const setGroup = (g: string | undefined) =>
-    navigate({ search: { group: g }, replace: true });
+  const setGroup = (g: string | undefined) => navigate({ search: { group: g }, replace: true });
 
   const selectedInfo = useMemo(
     () => clusters?.find((c) => c.name === selected),
@@ -54,8 +53,7 @@ function GroupsPage() {
     refetchInterval: 10_000,
   });
 
-  const capDisabled =
-    selectedInfo?.capabilities?.list_groups === false;
+  const capDisabled = selectedInfo?.capabilities?.list_groups === false;
 
   const groups = groupsQuery.data ?? [];
   const counts = {
@@ -84,9 +82,8 @@ function GroupsPage() {
 
       {capDisabled && (
         <Notice intent="warning" title="Consumer groups unavailable">
-          The configured Kafka user lacks <code className="font-mono">DESCRIBE</code>{" "}
-          on <code className="font-mono">GROUP:*</code>. Granting it will
-          enable this view.
+          The configured Kafka user lacks <code className="font-mono">DESCRIBE</code> on{" "}
+          <code className="font-mono">GROUP:*</code>. Granting it will enable this view.
         </Notice>
       )}
 
@@ -133,9 +130,7 @@ function GroupsTable({
   const [lagOnly, setLagOnly] = useState(false);
   const preFiltered = useMemo(() => {
     if (!groups) return [];
-    return lagOnly
-      ? groups.filter((g) => g.lag_known && g.lag > 0)
-      : groups;
+    return lagOnly ? groups.filter((g) => g.lag_known && g.lag > 0) : groups;
   }, [groups, lagOnly]);
 
   const fuzzy = useFuzzy(preFiltered, { keys: ["group_id"], query: q });
@@ -191,10 +186,7 @@ function GroupsTable({
           const reason = r.error ?? "lag unavailable";
           return (
             <>
-              <span
-                aria-describedby={reasonId}
-                className="text-subtle-text"
-              >
+              <span aria-describedby={reasonId} className="text-subtle-text">
                 ?
               </span>
               <span id={reasonId} className="sr-only">
@@ -243,7 +235,11 @@ function GroupsTable({
   return (
     <>
       {limited && (
-        <Notice intent="warning" title="No visible groups — possibly limited permissions" className="mb-3">
+        <Notice
+          intent="warning"
+          title="No visible groups — possibly limited permissions"
+          className="mb-3"
+        >
           Grant at least DESCRIBE on GROUP:* to see groups.
         </Notice>
       )}
@@ -314,7 +310,9 @@ function GroupDetailPanel({
     );
   }
   if (!q.data) return null;
-  return <GroupDetailBody cluster={cluster} detail={q.data} isProd={isProd} onDeleted={onDeleted} />;
+  return (
+    <GroupDetailBody cluster={cluster} detail={q.data} isProd={isProd} onDeleted={onDeleted} />
+  );
 }
 
 function GroupDetailBody({
@@ -369,9 +367,7 @@ function GroupDetailBody({
       </div>
 
       <div className="rounded-xl border border-border bg-panel">
-        <div className="border-b border-border p-3 text-sm font-semibold">
-          Members
-        </div>
+        <div className="border-b border-border p-3 text-sm font-semibold">Members</div>
         {detail.members.length === 0 ? (
           <div className="p-6 text-center text-sm text-subtle-text">
             No active members (group is empty).
@@ -399,9 +395,7 @@ function GroupDetailBody({
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-2 font-mono text-xs text-muted">
-                    {m.client_host}
-                  </td>
+                  <td className="px-4 py-2 font-mono text-xs text-muted">{m.client_host}</td>
                   <td className="max-w-[260px] px-4 py-2 text-xs">
                     <MonoId value={m.member_id} muted />
                   </td>
@@ -417,9 +411,7 @@ function GroupDetailBody({
                           className="mr-1 inline-flex items-center rounded bg-subtle px-1.5 py-0.5 font-mono hover:bg-hover"
                         >
                           {a.topic}
-                          <span className="ml-1 text-muted">
-                            [{a.partitions.length}]
-                          </span>
+                          <span className="ml-1 text-muted">[{a.partitions.length}]</span>
                         </Link>
                       ))
                     )}
@@ -432,19 +424,12 @@ function GroupDetailBody({
       </div>
 
       <div className="rounded-xl border border-border bg-panel">
-        <div className="border-b border-border p-3 text-sm font-semibold">
-          Offsets
-        </div>
+        <div className="border-b border-border p-3 text-sm font-semibold">Offsets</div>
         {byTopic.length === 0 ? (
-          <div className="p-6 text-center text-sm text-subtle-text">
-            No committed offsets.
-          </div>
+          <div className="p-6 text-center text-sm text-subtle-text">No committed offsets.</div>
         ) : (
           byTopic.map(([topic, offsets]) => {
-            const topicLag = offsets.reduce(
-              (s, o) => (o.lag >= 0 ? s + o.lag : s),
-              0,
-            );
+            const topicLag = offsets.reduce((s, o) => (o.lag >= 0 ? s + o.lag : s), 0);
             return (
               <div key={topic} className="border-b border-border last:border-0">
                 <div className="flex items-center justify-between bg-subtle/60 px-4 py-2 text-xs">
@@ -458,9 +443,7 @@ function GroupDetailBody({
                   <div className="flex items-center gap-3 text-muted">
                     <span>{offsets.length} partitions</span>
                     {topicLag > 0 && (
-                      <span className="font-semibold text-warning">
-                        lag {fmt.count(topicLag)}
-                      </span>
+                      <span className="font-semibold text-warning">lag {fmt.count(topicLag)}</span>
                     )}
                   </div>
                 </div>
@@ -485,35 +468,28 @@ function GroupDetailBody({
                         const clientId = atIdx >= 0 ? at.slice(0, atIdx) : at;
                         const host = atIdx >= 0 ? at.slice(atIdx + 1) : "";
                         return (
-                        <tr
-                          key={o.partition}
-                          className="border-t border-border text-xs"
-                        >
-                          <td className="px-4 py-1.5 tabular-nums">{o.partition}</td>
-                          <td className="px-4 py-1.5 text-right tabular-nums">
-                            {o.offset}
-                          </td>
-                          <td className="px-4 py-1.5 text-right tabular-nums text-muted">
-                            {o.log_end >= 0 ? o.log_end : "?"}
-                          </td>
-                          <td className="px-4 py-1.5 text-right tabular-nums">
-                            {o.lag < 0 ? (
-                              <span className="text-subtle-text">?</span>
-                            ) : o.lag === 0 ? (
-                              <span className="text-subtle-text">0</span>
-                            ) : (
-                              <span className="font-semibold text-warning">
-                                {fmt.count(o.lag)}
-                              </span>
-                            )}
-                          </td>
-                          <td className="max-w-[320px] px-4 py-1.5 text-xs">
-                            <MonoId value={clientId} muted placeholder="—" />
-                          </td>
-                          <td className="px-4 py-1.5 font-mono text-muted">
-                            {host || "—"}
-                          </td>
-                        </tr>
+                          <tr key={o.partition} className="border-t border-border text-xs">
+                            <td className="px-4 py-1.5 tabular-nums">{o.partition}</td>
+                            <td className="px-4 py-1.5 text-right tabular-nums">{o.offset}</td>
+                            <td className="px-4 py-1.5 text-right tabular-nums text-muted">
+                              {o.log_end >= 0 ? o.log_end : "?"}
+                            </td>
+                            <td className="px-4 py-1.5 text-right tabular-nums">
+                              {o.lag < 0 ? (
+                                <span className="text-subtle-text">?</span>
+                              ) : o.lag === 0 ? (
+                                <span className="text-subtle-text">0</span>
+                              ) : (
+                                <span className="font-semibold text-warning">
+                                  {fmt.count(o.lag)}
+                                </span>
+                              )}
+                            </td>
+                            <td className="max-w-[320px] px-4 py-1.5 text-xs">
+                              <MonoId value={clientId} muted placeholder="—" />
+                            </td>
+                            <td className="px-4 py-1.5 font-mono text-muted">{host || "—"}</td>
+                          </tr>
                         );
                       })}
                   </tbody>
@@ -538,9 +514,7 @@ function Metric({
 }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-subtle-text">
-        {label}
-      </div>
+      <div className="text-[10px] uppercase tracking-wider text-subtle-text">{label}</div>
       <div
         className={[
           "text-lg font-semibold tabular-nums",
@@ -569,8 +543,7 @@ function GroupActions({
   const [delOpen, setDelOpen] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const isEmpty =
-    (detail.state || "").toLowerCase() === "empty" ||
-    (detail.state || "").toLowerCase() === "dead";
+    (detail.state || "").toLowerCase() === "empty" || (detail.state || "").toLowerCase() === "dead";
 
   const delMut = useMutation({
     mutationFn: () => deleteGroup(cluster, detail.group_id),

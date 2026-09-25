@@ -82,12 +82,7 @@ function recordNode(tree: PathTree, path: string, isContainer: boolean) {
 // need a `[*]` normalization step: an XPath like `//items/item` already
 // matches every `item` sibling, so they collapse onto the same path key
 // naturally just by walking children and appending `/${tagName}`.
-function walkElement(
-  tree: PathTree,
-  el: Element,
-  path: string,
-  depth: number,
-) {
+function walkElement(tree: PathTree, el: Element, path: string, depth: number) {
   if (depth > MAX_DEPTH) return;
   // See MAX_PATHS: once the cap is reached the rest of the document can only
   // produce paths that get discarded, so stop instead of walking it out.

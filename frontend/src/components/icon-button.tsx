@@ -24,8 +24,7 @@ const sizeMap: Record<IconButtonSize, string> = {
 
 const variantMap: Record<IconButtonVariant, string> = {
   ghost: "text-subtle-text hover:text-text hover:bg-hover",
-  secondary:
-    "text-text border border-border hover:border-border-hover hover:bg-hover",
+  secondary: "text-text border border-border hover:border-border-hover hover:bg-hover",
   danger: "text-subtle-text hover:text-danger hover:bg-tint-red-bg",
 };
 

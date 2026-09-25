@@ -99,27 +99,14 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
 // Composition-mode renderer (sub-component shell)
 // ---------------------------------------------------------------------------
 
-function DataTableComposition({
-  children,
-  className,
-  title,
-  subtitle,
-  actions,
-}: CompositionProps) {
+function DataTableComposition({ children, className, title, subtitle, actions }: CompositionProps) {
   return (
-    <div
-      className={clsx(
-        "overflow-hidden rounded-xl border border-border bg-panel",
-        className,
-      )}
-    >
+    <div className={clsx("overflow-hidden rounded-xl border border-border bg-panel", className)}>
       {(title || actions) && (
         <div className="flex items-center justify-between gap-4 border-b border-border px-4 py-3">
           <div className="min-w-0">
             {title && <div className="text-sm font-semibold">{title}</div>}
-            {subtitle && (
-              <div className="text-xs text-muted">{subtitle}</div>
-            )}
+            {subtitle && <div className="text-xs text-muted">{subtitle}</div>}
           </div>
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </div>
@@ -180,9 +167,7 @@ function DataTableColumnView<Row>({
 
   return (
     <div className={cn("space-y-3", className)}>
-      {caption ? (
-        <div className="text-xs text-muted">{caption}</div>
-      ) : null}
+      {caption ? <div className="text-xs text-muted">{caption}</div> : null}
       <div className="overflow-x-auto rounded-xl border border-border bg-panel">
         <table className="w-full text-sm">
           <thead className="bg-subtle text-[11px] uppercase tracking-wider text-muted">
@@ -315,10 +300,7 @@ export function DataTableHead({
 }: TableHTMLAttributes<HTMLTableSectionElement>) {
   return (
     <thead
-      className={clsx(
-        "bg-subtle text-[11px] uppercase tracking-wider text-muted",
-        className,
-      )}
+      className={clsx("bg-subtle text-[11px] uppercase tracking-wider text-muted", className)}
       {...rest}
     >
       {children}
@@ -356,10 +338,7 @@ export function DataTableRow({
 }: HTMLAttributes<HTMLTableRowElement>) {
   return (
     <tr
-      className={clsx(
-        "border-t border-border transition-colors hover:bg-hover",
-        className,
-      )}
+      className={clsx("border-t border-border transition-colors hover:bg-hover", className)}
       {...rest}
     >
       {children}

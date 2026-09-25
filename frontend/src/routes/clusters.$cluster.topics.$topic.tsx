@@ -2,11 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { X } from "lucide-react";
-import {
-  fetchTopicConsumers,
-  fetchTopicDetail,
-  type TopicDetail,
-} from "@/lib/api";
+import { fetchTopicConsumers, fetchTopicDetail, type TopicDetail } from "@/lib/api";
 import { Tag } from "@/components/Tag";
 import { KpiCard } from "@/components/KpiCard";
 import { Notice } from "@/components/Notice";
@@ -88,9 +84,7 @@ function TopicDetailLayout() {
       </div>
 
       {!cluster && (
-        <Notice intent="warning">
-          Pick a cluster from the header to load topic detail.
-        </Notice>
+        <Notice intent="warning">Pick a cluster from the header to load topic detail.</Notice>
       )}
 
       <KpiStrip detail={detailQuery.data} consumers={consumersQuery.data} />
@@ -98,7 +92,8 @@ function TopicDetailLayout() {
       {configsError === "unauthorized" && !configWarningDismissed && (
         <div className="relative">
           <Notice intent="info">
-            Topic configuration access is restricted. Config details and retention info are unavailable for this topic.
+            Topic configuration access is restricted. Config details and retention info are
+            unavailable for this topic.
           </Notice>
           <button
             type="button"
@@ -139,11 +134,7 @@ function Breadcrumbs({ cluster, topic }: { cluster: string; topic: string }) {
     <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted">
       <span>{cluster || "—"}</span>
       <span>›</span>
-      <Link
-        to="/clusters/$cluster/topics"
-        params={{ cluster }}
-        className="hover:text-text"
-      >
+      <Link to="/clusters/$cluster/topics" params={{ cluster }} className="hover:text-text">
         Topics
       </Link>
       <span>›</span>

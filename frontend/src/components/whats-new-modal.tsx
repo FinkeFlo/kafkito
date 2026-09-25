@@ -1,11 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/button";
 import { Modal } from "@/components/Modal";
-import {
-  CHANGELOG,
-  type ChangelogEntry,
-  type ChangelogItemType,
-} from "@/content/changelog";
+import { CHANGELOG, type ChangelogEntry, type ChangelogItemType } from "@/content/changelog";
 import { normalizeVersion } from "@/lib/whats-new";
 
 // Token-only badge styling. Refine per DESIGN_GUIDELINES if needed; keep
@@ -16,13 +12,7 @@ const BADGE: Record<ChangelogItemType, { label: string; cls: string }> = {
   security: { label: "Security", cls: "border border-border text-danger" },
 };
 
-function EntryBlock({
-  entry,
-  defaultOpen,
-}: {
-  entry: ChangelogEntry;
-  defaultOpen: boolean;
-}) {
+function EntryBlock({ entry, defaultOpen }: { entry: ChangelogEntry; defaultOpen: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <section className="border-b border-border py-3 last:border-b-0">
@@ -32,9 +22,7 @@ function EntryBlock({
         className="flex w-full items-center justify-between text-left"
         aria-expanded={open}
       >
-        <span className="font-mono text-sm font-semibold text-text">
-          v{entry.version}
-        </span>
+        <span className="font-mono text-sm font-semibold text-text">v{entry.version}</span>
         <span className="text-xs text-subtle-text">{entry.date}</span>
       </button>
       {open && (
@@ -49,9 +37,7 @@ function EntryBlock({
               <div>
                 <span className="font-medium text-text">{it.title}</span>
                 {it.description ? (
-                  <span className="mt-0.5 block text-muted">
-                    {it.description}
-                  </span>
+                  <span className="mt-0.5 block text-muted">{it.description}</span>
                 ) : null}
                 {it.screenshot ? (
                   <img
@@ -78,9 +64,7 @@ export function WhatsNewModal({
   onClose: () => void;
 }) {
   const current = currentVersion ? normalizeVersion(currentVersion) : undefined;
-  const matchIdx = current
-    ? CHANGELOG.findIndex((e) => e.version === current)
-    : -1;
+  const matchIdx = current ? CHANGELOG.findIndex((e) => e.version === current) : -1;
   return (
     <Modal
       open

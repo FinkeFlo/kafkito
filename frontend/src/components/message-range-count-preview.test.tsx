@@ -15,9 +15,7 @@ vi.mock("@/lib/api", async (importActual) => {
   return { ...actual, fetchMessageCount };
 });
 
-function renderPreview(
-  props?: Partial<ComponentProps<typeof MessageRangeCountPreview>>,
-) {
+function renderPreview(props?: Partial<ComponentProps<typeof MessageRangeCountPreview>>) {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -134,9 +132,7 @@ describe("MessageRangeCountPreview", () => {
       });
     });
 
-    await waitFor(() =>
-      expect(screen.getByText("≈ 275 messages")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("≈ 275 messages")).toBeInTheDocument());
   });
 
   it("shows a paused snapshot state while live mode is enabled", () => {
@@ -152,9 +148,7 @@ describe("MessageRangeCountPreview", () => {
       cluster: "c1",
       topic: "orders",
       total_approx_count: 3504776,
-      partitions: [
-        { partition: 0, from_offset: 1000, to_offset: 3505776, approx_count: 3504776 },
-      ],
+      partitions: [{ partition: 0, from_offset: 1000, to_offset: 3505776, approx_count: 3504776 }],
     });
 
     renderPreview();

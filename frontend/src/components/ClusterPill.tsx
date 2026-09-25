@@ -178,7 +178,9 @@ export function ClusterPill({ className }: { className?: string }) {
         <span className="font-mono text-[12px] font-semibold">{activeInfo?.name ?? "-"}</span>
         {activeInfo && (
           <>
-            <span className="text-muted" aria-hidden>·</span>
+            <span className="text-muted" aria-hidden>
+              ·
+            </span>
             <span className="text-text">{brokersHint(activeInfo)}</span>
           </>
         )}

@@ -29,10 +29,7 @@ export function markSeen(version: string): void {
   }
 }
 
-export function hasUnseen(
-  current: string | undefined,
-  lastSeen: string | null,
-): boolean {
+export function hasUnseen(current: string | undefined, lastSeen: string | null): boolean {
   return !!current && current !== lastSeen;
 }
 

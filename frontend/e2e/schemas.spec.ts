@@ -21,9 +21,7 @@ test.describe("Schemas tab (capability-driven)", () => {
 
     await expect(page.getByRole("heading", { level: 1, name: "Schemas" })).toBeVisible();
     await expect(page.getByText(/Schemas not configured/i)).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /^\+ Register schema$/ }),
-    ).toBeDisabled();
+    await expect(page.getByRole("button", { name: /^\+ Register schema$/ })).toBeDisabled();
   });
 
   test("schemas link omits '(—)' suffix and is not aria-disabled when active cluster has SR", async ({

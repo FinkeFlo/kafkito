@@ -1,11 +1,5 @@
 import type { ReactNode } from "react";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Info,
-  XCircle,
-  type LucideIcon,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, XCircle, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type NoticeIntent = "info" | "success" | "warning" | "danger";
@@ -73,14 +67,7 @@ const ariaRole: Record<NoticeIntent, "status" | "alert"> = {
  * confirmations that aren't transient toasts. Pairs colour with an icon
  * so the intent survives monochrome rendering.
  */
-export function Notice({
-  intent,
-  title,
-  children,
-  icon,
-  actions,
-  className,
-}: NoticeProps) {
+export function Notice({ intent, title, children, icon, actions, className }: NoticeProps) {
   const Icon = defaultIcon[intent];
   return (
     <div
@@ -103,9 +90,7 @@ export function Notice({
       </div>
       <div className="min-w-0 flex-1 space-y-1">
         {title ? (
-          <div className={cn("text-sm font-semibold", iconToneByIntent[intent])}>
-            {title}
-          </div>
+          <div className={cn("text-sm font-semibold", iconToneByIntent[intent])}>{title}</div>
         ) : null}
         <div className="text-sm text-text">{children}</div>
         {actions ? <div className="pt-2">{actions}</div> : null}

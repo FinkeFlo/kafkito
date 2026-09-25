@@ -19,25 +19,15 @@ describe("changelog copy budget", () => {
     expect(item.title.length).toBeLessThanOrEqual(MAX_CHANGELOG_TITLE_LENGTH);
   });
 
-  it.each(items)(
-    "v$version description fits two lines: $item.title",
-    ({ item }) => {
-      expect(item.description?.length ?? 0).toBeLessThanOrEqual(
-        MAX_CHANGELOG_DESCRIPTION_LENGTH,
-      );
-    },
-  );
+  it.each(items)("v$version description fits two lines: $item.title", ({ item }) => {
+    expect(item.description?.length ?? 0).toBeLessThanOrEqual(MAX_CHANGELOG_DESCRIPTION_LENGTH);
+  });
 
-  it.each(items)(
-    "v$version description is not empty or a restatement: $item.title",
-    ({ item }) => {
-      if (item.description === undefined) return;
-      expect(item.description.trim()).not.toBe("");
-      expect(item.description.trim().toLowerCase()).not.toBe(
-        item.title.trim().toLowerCase(),
-      );
-    },
-  );
+  it.each(items)("v$version description is not empty or a restatement: $item.title", ({ item }) => {
+    if (item.description === undefined) return;
+    expect(item.description.trim()).not.toBe("");
+    expect(item.description.trim().toLowerCase()).not.toBe(item.title.trim().toLowerCase());
+  });
 });
 
 describe("changelog structure", () => {

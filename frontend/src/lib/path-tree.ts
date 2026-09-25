@@ -1,10 +1,4 @@
-export type PathType =
-  | "string"
-  | "number"
-  | "boolean"
-  | "null"
-  | "object"
-  | "array";
+export type PathType = "string" | "number" | "boolean" | "null" | "object" | "array";
 
 export interface PathInfo {
   type: PathType;

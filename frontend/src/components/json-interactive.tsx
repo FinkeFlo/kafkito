@@ -3,10 +3,7 @@ import { buildJsonPath, type Token } from "@/lib/path-builder";
 
 export interface JsonInteractiveProps {
   value: unknown;
-  onPick: (
-    trail: Token[],
-    leafValue: unknown,
-  ) => void;
+  onPick: (trail: Token[], leafValue: unknown) => void;
 }
 
 /**
@@ -52,12 +49,7 @@ export function JsonInteractive({ value, onPick }: JsonInteractiveProps) {
   }
   return (
     <pre className="overflow-auto rounded border border-border bg-panel p-2 text-xs">
-      <Node
-        node={value}
-        trail={[]}
-        onPick={onPick}
-        indent={0}
-      />
+      <Node node={value} trail={[]} onPick={onPick} indent={0} />
     </pre>
   );
 }
@@ -65,22 +57,13 @@ export function JsonInteractive({ value, onPick }: JsonInteractiveProps) {
 interface NodeProps {
   node: unknown;
   trail: Token[];
-  onPick: (
-    trail: Token[],
-    leafValue: unknown,
-  ) => void;
+  onPick: (trail: Token[], leafValue: unknown) => void;
   indent: number;
 }
 
 function Node({ node, trail, onPick, indent }: NodeProps) {
   if (node === null || typeof node !== "object") {
-    return (
-      <ClickableScalar
-        trail={trail}
-        value={node}
-        onPick={onPick}
-      />
-    );
+    return <ClickableScalar trail={trail} value={node} onPick={onPick} />;
   }
   if (Array.isArray(node)) {
     return (
@@ -110,10 +93,7 @@ function ClickableScalar({
 }: {
   trail: Token[];
   value: unknown;
-  onPick: (
-    trail: Token[],
-    leafValue: unknown,
-  ) => void;
+  onPick: (trail: Token[], leafValue: unknown) => void;
 }) {
   return (
     <button
@@ -121,11 +101,7 @@ function ClickableScalar({
       onClick={() => onPick(trail, value)}
       className="cursor-pointer rounded px-0.5 hover:bg-accent-subtle"
     >
-      {value === null
-        ? "null"
-        : typeof value === "string"
-          ? `"${value}"`
-          : String(value)}
+      {value === null ? "null" : typeof value === "string" ? `"${value}"` : String(value)}
     </button>
   );
 }
@@ -138,10 +114,7 @@ function ObjectNode({
 }: {
   obj: Record<string, unknown>;
   trail: Token[];
-  onPick: (
-    trail: Token[],
-    leafValue: unknown,
-  ) => void;
+  onPick: (trail: Token[], leafValue: unknown) => void;
   indent: number;
 }) {
   const pad = "  ".repeat(indent);
@@ -165,12 +138,7 @@ function ObjectNode({
               {`"${k}"`}
             </button>
             {": "}
-            <Node
-              node={v}
-              trail={childTrail}
-              onPick={onPick}
-              indent={indent + 1}
-            />
+            <Node node={v} trail={childTrail} onPick={onPick} indent={indent + 1} />
             {i < entries.length - 1 ? "," : ""}
             {"\n"}
           </span>
@@ -190,15 +158,10 @@ function ArrayNode({
 }: {
   arr: unknown[];
   trail: Token[];
-  onPick: (
-    trail: Token[],
-    leafValue: unknown,
-  ) => void;
+  onPick: (trail: Token[], leafValue: unknown) => void;
   indent: number;
 }) {
-  const [expanded, setExpanded] = useState(
-    arr.length <= ARRAY_COLLAPSE_THRESHOLD,
-  );
+  const [expanded, setExpanded] = useState(arr.length <= ARRAY_COLLAPSE_THRESHOLD);
   const pad = "  ".repeat(indent);
   const inner = "  ".repeat(indent + 1);
   if (!expanded) {
@@ -224,12 +187,7 @@ function ArrayNode({
         return (
           <span key={i}>
             {inner}
-            <Node
-              node={item}
-              trail={childTrail}
-              onPick={onPick}
-              indent={indent + 1}
-            />
+            <Node node={item} trail={childTrail} onPick={onPick} indent={indent + 1} />
             {i < arr.length - 1 ? "," : ""}
             {"\n"}
           </span>

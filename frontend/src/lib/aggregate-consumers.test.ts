@@ -1,19 +1,12 @@
 import { describe, expect, it } from "vitest";
-import {
-  aggregateConsumers,
-  aggregateConsumersFromInfo,
-} from "./aggregate-consumers";
+import { aggregateConsumers, aggregateConsumersFromInfo } from "./aggregate-consumers";
 import type { GroupDetail, GroupInfo, GroupOffset } from "./api";
 
 const lagLow = 5;
 const lagMid = 50;
 const lagHigh = 500;
 
-function offset(
-  topic: string,
-  partition: number,
-  lag: number | undefined,
-): GroupOffset {
+function offset(topic: string, partition: number, lag: number | undefined): GroupOffset {
   return {
     topic,
     partition,
@@ -114,11 +107,7 @@ describe("aggregateConsumers", () => {
 
     const result = aggregateConsumers([groupLow, groupHigh, groupMid]);
 
-    expect(result.get("orders")?.map((e) => e.lag)).toEqual([
-      lagHigh,
-      lagMid,
-      lagLow,
-    ]);
+    expect(result.get("orders")?.map((e) => e.lag)).toEqual([lagHigh, lagMid, lagLow]);
   });
 
   it("breaks lag ties by group_id ascending (C6 / M2 mutation-guard)", () => {
@@ -137,11 +126,7 @@ describe("aggregateConsumers", () => {
 
     const result = aggregateConsumers([groupZ, groupA, groupM]);
 
-    expect(result.get("orders")?.map((e) => e.group)).toEqual([
-      "alpha",
-      "mu",
-      "zeta",
-    ]);
+    expect(result.get("orders")?.map((e) => e.group)).toEqual(["alpha", "mu", "zeta"]);
   });
 
   it("falls back to members === 0 when members is not an array (C7 / M4 mutation-guard)", () => {
@@ -195,10 +180,7 @@ describe("aggregateConsumers", () => {
   it("treats nullish per-offset lag as 0 in the per-topic sum (C9 / M5 mutation-guard)", () => {
     const groupA = group({
       group_id: "group-a",
-      offsets: [
-        offset("orders", 0, undefined),
-        offset("orders", 1, lagLow),
-      ],
+      offsets: [offset("orders", 0, undefined), offset("orders", 1, lagLow)],
     });
 
     const result = aggregateConsumers([groupA]);
