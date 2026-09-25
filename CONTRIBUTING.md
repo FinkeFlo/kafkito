@@ -26,6 +26,32 @@ GitHub Actions.
 - Frontend: Tailwind tokens from `@theme`; the default palette is disabled there. See `docs/DESIGN_GUIDELINES.md`.
 - UI strings and code comments are English only. No emojis in UI chrome, logs, or commit messages.
 
+## Releasing
+
+Releases are cut manually by pushing a signed `v*` tag; everything else is
+automated by `.github/workflows/release.yml` and `.goreleaser.yaml`.
+
+1. In the release-prep commit, add an entry for the new version (without the
+   leading `v`) and today's date (`YYYY-MM-DD`) to
+   `frontend/src/content/changelog.ts`. This is the curated, user-facing
+   "What's new" shown in the app. Check it with
+   `make release-check VERSION=vX.Y.Z`.
+2. Tag and push: `git tag -s vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`.
+3. The `release-gate` job fails the release before anything is built if step 1
+   is missing. Then goreleaser builds the binaries and archives (with
+   `SHA256SUMS` and SBOMs), pushes the `ghcr.io/finkeflo/kafkito` images
+   (`vX.Y.Z`, `latest`, and the `-btp` / `-local` variants) and publishes the
+   GitHub release. Tags with a pre-release suffix (e.g. `v1.2.0-rc.1`) are
+   marked as pre-releases.
+
+The GitHub release notes are generated from the Conventional Commit subjects
+since the previous tag (grouped into Features, Bug Fixes, Security, Others and
+Dependencies; `chore`, `ci`, `test`, `style` and `docs(changelog)` are left
+out), so write commit subjects for humans.
+
+`make release-snapshot` runs the whole pipeline locally without publishing
+(requires goreleaser v2, Docker with buildx and syft); output goes to `./dist`.
+
 ## Secret scanning
 
 Secrets must never enter the repo. Three layers protect against accidents:
