@@ -37,9 +37,50 @@ jobs:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
+      # api/openapi.yaml is the HTTP contract (ADR-0005). Keep the Redocly
+      # version in sync with REDOCLY_VERSION in the Makefile.
+      - name: Lint OpenAPI spec
+        working-directory: .
+        run: bunx @redocly/cli@2.54.3 lint api/openapi.yaml
+      - name: Check generated API types are up to date
+        run: |
+          bun run api:generate
+          git diff --exit-code -- src/lib/api.gen.ts
       - run: bun run lint
       - run: bun run build
       - run: bun run test
+
+  api-breaking:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Extract base spec
+        id: base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          mkdir -p .oasdiff-base
+          if git cat-file -e "$BASE_SHA:api/openapi.yaml" 2>/dev/null; then
+            git show "$BASE_SHA:api/openapi.yaml" > .oasdiff-base/openapi.yaml
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::api/openapi.yaml does not exist on the PR base; skipping the breaking-change check."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Check for breaking API changes
+        if: steps.base.outputs.present == 'true'
+        uses: oasdiff/oasdiff-action/breaking@5e81b5c380accc6b523f9d32a637ca630e33620b # v0.1.17
+        with:
+          base: .oasdiff-base/openapi.yaml
+          revision: api/openapi.yaml
+          fail-on: ERR
+          # Keep the specs inside CI: no upload to oasdiff.com, no PR comment.
+          review: "false"
+          github-token: ""
 
   docker-build:
     runs-on: ubuntu-24.04
