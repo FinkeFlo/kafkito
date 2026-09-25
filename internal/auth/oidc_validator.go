@@ -27,14 +27,15 @@ type OIDCConfig struct {
 	// contain this value are rejected.
 	Audience string
 	// JWKSEndpoint is the URL serving the issuer's JSON Web Key Set used to
-	// verify token signatures. Required: this generic validator does not
-	// auto-discover via /.well-known/openid-configuration.
+	// verify token signatures. Required by NewOIDCValidator, which does not
+	// auto-discover; the "oidc" mode factory resolves it via
+	// DiscoverJWKSURL when unset.
 	JWKSEndpoint string
 }
 
 // OIDCValidator validates RS-signed JWTs against a fixed issuer/audience and
-// a JWKS endpoint. Use this as the default "mock" mode validator, and as a
-// drop-in for any OIDC IdP that publishes a JWKS URL.
+// a JWKS endpoint. It backs both the "mock" and the generic "oidc" modes and
+// works with any OIDC IdP that publishes a JWKS URL.
 type OIDCValidator struct {
 	cfg   OIDCConfig
 	cache *jwk.Cache
@@ -61,6 +62,9 @@ func NewOIDCValidator(cfg OIDCConfig) (*OIDCValidator, error) {
 	}
 	return &OIDCValidator{cfg: cfg, cache: cache}, nil
 }
+
+// Config returns the issuer/audience/JWKS settings the validator enforces.
+func (o *OIDCValidator) Config() OIDCConfig { return o.cfg }
 
 // Validate parses and signature-verifies raw, then enforces iss/aud/exp/nbf.
 func (o *OIDCValidator) Validate(ctx context.Context, raw string) (*Principal, error) {

@@ -19,7 +19,7 @@ var ErrModeUnavailable = errors.New("auth mode unavailable in this build")
 type ModeConfig struct {
 	// Mode selects which registered factory to use (e.g. "off", "mock"). The
 	// set of valid values depends on the build tags the binary was compiled
-	// with: a default build registers "off" and "mock"; tagged builds may
+	// with: every build registers "off", "mock" and "oidc"; tagged builds may
 	// register additional IdP-specific modes.
 	Mode string
 	// VCAPServices is the raw VCAP_SERVICES JSON, used by IdP modes that
@@ -28,6 +28,9 @@ type ModeConfig struct {
 	// XSAppName is an IdP-specific application identifier consumed by modes
 	// that need it. Ignored by the generic modes.
 	XSAppName string
+	// OIDC holds the issuer, audience and optional JWKS URL for the generic
+	// "oidc" mode. An empty JWKSEndpoint triggers OpenID Connect discovery.
+	OIDC OIDCConfig
 }
 
 // ModeFactory constructs a Validator for a registered auth mode. The returned

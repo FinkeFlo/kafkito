@@ -64,15 +64,20 @@ func main() {
 	// it's cancelled on shutdown; registry.Close() also waits for it.
 	registry.StartMetrics(ctx, 0)
 
+	// config.Load binds KAFKITO_AUTH_MODE to auth.mode; empty means "off".
 	mode := cfg.Auth.Mode
-	if mode == "" {
-		mode = os.Getenv("KAFKITO_AUTH_MODE")
-	}
 	if mode == "" {
 		mode = "off"
 	}
 
-	modeCfg := auth.ModeConfig{Mode: mode}
+	modeCfg := auth.ModeConfig{
+		Mode: mode,
+		OIDC: auth.OIDCConfig{
+			IssuerURL:    cfg.Auth.OIDC.IssuerURL,
+			Audience:     cfg.Auth.OIDC.Audience,
+			JWKSEndpoint: cfg.Auth.OIDC.JWKSURL,
+		},
+	}
 	populateAuthConfigFromEnv(&modeCfg)
 	validator, cleanup, err := auth.BuildValidator(modeCfg)
 	if err != nil {
@@ -80,7 +85,12 @@ func main() {
 		os.Exit(2)
 	}
 	defer cleanup()
-	logger.Info("auth initialised", "mode", mode)
+	authAttrs := []any{"mode", mode}
+	if ov, ok := validator.(*auth.OIDCValidator); ok && mode == config.AuthModeOIDC {
+		oc := ov.Config()
+		authAttrs = append(authAttrs, "issuer", oc.IssuerURL, "audience", oc.Audience, "jwks_url", oc.JWKSEndpoint)
+	}
+	logger.Info("auth initialised", authAttrs...)
 
 	addr := listenAddress(cfg.Server.Addr)
 	if err := guardAuthMode(mode, addr, os.Getenv); err != nil {
