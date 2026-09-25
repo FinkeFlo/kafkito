@@ -16,13 +16,6 @@ consumer groups, schemas, ACLs, and RBAC-aware operations in one place.
 - **HTTP API:** [API reference](API.md)
 - **Design notes:** [ADR overview](adr/0001-greenfield-apache2.md)
 
-## What this site will cover
-
-- Product overview and screenshots
-- Local setup and deployment
-- API and operational workflows
-- Architecture decisions and implementation notes
-
 ## Related docs
 
 | Page | Purpose |

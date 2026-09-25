@@ -8,9 +8,18 @@ endpoints that back the web UI — stable, documented, scriptable.
 - Base URL defaults to wherever you point `kafkito`. When you run it locally
   with `./bin/kafkito --config .local/kafkito.yaml`, that's typically
   `http://localhost:37421`.
-- No built-in login. If RBAC is configured, identity is read from the
-  `X-User` header (forwarded by your reverse proxy). With no RBAC configured,
-  the API is open.
+- No built-in login. Login and sessions are handled by an upstream auth
+  proxy (e.g. SAP Approuter on BTP, oauth2-proxy elsewhere), which forwards
+  requests with `Authorization: Bearer <JWT>`. kafkito validates that token
+  on every `/api/v1/*` request according to `KAFKITO_AUTH_MODE` (`mock`,
+  `xsuaa` in `-tags btp` builds, `off` only in `-tags devauth` builds) and
+  answers `401` when it is missing or invalid.
+- The verified JWT principal is the RBAC identity. The identity header
+  (`X-Kafkito-User` by default, configurable via `rbac.identity.header`) is
+  only consulted when no principal is present on the request; a
+  client-supplied header never overrides a validated token. Note that the
+  devauth `off` mode injects a synthetic `dev-user` principal. With no RBAC
+  configured, every authenticated caller has full access.
 - JSON everywhere. Request bodies: `Content-Type: application/json`. Response
   bodies: list endpoints always return `{ "<resource>": [...] }`, not bare
   arrays, so new fields can be added without breaking clients.
