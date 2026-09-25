@@ -28,6 +28,26 @@ GitHub Actions.
 4. Open a PR with a clear description and a Test plan.
 5. Sign off your commits (`-s`).
 
+## Pre-commit hooks
+
+Optional. `.pre-commit-config.yaml` defines lean hooks that only look at
+staged files:
+
+- `gitleaks` — blocks credentials (see [Secret scanning](#secret-scanning)).
+- `golangci-lint-fmt` — gofmt/goimports via the pinned golangci-lint in
+  `./bin` (installed on first use, like `make lint`).
+- `biome-check` — Biome for `frontend/src`; needs `make frontend-install`.
+
+Enable them once per clone:
+
+```sh
+brew install pre-commit   # or: pipx install pre-commit
+pre-commit install
+```
+
+The formatter hook rewrites files in place and fails the commit; review and
+stage the changes, then commit again. `make check` and CI remain the gate.
+
 ## Style
 
 - Backend: idiomatic Go 1.26, golangci-lint clean.
@@ -64,11 +84,8 @@ out), so write commit subjects for humans.
 
 Secrets must never enter the repo. Three layers protect against accidents:
 
-1. **Local pre-commit hook (Gitleaks).** Run once after cloning:
-   ```sh
-   brew install pre-commit   # or: pipx install pre-commit
-   pre-commit install
-   ```
+1. **Local pre-commit hook (Gitleaks).** Enable the
+   [pre-commit hooks](#pre-commit-hooks) once after cloning;
    `git commit` then aborts when Gitleaks finds a credential in the staged diff.
 2. **CI scan (TruffleHog).** `.github/workflows/secret-scan.yml` scans every push to `main` and every PR. Verified findings fail the job.
 3. **GitHub Push Protection.** Enabled in repo settings; blocks pushes containing recognised provider tokens server-side.

@@ -1,5 +1,24 @@
+# Optional local hooks; see CONTRIBUTING.md ("Pre-commit hooks").
 repos:
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
     hooks:
       - id: gitleaks
+
+  # Use the repo's pinned tools, so results match `make lint` and
+  # `make frontend-check`.
+  - repo: local
+    hooks:
+      - id: golangci-lint-fmt
+        name: gofmt/goimports (golangci-lint fmt)
+        language: system
+        types: [go]
+        entry: sh -c 'make -s lint-install && bin/golangci-lint fmt "$@"' --
+      - id: biome-check
+        name: biome check (frontend)
+        language: system
+        files: ^frontend/src/.*\.(ts|tsx)$
+        entry: >-
+          bash -c 'cd frontend &&
+          { [ -x node_modules/.bin/biome ] || { echo "biome missing: run make frontend-install" >&2; exit 1; }; } &&
+          exec node_modules/.bin/biome check --no-errors-on-unmatched --files-ignore-unknown=true "${@#frontend/}"' --
