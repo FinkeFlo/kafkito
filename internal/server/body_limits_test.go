@@ -224,3 +224,89 @@ func (e *emptyDeflateBlocks) Read(p []byte) (int, error) {
 	e.n += int64(len(p))
 	return len(p), nil
 }
+
+// The consumer group, schema, ACL and SCRAM user bodies keep their former
+// limits and messages: 1 MiB for groups, 2 MiB for schemas (they can be
+// large) and 16 KiB for ACLs and users, all capped before the validator.
+func TestAdminOps_BodyLimits(t *testing.T) {
+	t.Parallel()
+	h := adminServer(t, startFakeSchemaRegistry(t))
+	const cluster = "/api/v1/clusters/kf"
+	invalidBody := `{"error":"invalid body: http: request body too large"}`
+	invalidJSON := `{"error":"invalid json: http: request body too large"}`
+
+	for _, tc := range []struct {
+		name, method, path string
+		atLimit, overLimit string
+		limit, wantOK      int
+		wantTooLarge       string
+	}{
+		{"createGroup", http.MethodPost, cluster + "/groups", `{"group_id":"limit-a","topic":"orders","strategy":"latest"}`, `{"group_id":"limit-b","topic":"orders","strategy":"latest"}`, maxGroupBodyBytes, http.StatusOK, invalidBody},
+		{"resetGroupOffsets", http.MethodPost, cluster + "/groups/limit-reset/reset-offsets", `{"topic":"orders","strategy":"latest"}`, `{"topic":"orders","strategy":"latest"}`, maxGroupBodyBytes, http.StatusOK, invalidBody},
+		{"registerSchema", http.MethodPost, cluster + "/schemas/subjects/limit-value/versions", `{"schema":"\"string\""}`, `{"schema":"\"string\""}`, maxRegisterSchemaBodyBytes, http.StatusOK, invalidBody},
+		{"createAcl", http.MethodPost, cluster + "/acls", validACL, validACL, maxACLBodyBytes, http.StatusCreated, invalidJSON},
+		{"deleteAcl", http.MethodDelete, cluster + "/acls", validACL, validACL, maxACLBodyBytes, http.StatusOK, invalidJSON},
+		{"upsertScramUser", http.MethodPost, cluster + "/users", `{"user":"limit","mechanism":"SCRAM-SHA-256","password":"pw"}`, `{"user":"limit","mechanism":"SCRAM-SHA-256","password":"pw"}`, maxSCRAMBodyBytes, http.StatusOK, invalidJSON},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := sendBody(h, tc.method, tc.path, strings.NewReader(padJSON(t, tc.atLimit, tc.limit)), nil)
+			assert.Equal(t, tc.wantOK, rec.Code, "at the limit: %s", rec.Body.String())
+
+			rec = sendBody(h, tc.method, tc.path, strings.NewReader(padJSON(t, tc.overLimit, tc.limit+1)), nil)
+			assert.Equal(t, http.StatusBadRequest, rec.Code)
+			assert.JSONEq(t, tc.wantTooLarge, rec.Body.String())
+
+			src := &countingReader{}
+			rec = sendBody(h, tc.method, tc.path, src, nil)
+			assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+			assert.LessOrEqual(t, src.n, int64(tc.limit)+64<<10, "read %d bytes", src.n)
+		})
+	}
+	assert.Equal(t, 1<<20, maxGroupBodyBytes)
+	assert.Equal(t, 2<<20, maxRegisterSchemaBodyBytes)
+	assert.Equal(t, 16<<10, maxACLBodyBytes)
+	assert.Equal(t, 16<<10, maxSCRAMBodyBytes)
+}
+
+// With RBAC on, the middleware reads group_id from the create-group body
+// before the route's limit applies. That read is capped at the same 1 MiB,
+// and the body it read still reaches the validator and the handler.
+func TestCreateGroup_RBACBodyRead(t *testing.T) {
+	t.Parallel()
+	c := newKfake(t, "orders")
+	fetchOffsetsLikeKafka(c)
+	reg := kafkapkg.NewRegistry([]config.ClusterConfig{{Name: "kf", Brokers: []string{c.ListenAddrs()[0]}}}, slog.Default())
+	t.Cleanup(reg.Close)
+	h := New(Options{Version: "test", Logger: slog.Default(), Registry: reg, Config: config.Config{RBAC: config.RBACConfig{
+		Enabled:  true,
+		Identity: config.IdentityConfig{Header: rbacTestHeader},
+		Roles:    []config.RoleConfig{{Name: "grouper", Permissions: []config.PermissionConfig{{Resource: "group:allowed-*", Actions: []string{"edit"}}}}},
+		Subjects: []config.SubjectConfig{{User: userMallory, Roles: []string{"grouper"}}},
+	}}})
+	user := map[string]string{rbacTestHeader: userMallory}
+	const path = "/api/v1/clusters/kf/groups"
+	body := func(group string) string {
+		return `{"group_id":"` + group + `","topic":"orders","strategy":"latest"}`
+	}
+
+	rec := sendBody(h, http.MethodPost, path, strings.NewReader(padJSON(t, body("allowed-a"), maxJSONBodyBytes)), user)
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), `"group":"allowed-a"`)
+
+	rec = sendBody(h, http.MethodPost, path, strings.NewReader(`{"group_id":"allowed-b","topic":"orders","strategy":"latest","bogus":1}`), user)
+	assert.Equal(t, http.StatusBadRequest, rec.Code, "the validator sees the body the middleware read")
+	assert.Contains(t, rec.Body.String(), `"code":"invalid_request"`)
+
+	rec = sendBody(h, http.MethodPost, path, strings.NewReader(body("denied")), user)
+	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), `"resource":"group:denied"`)
+
+	rec = sendBody(h, http.MethodPost, path, strings.NewReader(padJSON(t, body("allowed-c"), maxJSONBodyBytes+1)), user)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.JSONEq(t, `{"error":"invalid body: http: request body too large"}`, rec.Body.String())
+
+	src := &countingReader{}
+	rec = sendBody(h, http.MethodPost, path, src, user)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.LessOrEqual(t, src.n, int64(maxJSONBodyBytes)+64<<10, "read %d bytes", src.n)
+}
