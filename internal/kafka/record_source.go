@@ -43,21 +43,29 @@ type scanCursor struct {
 	done              bool // the record at upper-1 (or beyond) was seen
 }
 
-// scanRecords reads the ranges of s and yields the in-range records of every
-// poll as one batch, in the order the client returned them. Batches are the
-// unit callers budget on: ConsumeMessages merges and truncates whole polls,
+// recordBatch is what one poll of a scan produced.
+type recordBatch struct {
+	// records are the in-range records, in the order the client returned them.
+	records []*kgo.Record
+	// drained lists the partitions whose range this poll finished.
+	drained []int32
+}
+
+// scanRecords reads the ranges of s and yields one batch per poll that
+// returned in-range records or finished a range. Batches are the unit
+// callers budget on: ConsumeMessages merges and truncates whole polls,
 // SearchMessages checks its scan budget and limit after each poll.
 //
 // The sequence ends once every range is drained or the caller stops. It
 // yields ctx.Err() when ctx ends and a wrapped error when a fetch fails, and
 // stops after any error. The short-lived consumer client is created on the
 // first pull and always closed when the sequence ends.
-func (r *Registry) scanRecords(ctx context.Context, s recordScan) iter.Seq2[[]*kgo.Record, error] {
-	return func(yield func([]*kgo.Record, error) bool) {
+func (r *Registry) scanRecords(ctx context.Context, s recordScan) iter.Seq2[recordBatch, error] {
+	return func(yield func(recordBatch, error) bool) {
 		cursors := s.cursors()
 		cl, err := r.scanClient(s, cursors)
 		if err != nil {
-			yield(nil, err)
+			yield(recordBatch{}, err)
 			return
 		}
 		defer cl.Close()
@@ -66,14 +74,14 @@ func (r *Registry) scanRecords(ctx context.Context, s recordScan) iter.Seq2[[]*k
 		for len(cursors) > 0 {
 			fetches := cl.PollFetches(ctx)
 			if err := ctx.Err(); err != nil {
-				yield(nil, err)
+				yield(recordBatch{}, err)
 				return
 			}
 			if err := s.fetchError(fetches); err != nil {
-				yield(nil, err)
+				yield(recordBatch{}, err)
 				return
 			}
-			batch := inRange(fetches, cursors)
+			records := inRange(fetches, cursors)
 			emptyPolls++
 			if !fetches.Empty() {
 				emptyPolls = 0
@@ -83,7 +91,8 @@ func (r *Registry) scanRecords(ctx context.Context, s recordScan) iter.Seq2[[]*k
 					c.done = true
 				}
 			}
-			if len(batch) > 0 && !yield(batch, nil) {
+			batch := recordBatch{records: records, drained: exhausted(cursors)}
+			if (len(batch.records) > 0 || len(batch.drained) > 0) && !yield(batch, nil) {
 				return
 			}
 			s.advance(cl, cursors)
@@ -152,6 +161,18 @@ func inRange(fetches kgo.Fetches, cursors map[int32]*scanCursor) []*kgo.Record {
 		}
 	})
 	return batch
+}
+
+// exhausted returns the partitions whose done chunk is the last one of their
+// range, i.e. the partitions the next advance drops.
+func exhausted(cursors map[int32]*scanCursor) []int32 {
+	var out []int32
+	for p, c := range cursors {
+		if c.done && c.pos <= c.lower {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // advance moves every done partition to its next chunk, or drops it when its
