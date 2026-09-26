@@ -293,6 +293,10 @@ func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, o
 
 	collected := make(map[int32][]Message, len(windows))
 	totalForward := 0
+	// reached tracks windows whose last offset (stop-1) has been delivered.
+	// PollFetches never returns an empty fetch for a drained partition, so
+	// this is the only reliable signal that a short page is complete.
+	reached := make(map[int32]bool, len(windows))
 
 	pollCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
@@ -300,6 +304,9 @@ func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, o
 	policy := r.MaskingPolicy(cluster)
 	dec := r.srDecoderFor(cluster)
 
+	allReached := func() bool {
+		return len(reached) == len(windows)
+	}
 	enough := func() bool {
 		if direction == CursorForward {
 			return totalForward >= opts.Limit
@@ -317,7 +324,7 @@ func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, o
 	}
 
 	emptyStreak := 0
-	for !enough() {
+	for !enough() && !allReached() {
 		fetches := cl.PollFetches(pollCtx)
 		if errs := fetches.Errors(); len(errs) > 0 {
 			if errors.Is(pollCtx.Err(), context.DeadlineExceeded) {
@@ -350,6 +357,9 @@ func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, o
 			}
 			if rec.Offset < w.begin || rec.Offset >= w.stop {
 				return
+			}
+			if rec.Offset >= w.stop-1 {
+				reached[rec.Partition] = true
 			}
 			m := recordToMessage(rec)
 			m.applySRDecoder(ctx, dec, rec.Key, rec.Value)
