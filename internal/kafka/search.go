@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"sort"
 	"strings"
 	"time"
 
@@ -178,47 +177,38 @@ func (o SearchOptions) compile() (matcher, error) {
 	}
 }
 
-// requested time range, cursor overrides and partition metadata.
-func resolveSearchRange(opts SearchOptions, partitions []int32, starts, ends map[int32]int64, fromOffsets, toOffsets map[int32]int64) map[int32]PartitionRange {
-	out := make(map[int32]PartitionRange, len(partitions))
-	for _, p := range partitions {
-		start := starts[p]
-		end := ends[p]
-		if end <= start {
-			continue
-		}
-		begin := start
-		finish := end
-		if opts.FromTS > 0 {
-			if o, ok := fromOffsets[p]; ok && o > begin {
-				begin = o
-			}
-		}
-		if opts.ToTS > 0 {
-			if o, ok := toOffsets[p]; ok && o < finish {
-				finish = o
-			}
-		}
-		// Cursors override begin/end based on direction.
+// resolveSearchRange picks the [start, end) offset range to scan per
+// partition from the partition offsets, the time bounds and the
+// continuation cursors, which override the end (newest-first) or the start
+// (oldest-first).
+func resolveSearchRange(opts SearchOptions, offs *topicOffsets) map[int32]PartitionRange {
+	out := make(map[int32]PartitionRange, len(offs.parts))
+	for _, p := range offs.parts {
+		begin, finish := offs.bounds(p)
 		if c, ok := opts.Cursors[p]; ok {
-			switch opts.Direction {
-			case DirNewestFirst:
-				if c < finish {
-					finish = c
-				}
-			default:
-				if c > begin {
-					begin = c
-				}
+			if opts.Direction == DirNewestFirst {
+				finish = min(finish, c)
+			} else {
+				begin = max(begin, c)
 			}
 		}
-		if finish <= begin {
-			continue
+		if finish > begin {
+			out[p] = PartitionRange{Start: begin, End: finish}
 		}
-		out[p] = PartitionRange{Start: begin, End: finish}
 	}
 	return out
 }
+
+// Search defaults and caps.
+const (
+	defaultSearchBudget = 10000
+	maxSearchBudget     = 500000
+	// searchChunkSize is how many offsets per partition a newest-first
+	// search reads per backward step. Larger values reduce re-seek overhead;
+	// smaller values give tighter stop-on-limit responsiveness when matches
+	// are dense near the end.
+	searchChunkSize int64 = 4000
+)
 
 // SearchMessages scans up to opts.Budget records across the selected partitions
 // and returns those matching the compiled predicate. It is a read-only op; it
@@ -228,82 +218,21 @@ func (r *Registry) SearchMessages(ctx context.Context, cluster, topic string, op
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, cluster)
 	}
-	if opts.Limit <= 0 {
-		opts.Limit = 50
-	}
-	if opts.Limit > maxConsumeLimit {
-		opts.Limit = maxConsumeLimit
-	}
-	if opts.Budget <= 0 {
-		opts.Budget = 10000
-	}
-	if opts.Budget > 500000 {
-		opts.Budget = 500000
-	}
-	if opts.Direction == "" {
-		opts.Direction = DirNewestFirst
-	}
-	if opts.Timeout <= 0 {
-		opts.Timeout = 8 * time.Second
-	}
-
+	opts = opts.withDefaults()
 	mt, err := opts.compile()
 	if err != nil {
 		return nil, err
 	}
-	policy := r.MaskingPolicy(cluster)
-	dec := r.srDecoderFor(cluster)
 
-	adm, err := r.Admin(cluster)
+	// Partitions are not validated: an unknown partition resolves to an
+	// empty range and therefore to an empty result.
+	offs, err := r.readerOffsets(ctx, cluster, topic, offsetsQuery{
+		partition: opts.Partition, unchecked: true, fromTSMs: opts.FromTS, toTSMs: opts.ToTS,
+	})
 	if err != nil {
 		return nil, err
 	}
-	admCtx, admCancel := context.WithTimeout(ctx, 3*time.Second)
-	defer admCancel()
-
-	md, err := adm.Metadata(admCtx, topic)
-	if err != nil {
-		return nil, fmt.Errorf("fetch metadata for topic %q on cluster %q: %w", topic, cluster, err)
-	}
-	t, ok := md.Topics[topic]
-	if !ok || t.Err != nil {
-		return nil, fmt.Errorf("topic %q not found on cluster %q", topic, cluster)
-	}
-	parts := make([]int32, 0, len(t.Partitions))
-	if opts.Partition >= 0 {
-		parts = append(parts, opts.Partition)
-	} else {
-		for _, p := range t.Partitions {
-			parts = append(parts, p.Partition)
-		}
-	}
-	sort.Slice(parts, func(i, j int) bool { return parts[i] < parts[j] })
-
-	starts, err := adm.ListStartOffsets(admCtx, topic)
-	if err != nil {
-		return nil, fmt.Errorf("list start offsets for topic %q on cluster %q: %w", topic, cluster, err)
-	}
-	ends, err := adm.ListEndOffsets(admCtx, topic)
-	if err != nil {
-		return nil, fmt.Errorf("list end offsets for topic %q on cluster %q: %w", topic, cluster, err)
-	}
-	startMap := make(map[int32]int64, len(parts))
-	endMap := make(map[int32]int64, len(parts))
-	for _, p := range parts {
-		if so, ok := starts.Lookup(topic, p); ok {
-			startMap[p] = so.Offset
-		}
-		if eo, ok := ends.Lookup(topic, p); ok {
-			endMap[p] = eo.Offset
-		}
-	}
-
-	fromOffsets, toOffsets, err := resolveTimestampOffsets(admCtx, adm, topic, parts, opts.FromTS, opts.ToTS)
-	if err != nil {
-		return nil, fmt.Errorf("resolve time range for topic %q on cluster %q: %w", topic, cluster, err)
-	}
-
-	ranges := resolveSearchRange(opts, parts, startMap, endMap, fromOffsets, toOffsets)
+	ranges := resolveSearchRange(opts, offs)
 	if len(ranges) == 0 {
 		return &SearchResult{
 			Messages: []Message{},
@@ -314,309 +243,32 @@ func (r *Registry) SearchMessages(ctx context.Context, cluster, topic string, op
 		}, nil
 	}
 
-	consumeOpts := clientOpts(cfg, r.log.With("cluster", cluster, "role", "search"))
-	// Initial partition assignment depends on direction: oldest-first scans
-	// forward from rng.Start in a single pass; newest-first consumes backward
-	// in chunks by re-seeking between iterations.
-	initialOffsets := make(map[int32]kgo.Offset, len(ranges))
-	// upperBounds[p] is the exclusive upper offset still to process. For
-	// newest-first it shrinks each chunk; for oldest-first it stays at rng.End.
-	upperBounds := make(map[int32]int64, len(ranges))
-	// lowerBounds[p] is the inclusive lower offset we are allowed to read.
-	lowerBounds := make(map[int32]int64, len(ranges))
-	// chunkStarts[p] is the offset the current consumer is positioned at.
-	chunkStarts := make(map[int32]int64, len(ranges))
-
-	// chunkSize controls how many offsets per partition we consume per backward
-	// iteration. Larger values reduce re-seek overhead; smaller values give
-	// tighter stop-on-limit responsiveness when matches are dense near the end.
-	const chunkSize int64 = 4000
-
-	for p, rng := range ranges {
-		upperBounds[p] = rng.End
-		lowerBounds[p] = rng.Start
-		switch opts.Direction {
-		case DirNewestFirst:
-			cs := rng.End - chunkSize
-			if cs < rng.Start {
-				cs = rng.Start
-			}
-			chunkStarts[p] = cs
-		default:
-			chunkStarts[p] = rng.Start
-		}
-		initialOffsets[p] = kgo.NewOffset().At(chunkStarts[p])
-	}
-	consumeOpts = append(consumeOpts,
-		kgo.ConsumePartitions(map[string]map[int32]kgo.Offset{topic: initialOffsets}),
-		kgo.FetchMaxWait(500*time.Millisecond),
-	)
-	cl, err := kgo.NewClient(consumeOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("create search client for topic %q on cluster %q: %w", topic, cluster, err)
-	}
-	defer cl.Close()
-
-	pollCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
-	defer cancel()
-
-	var matches []Message
-	scanned := 0
-	parseErrors := 0
-	var parseErrorOffsets []ParseErrorOffset
-	// highestOffset tracks the highest offset we've processed per partition
-	// (used for oldest-first next_cursor).
-	highestOffset := make(map[int32]int64, len(ranges))
-	// lowestOffset tracks the lowest offset we've processed per partition
-	// (used for newest-first next_cursor).
-	lowestOffset := make(map[int32]int64, len(ranges))
-	// chunkDone[p] flips true within a poll once we observe an offset ≥
-	// upperBounds[p], signalling the current backward chunk is exhausted and
-	// the partition should be reseeked.
-	chunkDone := make(map[int32]bool, len(ranges))
-	budgetExhausted := false
-	timedOut := false
 	started := time.Now()
-
-	// advanceNewestChunks reseeks any partitions whose current chunk is done
-	// to the next backward window. Returns false when every partition has
-	// reached its lowerBounds and no further scan is possible.
-	advanceNewestChunks := func() bool {
-		removeList := make([]int32, 0, len(upperBounds))
-		addOffsets := make(map[int32]kgo.Offset, len(upperBounds))
-		for p := range upperBounds {
-			if !chunkDone[p] {
-				continue
-			}
-			// Current chunk has been fully processed: move window down.
-			upperBounds[p] = chunkStarts[p]
-			chunkDone[p] = false
-			if upperBounds[p] <= lowerBounds[p] {
-				delete(upperBounds, p)
-				removeList = append(removeList, p)
-				continue
-			}
-			cs := upperBounds[p] - chunkSize
-			if cs < lowerBounds[p] {
-				cs = lowerBounds[p]
-			}
-			chunkStarts[p] = cs
-			removeList = append(removeList, p)
-			addOffsets[p] = kgo.NewOffset().At(cs)
-		}
-		if len(removeList) > 0 {
-			cl.RemoveConsumePartitions(map[string][]int32{topic: removeList})
-		}
-		if len(addOffsets) > 0 {
-			cl.AddConsumePartitions(map[string]map[int32]kgo.Offset{topic: addOffsets})
-		}
-		return len(upperBounds) > 0
+	sc := &searchScan{
+		match:   mt,
+		dec:     r.recordDecoder(cluster, topic),
+		lowest:  make(map[int32]int64, len(ranges)),
+		highest: make(map[int32]int64, len(ranges)),
 	}
-
-scan:
-	for scanned < opts.Budget {
-		fetches := cl.PollFetches(pollCtx)
-		if err := pollCtx.Err(); err != nil {
-			if errors.Is(err, context.DeadlineExceeded) {
-				timedOut = true
-				break
-			}
-			return nil, err
-		}
-		if errs := fetches.Errors(); len(errs) > 0 {
-			for _, e := range errs {
-				if errors.Is(e.Err, context.Canceled) || errors.Is(e.Err, context.DeadlineExceeded) {
-					continue
-				}
-				return nil, fmt.Errorf("fetch p%d: %w", e.Partition, e.Err)
-			}
-		}
-		batchEmpty := fetches.Empty()
-		fetches.EachRecord(func(rec *kgo.Record) {
-			p := rec.Partition
-			ub, active := upperBounds[p]
-			if !active {
-				return
-			}
-			if rec.Offset >= ub {
-				// Past the current chunk's upper bound — either already
-				// processed in a previous chunk (newest-first) or past end
-				// (oldest-first). Mark chunk complete so we reseek.
-				chunkDone[p] = true
-				return
-			}
-			if rec.Offset < lowerBounds[p] {
-				return
-			}
-			if cur, ok := highestOffset[p]; !ok || rec.Offset > cur {
-				highestOffset[p] = rec.Offset
-			}
-			if cur, ok := lowestOffset[p]; !ok || rec.Offset < cur {
-				lowestOffset[p] = rec.Offset
-			}
-			scanned++
-			// The chunk (newest-first) or the whole range (oldest-first) is
-			// complete once the record at upperBounds-1 has been seen. Mark
-			// it before matching so a parse error cannot skip it.
-			if rec.Offset == ub-1 {
-				chunkDone[p] = true
-			}
-			// Match against the full, untruncated record content: truncating
-			// first (as the consume/list path does) would silently hide
-			// contains-matches past maxMessageValueBytes and would corrupt
-			// JSONPath/XPath/JS parsing of any record larger than that cap.
-			// recordToMatchMessage fills only the fields the matchers read,
-			// so scanning a large record does not pay for a base64 rendering
-			// of its full value that nothing consumes.
-			fullMsg := recordToMatchMessage(rec)
-			fullMsg.applySRDecoderFull(ctx, dec, rec.Key, rec.Value)
-			hit, err := mt.match(&fullMsg)
-			if err != nil {
-				parseErrors++
-				slog.WarnContext(ctx, "search: skipping message – parse error",
-					"partition", rec.Partition,
-					"offset", rec.Offset,
-					"error", err)
-				if len(parseErrorOffsets) < parseErrorOffsetsCap {
-					parseErrorOffsets = append(parseErrorOffsets, ParseErrorOffset{
-						Partition: rec.Partition,
-						Offset:    rec.Offset,
-						Error:     err.Error(),
-					})
-				}
-				return
-			}
-			if hit {
-				// Rebuild the hit through the truncating path so the response
-				// carries the same bounded preview (and ValueTruncated flag)
-				// as every other consume path, regardless of how large the
-				// full record we just matched against was.
-				msg := recordToMessage(rec)
-				msg.applySRDecoder(ctx, dec, rec.Key, rec.Value)
-				if !policy.IsEmpty() && msg.Value != "" {
-					if mv, did := policy.Apply(topic, msg.Value); did {
-						msg.Value = mv
-						msg.Masked = true
-					}
-				}
-				matches = append(matches, msg)
-			}
-		})
-		if scanned >= opts.Budget {
-			budgetExhausted = true
-			break scan
-		}
-		if opts.StopOnLimit && len(matches) >= opts.Limit {
-			break scan
-		}
-		switch opts.Direction {
-		case DirNewestFirst:
-			anyDone := false
-			for p := range chunkDone {
-				if chunkDone[p] {
-					anyDone = true
-					break
-				}
-			}
-			if batchEmpty {
-				// Drained without hitting upper bound (gaps / compaction /
-				// broker idle): treat every active partition as chunk-done so
-				// we advance the window.
-				for p := range upperBounds {
-					chunkDone[p] = true
-				}
-				anyDone = true
-			}
-			if anyDone {
-				if !advanceNewestChunks() {
-					break scan
-				}
-			}
-		case DirOldestFirst:
-			// Single forward pass; empty fetch or all partitions done = stop.
-			if batchEmpty {
-				break scan
-			}
-			allDone := len(upperBounds) > 0
-			for p := range upperBounds {
-				if !chunkDone[p] {
-					allDone = false
-					break
-				}
-			}
-			if allDone {
-				break scan
-			}
-		}
-	}
-
-	// Sort and trim.
+	scan := recordScan{cluster: cluster, topic: topic, role: "search", cfg: cfg, ranges: ranges, drainAfter: 1}
 	if opts.Direction == DirNewestFirst {
-		sort.Slice(matches, func(i, j int) bool {
-			if matches[i].Timestamp != matches[j].Timestamp {
-				return matches[i].Timestamp > matches[j].Timestamp
-			}
-			if matches[i].Partition != matches[j].Partition {
-				return matches[i].Partition < matches[j].Partition
-			}
-			return matches[i].Offset > matches[j].Offset
-		})
-	} else {
-		sort.Slice(matches, func(i, j int) bool {
-			if matches[i].Timestamp != matches[j].Timestamp {
-				return matches[i].Timestamp < matches[j].Timestamp
-			}
-			if matches[i].Partition != matches[j].Partition {
-				return matches[i].Partition < matches[j].Partition
-			}
-			return matches[i].Offset < matches[j].Offset
-		})
+		scan.chunk = searchChunkSize
 	}
+	budgetExhausted, timedOut, err := r.runSearch(ctx, scan, opts, sc)
+	if err != nil {
+		return nil, err
+	}
+
+	matches := sc.matches
+	sortMessages(matches, opts.Direction == DirNewestFirst)
 	matched := len(matches)
 	if matched > opts.Limit {
 		matches = matches[:opts.Limit]
 	}
+	nextCursors, moreAvailable := sc.continuation(ranges, opts.Direction)
 
-	nextCursors := make(map[int32]int64, len(ranges))
-	for p, rng := range ranges {
-		switch opts.Direction {
-		case DirNewestFirst:
-			if lo, ok := lowestOffset[p]; ok {
-				// Future call should scan [Start, lo): we've processed lo+.
-				nextCursors[p] = lo
-			} else {
-				nextCursors[p] = rng.Start
-			}
-		default:
-			if hi, ok := highestOffset[p]; ok {
-				nextCursors[p] = hi + 1
-			} else {
-				nextCursors[p] = rng.End
-			}
-		}
-	}
-
-	// moreAvailable is true when at least one partition's continuation cursor
-	// still leaves a non-empty window to scan. This is precise: it is false
-	// exactly when every partition's range was fully consumed, so the UI can
-	// hide "Search more" without an extra empty round-trip.
-	moreAvailable := false
-	for p, rng := range ranges {
-		c := nextCursors[p]
-		switch opts.Direction {
-		case DirNewestFirst:
-			if c > rng.Start {
-				moreAvailable = true
-			}
-		default:
-			if c < rng.End {
-				moreAvailable = true
-			}
-		}
-	}
-
-	stats := SearchStats{
-		Scanned:           scanned,
+	return &SearchResult{Messages: matches, Stats: SearchStats{
+		Scanned:           sc.scanned,
 		Matched:           matched,
 		BudgetExhausted:   budgetExhausted,
 		TimedOut:          timedOut,
@@ -624,9 +276,129 @@ scan:
 		Direction:         opts.Direction,
 		NextCursors:       nextCursors,
 		ResolvedRange:     ranges,
-		ParseErrors:       parseErrors,
-		ParseErrorOffsets: parseErrorOffsets,
+		ParseErrors:       sc.parseErrors,
+		ParseErrorOffsets: sc.parseErrorOffsets,
 		Durations:         map[string]int64{"total": time.Since(started).Milliseconds()},
+	}}, nil
+}
+
+func (o SearchOptions) withDefaults() SearchOptions {
+	if o.Limit <= 0 {
+		o.Limit = defaultConsumeLimit
 	}
-	return &SearchResult{Messages: matches, Stats: stats}, nil
+	o.Limit = min(o.Limit, maxConsumeLimit)
+	if o.Budget <= 0 {
+		o.Budget = defaultSearchBudget
+	}
+	o.Budget = min(o.Budget, maxSearchBudget)
+	if o.Direction == "" {
+		o.Direction = DirNewestFirst
+	}
+	if o.Timeout <= 0 {
+		o.Timeout = 8 * time.Second
+	}
+	return o
+}
+
+// runSearch feeds the scanned records into sc until the ranges are drained,
+// the budget is spent, enough matches were found (StopOnLimit) or
+// opts.Timeout elapses. Budget and limit are checked after every poll.
+func (r *Registry) runSearch(ctx context.Context, s recordScan, opts SearchOptions, sc *searchScan) (budgetExhausted, timedOut bool, err error) {
+	pollCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
+	defer cancel()
+	for batch, err := range r.scanRecords(pollCtx, s) {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return false, true, nil
+		}
+		if err != nil {
+			return false, false, err
+		}
+		for _, rec := range batch {
+			sc.visit(ctx, rec)
+		}
+		if sc.scanned >= opts.Budget {
+			return true, false, nil
+		}
+		if opts.StopOnLimit && len(sc.matches) >= opts.Limit {
+			break
+		}
+	}
+	return false, false, nil
+}
+
+// searchScan accumulates the matches and stats of one SearchMessages call.
+type searchScan struct {
+	match             matcher
+	dec               recordDecoder
+	matches           []Message
+	scanned           int
+	parseErrors       int
+	parseErrorOffsets []ParseErrorOffset
+	// lowest/highest offset processed per partition, for the next cursors.
+	lowest, highest map[int32]int64
+}
+
+func (sc *searchScan) visit(ctx context.Context, rec *kgo.Record) {
+	p := rec.Partition
+	if cur, ok := sc.highest[p]; !ok || rec.Offset > cur {
+		sc.highest[p] = rec.Offset
+	}
+	if cur, ok := sc.lowest[p]; !ok || rec.Offset < cur {
+		sc.lowest[p] = rec.Offset
+	}
+	sc.scanned++
+	// Match against the full, untruncated and unmasked record: truncating
+	// first would hide contains-matches past maxMessageValueBytes and corrupt
+	// JSONPath/XPath/JS parsing of any larger record. A hit is rebuilt
+	// through the truncating, masking path so the response carries the same
+	// bounded preview as every other consume path.
+	full := sc.dec.matchMessage(ctx, rec)
+	hit, err := sc.match.match(&full)
+	if err != nil {
+		sc.parseError(ctx, rec, err)
+		return
+	}
+	if hit {
+		sc.matches = append(sc.matches, sc.dec.message(ctx, rec))
+	}
+}
+
+func (sc *searchScan) parseError(ctx context.Context, rec *kgo.Record, err error) {
+	sc.parseErrors++
+	slog.WarnContext(ctx, "search: skipping message – parse error",
+		"partition", rec.Partition,
+		"offset", rec.Offset,
+		"error", err)
+	if len(sc.parseErrorOffsets) < parseErrorOffsetsCap {
+		sc.parseErrorOffsets = append(sc.parseErrorOffsets, ParseErrorOffset{
+			Partition: rec.Partition,
+			Offset:    rec.Offset,
+			Error:     err.Error(),
+		})
+	}
+}
+
+// continuation returns the per-partition cursors for a follow-up search and
+// whether that search would scan anything. Partitions without a scanned
+// record are treated as fully scanned.
+func (sc *searchScan) continuation(ranges map[int32]PartitionRange, dir SearchDirection) (map[int32]int64, bool) {
+	next := make(map[int32]int64, len(ranges))
+	more := false
+	for p, rng := range ranges {
+		if dir == DirNewestFirst {
+			// A follow-up scans [Start, lowest): everything above is done.
+			next[p] = rng.Start
+			if lo, ok := sc.lowest[p]; ok {
+				next[p] = lo
+			}
+			more = more || next[p] > rng.Start
+			continue
+		}
+		next[p] = rng.End
+		if hi, ok := sc.highest[p]; ok {
+			next[p] = hi + 1
+		}
+		more = more || next[p] < rng.End
+	}
+	return next, more
 }

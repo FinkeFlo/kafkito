@@ -4,16 +4,10 @@
 package kafka
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
-	"encoding/xml"
 	"errors"
 	"fmt"
-	"io"
-	"sort"
 	"time"
 	"unicode/utf8"
 
@@ -176,93 +170,19 @@ func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, o
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, cluster)
 	}
-	if opts.Limit <= 0 {
-		opts.Limit = defaultConsumeLimit
-	}
-	if opts.Limit > maxConsumeLimit {
-		opts.Limit = maxConsumeLimit
-	}
-	if opts.From == "" {
-		if opts.FromTSMs > 0 || opts.ToTSMs > 0 {
-			opts.From = FromTimestamp
-		} else {
-			opts.From = FromEnd
-		}
-	}
-	if opts.Timeout <= 0 {
-		opts.Timeout = 5 * time.Second
-	}
+	opts = opts.withDefaults()
 
-	adm, err := r.Admin(cluster)
+	// Time bounds are resolved up front so buildWindows can stay pure
+	// (offset-only). They apply to FromTimestamp (the seek mechanism), to
+	// FromEnd / FromStart (where they clamp the browse window) and cap
+	// forward cursor pages.
+	offs, err := r.readerOffsets(ctx, cluster, topic, offsetsQuery{
+		partition: opts.Partition, fromTSMs: opts.FromTSMs, toTSMs: opts.ToTSMs,
+	})
 	if err != nil {
 		return nil, err
 	}
-	admCtx, admCancel := context.WithTimeout(ctx, 3*time.Second)
-	defer admCancel()
-
-	md, err := adm.Metadata(admCtx, topic)
-	if err != nil {
-		return nil, fmt.Errorf("fetch metadata for topic %q on cluster %q: %w", topic, cluster, err)
-	}
-	t, ok := md.Topics[topic]
-	if !ok || t.Err != nil {
-		return nil, fmt.Errorf("topic %q not found on cluster %q", topic, cluster)
-	}
-
-	allParts := make([]int32, 0, len(t.Partitions))
-	for _, p := range t.Partitions {
-		allParts = append(allParts, p.Partition)
-	}
-	sort.Slice(allParts, func(i, j int) bool { return allParts[i] < allParts[j] })
-
-	parts := allParts
-	if opts.Partition >= 0 {
-		found := false
-		for _, p := range allParts {
-			if p == opts.Partition {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return nil, fmt.Errorf("partition %d not found in topic %q on cluster %q", opts.Partition, topic, cluster)
-		}
-		parts = []int32{opts.Partition}
-	}
-
-	starts, err := adm.ListStartOffsets(admCtx, topic)
-	if err != nil {
-		return nil, fmt.Errorf("list start offsets for topic %q on cluster %q: %w", topic, cluster, err)
-	}
-	ends, err := adm.ListEndOffsets(admCtx, topic)
-	if err != nil {
-		return nil, fmt.Errorf("list end offsets for topic %q on cluster %q: %w", topic, cluster, err)
-	}
-	startMap := make(map[int32]int64, len(parts))
-	endMap := make(map[int32]int64, len(parts))
-	for _, p := range parts {
-		if so, ok := starts.Lookup(topic, p); ok {
-			startMap[p] = so.Offset
-		}
-		if eo, ok := ends.Lookup(topic, p); ok {
-			endMap[p] = eo.Offset
-		}
-	}
-
-	// Time bounds need an admin call before the offset window math; resolve
-	// here so buildWindows can stay pure (offset-only). Bounds apply to
-	// FromTimestamp (the seek mechanism) and to FromEnd / FromStart (where
-	// they clamp the browse window).
-	var fromOff, toOff map[int32]int64
-	if opts.FromTSMs > 0 || opts.ToTSMs > 0 {
-		var rerr error
-		fromOff, toOff, rerr = resolveTimestampOffsets(admCtx, adm, topic, parts, opts.FromTSMs, opts.ToTSMs)
-		if rerr != nil {
-			return nil, fmt.Errorf("resolve time range for topic %q on cluster %q: %w", topic, cluster, rerr)
-		}
-	}
-
-	windows, err := buildWindows(parts, opts, startMap, endMap, fromOff, toOff)
+	windows, err := buildWindows(offs.parts, opts, offs.start, offs.end, offs.fromTS, offs.toTS)
 	if err != nil {
 		return nil, err
 	}
@@ -270,148 +190,20 @@ func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, o
 		return &ConsumeResult{Messages: []Message{}}, nil
 	}
 
-	direction := CursorBackward
-	if opts.From == FromStart || opts.From == FromOffset || opts.From == FromTimestamp {
-		direction = CursorForward
-	}
-
-	partOffsets := make(map[int32]kgo.Offset, len(windows))
-	for p, w := range windows {
-		partOffsets[p] = kgo.NewOffset().At(w.begin)
-	}
-
-	consumeOpts := clientOpts(cfg, r.log.With("cluster", cluster, "role", "consume"))
-	consumeOpts = append(consumeOpts,
-		kgo.ConsumePartitions(map[string]map[int32]kgo.Offset{topic: partOffsets}),
-		kgo.FetchMaxWait(500*time.Millisecond),
-	)
-	cl, err := kgo.NewClient(consumeOpts...)
+	direction := opts.direction()
+	collected, err := r.collectWindows(ctx, recordScan{
+		cluster: cluster, topic: topic, role: "consume", cfg: cfg,
+		ranges: windowRanges(windows), drainAfter: 2,
+	}, opts, windows)
 	if err != nil {
-		return nil, fmt.Errorf("create consume client for topic %q on cluster %q: %w", topic, cluster, err)
-	}
-	defer cl.Close()
-
-	collected := make(map[int32][]Message, len(windows))
-	totalForward := 0
-	// reached tracks windows whose last offset (stop-1) has been delivered.
-	// PollFetches never returns an empty fetch for a drained partition, so
-	// this is the only reliable signal that a short page is complete.
-	reached := make(map[int32]bool, len(windows))
-
-	pollCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
-	defer cancel()
-
-	policy := r.MaskingPolicy(cluster)
-	dec := r.srDecoderFor(cluster)
-
-	allReached := func() bool {
-		return len(reached) == len(windows)
-	}
-	enough := func() bool {
-		if direction == CursorForward {
-			return totalForward >= opts.Limit
-		}
-		// Backward: every active partition must have collected its window
-		// (window-size = stop - begin, which is bounded by the fair share).
-		for p, w := range windows {
-			got := int64(len(collected[p]))
-			want := w.stop - w.begin
-			if got < want {
-				return false
-			}
-		}
-		return true
-	}
-
-	emptyStreak := 0
-	for !enough() && !allReached() {
-		fetches := cl.PollFetches(pollCtx)
-		if errs := fetches.Errors(); len(errs) > 0 {
-			if errors.Is(pollCtx.Err(), context.DeadlineExceeded) {
-				break
-			}
-			fatal := false
-			var firstFatal error
-			for _, e := range errs {
-				if errors.Is(e.Err, context.Canceled) || errors.Is(e.Err, context.DeadlineExceeded) {
-					continue
-				}
-				if firstFatal == nil {
-					firstFatal = fmt.Errorf("fetch topic %q partition %d on cluster %q: %w", topic, e.Partition, cluster, e.Err)
-				}
-				fatal = true
-			}
-			if fatal {
-				return nil, firstFatal
-			}
-		}
-		if pollCtx.Err() != nil {
-			break
-		}
-
-		empty := fetches.Empty()
-		fetches.EachRecord(func(rec *kgo.Record) {
-			w, active := windows[rec.Partition]
-			if !active {
-				return
-			}
-			if rec.Offset < w.begin || rec.Offset >= w.stop {
-				return
-			}
-			if rec.Offset >= w.stop-1 {
-				reached[rec.Partition] = true
-			}
-			m := recordToMessage(rec)
-			m.applySRDecoder(ctx, dec, rec.Key, rec.Value)
-			if !policy.IsEmpty() && m.Value != "" {
-				if mv, did := policy.Apply(topic, m.Value); did {
-					m.Value = mv
-					m.Masked = true
-				}
-			}
-			collected[rec.Partition] = append(collected[rec.Partition], m)
-			if direction == CursorForward {
-				totalForward++
-			}
-		})
-
-		if empty {
-			emptyStreak++
-			// Two consecutive empty polls almost always means we've drained the
-			// brokers' assigned partitions. Bail.
-			if emptyStreak >= 2 {
-				break
-			}
-		} else {
-			emptyStreak = 0
-		}
+		return nil, err
 	}
 
 	merged := make([]Message, 0)
 	for _, msgs := range collected {
 		merged = append(merged, msgs...)
 	}
-	if direction == CursorBackward {
-		sort.Slice(merged, func(i, j int) bool {
-			if merged[i].Timestamp != merged[j].Timestamp {
-				return merged[i].Timestamp > merged[j].Timestamp
-			}
-			if merged[i].Partition != merged[j].Partition {
-				return merged[i].Partition < merged[j].Partition
-			}
-			return merged[i].Offset > merged[j].Offset
-		})
-	} else {
-		sort.Slice(merged, func(i, j int) bool {
-			if merged[i].Timestamp != merged[j].Timestamp {
-				return merged[i].Timestamp < merged[j].Timestamp
-			}
-			if merged[i].Partition != merged[j].Partition {
-				return merged[i].Partition < merged[j].Partition
-			}
-			return merged[i].Offset < merged[j].Offset
-		})
-	}
+	sortMessages(merged, direction == CursorBackward)
 	if len(merged) > opts.Limit {
 		merged = merged[:opts.Limit]
 	}
@@ -426,14 +218,88 @@ func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, o
 		Messages:   merged,
 		NextCursor: nextCursor,
 		HasMore:    hasMore,
-		Partial:    direction == CursorBackward && !enough(),
+		Partial:    direction == CursorBackward && !windowsFull(windows, collected),
 	}, nil
+}
+
+func (o ConsumeOptions) withDefaults() ConsumeOptions {
+	if o.Limit <= 0 {
+		o.Limit = defaultConsumeLimit
+	}
+	o.Limit = min(o.Limit, maxConsumeLimit)
+	if o.From == "" {
+		o.From = FromEnd
+		if o.FromTSMs > 0 || o.ToTSMs > 0 {
+			o.From = FromTimestamp
+		}
+	}
+	if o.Timeout <= 0 {
+		o.Timeout = 5 * time.Second
+	}
+	return o
+}
+
+func (o ConsumeOptions) direction() CursorDirection {
+	switch o.From {
+	case FromStart, FromOffset, FromTimestamp:
+		return CursorForward
+	default: // FromEnd, like buildWindows
+		return CursorBackward
+	}
+}
+
+// collectWindows reads the page windows and returns the decoded records per
+// partition. It stops once the page is full (forward: limit records;
+// backward: every window complete), the windows are drained or opts.Timeout
+// elapses; a timeout is not an error, the page is then just short.
+func (r *Registry) collectWindows(ctx context.Context, s recordScan, opts ConsumeOptions, windows map[int32]pageWindow) (map[int32][]Message, error) {
+	pollCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
+	defer cancel()
+	dec := r.recordDecoder(s.cluster, s.topic)
+	collected := make(map[int32][]Message, len(windows))
+	forward := opts.direction() == CursorForward
+	total := 0
+	for batch, err := range r.scanRecords(pollCtx, s) {
+		if isContextErr(err) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		for _, rec := range batch {
+			collected[rec.Partition] = append(collected[rec.Partition], dec.message(ctx, rec))
+		}
+		total += len(batch)
+		if forward && total >= opts.Limit || !forward && windowsFull(windows, collected) {
+			break
+		}
+	}
+	return collected, nil
+}
+
+// windowsFull reports whether every window has collected all its records
+// (window size = stop - begin, which is bounded by the fair share).
+func windowsFull(windows map[int32]pageWindow, collected map[int32][]Message) bool {
+	for p, w := range windows {
+		if int64(len(collected[p])) < w.stop-w.begin {
+			return false
+		}
+	}
+	return true
+}
+
+func windowRanges(windows map[int32]pageWindow) map[int32]PartitionRange {
+	out := make(map[int32]PartitionRange, len(windows))
+	for p, w := range windows {
+		out[p] = PartitionRange{Start: w.begin, End: w.stop}
+	}
+	return out
 }
 
 // buildWindows resolves the [begin, stop) offset range to scan per partition,
 // based on the From/Offset/PartitionOffsets/CursorUpperBounds fields of opts.
-// For FromTimestamp the caller pre-resolves fromOff/toOff via
-// resolveTimestampOffsets and passes them through.
+// fromOff/toOff are the offsets of the time bounds as resolved by
+// resolveTimestampOffsets, nil when the respective bound is unset.
 func buildWindows(
 	parts []int32,
 	opts ConsumeOptions,
@@ -441,123 +307,69 @@ func buildWindows(
 	fromOff, toOff map[int32]int64,
 ) (map[int32]pageWindow, error) {
 	windows := make(map[int32]pageWindow, len(parts))
-
-	switch opts.From {
-	case FromTimestamp:
-		for _, p := range parts {
-			b := startMap[p]
-			e := endMap[p]
-			if e <= b {
-				continue
-			}
-			if opts.FromTSMs > 0 {
-				if o, ok := fromOff[p]; ok && o > b {
-					b = o
-				}
-			}
-			if opts.ToTSMs > 0 {
-				if o, ok := toOff[p]; ok && o < e {
-					e = o
-				}
-			}
-			if e <= b {
-				continue
-			}
+	add := func(p int32, b, e int64) {
+		if e > b {
 			windows[p] = pageWindow{begin: b, stop: e, trueBegin: b}
-		}
-	case FromOffset:
-		switch {
-		case len(opts.PartitionOffsets) > 0:
-			for p, off := range opts.PartitionOffsets {
-				if !containsPartition(parts, p) {
-					continue
-				}
-				b := off
-				if s, ok := startMap[p]; ok && b < s {
-					b = s
-				}
-				e, ok := endMap[p]
-				// A forward cursor continues a time-range query, so the
-				// exclusive upper time bound still applies.
-				if o, has := toOff[p]; has && opts.ToTSMs > 0 && o < e {
-					e = o
-				}
-				if !ok || e <= b {
-					continue
-				}
-				windows[p] = pageWindow{begin: b, stop: e, trueBegin: b}
-			}
-		case len(parts) == 1:
-			p := parts[0]
-			b := opts.Offset
-			if s, ok := startMap[p]; ok && b < s {
-				b = s
-			}
-			if e, ok := endMap[p]; ok && e > b {
-				windows[p] = pageWindow{begin: b, stop: e, trueBegin: b}
-			}
-		default:
-			return nil, fmt.Errorf("from=offset with partition=-1 requires partition_offsets")
-		}
-	case FromStart:
-		for _, p := range parts {
-			s := startMap[p]
-			e := endMap[p]
-			if o, ok := fromOff[p]; ok && o > s {
-				s = o
-			}
-			if o, ok := toOff[p]; ok && o < e {
-				e = o
-			}
-			if e > s {
-				windows[p] = pageWindow{begin: s, stop: e, trueBegin: s}
-			}
-		}
-	default: // FromEnd
-		// Clamp order: time bounds (filter window), then cursor upper bound
-		// (paginate within filter window). The result feeds fairShare so
-		// partitions whose entire range falls outside the filter window
-		// drop out of the denominator.
-		clamp := func(p int32) (int64, int64) {
-			s := startMap[p]
-			e := endMap[p]
-			if o, ok := fromOff[p]; ok && o > s {
-				s = o
-			}
-			if o, ok := toOff[p]; ok && o < e {
-				e = o
-			}
-			if ub, ok := opts.CursorUpperBounds[p]; ok && ub < e {
-				e = ub
-			}
-			return s, e
-		}
-		nonEmpty := 0
-		for _, p := range parts {
-			s, e := clamp(p)
-			if e > s {
-				nonEmpty++
-			}
-		}
-		share := fairShare(opts.Limit, nonEmpty)
-		for _, p := range parts {
-			s, e := clamp(p)
-			if e <= s {
-				continue
-			}
-			tail := int64(share)
-			if avail := e - s; avail < tail {
-				tail = avail
-			}
-			b := e - tail
-			if b < s {
-				b = s
-			}
-			windows[p] = pageWindow{begin: b, stop: e, trueBegin: s}
 		}
 	}
 
+	switch opts.From {
+	case FromTimestamp, FromStart:
+		for _, p := range parts {
+			b, e := clampRange(p, startMap[p], endMap[p], fromOff, toOff)
+			add(p, b, e)
+		}
+	case FromOffset:
+		// A forward cursor continues a time-range query, so the exclusive
+		// upper time bound still applies to partition_offsets.
+		offsets, upper := opts.PartitionOffsets, toOff
+		if len(offsets) == 0 {
+			if len(parts) != 1 {
+				return nil, fmt.Errorf("from=offset with partition=-1 requires partition_offsets")
+			}
+			offsets, upper = map[int32]int64{parts[0]: opts.Offset}, nil
+		}
+		for p, b := range offsets {
+			e, ok := endMap[p]
+			if !ok || !containsPartition(parts, p) {
+				continue
+			}
+			if s, ok := startMap[p]; ok {
+				b = max(b, s)
+			}
+			_, e = clampRange(p, b, e, nil, upper)
+			add(p, b, e)
+		}
+	default: // FromEnd
+		// Clamp order: time bounds (filter window), then cursor upper bound
+		// (paginate within filter window). Partitions whose entire range
+		// falls outside drop out of the fair-share denominator.
+		ranges := make(map[int32]PartitionRange, len(parts))
+		for _, p := range parts {
+			s, e := clampRange(p, startMap[p], endMap[p], fromOff, toOff)
+			_, e = clampRange(p, s, e, nil, opts.CursorUpperBounds)
+			if e > s {
+				ranges[p] = PartitionRange{Start: s, End: e}
+			}
+		}
+		share := int64(fairShare(opts.Limit, len(ranges)))
+		for p, rng := range ranges {
+			windows[p] = pageWindow{begin: max(rng.Start, rng.End-share), stop: rng.End, trueBegin: rng.Start}
+		}
+	}
 	return windows, nil
+}
+
+// timeBounds narrows [start, end) of partition p to the offsets in fromOff
+// (inclusive lower) and toOff (exclusive upper); nil maps leave it as is.
+func clampRange(p int32, start, end int64, fromOff, toOff map[int32]int64) (int64, int64) {
+	if o, ok := fromOff[p]; ok && o > start {
+		start = o
+	}
+	if o, ok := toOff[p]; ok && o < end {
+		end = o
+	}
+	return start, end
 }
 
 // containsPartition reports whether p appears in parts.
@@ -678,208 +490,6 @@ func buildNextCursor(
 	return &c, true
 }
 
-// recordToMessage renders a record for the consume/list path: the value is
-// capped at maxMessageValueBytes so response sizes stay bounded. The search
-// scan uses recordToMatchMessage instead, which must not truncate.
-func recordToMessage(rec *kgo.Record) Message {
-	m := Message{
-		Partition:      rec.Partition,
-		Offset:         rec.Offset,
-		Timestamp:      rec.Timestamp.UnixMilli(),
-		ValueSizeBytes: int64(len(rec.Value)),
-	}
-	m.Key, m.KeyEncoding, m.KeyB64 = decodeBytes(rec.Key, false)
-
-	// Truncate the raw value bytes before decoding to prevent large payloads
-	// from causing outsized string allocations. The full byte length is already
-	// stored in ValueSizeBytes so the UI can show the original size.
-	valBytes := rec.Value
-	if int64(len(valBytes)) > maxMessageValueBytes {
-		valBytes = valBytes[:maxMessageValueBytes]
-		m.ValueTruncated = true
-	}
-	m.Value, m.ValueEncoding, m.ValueB64 = decodeBytes(valBytes, m.ValueTruncated)
-	if len(rec.Headers) > 0 {
-		m.Headers = make(map[string]string, len(rec.Headers))
-		for _, h := range rec.Headers {
-			if utf8.Valid(h.Value) {
-				m.Headers[h.Key] = string(h.Value)
-			} else {
-				// Keep the hex rendering for display, but also carry the raw
-				// bytes so a verbatim re-produce (topic copy) stays lossless.
-				m.Headers[h.Key] = "0x" + hex.EncodeToString(h.Value)
-				if m.HeadersB64 == nil {
-					m.HeadersB64 = make(map[string]string, 1)
-				}
-				m.HeadersB64[h.Key] = base64.StdEncoding.EncodeToString(h.Value)
-			}
-		}
-	}
-	return m
-}
-
-// recordToMatchMessage builds the untruncated Message the search scan matches
-// against. It exists because matching must see the full record content —
-// truncating first (as the consume/list path does) would silently hide
-// matches located past maxMessageValueBytes and would corrupt structured
-// (JSONPath/XPath/JS) parsing of any record larger than that cap.
-//
-// It deliberately populates only the fields the matchers actually read
-// (Partition, Offset, Timestamp, Key, Value, Headers). In particular it skips
-// the base64 rendering of the raw value: on the list path that string is
-// capped at maxMessageValueBytes, but over the full value it costs ~1.33x the
-// record size per scanned record and no matcher ever reads it. It likewise
-// skips json.Valid/validXML, since ValueEncoding is not read during matching
-// either.
-//
-// Callers must not put the resulting Message into a response as-is; rebuild
-// the hit via recordToMessage (and applySRDecoder, not applySRDecoderFull)
-// first so response sizes stay bounded exactly like every other consume path.
-func recordToMatchMessage(rec *kgo.Record) Message {
-	m := Message{
-		Partition:      rec.Partition,
-		Offset:         rec.Offset,
-		Timestamp:      rec.Timestamp.UnixMilli(),
-		ValueSizeBytes: int64(len(rec.Value)),
-	}
-	m.Key = renderForMatch(rec.Key)
-	m.Value = renderForMatch(rec.Value)
-	if len(rec.Headers) > 0 {
-		m.Headers = make(map[string]string, len(rec.Headers))
-		for _, h := range rec.Headers {
-			if utf8.Valid(h.Value) {
-				m.Headers[h.Key] = string(h.Value)
-			} else {
-				m.Headers[h.Key] = "0x" + hex.EncodeToString(h.Value)
-			}
-		}
-	}
-	return m
-}
-
-// renderForMatch returns the same rendered string decodeBytes produces for an
-// untruncated input, without computing the encoding label or the base64 of the
-// raw bytes. Keep this byte-identical to decodeBytes's rendered return value —
-// TestRenderForMatchMatchesDecodeBytes guards that.
-func renderForMatch(b []byte) string {
-	if len(b) == 0 {
-		return ""
-	}
-	if utf8.Valid(b) {
-		return string(b)
-	}
-	preview := b
-	if len(preview) > binaryPreviewBytes {
-		preview = preview[:binaryPreviewBytes]
-	}
-	return "0x" + hex.EncodeToString(preview)
-}
-
-// applySRDecoder runs the optional Schema-Registry decoder over key+value of m.
-// When decoding succeeds, the rendered string + encoding are overwritten with
-// the JSON form and the corresponding *SR meta is attached. When decoding
-// fails, the raw render is kept and meta is still attached so the UI can show
-// "schema id N (decode error)".
-func (m *Message) applySRDecoder(ctx context.Context, dec *SRDecoder, rawKey, rawValue []byte) {
-	m.applySRDecode(ctx, dec, rawKey, rawValue, true)
-}
-
-// applySRDecoderFull behaves like applySRDecoder but never truncates the
-// decoded value. See recordToMessageFull for why the search scan needs this.
-func (m *Message) applySRDecoderFull(ctx context.Context, dec *SRDecoder, rawKey, rawValue []byte) {
-	m.applySRDecode(ctx, dec, rawKey, rawValue, false)
-}
-
-func (m *Message) applySRDecode(ctx context.Context, dec *SRDecoder, rawKey, rawValue []byte, truncate bool) {
-	if dec == nil {
-		return
-	}
-	if rendered, meta, ok, _ := dec.Decode(ctx, rawKey); meta.Format != "" {
-		if ok {
-			m.Key = rendered
-			m.KeyEncoding = meta.Format
-			m.KeyB64 = ""
-		}
-		mm := meta
-		m.KeySR = &mm
-	}
-	if rendered, meta, ok, _ := dec.Decode(ctx, rawValue); meta.Format != "" {
-		if ok {
-			m.Value = rendered
-			if truncate && int64(len(m.Value)) > maxMessageValueBytes {
-				m.Value = m.Value[:maxMessageValueBytes]
-				m.ValueTruncated = true
-			}
-			m.ValueEncoding = meta.Format
-			m.ValueB64 = ""
-		}
-		mm := meta
-		m.ValueSR = &mm
-	}
-}
-
-// decodeBytes detects json/text/binary and returns a rendered string plus encoding.
-// For binary payloads, it returns a hex preview and full base64 in b64.
-func decodeBytes(b []byte, truncated bool) (rendered, encoding, b64 string) {
-	if b == nil {
-		return "", "null", ""
-	}
-	if len(b) == 0 {
-		return "", "empty", ""
-	}
-	if utf8.Valid(b) {
-		trimmed := bytesTrimSpace(b)
-		looksJSON := len(trimmed) > 0 && (trimmed[0] == '{' || trimmed[0] == '[')
-		// A truncated value is cut off mid-structure, so json.Valid on it will
-		// (almost) always fail even for genuinely JSON payloads — checking only
-		// the first non-whitespace byte (which truncation never removes) is the
-		// best signal available. The full value is validated for real on
-		// demand when the UI loads it in full; a false positive here just
-		// falls back to a plain-text render at that point.
-		if looksJSON && (truncated || json.Valid(trimmed)) {
-			return string(b), "json", ""
-		}
-		looksXML := len(trimmed) > 0 && trimmed[0] == '<'
-		if looksXML && (truncated || validXML(trimmed)) {
-			return string(b), "xml", ""
-		}
-		return string(b), "text", ""
-	}
-	preview := b
-	if len(preview) > binaryPreviewBytes {
-		preview = preview[:binaryPreviewBytes]
-	}
-	return "0x" + hex.EncodeToString(preview), "binary", base64.StdEncoding.EncodeToString(b)
-}
-
-// validXML reports whether b is a well-formed XML document by tokenizing it
-// end to end — cheaper than building a DOM (xmlquery.Parse, used by the
-// XPath search matcher) when all that's needed is a validity check.
-func validXML(b []byte) bool {
-	dec := xml.NewDecoder(bytes.NewReader(b))
-	for {
-		_, err := dec.Token()
-		if err != nil {
-			return errors.Is(err, io.EOF)
-		}
-	}
-}
-
-func bytesTrimSpace(b []byte) []byte {
-	start, end := 0, len(b)
-	for start < end && isSpace(b[start]) {
-		start++
-	}
-	for end > start && isSpace(b[end-1]) {
-		end--
-	}
-	return b[start:end]
-}
-
-func isSpace(c byte) bool {
-	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
-}
-
 // MaxRawDownloadMB is the download cap in megabytes, exported so handlers can
 // include it in error messages.
 const MaxRawDownloadMB = 15
@@ -909,30 +519,19 @@ func (r *Registry) FetchRawMessageValue(ctx context.Context, cluster, topic stri
 		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, cluster)
 	}
 
-	consumeOpts := clientOpts(cfg, r.log.With("cluster", cluster, "role", "raw-download"))
-	consumeOpts = append(consumeOpts,
-		kgo.ConsumePartitions(map[string]map[int32]kgo.Offset{
-			topic: {partition: kgo.NewOffset().At(offset)},
-		}),
-		kgo.FetchMaxWait(3*time.Second),
-	)
-	cl, err := kgo.NewClient(consumeOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("create client: %w", err)
-	}
-	defer cl.Close()
-
-	fetches := cl.PollFetches(ctx)
-	if err := fetches.Err(); err != nil && !errors.Is(err, context.Canceled) {
-		return nil, fmt.Errorf("poll fetches: %w", err)
-	}
-
 	var rec *kgo.Record
-	fetches.EachRecord(func(r *kgo.Record) {
-		if rec == nil && r.Partition == partition && r.Offset == offset {
-			rec = r
+	for batch, err := range r.scanRecords(ctx, recordScan{
+		cluster: cluster, topic: topic, role: "raw-download", cfg: cfg,
+		ranges: map[int32]PartitionRange{partition: {Start: offset, End: offset + 1}}, drainAfter: 1,
+	}) {
+		if errors.Is(err, context.Canceled) {
+			break
 		}
-	})
+		if err != nil {
+			return nil, fmt.Errorf("poll fetches: %w", err)
+		}
+		rec = batch[0]
+	}
 	if rec == nil {
 		return nil, fmt.Errorf("record not found: partition %d offset %d", partition, offset)
 	}
