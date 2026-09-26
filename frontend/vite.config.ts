@@ -67,6 +67,9 @@ export default defineConfig({
   },
   test: {
     environment: "happy-dom",
+    // Resolve relative request URLs like a browser does instead of against
+    // happy-dom's default about:blank.
+    environmentOptions: { happyDOM: { url: "http://localhost:3000" } },
     globals: true,
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["./vitest.setup.ts"],
