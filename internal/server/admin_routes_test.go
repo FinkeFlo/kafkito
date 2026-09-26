@@ -34,7 +34,6 @@ type fakeSchemaRegistry struct {
 	subjects map[string][]kafkapkg.SchemaVersion
 	nextID   int
 	requests []string // "METHOD escaped-path?query"
-	bodies   []string
 }
 
 func startFakeSchemaRegistry(t *testing.T) *fakeSchemaRegistry {
@@ -62,15 +61,6 @@ func (sr *fakeSchemaRegistry) recorded() []string {
 	return append([]string(nil), sr.requests...)
 }
 
-func (sr *fakeSchemaRegistry) lastBody() string {
-	sr.mu.Lock()
-	defer sr.mu.Unlock()
-	if len(sr.bodies) == 0 {
-		return ""
-	}
-	return sr.bodies[len(sr.bodies)-1]
-}
-
 func srError(w http.ResponseWriter, status, code int, msg string) {
 	w.Header().Set("Content-Type", "application/vnd.schemaregistry.v1+json")
 	w.WriteHeader(status)
@@ -90,9 +80,6 @@ func (sr *fakeSchemaRegistry) serve(w http.ResponseWriter, r *http.Request) {
 		rec += "?" + r.URL.RawQuery
 	}
 	sr.requests = append(sr.requests, rec)
-	if len(body) > 0 {
-		sr.bodies = append(sr.bodies, string(body))
-	}
 	sr.mu.Unlock()
 
 	parts := strings.Split(strings.TrimPrefix(r.URL.EscapedPath(), "/"), "/")
