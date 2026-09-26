@@ -57,7 +57,7 @@ func New(opts Options) http.Handler {
 
 	policy := rbac.Compile(opts.Config.RBAC)
 
-	var copyReg copyRegistry = opts.copyRegistry
+	copyReg := opts.copyRegistry
 	if copyReg == nil && opts.Registry != nil {
 		copyReg = opts.Registry
 	}
