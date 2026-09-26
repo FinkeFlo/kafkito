@@ -106,7 +106,7 @@ function UsersBody({ cluster }: { cluster: string }) {
       },
       {
         id: "actions",
-        header: "",
+        header: <span className="sr-only">Actions</span>,
         className: "w-40",
         align: "right",
         cell: (r) =>

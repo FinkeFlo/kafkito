@@ -139,7 +139,7 @@ export function Shell() {
             <UserMenu />
           </div>
         </div>
-        <nav className="flex items-center gap-1 px-6 pb-0 pt-3">
+        <nav aria-label="Main" className="flex items-center gap-1 px-6 pb-0 pt-3">
           {cluster ? (
             <>
               <Link to="/clusters/$cluster/topics" params={{ cluster }} className={navLinkBase}>

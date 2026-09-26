@@ -19,7 +19,10 @@ function SecurityLayout() {
         title="Security"
         subtitle="Principals, ACLs, and SCRAM credentials for this cluster."
       />
-      <nav className="flex items-center gap-1 border-b border-border">
+      <nav
+        aria-label="Security sections"
+        className="flex items-center gap-1 border-b border-border"
+      >
         <Link
           to="/clusters/$cluster/security/acls"
           params={{ cluster }}
