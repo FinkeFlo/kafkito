@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 	"unicode/utf8"
 
@@ -379,7 +380,7 @@ func buildWindows(
 		}
 		for p, b := range offsets {
 			e, ok := endMap[p]
-			if !ok || !containsPartition(parts, p) {
+			if !ok || !slices.Contains(parts, p) {
 				continue
 			}
 			if s, ok := startMap[p]; ok {
@@ -408,7 +409,7 @@ func buildWindows(
 	return windows, nil
 }
 
-// timeBounds narrows [start, end) of partition p to the offsets in fromOff
+// clampRange narrows [start, end) of partition p to the offsets in fromOff
 // (inclusive lower) and toOff (exclusive upper); nil maps leave it as is.
 func clampRange(p int32, start, end int64, fromOff, toOff map[int32]int64) (int64, int64) {
 	if o, ok := fromOff[p]; ok && o > start {
@@ -418,16 +419,6 @@ func clampRange(p int32, start, end int64, fromOff, toOff map[int32]int64) (int6
 		end = o
 	}
 	return start, end
-}
-
-// containsPartition reports whether p appears in parts.
-func containsPartition(parts []int32, p int32) bool {
-	for _, x := range parts {
-		if x == p {
-			return true
-		}
-	}
-	return false
 }
 
 // buildNextCursor returns the cursor pointing at the next page boundary,
