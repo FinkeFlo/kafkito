@@ -6,7 +6,7 @@ import {
   type CreateGroupStrategy,
   type ResetOffsetResult,
 } from "@/lib/api";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Notice } from "@/components/ui/Notice";

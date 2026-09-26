@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Button } from "./button";
+import { Button } from "./Button";
 import { Modal } from "./Modal";
 
 export interface ConfirmDialogProps {

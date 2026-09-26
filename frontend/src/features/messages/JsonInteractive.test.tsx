@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ARRAY_COLLAPSE_THRESHOLD, JsonInteractive, SIZE_LIMIT_BYTES } from "./json-interactive";
+import { ARRAY_COLLAPSE_THRESHOLD, JsonInteractive, SIZE_LIMIT_BYTES } from "./JsonInteractive";
 
 describe("JsonInteractive", () => {
   it("renders scalar values clickably and reports trail + literal on click", async () => {

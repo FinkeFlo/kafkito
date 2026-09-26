@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { StatusDot } from "./StatusDot";
-import { StatusBox, StatusIcon } from "./status-icon";
+import { StatusBox, StatusIcon } from "./StatusIcon";
 import { KpiCard } from "./KpiCard";
 import { Notice } from "./Notice";
 

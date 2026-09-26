@@ -7,11 +7,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Square, Play } from "lucide-react";
 import { copyMessages, type CopyProgressEvent, type CopyRequest } from "@/lib/api";
 import { useCluster, type ClusterListItem } from "@/lib/use-cluster";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { TopicCombobox } from "./topic-combobox";
-import { StatusBox } from "@/components/ui/status-icon";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { TopicCombobox } from "./TopicCombobox";
+import { StatusBox } from "@/components/ui/StatusIcon";
 import { getPrivateClusterByName, toBackendClusterConfig } from "@/lib/private-clusters";
 import { topicQueries } from "@/lib/queries/topics";
 

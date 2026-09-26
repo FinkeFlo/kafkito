@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { alterTopicConfigs, can, type Capabilities, type TopicConfigEntry } from "@/lib/api";
 import { useAuth } from "@/auth/hooks";
 import { Notice } from "@/components/ui/Notice";
-import { StatusBox, StatusIcon } from "@/components/ui/status-icon";
+import { StatusBox, StatusIcon } from "@/components/ui/StatusIcon";
 import { clusterQueries } from "@/lib/queries/clusters";
 import { topicQueries } from "@/lib/queries/topics";
 

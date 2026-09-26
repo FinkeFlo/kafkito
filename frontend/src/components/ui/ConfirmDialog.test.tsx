@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { ConfirmDialog } from "./confirm-dialog";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 afterEach(cleanup);
 

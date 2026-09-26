@@ -28,8 +28,8 @@ import { prettyValue } from "@/lib/format";
 import type { Token } from "@/lib/path-builder";
 import { useFormatters } from "@/lib/use-formatters";
 import { useMessageRawValue } from "@/lib/use-message-raw-value";
-import { JsonInteractive, SIZE_LIMIT_BYTES } from "@/features/messages/json-interactive";
-import { Button } from "@/components/ui/button";
+import { JsonInteractive, SIZE_LIMIT_BYTES } from "@/features/messages/JsonInteractive";
+import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
 
 function ClickToFilterHint() {

@@ -11,14 +11,14 @@ import {
   type ProduceResult,
 } from "@/lib/api";
 import { useAuth } from "@/auth/hooks";
-import { Button } from "@/components/ui/button";
-import { IconButton } from "@/components/ui/icon-button";
-import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { Timestamp } from "@/components/ui/timestamp";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Timestamp } from "@/components/ui/Timestamp";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useCluster } from "@/lib/use-cluster";
-import { StatusBox } from "@/components/ui/status-icon";
+import { StatusBox } from "@/components/ui/StatusIcon";
 import { messageKeys, messageQueries } from "@/lib/queries/messages";
 import { topicQueries } from "@/lib/queries/topics";
 

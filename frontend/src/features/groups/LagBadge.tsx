@@ -1,4 +1,4 @@
-import { Badge, type BadgeVariant } from "@/components/ui/badge";
+import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { lagVariant } from "@/lib/format";
 import { useFormatters } from "@/lib/use-formatters";
 

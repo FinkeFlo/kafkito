@@ -2,7 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Sparkles } from "lucide-react";
 import { anyModalOpen } from "@/components/ui/Modal";
-import { WhatsNewModal } from "@/features/shell/whats-new-modal";
+import { WhatsNewModal } from "@/features/shell/WhatsNewModal";
 import { CHANGELOG } from "@/content/changelog";
 import {
   getLastSeen,

@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { topicQueries } from "@/lib/queries/topics";
-import { CreateGroupModal } from "./create-group-modal";
+import { CreateGroupModal } from "./CreateGroupModal";
 
 const createGroup = vi.hoisted(() => vi.fn());
 const listACLs = vi.hoisted(() => vi.fn());

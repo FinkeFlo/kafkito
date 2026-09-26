@@ -1,6 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { Timestamp } from "./timestamp";
+import { Timestamp } from "./Timestamp";
 import { setTimeZone } from "@/lib/use-timezone";
 
 const tzKey = "kafkito.timezone";

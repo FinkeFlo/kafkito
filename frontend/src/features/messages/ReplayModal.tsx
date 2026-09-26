@@ -27,10 +27,10 @@ import { useCluster, type ClusterListItem } from "@/lib/use-cluster";
 import { useFormatters } from "@/lib/use-formatters";
 import { useMessageRawValue } from "@/lib/use-message-raw-value";
 import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { TopicCombobox } from "./topic-combobox";
-import { StatusBox } from "@/components/ui/status-icon";
+import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { TopicCombobox } from "./TopicCombobox";
+import { StatusBox } from "@/components/ui/StatusIcon";
 import { topicQueries } from "@/lib/queries/topics";
 
 interface ReplayModalProps {
