@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Check } from "lucide-react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   resetGroupOffsets,
@@ -330,7 +331,8 @@ export function ResetOffsetsModal({
                     onChange={(e) => setPartSel((s) => ({ ...s, [p]: e.target.checked }))}
                     className="sr-only"
                   />
-                  p{p}
+                  {partSel[p] && <Check aria-hidden="true" className="h-3 w-3" strokeWidth={3} />}p
+                  {p}
                 </label>
               );
             })}
@@ -404,7 +406,16 @@ export function ResetOffsetsModal({
                       const active = committed || !!partSel[r.partition];
                       return (
                         <tr key={r.partition} className={active ? "" : "text-subtle-text"}>
-                          <td className={active ? "text-accent" : undefined}>p{r.partition}</td>
+                          <td className={active ? "text-accent" : undefined}>
+                            <span className="inline-flex items-center gap-1">
+                              {active && !committed ? (
+                                <Check role="img" aria-label="selected" className="h-3 w-3" />
+                              ) : (
+                                <span aria-hidden="true" className="inline-block w-3" />
+                              )}
+                              p{r.partition}
+                            </span>
+                          </td>
                           <td className="text-right text-muted">
                             {r.old_offset >= 0 ? r.old_offset : "—"}
                           </td>
@@ -426,7 +437,7 @@ export function ResetOffsetsModal({
                 <p className="mt-1 text-[10px] text-subtle-text">
                   {committed
                     ? "At commit time — live traffic may increase this."
-                    : "Highlighted rows are the partitions you have selected to reset. At preview time — live traffic may increase this."}
+                    : "Rows marked with a check are the partitions you have selected to reset. At preview time — live traffic may increase this."}
                 </p>
               </>
             );

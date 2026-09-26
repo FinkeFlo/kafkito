@@ -97,7 +97,7 @@ export function ClusterPill({ className }: { className?: string }) {
           className,
         )}
       >
-        <StatusDot reachable={false} />
+        <StatusDot intent="neutral" hideLabel />
         <span>loading…</span>
       </span>
     );
@@ -172,10 +172,10 @@ export function ClusterPill({ className }: { className?: string }) {
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={popoverId}
-        aria-label={`Cluster: ${activeInfo?.name ?? "-"}`}
+        aria-label={`Cluster: ${activeInfo?.name ?? "-"}${activeInfo ? (reachable ? ", reachable" : ", unreachable") : ""}`}
         className="inline-flex h-8 items-center gap-2 rounded-full border border-border bg-panel px-3 text-xs text-text transition-colors hover:bg-hover"
       >
-        <StatusDot reachable={reachable} pulsing={reachable} />
+        <StatusDot reachable={reachable} pulsing={reachable} hideLabel />
         <span className="font-mono text-[12px] font-semibold">{activeInfo?.name ?? "-"}</span>
         {activeInfo && (
           <>
@@ -236,7 +236,10 @@ export function ClusterPill({ className }: { className?: string }) {
                         active && "bg-accent-subtle",
                       )}
                     >
-                      <StatusDot reachable={c.reachable} />
+                      <StatusDot
+                        reachable={c.reachable}
+                        label={c.reachable ? "reachable" : "unreachable"}
+                      />
                       <span className="min-w-0 flex-1 truncate font-mono text-[12px] font-medium text-text">
                         {c.name}
                       </span>

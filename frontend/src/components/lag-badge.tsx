@@ -12,11 +12,13 @@ export interface LagBadgeProps {
 
 // Non-colour cue per WCAG 1.4.1 — glyph reinforces the colour intent so
 // the lag bucket is distinguishable in monochrome / colour-blind contexts.
-// `▲` for "rising" buckets (warning + danger), `·` neutral, `—` unknown.
+// `▲` elevated, `▲▲` critical, `·` normal, `—` unknown. Warning and danger
+// need different glyphs: amber and red are hard to tell apart for
+// red-green colour-blind users.
 const glyphByVariant: Record<BadgeVariant, string> = {
   success: "▼",
   warning: "▲",
-  danger: "▲",
+  danger: "▲▲",
   neutral: "·",
   info: "·",
 };

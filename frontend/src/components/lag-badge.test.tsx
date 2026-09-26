@@ -63,11 +63,11 @@ describe("LagBadge", () => {
     expect(screen.getByText("1,000")).toBeInTheDocument();
   });
 
-  it("flips to danger with 'critical lag' label and '▲' glyph at the danger threshold (C7, lagThresholdDanger / M3 mutation-guard)", () => {
+  it("flips to danger with 'critical lag' label and '▲▲' glyph at the danger threshold (C7, lagThresholdDanger / M3 mutation-guard)", () => {
     setup({ value: lagThresholdDanger });
 
     expect(screen.getByText(/critical lag/i)).toBeInTheDocument();
-    expect(screen.getByText("▲")).toBeInTheDocument();
+    expect(screen.getByText("▲▲")).toBeInTheDocument();
     expect(screen.getByText("10,000")).toBeInTheDocument();
   });
 

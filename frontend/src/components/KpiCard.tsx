@@ -1,34 +1,14 @@
 import type { ReactNode } from "react";
 import { clsx } from "clsx";
+import { StatusIcon } from "./status-icon";
 
 type DeltaIntent = "good" | "bad" | "neutral";
 
-const deltaPrefix: Record<DeltaIntent, string> = {
-  good: "+",
-  bad: "−",
-  neutral: "±",
-};
-
-const deltaSrLabel: Record<DeltaIntent, string> = {
-  good: "increase",
-  bad: "decrease",
-  neutral: "change",
-};
-
-function isReactNodeWithExplicitSign(delta: ReactNode): boolean {
-  if (typeof delta !== "string") return false;
-  const trimmed = delta.trim();
-  if (trimmed.length === 0) return false;
-  const first = trimmed.charAt(0);
-  return first === "+" || first === "-" || first === "−" || first === "±";
-}
-
 /**
- * KPI card with label / value / unit / optional delta. The delta intent is
- * conveyed by both colour AND a leading sign glyph (`+` / `−` / `±`) so
- * the meaning survives monochrome / colour-blind contexts (WCAG 1.4.1).
- * If the caller already encoded the sign (e.g. `delta="+12%"`), the
- * component does not add a second prefix.
+ * KPI card with label / value / unit / optional delta. A good or bad delta
+ * carries a check or cross icon next to its colour so the verdict survives
+ * colour-blind and monochrome contexts (WCAG 1.4.1); neutral deltas stay
+ * plain muted text.
  */
 export function KpiCard({
   label,
@@ -46,7 +26,6 @@ export function KpiCard({
   className?: string;
 }) {
   const hasDelta = delta !== undefined && delta !== null && delta !== "";
-  const needsPrefix = hasDelta && !isReactNodeWithExplicitSign(delta);
 
   return (
     <div className={clsx("rounded-xl border border-border bg-panel p-4", className)}>
@@ -60,18 +39,14 @@ export function KpiCard({
       {hasDelta && (
         <div
           className={clsx(
-            "mt-1 text-xs font-medium",
+            "mt-1 flex items-center gap-1 text-xs font-medium",
             deltaIntent === "good" && "text-success",
             deltaIntent === "bad" && "text-danger",
             deltaIntent === "neutral" && "text-muted",
           )}
         >
-          <span className="sr-only">{deltaSrLabel[deltaIntent]}: </span>
-          {needsPrefix ? (
-            <span aria-hidden="true" className="mr-0.5 font-mono">
-              {deltaPrefix[deltaIntent]}
-            </span>
-          ) : null}
+          {deltaIntent === "good" && <StatusIcon intent="success" label="Good" />}
+          {deltaIntent === "bad" && <StatusIcon intent="danger" label="Needs attention" />}
           {delta}
         </div>
       )}

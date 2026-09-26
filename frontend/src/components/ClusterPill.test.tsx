@@ -51,3 +51,19 @@ describe("ClusterPill hook-order regression (React #310)", () => {
     expect(() => rerender(<ClusterPill />)).not.toThrow();
   });
 });
+
+describe("ClusterPill reachability cue", () => {
+  it.each([
+    [true, "Cluster: local, reachable"],
+    [false, "Cluster: local, unreachable"],
+  ])("names the trigger with the reachability (reachable=%s)", (reachable, name) => {
+    mockState = {
+      cluster: "local",
+      clusters: [{ ...loadedCluster, reachable }],
+      setCluster: vi.fn(),
+      isLoading: false,
+    };
+    const { getByRole } = render(<ClusterPill />);
+    expect(getByRole("button", { name })).toBeInTheDocument();
+  });
+});
