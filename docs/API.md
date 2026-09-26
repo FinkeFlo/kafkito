@@ -13,7 +13,10 @@ endpoints that back the web UI — stable, documented, scriptable.
   requests with `Authorization: Bearer <JWT>`. kafkito validates that token
   on every `/api/v1/*` request according to `KAFKITO_AUTH_MODE` (`mock`,
   `xsuaa` in `-tags btp` builds, `off` only in `-tags devauth` builds) and
-  answers `401` when it is missing or invalid.
+  answers `401` when it is missing or invalid, before any routing or RBAC:
+  `{"error": "unauthorized", "message": "missing bearer token"}` (or
+  `"invalid token"`) with `WWW-Authenticate: Bearer realm="kafkito"`.
+  `/healthz` and `/readyz` are never authenticated.
 - The verified JWT principal is the RBAC identity. The identity header
   (`X-Kafkito-User` by default, configurable via `rbac.identity.header`) is
   only consulted when no principal is present on the request; a
@@ -32,6 +35,30 @@ endpoints that back the web UI — stable, documented, scriptable.
 - JSON everywhere. Request bodies: `Content-Type: application/json`. Response
   bodies: list endpoints always return `{ "<resource>": [...] }`, not bare
   arrays, so new fields can be added without breaking clients.
+- Every response (API, UI and static files) carries the security headers
+  listed in the README under
+  [Security headers](https://github.com/FinkeFlo/kafkito/blob/main/README.md#security-headers),
+  including a strict `Content-Security-Policy`.
+
+## Private clusters
+
+Clusters a user adds in the UI are stored in their browser only. To address
+one from a script, use the path segment `__private__` as `{cluster}` and send
+the cluster definition as base64-encoded JSON (`ClusterConfig` in the spec,
+at most 8 KiB decoded) in the `X-Kafkito-Cluster` header on every request.
+The server keeps nothing between requests.
+
+- A malformed header, a missing header on a `__private__` path, or a broker
+  or Schema Registry host the SSRF guard refuses returns `400`. Neither the
+  raw header nor the credentials in it appear in a response or a log line.
+- RBAC does not apply to private clusters; only the broker's own ACLs do.
+- `POST /api/v1/clusters/_test` probes a cluster definition sent in the body
+  (the "Test connection" button).
+
+```bash
+PRIVATE=$(printf '%s' '{"name":"mine","brokers":["broker.example.com:9092"],"auth":{"type":"none"},"tls":{"enabled":false}}' | base64 | tr -d '\n')
+curl -s -H "X-Kafkito-Cluster: $PRIVATE" "$BASE/api/v1/clusters/__private__/topics" | jq '.topics[].name'
+```
 
 ## Contract and live docs
 
@@ -46,12 +73,13 @@ endpoints that back the web UI — stable, documented, scriptable.
 
 ## Meta
 
-| Method | Path                | Purpose                                          |
-| ------ | ------------------- | ------------------------------------------------ |
-| GET    | `/healthz`          | Liveness (always 200 while the process is up).   |
-| GET    | `/readyz`           | Readiness. 503 if any configured cluster is down.|
-| GET    | `/api/v1/info`      | Build name + version.                            |
-| GET    | `/api/v1/me`        | Resolved caller identity + effective permissions.|
+| Method | Path                   | Purpose                                          |
+| ------ | ---------------------- | ------------------------------------------------ |
+| GET    | `/healthz`             | Liveness (always 200 while the process is up).   |
+| GET    | `/readyz`              | Readiness. 503 if any configured cluster is down.|
+| GET    | `/api/v1/info`         | Build name + version.                            |
+| GET    | `/api/v1/me`           | Resolved caller identity + effective permissions.|
+| GET    | `/api/v1/openapi.yaml` | The OpenAPI document (see above).                |
 
 ## Clusters
 
@@ -80,18 +108,17 @@ curl -s $BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/consumers | jq
 
 `GET /api/v1/clusters/{cluster}/topics/{topic}/messages`
 
-| Query       | Default | Notes                                                |
-| ----------- | ------- | ---------------------------------------------------- |
-| `partition` | `-1`    | `-1` = all partitions.                               |
-| `limit`     | `50`    | Server caps at 500.                                  |
-| `from`      | `latest`| `latest` / `oldest` / `offset`.                      |
-| `offset`    | —       | Required when `from=offset`.                         |
+The query parameters (`partition`, `limit` capped at 500, `from` =
+`end` | `start` | `offset` | `timestamp`, `offset`, `partition_offsets`,
+`from_ts_ms`, `to_ts_ms`, `cursor`) and the `MessagesPage` response are
+described in the spec. Pass the returned `next_cursor` back as `cursor` to
+page.
 
-Response: `{ "messages": [Message, ...] }`. Records are returned in per-partition
-offset order. `value` is populated when printable; binary payloads come through
-as `value_b64` with `value_encoding=binary`. Schema-Registry encoded records
-are decoded transparently when an SR is configured for the cluster and carry a
-`value_sr` meta block (`schema_id`, `subject`, `version`, `format`).
+Records are returned in per-partition offset order. `value` is populated when
+printable; a binary payload is rendered as a `0x…` hex preview with
+`value_encoding=binary` and its bytes in `value_b64`. Schema-Registry encoded
+records are decoded transparently when an SR is configured for the cluster and
+carry a `value_sr` meta block (`schema_id`, `subject`, `version`, `format`).
 
 `value_encoding` is `json` or `xml` when the value's structure was detected,
 `text` otherwise. A value over 64 KB (`value_truncated=true`) only has its
@@ -115,10 +142,10 @@ keys). Use `headers_b64` when you need to reproduce a header byte-for-byte.
 
 ```bash
 # Most recent 20 records across all partitions
-curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages?limit=20&from=latest" | jq '.messages[] | {p:.partition, off:.offset, ts:.timestamp_ms, enc:.value_encoding}'
+curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages?limit=20&from=end" | jq '.messages[] | {p:.partition, off:.offset, ts:.timestamp_ms, enc:.value_encoding}'
 
 # Read from the beginning of partition 0
-curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages?partition=0&from=oldest&limit=100" | jq
+curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages?partition=0&from=start&limit=100" | jq
 ```
 
 ### Download raw value
@@ -131,12 +158,8 @@ whenever the 64 KB preview in `GET .../messages` is not enough: to inspect a
 large value in full, to confirm a truncated preview's real encoding, or to
 re-produce a record byte-for-byte.
 
-| Path param  | Type    | Notes                                     |
-| ----------- | ------- | ----------------------------------------- |
-| `partition` | `int32` | Exact partition; `-1` is not accepted.    |
-| `offset`    | `int64` | Exact offset; must be `>= 0`.             |
-
-Takes no query parameters.
+`partition` and `offset` are exact (no `-1`, no negative offsets); the
+endpoint takes no query parameters.
 
 Response headers:
 
@@ -153,15 +176,14 @@ Status codes:
 | Status | When                                                              |
 | ------ | ----------------------------------------------------------------- |
 | `200`  | Value returned in the body.                                       |
-| `400`  | `partition` is not an int32, or `offset` is not a non-negative int64. |
+| `400`  | `partition` is not a non-negative int32, or `offset` is not a non-negative int64 (`code: invalid_request`). |
 | `403`  | RBAC denied the read, or the value is masked (`code: value_masked`). |
 | `404`  | Unknown cluster.                                                  |
 | `413`  | Value is larger than the 15 MB download cap.                      |
-| `502`  | Broker error, or no record at that partition/offset.              |
+| `502`  | Broker error, or no record at that partition/offset (`code: kafka_upstream`). |
 
 The 15 MB cap is fixed (not configurable) so a single oversized record cannot
-exhaust process memory. `400`/`404`/`413` respond with `{ "error": "..." }`;
-`502` responds with `{ "error": "upstream kafka error", "code": "kafka_upstream" }`.
+exhaust process memory.
 
 Masked values are not downloadable: when the cluster's `data_masking` rules
 change the value of the record (checked on the same decoded rendering
@@ -192,15 +214,23 @@ curl -s -o /dev/null -w '%{http_code}\n' \
 
 `POST /api/v1/clusters/{cluster}/topics/{topic}/messages/search`
 
-Bounded content search with a scan budget. Request body is a JSON object describing the scan (mode, path/value, zones, limit, budget). Common fields: `mode` (contains|jsonpath|xpath|js), `path` (for path modes), `op` (exists|eq|contains|regex|...), `value`, `zones` (array, e.g. ["value","headers","key"]).
+Bounded content search with a scan budget. The body is a `SearchRequest`
+(see the spec). Common fields: `mode` (`contains` | `jsonpath` | `xpath` |
+`js`), `path` (the JSONPath or XPath expression), `op` (`exists` | `eq` |
+`contains` | `regex` | …), `value` (the needle, or the JS predicate in `js`
+mode), `zones` (e.g. `["value","headers","key"]`), `direction`
+(`newest_first` | `oldest_first`), `limit` (matches) and `budget` (records to
+scan). The response carries the matches in `messages` and the scan statistics
+in `search`; pass `search.next_cursors` back as `cursors` to continue. Bodies
+over 1 MiB return `400`.
 
 Quick example — simple contains across message value:
 
 ```bash
 curl -s -X POST "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/search" \
   -H 'content-type: application/json' \
-  -d '{"value":"customerNumber","zones":["value"],"mode":"contains","direction":"backward","limit":20,"max_scan":5000}' \
-  | jq '.stats, (.messages[] | {p:.partition, off:.offset})'
+  -d '{"value":"customerNumber","zones":["value"],"mode":"contains","direction":"newest_first","limit":20,"budget":5000}' \
+  | jq '.search, (.messages[] | {p:.partition, off:.offset})'
 ```
 
 Advanced: JSONPath example (match messages where isAvailable==true AND language=='English')
@@ -209,7 +239,7 @@ Advanced: JSONPath example (match messages where isAvailable==true AND language=
 curl -sS -X POST "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/search" \
   -H 'content-type: application/json' \
   -d "{\"mode\":\"jsonpath\",\"op\":\"exists\",\"path\":\"$..[?(@.isAvailable==true && @.language=='English')]\",\"zones\":[\"value\"],\"limit\":20}" \
-  | jq '.stats, (.messages[] | {p:.partition, off:.offset})'
+  | jq '.search, (.messages[] | {p:.partition, off:.offset})'
 ```
 
 Advanced: JavaScript predicate example (same logic, runs the predicate per message)
@@ -218,7 +248,7 @@ Advanced: JavaScript predicate example (same logic, runs the predicate per messa
 curl -sS -X POST "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/search" \
   -H 'content-type: application/json' \
   -d "{\"mode\":\"js\",\"value\":\"parsed.isAvailable === true && parsed.language === 'English'\",\"zones\":[\"value\"],\"limit\":20}" \
-  | jq '.stats, (.messages[] | {p:.partition, off:.offset})'
+  | jq '.search, (.messages[] | {p:.partition, off:.offset})'
 ```
 
 Notes:
@@ -239,13 +269,9 @@ curl -s -X POST "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages" \
   | jq
 ```
 
-| Field                             | Notes                                                    |
-| --------------------------------- | -------------------------------------------------------- |
-| `partition`                       | Optional. Omit to let the partitioner choose.             |
-| `key` / `value`                   | Payloads, interpreted per the matching `*_encoding`.      |
-| `key_encoding` / `value_encoding` | `text` (default), `base64` or `empty`.                    |
-| `headers`                         | Header values as UTF-8 text.                              |
-| `headers_b64`                     | Header values as standard base64 raw bytes.               |
+The body is a `ProduceRequest` (see the spec): optional `partition`, `key` and
+`value` with their `key_encoding` / `value_encoding`, and `headers` /
+`headers_b64`.
 
 Encodings:
 
@@ -270,8 +296,10 @@ them.
 
 The body may be gzip-compressed with `Content-Encoding: gzip`. The body is
 capped at 15 MiB of JSON either way (after decompression); a larger body
-returns `413` `request body exceeds the 15 MB produce limit`. Unknown fields are
-rejected with `400`.
+returns `413` `request body exceeds the 15 MB produce limit`. A record the
+client-side 10 MiB batch cap or the broker's `max.message.bytes` refuses
+returns `413` with `code: kafka_message_too_large`. Unknown fields are rejected
+with `400`.
 
 ```bash
 # Zero-length value (not a tombstone) plus a binary header
@@ -298,18 +326,10 @@ kafkito does not create it.
 The response is **not** JSON: it is a `text/event-stream` of progress events,
 because a copy can run far longer than a normal request.
 
-| Field                 | Type          | Notes                                                                                          |
-| --------------------- | ------------- | ---------------------------------------------------------------------------------------------- |
-| `dest_cluster`        | string        | Name of a server-configured destination cluster. Mutually exclusive with `dest_cluster_config`. |
-| `dest_cluster_config` | object        | Ad-hoc ("private") destination cluster, same shape the `X-Kafkito-Cluster` header carries.      |
-| `dest_topic`          | string        | **Required.** Destination topic.                                                                |
-| `partition`           | int32         | Single source partition. Absent = all partitions.                                               |
-| `from_ts_ms`          | int64         | Inclusive lower bound on source record timestamps.                                              |
-| `to_ts_ms`            | int64         | **Exclusive** upper bound. See below.                                                           |
-| `limit`               | int64         | Max records to copy. Absent = no limit.                                                         |
-| `preserve_partition`  | bool          | Produce each record to the partition number it came from.                                       |
-
-Exactly one of `dest_cluster` / `dest_cluster_config` must be set.
+The body is a `CopyRequest` (see the spec for every field). `dest_topic` is
+required, and exactly one of `dest_cluster` (a server-configured cluster) /
+`dest_cluster_config` (a private cluster, same shape the `X-Kafkito-Cluster`
+header carries) must be set. `from_ts_ms` is inclusive, `to_ts_ms` exclusive.
 
 When `to_ts_ms` is omitted the server substitutes the job's start time, so a
 copy of a live topic terminates instead of tailing it forever: records produced
@@ -333,14 +353,9 @@ data: {"copied":500,"skipped":3}
 data: {"copied":812,"skipped":5,"done":true}
 ```
 
-Each event is a `data: {json}` line pair with the fields:
-
-| Field     | Notes                                                                     |
-| --------- | ------------------------------------------------------------------------- |
-| `copied`  | Records produced to the destination so far.                               |
-| `skipped` | Records deliberately left out (see below). Omitted while 0.               |
-| `done`    | `true` on the final event only; omitted otherwise.                        |
-| `error`   | Set on the final event if the job aborted. Omitted when empty.            |
+Each event is a `data: {json}` line pair carrying a `CopyProgressEvent`:
+`copied`, `skipped` (omitted while 0), `done` (final event only) and `error`
+(set on the final event if the job aborted).
 
 Progress events arrive periodically — one right after the stream opens and at
 least one per fetched page. Because the SSE headers are sent before the copy
@@ -377,7 +392,7 @@ Status codes returned **before** the stream starts:
 | 400  | Invalid body (including unknown fields or a body over 32 KiB), missing `dest_topic`, both or neither destination field, destination equal to the source cluster+topic (would never terminate), unknown `dest_cluster`, `dest_topic` does not exist (the destination is never auto-created), or `preserve_partition` with too few destination partitions. |
 | 403  | RBAC denied consume on the source or produce on the destination.                                                                                                          |
 | 428  | Destination cluster is marked `is_prod` and the `X-Kafkito-Confirm-Prod: true` header is missing.                                                                         |
-| 429  | Too many concurrent copy jobs server-wide; body carries `code: copy_concurrency_limit` and the response has a `Retry-After` header. Copies hold broker connections for their whole run, so the server sheds load instead of queueing. |
+| 429  | Too many concurrent copy jobs server-wide (4); body carries `code: copy_concurrency_limit` and the response has a `Retry-After: 30` header. Copies hold broker connections for their whole run, so the server sheds load instead of queueing. |
 
 **Authorization.** The source is checked as `topic:consume` by the RBAC
 middleware (from the URL); the destination is checked as `topic:produce` by the
@@ -484,8 +499,8 @@ curl -s -X POST "$BASE/api/v1/clusters/$CLUSTER/acls" \
 
 Create (`POST`) and delete (`DELETE` with the filter as JSON body) take all
 seven fields, `host` included; a missing field returns `400`
-`invalid_request` (a missing `host` used to default to `*`). Enum-like values
-stay case-insensitive. Bodies are capped at 16 KiB.
+`invalid_request` (`host` has no default). Enum-like values are
+case-insensitive. Bodies are capped at 16 KiB.
 
 ## SCRAM users
 
@@ -513,10 +528,13 @@ All error responses share the `Error` schema from the spec:
 ```
 
 `error` is always present. `code` is set where a machine-readable code
-exists (e.g. `kafka_upstream`, `invalid_request`). RBAC
-denials add `resource` and `action`, and 401s from the auth middleware add
-`message`. Upstream Kafka/Schema Registry details are only logged
-server-side; the response carries `"error": "upstream kafka error"`.
+exists; the spec's `Error` schema lists them (`kafka_upstream`,
+`invalid_request`, `value_masked`, `production_confirmation_required`,
+`copy_concurrency_limit`, …). RBAC denials add `resource` and `action`, and
+401s from the auth middleware add `message`. Upstream Kafka/Schema Registry
+details are only logged server-side; the response carries
+`"error": "upstream kafka error"`. Error bodies never contain credentials or
+the raw `X-Kafkito-Cluster` header.
 
 Every request is validated against `api/openapi.yaml` (see
 [ADR-0005](adr/0005-openapi-contract.md)) before the handler runs. A mismatch returns `400` with
@@ -529,10 +547,10 @@ and the violated rule, but never the submitted value:
 
 A body that is not valid JSON returns `400` `request body: malformed`, and a
 field the schema does not allow returns `400`
-`request body: has properties that are not allowed`. Before the groups,
-schema, ACL and SCRAM user endpoints were served by generated handlers they
-answered with `invalid body: <decoder error>` or `invalid json: <decoder
-error>`; bodies over the limit keep those texts.
+`request body: has properties that are not allowed`. A body over an
+endpoint's size limit returns `400` `invalid body: http: request body too
+large` (`invalid json: …` for ACLs and SCRAM users, `invalid json body: …` for
+search); only the produce endpoint answers `413`.
 
 JSON request bodies must be sent with
 `Content-Type: application/json` (a `charset` parameter is fine); other
@@ -546,21 +564,22 @@ Status codes used by the server:
 
 | Code | Meaning                                                         |
 | ---- | --------------------------------------------------------------- |
-| 400  | Request body/query parameter is invalid.                        |
-| 401  | Authentication required (proxy did not set `X-User`).           |
-| 403  | RBAC denied the requested action on the resource.               |
+| 400  | Request body/query parameter/header is invalid.                 |
+| 401  | Bearer token missing or invalid (see [Base URL and auth](#base-url-and-auth)). |
+| 403  | RBAC denied the action, the broker denied the credential (`kafka_not_authorized`), or the value is masked (`value_masked`). |
 | 404  | Cluster/topic/group/subject not found.                          |
 | 409  | Conflict (topic already exists, group not empty, etc.).         |
+| 413  | Produce body over 15 MiB, record too large for the broker, or raw value over 15 MB. |
 | 428  | Production cluster needs `X-Kafkito-Confirm-Prod: true`.        |
 | 429  | Too many concurrent long-running jobs (e.g. topic copies).      |
-| 502  | Kafka broker returned an error.                                 |
+| 502  | Kafka broker or Schema Registry returned an error.              |
 | 504  | Request to Kafka/SR timed out.                                  |
 
 ## Shell setup used in examples
 
 ```bash
 export BASE=http://localhost:37421
-export CLUSTER=spinedev-preview
-export TOPIC=FRA_acme_eXtend_SalesPrices_DEV
-export GROUP=FRA_acme_IF_H001_Acme_Post_Prices_Example
+export CLUSTER=local
+export TOPIC=orders
+export GROUP=orders-consumer
 ```
