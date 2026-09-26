@@ -32,6 +32,9 @@ type Options struct {
 	// the request context for /api/v1/* routes. nil disables the
 	// auth middleware (used by tests).
 	Auth auth.Validator
+
+	// copyRegistry replaces Registry for the copy job in tests.
+	copyRegistry copyRegistry
 }
 
 // New returns a ready-to-serve http.Handler.
@@ -54,10 +57,16 @@ func New(opts Options) http.Handler {
 
 	policy := rbac.Compile(opts.Config.RBAC)
 
+	var copyReg copyRegistry = opts.copyRegistry
+	if copyReg == nil && opts.Registry != nil {
+		copyReg = opts.Registry
+	}
+
 	generated, err := newGeneratedRoutes(&apiServer{
 		version:         opts.Version,
 		policy:          policy,
 		reg:             opts.Registry,
+		copyReg:         copyReg,
 		log:             handlerLog,
 		testConnTimeout: opts.Config.Server.TestConnectionTimeout,
 	}, errorWriter{log: handlerLog})

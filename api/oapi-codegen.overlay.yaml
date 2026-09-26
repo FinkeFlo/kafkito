@@ -27,6 +27,76 @@ actions:
       x-go-type: kafka.BrokerInfo
       x-go-type-import:
         path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.TopicInfo
+    update:
+      x-go-type: kafka.TopicInfo
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.TopicDetail
+    update:
+      x-go-type: kafka.TopicDetail
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.CreateTopicRequest
+    update:
+      x-go-type: kafka.CreateTopicRequest
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.AlterTopicConfigsRequest
+    update:
+      x-go-type: kafka.AlterTopicConfigsRequest
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.AlterTopicConfigsResult
+    update:
+      x-go-type: kafka.AlterTopicConfigsResult
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.TopicConsumer
+    update:
+      x-go-type: kafka.TopicConsumer
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.DeleteRecordsRequest
+    update:
+      x-go-type: kafka.DeleteRecordsRequest
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.DeleteRecordsResult
+    update:
+      x-go-type: kafka.DeleteRecordsResult
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.Message
+    update:
+      x-go-type: kafka.Message
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.ProduceRequest
+    update:
+      x-go-type: kafka.ProduceRequest
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.ProduceResult
+    update:
+      x-go-type: kafka.ProduceResult
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.MessageCountPartition
+    update:
+      x-go-type: kafka.PartitionMessageCount
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.MessageTimelineSlot
+    update:
+      x-go-type: kafka.TimelineSlot
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.SearchStats
+    update:
+      x-go-type: kafka.SearchStats
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
   # The header is decoded and validated by privateClusterMiddleware; the
   # generated binding only passes the raw value through.
   - target: $.components.parameters.PrivateClusterHeader.schema

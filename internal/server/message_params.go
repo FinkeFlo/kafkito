@@ -4,18 +4,19 @@
 package server
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
+	gen "github.com/FinkeFlo/kafkito/internal/server/api"
 )
+
+// The request validator enforces the rules api/openapi.yaml states for these
+// parameters (types, enums, minimums, required, path maxLength). What is left
+// here are defaults, clamping and the cross-field rules the spec cannot
+// express. Their error texts are unchanged from the hand-written parsing.
 
 // maxSearchBodyBytes bounds the search request body to protect against memory
 // exhaustion, matching the cap used by the other JSON handlers.
@@ -30,131 +31,71 @@ const maxConsumeLimit = 500
 // in the kafka layer.
 const maxPartitionOffsetsEntries = 1024
 
-// maxSearchPathLen bounds jsonpath/xpath expressions supplied in a search
-// request. These modes intentionally let the caller author the full query
-// (like a grep pattern), so the string always reaches xpath.Compile /
-// jp.ParseString verbatim - that isn't the classic "user data spliced into
-// a privileged query" injection pattern, since there is no base query to
-// escape. The real risk here is a pathological expression driving excessive
-// CPU/memory in the parser or evaluator, which this length cap mitigates.
-const maxSearchPathLen = 2048
+// maxSampleSize is the upper clamp of the sample endpoint's n.
+const maxSampleSize = 25
 
-// paramError is a client-visible parse failure carrying an HTTP status.
-type paramError struct {
-	status int
-	msg    string
-}
-
-func (e *paramError) Error() string { return e.msg }
-
-func badParam(msg string) *paramError { return &paramError{status: http.StatusBadRequest, msg: msg} }
-
-// writeParamError writes err as a JSON error response; the caller must return
-// right after. A *paramError keeps its specific status and message; any other
-// error is reported as a generic 400 so a malformed request can never fall
-// through into handler logic with partially-parsed options.
-func writeParamError(w http.ResponseWriter, err error) {
-	var pe *paramError
-	if errors.As(err, &pe) {
-		writeJSON(w, pe.status, map[string]string{"error": pe.msg})
-		return
-	}
-	writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request parameters"})
-}
-
-// parseConsumeQuery maps URL query to ConsumeOptions.
-// Returns a *paramError on bad input.
-func parseConsumeQuery(q url.Values) (kafkapkg.ConsumeOptions, error) {
+// consumeOptions maps the consumeMessages parameters to ConsumeOptions.
+func consumeOptions(p gen.ConsumeMessagesParams) (kafkapkg.ConsumeOptions, error) {
 	opts := kafkapkg.ConsumeOptions{
 		Partition: -1,
 		Limit:     50,
 		From:      kafkapkg.FromEnd,
 		Timeout:   6 * time.Second,
 	}
-	if s := q.Get("partition"); s != "" {
-		v, err := strconv.ParseInt(s, 10, 32)
-		if err != nil {
-			return opts, badParam("invalid partition")
-		}
-		opts.Partition = int32(v)
+	if p.Partition != nil {
+		opts.Partition = *p.Partition
 	}
-	if s := q.Get("limit"); s != "" {
-		v, err := strconv.Atoi(s)
-		if err != nil || v <= 0 {
-			return opts, badParam("invalid limit")
-		}
-		if v > maxConsumeLimit {
-			v = maxConsumeLimit
-		}
-		opts.Limit = v
+	if p.Limit != nil {
+		opts.Limit = min(*p.Limit, maxConsumeLimit)
 	}
-	rawFrom := q.Get("from")
-	switch rawFrom {
-	case "", "end":
-		opts.From = kafkapkg.FromEnd
-	case "start":
-		opts.From = kafkapkg.FromStart
-	case "offset":
-		opts.From = kafkapkg.FromOffset
-	case "timestamp":
-		opts.From = kafkapkg.FromTimestamp
-	default:
-		return opts, badParam("invalid from")
+	var rawFrom string
+	if p.From != nil {
+		rawFrom = string(*p.From)
+		opts.From = kafkapkg.ConsumeFrom(rawFrom)
 	}
-
-	if s := q.Get("from_ts_ms"); s != "" {
-		v, err := strconv.ParseInt(s, 10, 64)
-		if err != nil || v < 0 {
-			return opts, badParam("invalid from_ts_ms")
-		}
-		opts.FromTSMs = v
+	if p.FromTsMs != nil {
+		opts.FromTSMs = *p.FromTsMs
 	}
-	if s := q.Get("to_ts_ms"); s != "" {
-		v, err := strconv.ParseInt(s, 10, 64)
-		if err != nil || v < 0 {
-			return opts, badParam("invalid to_ts_ms")
-		}
-		opts.ToTSMs = v
+	if p.ToTsMs != nil {
+		opts.ToTSMs = *p.ToTsMs
 	}
 	if opts.FromTSMs > 0 && opts.ToTSMs > 0 && opts.ToTSMs < opts.FromTSMs {
-		return opts, badParam("to_ts_ms must be >= from_ts_ms")
+		return opts, badRequest("to_ts_ms must be >= from_ts_ms")
 	}
 
-	if s := q.Get("partition_offsets"); s != "" {
+	if p.PartitionOffsets != nil && *p.PartitionOffsets != "" {
 		if opts.From != kafkapkg.FromOffset {
-			return opts, badParam("partition_offsets requires from=offset")
+			return opts, badRequest("partition_offsets requires from=offset")
 		}
-		offs, err := parsePartitionOffsets(s)
+		offs, err := parsePartitionOffsets(*p.PartitionOffsets)
 		if err != nil {
-			return opts, badParam("invalid partition_offsets: " + err.Error())
+			return opts, badRequest("invalid partition_offsets: " + err.Error())
 		}
 		opts.PartitionOffsets = offs
 	}
 
 	if opts.From == kafkapkg.FromOffset && len(opts.PartitionOffsets) == 0 {
-		s := q.Get("offset")
-		v, err := strconv.ParseInt(s, 10, 64)
-		if err != nil {
-			return opts, badParam("invalid offset")
+		if p.Offset == nil {
+			return opts, badRequest("invalid offset")
 		}
-		opts.Offset = v
+		opts.Offset = *p.Offset
 	}
 
-	if s := q.Get("cursor"); s != "" {
-		c, decodeErr := kafkapkg.DecodeCursor(s)
-		if decodeErr != nil {
-			return opts, badParam("invalid cursor: " + decodeErr.Error())
+	if p.Cursor != nil && *p.Cursor != "" {
+		c, err := kafkapkg.DecodeCursor(*p.Cursor)
+		if err != nil {
+			return opts, badRequest("invalid cursor: " + err.Error())
 		}
 		switch c.Direction {
 		case kafkapkg.CursorBackward:
 			if rawFrom != "" && rawFrom != "end" {
-				return opts, badParam(fmt.Sprintf("cursor direction backward conflicts with from=%s", rawFrom))
+				return opts, badRequest(fmt.Sprintf("cursor direction backward conflicts with from=%s", rawFrom))
 			}
 			opts.From = kafkapkg.FromEnd
 			opts.CursorUpperBounds = c.Partitions
 		case kafkapkg.CursorForward:
 			if rawFrom == "end" {
-				return opts, badParam("cursor direction forward conflicts with from=end")
+				return opts, badRequest("cursor direction forward conflicts with from=end")
 			}
 			opts.From = kafkapkg.FromOffset
 			opts.PartitionOffsets = c.Partitions
@@ -164,88 +105,48 @@ func parseConsumeQuery(q url.Values) (kafkapkg.ConsumeOptions, error) {
 	return opts, nil
 }
 
-// parseCountQuery maps URL query to CountMessagesOptions.
-// Returns a *paramError on bad input.
-func parseCountQuery(q url.Values) (kafkapkg.CountMessagesOptions, error) {
+// countOptions maps the countMessages parameters to CountMessagesOptions.
+func countOptions(p gen.CountMessagesParams) (kafkapkg.CountMessagesOptions, error) {
 	opts := kafkapkg.CountMessagesOptions{
 		Partition: -1,
 		Timeout:   6 * time.Second,
 	}
-	if s := q.Get("partition"); s != "" {
-		v, err := strconv.ParseInt(s, 10, 32)
-		if err != nil {
-			return opts, badParam("invalid partition")
-		}
-		opts.Partition = int32(v)
+	if p.Partition != nil {
+		opts.Partition = *p.Partition
 	}
-	if s := q.Get("from_ts_ms"); s != "" {
-		v, err := strconv.ParseInt(s, 10, 64)
-		if err != nil || v < 0 {
-			return opts, badParam("invalid from_ts_ms")
-		}
-		opts.FromTSMs = v
+	if p.FromTsMs != nil {
+		opts.FromTSMs = *p.FromTsMs
 	}
-	if s := q.Get("to_ts_ms"); s != "" {
-		v, err := strconv.ParseInt(s, 10, 64)
-		if err != nil || v < 0 {
-			return opts, badParam("invalid to_ts_ms")
-		}
-		opts.ToTSMs = v
+	if p.ToTsMs != nil {
+		opts.ToTSMs = *p.ToTsMs
 	}
 	if opts.FromTSMs > 0 && opts.ToTSMs > 0 && opts.ToTSMs < opts.FromTSMs {
-		return opts, badParam("to_ts_ms must be >= from_ts_ms")
+		return opts, badRequest("to_ts_ms must be >= from_ts_ms")
 	}
 	return opts, nil
 }
 
-// parseTimelineQuery maps URL query to MessageTimelineOptions.
-// Returns a *paramError on bad input.
-func parseTimelineQuery(q url.Values) (kafkapkg.MessageTimelineOptions, error) {
+// timelineOptions maps the getMessageTimeline parameters to
+// MessageTimelineOptions. The spec requires from_ts_ms, to_ts_ms and slot_ms
+// and bounds them to >= 1.
+func timelineOptions(p gen.GetMessageTimelineParams) (kafkapkg.MessageTimelineOptions, error) {
 	opts := kafkapkg.MessageTimelineOptions{
 		Partition: -1,
+		FromTSMs:  p.FromTsMs,
+		ToTSMs:    p.ToTsMs,
+		SlotMs:    p.SlotMs,
 		Timeout:   20 * time.Second,
 	}
-	if s := q.Get("partition"); s != "" {
-		v, err := strconv.ParseInt(s, 10, 32)
-		if err != nil {
-			return opts, badParam("invalid partition")
-		}
-		opts.Partition = int32(v)
+	if p.Partition != nil {
+		opts.Partition = *p.Partition
 	}
-	fromRaw := q.Get("from_ts_ms")
-	toRaw := q.Get("to_ts_ms")
-	if fromRaw == "" || toRaw == "" {
-		return opts, badParam("from_ts_ms and to_ts_ms are required")
+	if opts.ToTSMs <= opts.FromTSMs {
+		return opts, badRequest("to_ts_ms must be > from_ts_ms")
 	}
-	from, err := strconv.ParseInt(fromRaw, 10, 64)
-	if err != nil || from <= 0 {
-		return opts, badParam("invalid from_ts_ms")
-	}
-	to, err := strconv.ParseInt(toRaw, 10, 64)
-	if err != nil || to <= 0 {
-		return opts, badParam("invalid to_ts_ms")
-	}
-	if to <= from {
-		return opts, badParam("to_ts_ms must be > from_ts_ms")
-	}
-	opts.FromTSMs = from
-	opts.ToTSMs = to
-
-	slotRaw := q.Get("slot_ms")
-	if slotRaw == "" {
-		return opts, badParam("slot_ms is required")
-	}
-	slot, err := strconv.ParseInt(slotRaw, 10, 64)
-	if err != nil || slot <= 0 {
-		return opts, badParam("invalid slot_ms")
-	}
-	opts.SlotMs = slot
-
-	numSlots := (to - from + slot - 1) / slot
+	numSlots := (opts.ToTSMs - opts.FromTSMs + opts.SlotMs - 1) / opts.SlotMs
 	if numSlots > kafkapkg.MaxTimelineSlots {
-		return opts, badParam(fmt.Sprintf("range/slot combination yields %d slots, exceeding the limit of %d", numSlots, kafkapkg.MaxTimelineSlots))
+		return opts, badRequest(fmt.Sprintf("range/slot combination yields %d slots, exceeding the limit of %d", numSlots, kafkapkg.MaxTimelineSlots))
 	}
-
 	return opts, nil
 }
 
@@ -286,95 +187,71 @@ func parsePartitionOffsets(s string) (map[int32]int64, error) {
 	return out, nil
 }
 
-// parseSampleQuery maps URL query to ConsumeOptions for the sample endpoint.
-// Defaults: n=5, partition=-1, from=end. Caps n at 25, raises n<1 to 1.
-func parseSampleQuery(q url.Values) (kafkapkg.ConsumeOptions, error) {
+// sampleOptions maps the sampleMessages parameters to ConsumeOptions.
+// Defaults: n=5, partition=-1, from=end. n is clamped to 1..25.
+func sampleOptions(p gen.SampleMessagesParams) kafkapkg.ConsumeOptions {
 	opts := kafkapkg.ConsumeOptions{
 		Partition: -1,
 		Limit:     5,
 		From:      kafkapkg.FromEnd,
 		Timeout:   6 * time.Second,
 	}
-	if s := q.Get("partition"); s != "" {
-		v, err := strconv.ParseInt(s, 10, 32)
-		if err != nil {
-			return opts, badParam("invalid partition")
-		}
-		opts.Partition = int32(v)
+	if p.Partition != nil {
+		opts.Partition = *p.Partition
 	}
-	if s := q.Get("n"); s != "" {
-		v, err := strconv.Atoi(s)
-		if err != nil {
-			return opts, badParam("invalid n")
-		}
-		if v < 1 {
-			v = 1
-		}
-		if v > 25 {
-			v = 25
-		}
-		opts.Limit = v
+	if p.N != nil {
+		opts.Limit = min(max(*p.N, 1), maxSampleSize)
 	}
-	return opts, nil
+	return opts
 }
 
-// searchRequestBody is the wire format for POST /topics/{topic}/messages/search.
-type searchRequestBody struct {
-	Partition   *int32           `json:"partition"`
-	Limit       int              `json:"limit"`
-	Budget      int              `json:"budget"`
-	Direction   string           `json:"direction"`
-	StopOnLimit *bool            `json:"stop_on_limit"`
-	Mode        string           `json:"mode"`
-	Path        string           `json:"path"`
-	Op          string           `json:"op"`
-	Value       string           `json:"value"`
-	Zones       []string         `json:"zones"`
-	FromTSMs    int64            `json:"from_ts_ms"`
-	ToTSMs      int64            `json:"to_ts_ms"`
-	Cursors     map[string]int64 `json:"cursors"`
-}
-
-// parseSearchBody decodes the request body and maps it to SearchOptions.
-// Returns a *paramError on bad input.
-func parseSearchBody(w http.ResponseWriter, r *http.Request) (kafkapkg.SearchOptions, error) {
-	var body searchRequestBody
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxSearchBodyBytes))
-	if err := dec.Decode(&body); err != nil && !errors.Is(err, io.EOF) {
-		return kafkapkg.SearchOptions{}, badParam("invalid json body: " + err.Error())
-	}
+// searchOptions maps an optional SearchRequest body to SearchOptions.
+func searchOptions(body *gen.SearchRequest) (kafkapkg.SearchOptions, error) {
 	opts := kafkapkg.SearchOptions{
-		Partition: -1,
-		Limit:     body.Limit,
-		Budget:    body.Budget,
-		Direction: kafkapkg.SearchDirection(body.Direction),
-		Mode:      kafkapkg.SearchMode(body.Mode),
-		Path:      body.Path,
-		Op:        kafkapkg.SearchOp(body.Op),
-		Value:     body.Value,
-		FromTS:    body.FromTSMs,
-		ToTS:      body.ToTSMs,
-		Timeout:   12 * time.Second,
+		Partition:   -1,
+		StopOnLimit: true,
+		Timeout:     12 * time.Second,
+	}
+	if body == nil {
+		return opts, nil
 	}
 	if body.Partition != nil {
 		opts.Partition = *body.Partition
 	}
-	if len(opts.Path) > maxSearchPathLen {
-		return kafkapkg.SearchOptions{}, badParam(fmt.Sprintf("path exceeds maximum length of %d", maxSearchPathLen))
+	opts.Limit = deref(body.Limit)
+	opts.Budget = deref(body.Budget)
+	opts.Direction = kafkapkg.SearchDirection(deref(body.Direction))
+	opts.Mode = kafkapkg.SearchMode(deref(body.Mode))
+	opts.Path = deref(body.Path)
+	opts.Op = kafkapkg.SearchOp(deref(body.Op))
+	opts.Value = deref(body.Value)
+	opts.FromTS = deref(body.FromTsMs)
+	opts.ToTS = deref(body.ToTsMs)
+	if body.StopOnLimit != nil {
+		opts.StopOnLimit = *body.StopOnLimit
 	}
-	opts.StopOnLimit = body.StopOnLimit == nil || *body.StopOnLimit
-	for _, z := range body.Zones {
-		opts.Zones = append(opts.Zones, kafkapkg.SearchZone(z))
+	if body.Zones != nil {
+		for _, z := range *body.Zones {
+			opts.Zones = append(opts.Zones, kafkapkg.SearchZone(z))
+		}
 	}
-	if len(body.Cursors) > 0 {
-		opts.Cursors = make(map[int32]int64, len(body.Cursors))
-		for k, v := range body.Cursors {
+	if body.Cursors != nil && len(*body.Cursors) > 0 {
+		opts.Cursors = make(map[int32]int64, len(*body.Cursors))
+		for k, v := range *body.Cursors {
 			pn, err := strconv.ParseInt(k, 10, 32)
 			if err != nil {
-				return opts, badParam(fmt.Sprintf("invalid partition key in cursors: %q", k))
+				return opts, badRequest(fmt.Sprintf("invalid partition key in cursors: %q", k))
 			}
 			opts.Cursors[int32(pn)] = v
 		}
 	}
 	return opts, nil
+}
+
+func deref[T any](p *T) T {
+	var zero T
+	if p == nil {
+		return zero
+	}
+	return *p
 }

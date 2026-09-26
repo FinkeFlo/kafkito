@@ -4,46 +4,20 @@
 package server
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/FinkeFlo/kafkito/internal/rbac"
 	"github.com/go-chi/chi/v5"
-	"github.com/twmb/franz-go/pkg/kerr"
 )
-
-// maxProduceBodyBytes caps the decompressed JSON body of a single-record
-// produce request. Exported as a value (not just inline) so the 413 message
-// and any client-side pre-flight size check (the Replay dialog) can reference
-// the same number.
-//
-// Sized to fit a base64-encoded value up to kafkapkg.ProducerBatchMaxBytes
-// (10 MiB raw): base64 inflates raw bytes by ~4/3 (~13.3 MiB), plus the key,
-// headers and JSON punctuation, so 15 MiB leaves comfortable headroom —
-// matching the existing 15 MB raw-download cap elsewhere in the app.
-const maxProduceBodyBytes = 15 << 20 // 15 MiB
-
-// maxProduceCompressedBodyBytes bounds the bytes read off the wire before
-// gzip decompression (Content-Encoding: gzip) when the client compresses a
-// large produce body. Gzip essentially never expands well-formed input by
-// more than a small constant, so this only needs modest headroom over
-// maxProduceBodyBytes; it exists purely as a safety net against a gzip bomb
-// (a tiny compressed stream that decompresses to something enormous) rather
-// than as a real-world limit — the decompressed size is what actually caps
-// what the caller can send, enforced separately below.
-const maxProduceCompressedBodyBytes = maxProduceBodyBytes + (1 << 20) // +1 MiB
 
 // ProdConfirmHeader is the request header the frontend must set to "true"
 // to perform a mutating/dangerous operation (produce, delete topic, delete
@@ -54,24 +28,37 @@ const maxProduceCompressedBodyBytes = maxProduceBodyBytes + (1 << 20) // +1 MiB
 // caller's local cluster list says.
 const ProdConfirmHeader = "X-Kafkito-Confirm-Prod"
 
-// requireProdConfirmation returns true if the request may proceed. If the
+// prodConfirmationError returns a 428 Precondition Required error when the
 // named cluster is marked is_prod and the caller did not set
-// ProdConfirmHeader: true, it writes a 428 Precondition Required and
-// returns false. Unknown clusters are allowed through here; the caller's
-// own lookup (Client/Admin/etc.) will report ErrUnknownCluster as usual.
-func (a *clusterAPI) requireProdConfirmation(w http.ResponseWriter, r *http.Request, cluster string) bool {
-	cfg, ok := a.reg.ConfigFor(cluster)
+// ProdConfirmHeader: true, and nil when the request may proceed. Unknown
+// clusters are allowed through here; the caller's own lookup
+// (Client/Admin/etc.) will report ErrUnknownCluster as usual.
+func prodConfirmationError(reg interface {
+	ConfigFor(name string) (config.ClusterConfig, bool)
+}, cluster string, r *http.Request) *apiError {
+	cfg, ok := reg.ConfigFor(cluster)
 	if !ok || !cfg.IsProd {
-		return true
+		return nil
 	}
 	if strings.EqualFold(r.Header.Get(ProdConfirmHeader), "true") {
-		return true
+		return nil
 	}
-	writeJSON(w, http.StatusPreconditionRequired, map[string]string{
-		"error": "production cluster: resend with " + ProdConfirmHeader + ": true after user confirmation",
-		"code":  "production_confirmation_required",
-	})
-	return false
+	return &apiError{
+		Status:  http.StatusPreconditionRequired,
+		Code:    "production_confirmation_required",
+		Message: "production cluster: resend with " + ProdConfirmHeader + ": true after user confirmation",
+	}
+}
+
+// requireProdConfirmation is prodConfirmationError for the hand-written
+// handlers: it writes the 428 and returns false, or returns true if the
+// request may proceed.
+func (a *clusterAPI) requireProdConfirmation(w http.ResponseWriter, r *http.Request, cluster string) bool {
+	if err := prodConfirmationError(a.reg, cluster, r); err != nil {
+		writeJSON(w, err.Status, map[string]string{"error": err.Message, "code": err.Code})
+		return false
+	}
+	return true
 }
 
 // clusterAPI wires cluster- and topic-related endpoints.
@@ -82,21 +69,6 @@ type clusterAPI struct {
 }
 
 func (a *clusterAPI) mount(r chi.Router) {
-	r.Get("/clusters/{cluster}/topics", a.listTopics)
-	r.Post("/clusters/{cluster}/topics", a.createTopic)
-	r.Get("/clusters/{cluster}/topics/{topic}", a.describeTopic)
-	r.Get("/clusters/{cluster}/topics/{topic}/consumers", a.listTopicConsumers)
-	r.Patch("/clusters/{cluster}/topics/{topic}/configs", a.alterTopicConfigs)
-	r.Delete("/clusters/{cluster}/topics/{topic}", a.deleteTopic)
-	r.Delete("/clusters/{cluster}/topics/{topic}/records", a.deleteRecords)
-	r.Get("/clusters/{cluster}/topics/{topic}/messages", a.consumeMessages)
-	r.Get("/clusters/{cluster}/topics/{topic}/messages/count", a.countMessages)
-	r.Get("/clusters/{cluster}/topics/{topic}/messages/timeline", a.messageTimeline)
-	r.Get("/clusters/{cluster}/topics/{topic}/messages/{partition}/{offset}/raw", a.downloadMessageRaw)
-	r.Get("/clusters/{cluster}/topics/{topic}/sample", a.sampleMessages)
-	r.Post("/clusters/{cluster}/topics/{topic}/messages/search", a.searchMessages)
-	r.Post("/clusters/{cluster}/topics/{topic}/messages", a.produceMessage)
-	r.Post("/clusters/{cluster}/topics/{topic}/copy", a.copyMessages)
 	r.Get("/clusters/{cluster}/groups", a.listGroups)
 	r.Post("/clusters/{cluster}/groups", a.createGroup)
 	r.Get("/clusters/{cluster}/groups/{group}", a.describeGroup)
@@ -113,304 +85,6 @@ func (a *clusterAPI) mount(r chi.Router) {
 	r.Get("/clusters/{cluster}/users", a.listSCRAMUsers)
 	r.Post("/clusters/{cluster}/users", a.upsertSCRAMUser)
 	r.Delete("/clusters/{cluster}/users/{user}", a.deleteSCRAMUser)
-}
-
-// listTopics returns the topics of the named cluster.
-//
-// Budget is 15s (matches test-connection). Private/browser-stored clusters
-// trigger an inline metrics probe inside Registry.ListTopics that can take
-// 5–12s on a cold load and is cached for ~30s afterwards.
-func (a *clusterAPI) listTopics(w http.ResponseWriter, r *http.Request) {
-	name := chi.URLParam(r, "cluster")
-
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-	defer cancel()
-
-	topics, err := a.reg.ListTopics(ctx, name)
-	if err != nil {
-		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
-			writeJSON(w, http.StatusNotFound, map[string]string{
-				"error": "unknown cluster: " + name,
-			})
-			return
-		}
-		gatewayError(ctx, w, a.log, "list topics", err)
-		return
-	}
-	sort.Slice(topics, func(i, j int) bool { return topics[i].Name < topics[j].Name })
-	if a.policy != nil && a.policy.Enabled() {
-		user := rbacSubject(r, a.policy)
-		topics = filterTopicsByRBAC(topics, a.policy, user, name)
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"cluster": name,
-		"topics":  topics,
-	})
-}
-
-// describeTopic returns full detail (partitions, offsets, configs) for a topic.
-func (a *clusterAPI) describeTopic(w http.ResponseWriter, r *http.Request) {
-	cluster := chi.URLParam(r, "cluster")
-	topic := chi.URLParam(r, "topic")
-
-	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
-	defer cancel()
-
-	detail, err := a.reg.DescribeTopic(ctx, cluster, topic)
-	if err != nil {
-		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
-			writeJSON(w, http.StatusNotFound, map[string]string{
-				"error": "unknown cluster: " + cluster,
-			})
-			return
-		}
-		gatewayError(ctx, w, a.log, "describe topic", err)
-		return
-	}
-	sort.Slice(detail.Partitions, func(i, j int) bool {
-		return detail.Partitions[i].Partition < detail.Partitions[j].Partition
-	})
-	sort.Slice(detail.Configs, func(i, j int) bool {
-		return detail.Configs[i].Name < detail.Configs[j].Name
-	})
-	writeJSON(w, http.StatusOK, map[string]any{
-		"cluster": cluster,
-		"topic":   detail,
-	})
-}
-
-// consumeMessages pulls a bounded batch of messages from a topic.
-//
-// Query params:
-//
-//	partition:         int32 or -1 for all (default: -1)
-//	limit:             1..500              (default: 50)
-//	from:              end|start|offset|timestamp (default: end)
-//	offset:            int64 (used when from=offset, single partition)
-//	partition_offsets: "p:o,p:o" (used when from=offset, multi partition;
-//	                   capped at 1024 entries)
-//	from_ts_ms:        UNIX millis lower bound. With from=end / from=start
-//	                   it clamps the browse window. With from=timestamp it
-//	                   selects the seek offsets.
-//	to_ts_ms:          UNIX millis upper bound (exclusive). Same semantics
-//	                   as from_ts_ms across modes.
-//	cursor:            opaque continuation token. When present it forces
-//	                   the seek mode to match the cursor direction
-//	                   (backward → from=end, forward → from=offset). An
-//	                   explicit `from` that contradicts the cursor returns
-//	                   400.
-func (a *clusterAPI) consumeMessages(w http.ResponseWriter, r *http.Request) {
-	cluster := chi.URLParam(r, "cluster")
-	topic := chi.URLParam(r, "topic")
-
-	opts, err := parseConsumeQuery(r.URL.Query())
-	if err != nil {
-		writeParamError(w, err)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
-	defer cancel()
-
-	res, err := a.reg.ConsumeMessages(ctx, cluster, topic, opts)
-	if err != nil {
-		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
-			return
-		}
-		gatewayError(ctx, w, a.log, "consume messages", err)
-		return
-	}
-	resp := map[string]any{
-		"cluster":  cluster,
-		"topic":    topic,
-		"messages": res.Messages,
-		"has_more": res.HasMore,
-	}
-	if res.Partial {
-		resp["partial"] = true
-	}
-	if res.NextCursor != nil {
-		if s, encErr := kafkapkg.EncodeCursor(*res.NextCursor); encErr == nil {
-			resp["next_cursor"] = s
-		}
-	}
-	writeJSON(w, http.StatusOK, resp)
-}
-
-// downloadMessageRaw streams the raw value bytes of a single Kafka record
-// identified by partition and offset directly to the response without any
-// string/base64 conversion. Values larger than 15 MB are rejected with 413
-// so a single oversized record cannot exhaust process memory.
-//
-// Path params: {partition} int32, {offset} int64
-func (a *clusterAPI) downloadMessageRaw(w http.ResponseWriter, r *http.Request) {
-	cluster := chi.URLParam(r, "cluster")
-	topic := chi.URLParam(r, "topic")
-
-	partRaw := chi.URLParam(r, "partition")
-	offRaw := chi.URLParam(r, "offset")
-
-	part, err := strconv.ParseInt(partRaw, 10, 32)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid partition"})
-		return
-	}
-	off, err := strconv.ParseInt(offRaw, 10, 64)
-	if err != nil || off < 0 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid offset"})
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-	defer cancel()
-
-	raw, err := a.reg.FetchRawMessageValue(ctx, cluster, topic, int32(part), off)
-	if err != nil {
-		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
-			return
-		}
-		if errors.Is(err, kafkapkg.ErrValueTooLarge) {
-			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{
-				"error": fmt.Sprintf("value exceeds the %d MB download limit", kafkapkg.MaxRawDownloadMB),
-			})
-			return
-		}
-		gatewayError(ctx, w, a.log, "download message raw", err)
-		return
-	}
-
-	filename := fmt.Sprintf("%s-p%d-o%d.%s", topic, part, off, raw.Extension)
-	w.Header().Set("Content-Type", raw.ContentType)
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
-	w.Header().Set("Content-Length", strconv.Itoa(len(raw.Value)))
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(raw.Value) //nolint:gosec // G705: value is served as attachment (Content-Disposition: attachment), not rendered as HTML.
-}
-
-// countMessages resolves the selected range to per-partition offset deltas and
-// returns the approximate number of messages inside that window.
-//
-// Query params:
-//
-//	partition:  int32 or -1 for all (default: -1)
-//	from_ts_ms: UNIX millis lower bound (optional)
-//	to_ts_ms:   UNIX millis upper bound (exclusive, optional)
-func (a *clusterAPI) countMessages(w http.ResponseWriter, r *http.Request) {
-	cluster := chi.URLParam(r, "cluster")
-	topic := chi.URLParam(r, "topic")
-
-	opts, err := parseCountQuery(r.URL.Query())
-	if err != nil {
-		writeParamError(w, err)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-
-	res, err := a.reg.CountMessages(ctx, cluster, topic, opts)
-	if err != nil {
-		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
-			return
-		}
-		gatewayError(ctx, w, a.log, "count messages", err)
-		return
-	}
-	resp := map[string]any{
-		"cluster":            cluster,
-		"topic":              topic,
-		"total_approx_count": res.TotalApproxCount,
-		"partitions":         res.Partitions,
-	}
-	if res.FromTSMs != nil {
-		resp["from_ts_ms"] = *res.FromTSMs
-	}
-	if res.ToTSMs != nil {
-		resp["to_ts_ms"] = *res.ToTSMs
-	}
-	writeJSON(w, http.StatusOK, resp)
-}
-
-// messageTimeline resolves the selected range into fixed-width time slots and
-// returns the approximate number of messages produced inside each slot.
-//
-// Query params:
-//
-//	partition:  int32 or -1 for all (default: -1)
-//	from_ts_ms: UNIX millis lower bound (required)
-//	to_ts_ms:   UNIX millis upper bound, exclusive (required)
-//	slot_ms:    time-slot width in milliseconds (required)
-func (a *clusterAPI) messageTimeline(w http.ResponseWriter, r *http.Request) {
-	cluster := chi.URLParam(r, "cluster")
-	topic := chi.URLParam(r, "topic")
-
-	opts, err := parseTimelineQuery(r.URL.Query())
-	if err != nil {
-		writeParamError(w, err)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
-	defer cancel()
-
-	res, err := a.reg.MessageTimeline(ctx, cluster, topic, opts)
-	if err != nil {
-		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
-			return
-		}
-		gatewayError(ctx, w, a.log, "message timeline", err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"cluster":    cluster,
-		"topic":      topic,
-		"from_ts_ms": res.FromTSMs,
-		"to_ts_ms":   res.ToTSMs,
-		"slot_ms":    res.SlotMs,
-		"slots":      res.Slots,
-	})
-}
-
-// sampleMessages returns the last n decoded messages for use as a structural
-// sample by the topic-search path picker. Reuses the existing consume pipeline
-// with hard server-side defaults (from=end, n<=25).
-//
-// Query params:
-//
-//	partition: int32 or -1 for all (default: -1)
-//	n:         1..25              (default: 5)
-func (a *clusterAPI) sampleMessages(w http.ResponseWriter, r *http.Request) {
-	cluster := chi.URLParam(r, "cluster")
-	topic := chi.URLParam(r, "topic")
-
-	opts, err := parseSampleQuery(r.URL.Query())
-	if err != nil {
-		writeParamError(w, err)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-
-	res, err := a.reg.ConsumeMessages(ctx, cluster, topic, opts)
-	if err != nil {
-		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
-			return
-		}
-		gatewayError(ctx, w, a.log, "sample messages", err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"cluster":    cluster,
-		"topic":      topic,
-		"messages":   res.Messages,
-		"sampled_at": time.Now().UnixMilli(),
-	})
 }
 
 // listGroups returns the consumer groups of a cluster.
@@ -453,127 +127,6 @@ func (a *clusterAPI) describeGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, d)
-}
-
-// readProduceBody reads and returns the produceMessage request body,
-// transparently gzip-decompressing when the caller sends
-// "Content-Encoding: gzip" (the Replay dialog uses this to shrink large
-// recovered values before they cross the wire). The decompressed size is
-// still capped at maxProduceBodyBytes regardless of the encoding used, so
-// compression cannot be used to smuggle a larger-than-allowed value past the
-// limit — it only reduces bytes actually transferred for a given payload.
-//
-// On success ok is true and body holds the decompressed bytes. On failure ok
-// is false and status/msg carry the HTTP response to write (400 for a
-// malformed gzip stream, 413 once either the wire or decompressed size
-// exceeds its cap).
-func readProduceBody(w http.ResponseWriter, r *http.Request) (body []byte, status int, msg string, ok bool) {
-	src := io.Reader(http.MaxBytesReader(w, r.Body, maxProduceCompressedBodyBytes))
-	if strings.EqualFold(r.Header.Get("Content-Encoding"), "gzip") {
-		gz, err := gzip.NewReader(src)
-		if err != nil {
-			return nil, http.StatusBadRequest, "invalid gzip body: " + err.Error(), false
-		}
-		defer gz.Close() //nolint:errcheck // read-only reader; nothing actionable on close error
-		src = gz
-	}
-
-	// Read one byte past the cap so an exactly-at-the-limit body doesn't get
-	// mistaken for an oversized one, without ever buffering more than
-	// maxProduceBodyBytes+1 bytes regardless of what the client claims.
-	data, err := io.ReadAll(io.LimitReader(src, maxProduceBodyBytes+1))
-	if err != nil {
-		var mbe *http.MaxBytesError
-		if errors.As(err, &mbe) {
-			return nil, http.StatusRequestEntityTooLarge, fmt.Sprintf("request body exceeds the %d MB produce limit", maxProduceBodyBytes/(1<<20)), false
-		}
-		return nil, http.StatusBadRequest, "invalid body: " + err.Error(), false
-	}
-	if len(data) > maxProduceBodyBytes {
-		return nil, http.StatusRequestEntityTooLarge, fmt.Sprintf("request body exceeds the %d MB produce limit", maxProduceBodyBytes/(1<<20)), false
-	}
-	return data, 0, "", true
-}
-
-// produceMessage produces a single record to a topic.
-func (a *clusterAPI) produceMessage(w http.ResponseWriter, r *http.Request) {
-	cluster := chi.URLParam(r, "cluster")
-	topic := chi.URLParam(r, "topic")
-
-	if !a.requireProdConfirmation(w, r, cluster) {
-		return
-	}
-
-	var req kafkapkg.ProduceRequest
-	body, status, errMsg, ok := readProduceBody(w, r)
-	if !ok {
-		writeJSON(w, status, map[string]string{"error": errMsg})
-		return
-	}
-	dec := json.NewDecoder(bytes.NewReader(body))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": "invalid body: " + err.Error(),
-		})
-		return
-	}
-
-	user := rbacSubject(r, a.policy)
-	injectKafkitoProduceHeaders(&req, user)
-
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-	res, err := a.reg.Produce(ctx, cluster, topic, req)
-	if err != nil {
-		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
-			return
-		}
-		// Encoding issues are client errors; everything else is 502.
-		msg := err.Error()
-		// A rejected partition choice means the caller named a partition the
-		// topic does not have. kgo phrases this in terms of the index the
-		// partitioner returned (kafkito's internal "reject" sentinel), which
-		// says nothing useful to the caller — report the partition they asked
-		// for instead. Producing without a partition cannot reach this branch.
-		if isInvalidPartitionErr(msg) && req.Partition != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{
-				"error": fmt.Sprintf("partition %d does not exist on topic %q", *req.Partition, topic),
-			})
-			return
-		}
-		if isClientProduceErr(msg) {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
-			return
-		}
-		// A record larger than kafkito's client-side batch cap (see
-		// kgo.ProducerBatchMaxBytes in clientOpts) or the destination broker's
-		// own max.message.bytes is a caller-actionable input problem, not an
-		// upstream outage — surface it as 413 with the concrete limit instead
-		// of the generic 502.
-		if errors.Is(err, kerr.MessageTooLarge) {
-			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{
-				"error": fmt.Sprintf("message too large to produce to topic %q (limit is %d MB)", topic, kafkapkg.ProducerBatchMaxBytes/(1<<20)),
-				"code":  "kafka_message_too_large",
-			})
-			return
-		}
-		// The broker rejected the produce because the connected user/credential
-		// lacks WRITE (or Idempotent Write) ACLs on the topic. Surface this as
-		// 403 with a specific message instead of the generic 502, since it's an
-		// actionable permission problem, not an upstream outage.
-		if kafkapkg.IsAuthorizationFailure(msg) {
-			writeJSON(w, http.StatusForbidden, map[string]string{
-				"error": fmt.Sprintf("not authorized to produce to topic %q (check the cluster credential's ACLs)", topic),
-				"code":  "kafka_not_authorized",
-			})
-			return
-		}
-		gatewayError(ctx, w, a.log, "produce message", err)
-		return
-	}
-	writeJSON(w, http.StatusOK, res)
 }
 
 func injectKafkitoProduceHeaders(req *kafkapkg.ProduceRequest, user string) {
@@ -719,94 +272,6 @@ func (a *clusterAPI) deleteGroup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"deleted": group})
 }
 
-// createTopic creates a topic on the cluster.
-func (a *clusterAPI) createTopic(w http.ResponseWriter, r *http.Request) {
-	cluster := chi.URLParam(r, "cluster")
-
-	var req kafkapkg.CreateTopicRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body: " + err.Error()})
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-	defer cancel()
-	if err := a.reg.CreateTopic(ctx, cluster, req); err != nil {
-		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
-			return
-		}
-		msg := err.Error()
-		if strings.Contains(msg, "topic name required") {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
-			return
-		}
-		gatewayError(ctx, w, a.log, "create topic", err)
-		return
-	}
-	writeJSON(w, http.StatusCreated, map[string]any{"created": req.Name})
-}
-
-// deleteTopic removes a topic.
-func (a *clusterAPI) deleteTopic(w http.ResponseWriter, r *http.Request) {
-	cluster := chi.URLParam(r, "cluster")
-	topic := chi.URLParam(r, "topic")
-
-	if !a.requireProdConfirmation(w, r, cluster) {
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-	defer cancel()
-	if err := a.reg.DeleteTopic(ctx, cluster, topic); err != nil {
-		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
-			return
-		}
-		gatewayError(ctx, w, a.log, "delete topic", err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"deleted": topic})
-}
-
-// deleteRecords truncates the topic log per partition.
-func (a *clusterAPI) deleteRecords(w http.ResponseWriter, r *http.Request) {
-	cluster := chi.URLParam(r, "cluster")
-	topic := chi.URLParam(r, "topic")
-
-	if !a.requireProdConfirmation(w, r, cluster) {
-		return
-	}
-
-	var req kafkapkg.DeleteRecordsRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body: " + err.Error()})
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-	defer cancel()
-	res, err := a.reg.DeleteRecords(ctx, cluster, topic, req)
-	if err != nil {
-		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
-			return
-		}
-		msg := err.Error()
-		if strings.Contains(msg, "required") || strings.Contains(msg, "no resolvable") {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
-			return
-		}
-		gatewayError(ctx, w, a.log, "delete records", err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"results": res})
-}
-
 // --- Schema Registry handlers ---
 
 func (a *clusterAPI) srClient(w http.ResponseWriter, r *http.Request, cluster string) *kafkapkg.SchemaRegistryClient {
@@ -923,36 +388,6 @@ func (a *clusterAPI) deleteSubject(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"deleted": subject, "versions": versions, "permanent": permanent})
 }
 
-// alterTopicConfigs applies incremental config changes to a topic.
-func (a *clusterAPI) alterTopicConfigs(w http.ResponseWriter, r *http.Request) {
-	cluster := chi.URLParam(r, "cluster")
-	topic := chi.URLParam(r, "topic")
-	var req kafkapkg.AlterTopicConfigsRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body: " + err.Error()})
-		return
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-	defer cancel()
-	res, err := a.reg.AlterTopicConfigs(ctx, cluster, topic, req)
-	if err != nil {
-		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
-			return
-		}
-		msg := err.Error()
-		if strings.Contains(msg, "required") || strings.Contains(msg, "no changes") {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "kafka: " + msg})
-			return
-		}
-		gatewayError(ctx, w, a.log, "alter topic configs", err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"results": res})
-}
-
 // listACLs enumerates visible ACLs on the cluster.
 func (a *clusterAPI) listACLs(w http.ResponseWriter, r *http.Request) {
 	cluster := chi.URLParam(r, "cluster")
@@ -968,61 +403,6 @@ func (a *clusterAPI) listACLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"cluster": cluster, "acls": acls})
-}
-
-// searchMessages scans a topic for records matching a predicate.
-//
-// Body (application/json):
-//
-//	{
-//	 "partition":   -1,
-//	 "limit":       50,
-//	 "budget":      10000,
-//	 "direction":   "newest_first" | "oldest_first",
-//	 "stop_on_limit": true,
-//	 "mode":        "contains" | "jsonpath" | "xpath",
-//	 "path":        "$.order.id" | "//order/@id" | "",
-//	 "op":          "eq" | "ne" | "contains" | "regex" | "gt" | "lt" | "gte" | "lte" | "exists",
-//	 "value":       "42",
-//	 "zones":       ["value","key","headers"],
-//	 "from_ts_ms":  1711234567890,
-//	 "to_ts_ms":    1711239999999,
-//	 "cursors":     {"0": 12340, "1": 12202}
-//	}
-func (a *clusterAPI) searchMessages(w http.ResponseWriter, r *http.Request) {
-	cluster := chi.URLParam(r, "cluster")
-	topic := chi.URLParam(r, "topic")
-
-	opts, err := parseSearchBody(w, r)
-	if err != nil {
-		writeParamError(w, err)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
-	defer cancel()
-	res, err := a.reg.SearchMessages(ctx, cluster, topic, opts)
-	if err != nil {
-		if errors.Is(err, kafkapkg.ErrUnknownCluster) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown cluster: " + cluster})
-			return
-		}
-		msg := err.Error()
-		if isSearchClientErr(msg) {
-			// searchMessages preserves the original contract: 400 body uses
-			// the raw msg with no "kafka: " prefix (unlike sibling handlers).
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg})
-			return
-		}
-		gatewayError(ctx, w, a.log, "search messages", err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"cluster":  cluster,
-		"topic":    topic,
-		"messages": res.Messages,
-		"search":   res.Stats,
-	})
 }
 
 // createACL creates a single ACL entry on the cluster.

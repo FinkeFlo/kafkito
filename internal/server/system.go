@@ -25,6 +25,7 @@ type apiServer struct {
 	version         string
 	policy          *rbac.Policy
 	reg             *kafkapkg.Registry // nil without kafka configuration
+	copyReg         copyRegistry       // reg, or a test fake
 	log             *slog.Logger
 	testConnTimeout time.Duration
 }
