@@ -5,8 +5,8 @@ package kafka
 
 import (
 	"context"
+	"fmt"
 	"net"
-	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -28,7 +28,8 @@ func TestCreateTopic_WaitsUntilMetadataListsTheTopic(t *testing.T) {
 
 	host, portStr, err := net.SplitHostPort(c.ListenAddrs()[0])
 	require.NoError(t, err)
-	port, err := strconv.Atoi(portStr)
+	var port int32
+	_, err = fmt.Sscan(portStr, &port)
 	require.NoError(t, err)
 
 	// After the create, the next metadata answers still report the topic as
@@ -55,7 +56,7 @@ func TestCreateTopic_WaitsUntilMetadataListsTheTopic(t *testing.T) {
 		resp := mreq.ResponseKind().(*kmsg.MetadataResponse)
 		resp.ControllerID = 0
 		b := kmsg.NewMetadataResponseBroker()
-		b.NodeID, b.Host, b.Port = 0, host, int32(port)
+		b.NodeID, b.Host, b.Port = 0, host, port
 		resp.Brokers = append(resp.Brokers, b)
 		mt := kmsg.NewMetadataResponseTopic()
 		mt.Topic = kmsg.StringPtr(topic)
