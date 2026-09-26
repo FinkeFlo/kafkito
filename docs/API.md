@@ -421,7 +421,16 @@ curl -s -X POST "$BASE/api/v1/clusters/$CLUSTER/groups/$GROUP/reset-offsets" \
 ```
 
 Strategies: `earliest`, `latest`, `offset` (+ `offset`), `timestamp`
-(+ `timestamp_ms`), `shift-by` (+ `shift`).
+(+ `timestamp_ms`), `shift-by` (+ `shift`). `topic` and `strategy` are
+required, and an unknown strategy or an unknown body field returns `400`
+`invalid_request`. The body is checked before the production confirmation,
+so an invalid body on a production cluster returns `400`, not `428`.
+
+Creating a group (`POST /api/v1/clusters/{cluster}/groups`) takes
+`group_id`, `topic` and `strategy` (`earliest`, `latest`, `offset`,
+`timestamp`; a new group has no offsets to shift, so `shift-by` returns
+`400`). Broker
+errors return the generic `502` `kafka_upstream` response.
 
 ## Schema Registry
 
@@ -430,6 +439,15 @@ curl -s $BASE/api/v1/clusters/$CLUSTER/schemas/subjects | jq
 curl -s $BASE/api/v1/clusters/$CLUSTER/schemas/subjects/$SUBJECT/versions | jq
 curl -s $BASE/api/v1/clusters/$CLUSTER/schemas/subjects/$SUBJECT/versions/latest | jq
 ```
+
+Registering a schema requires `schema`. `schemaType` is `AVRO` (default),
+`JSON` or `PROTOBUF`, spelled exactly; every reference needs `name`,
+`subject` and `version`. Unknown body fields return `400`, and bodies over
+2 MiB return `400` `invalid body: http: request body too large`.
+
+`DELETE .../schemas/subjects/{subject}?permanent=true` hard-deletes the
+subject. `permanent` accepts only `true` and `false`; any other value,
+including an empty one, returns `400` instead of a soft delete.
 
 ## ACLs
 
@@ -442,6 +460,11 @@ curl -s -X POST "$BASE/api/v1/clusters/$CLUSTER/acls" \
   | jq
 ```
 
+Create (`POST`) and delete (`DELETE` with the filter as JSON body) take all
+seven fields, `host` included; a missing field returns `400`
+`invalid_request` (a missing `host` used to default to `*`). Enum-like values
+stay case-insensitive. Bodies are capped at 16 KiB.
+
 ## SCRAM users
 
 ```bash
@@ -452,6 +475,12 @@ curl -s -X POST "$BASE/api/v1/clusters/$CLUSTER/users" \
   -d '{"user":"alice","mechanism":"SCRAM-SHA-512","password":"s3cret","iterations":8192}' \
   | jq
 ```
+
+`mechanism` must be exactly `SCRAM-SHA-256` or `SCRAM-SHA-512`, in the body
+and in the `mechanism` query of `DELETE .../users/{user}`. Aliases such as
+`SHA-256` or lower case return `400`. Omit the query parameter to delete
+both mechanisms; an empty `?mechanism=` returns `400`. The password never
+appears in a response or a log line, not even in validation errors.
 
 ## Errors
 
@@ -467,9 +496,8 @@ denials add `resource` and `action`, and 401s from the auth middleware add
 `message`. Upstream Kafka/Schema Registry details are only logged
 server-side; the response carries `"error": "upstream kafka error"`.
 
-Requests to endpoints served by the generated handlers (see
-[ADR-0005](adr/0005-openapi-contract.md)) are validated against
-`api/openapi.yaml` before the handler runs. A mismatch returns `400` with
+Every request is validated against `api/openapi.yaml` (see
+[ADR-0005](adr/0005-openapi-contract.md)) before the handler runs. A mismatch returns `400` with
 `"code": "invalid_request"`, and `error` names the parameter or body field
 and the violated rule, but never the submitted value:
 
@@ -477,11 +505,18 @@ and the violated rule, but never the submitted value:
 { "error": "request body \"/auth/type\": must be one of the allowed values", "code": "invalid_request" }
 ```
 
-JSON request bodies on those endpoints must be sent with
+A body that is not valid JSON returns `400` `request body: malformed`, and a
+field the schema does not allow returns `400`
+`request body: has properties that are not allowed`. Before the groups,
+schema, ACL and SCRAM user endpoints were served by generated handlers they
+answered with `invalid body: <decoder error>` or `invalid json: <decoder
+error>`; bodies over the limit keep those texts.
+
+JSON request bodies must be sent with
 `Content-Type: application/json` (a `charset` parameter is fine); other
 content types return `400` `request body: unsupported Content-Type`.
 
-On those endpoints `X-Kafkito-Confirm-Prod` must be exactly `true` when sent;
+`X-Kafkito-Confirm-Prod` must be exactly `true` when sent;
 any other value returns `400` before the production check runs. Omit the
 header to get the `428` `production_confirmation_required` response.
 

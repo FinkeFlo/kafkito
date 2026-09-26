@@ -24,7 +24,11 @@ GitHub Actions.
    golangci-lint runs via its GitHub Action, pinned to the same version.
    `make actionlint` lints the GitHub workflows.
 3. Changing the HTTP API? Edit `api/openapi.yaml` (the contract, see ADR-0005)
-   and run `make api-generate` to refresh the generated frontend types.
+   and run `make api-generate` to refresh the generated server interface and
+   frontend types. A new endpoint then needs its strict handler method, its
+   mount in `internal/server/api_routes.go` and an `apiOps` test entry; the
+   steps are in
+   [ADR-0005, "Adding an endpoint"](docs/adr/0005-openapi-contract.md#adding-an-endpoint).
 4. Open a PR with a clear description and a Test plan.
 5. Sign off your commits (`-s`).
 

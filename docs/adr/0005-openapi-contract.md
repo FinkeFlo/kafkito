@@ -74,9 +74,18 @@ supports OpenAPI 3.1 (including `type: [T, "null"]` and `const`).
   exactly what the hand-written handlers returned. It also drops the
   `X-Request-Id` response headers, because the request log middleware
   already sets them.
-- **Incremental migration.** `output-options.include-operation-ids` lists
-  the migrated operations. All other routes stay hand-written chi handlers
-  until they are migrated. The route/spec parity test covers both kinds.
+- **Migration complete.** The operations were migrated in steps; the
+  codegen config listed the migrated ones in
+  `output-options.include-operation-ids`. Every operation of the spec is
+  now generated and served by the strict server, so the list is gone and
+  no chi route is written by hand. Two tests keep it that way:
+  `TestSpecOperations_AllGeneratedAndMounted` checks that every operation
+  id has a strict method and a route wrapper and that a request to its
+  path reaches the generated binding of that operation (the SSE
+  `copyMessages` included), and `TestRouter_EveryRouteIsASpecOperation`
+  walks the chi router and fails on any route that is not a spec
+  operation served by its generated binding, and on any operation without
+  a route.
 - **Per-group registration.** The generated `HandlerWithOptions` would put
   every operation on one router behind one middleware chain. Instead, each
   generated `ServerInterfaceWrapper` method is registered individually on
@@ -85,11 +94,10 @@ supports OpenAPI 3.1 (including `type: [T, "null"]` and `const`).
   cluster routes also run the private-cluster, RBAC and
   private-cluster-param middleware. The relative paths keep the chi route
   patterns unchanged, because RBAC resolves permissions from those patterns.
-  A test asserts the pattern, chain and permission of every migrated
-  operation.
+  A test asserts the pattern, chain and permission of every operation.
 - **Request validation.** Each generated route runs
   `github.com/oapi-codegen/nethttp-middleware` (kin-openapi) after its group
-  middleware, so validation applies to migrated operations only. The rules
+  middleware, so every operation is validated. The rules
   live in the spec only (enum, pattern, minItems, required, ...), and the
   duplicated hand-written input checks were removed. The options are:
   - `AuthenticationFunc = openapi3filter.NoopAuthenticationFunc`:
@@ -136,14 +144,17 @@ supports OpenAPI 3.1 (including `type: [T, "null"]` and `const`).
   decoded by `privateClusterMiddleware` and is not schema-validated.
 - **Body limits before body readers.** Every body is capped before
   anything reads it. JSON bodies (create topic, alter configs, delete
-  records) are capped at 1 MiB, search at 1 MiB and copy at 32 KiB, each
-  with its previous 400 message. Produce has its own middleware in front of
+  records, create group, reset offsets) are capped at 1 MiB, search at
+  1 MiB, register schema at 2 MiB, copy at 32 KiB and the ACL and SCRAM
+  user bodies (the ACL delete body included) at 16 KiB, each with its
+  previous 400 message. Produce has its own middleware in front of
   the validator. It caps the wire bytes, decompresses a
   `Content-Encoding: gzip` body, caps the decompressed JSON at 15 MiB (413)
   and hands the validator and the handler the plain body. The RBAC
-  middleware reads the create-topic body to find the topic name before any
-  route runs. That read is capped at the same 1 MiB, and the bytes it read
-  become the body again for the validator and the handler.
+  middleware reads the create-topic and create-group bodies to find the
+  topic or group name before any route runs. That read is capped at the
+  same 1 MiB, and the bytes it read become the body again for the
+  validator and the handler.
 - **Streaming (topic copy).** oapi-codegen v2.8.0 streams
   `text/event-stream` responses natively. The generated response writes
   `Content-Type: text/event-stream`, reads the `io.Reader` body in 4 KiB
@@ -177,6 +188,29 @@ supports OpenAPI 3.1 (including `type: [T, "null"]` and `const`).
     after the deadline stopping the job, the job outliving the deadline,
     the headers, and events matching `CopyProgressEvent`.
 
+## Adding an endpoint
+
+1. Describe the operation in `api/openapi.yaml`: path, `operationId`,
+   parameters, request body and every response, with the rules the input
+   must meet (enum, pattern, bounds, required, `additionalProperties`).
+   Map schemas onto existing Go types in `api/oapi-codegen.overlay.yaml`
+   where they exist.
+2. Run `make api-generate`. It regenerates `internal/server/api/server.gen.go`
+   and `frontend/src/lib/api.gen.ts`.
+3. Implement the new `StrictServerInterface` method on `apiServer` in the
+   file for its resource (`topics.go`, `groups.go`, ...). Return the
+   generated response types, and errors as `apiError` or through
+   `upstreamError`/`clusterError`.
+4. Mount the generated wrapper method in `internal/server/api_routes.go` on
+   the right group, with `noRequestBody` or a body limit
+   (`limitRequestBody`/`limitRequestBodyMsg`) in front of `g.validate`. If
+   the route needs a permission, add its pattern to `resolvePermission`.
+5. Add the operation to `apiOps` in
+   `internal/server/generated_routes_test.go` and give it at least one
+   successful request in `TestAPIOps_Requests`. The contract, router,
+   RBAC, private-cluster and response validation tests then cover it; they
+   fail until steps 3–5 are done.
+
 ## Consequences
 
 **Positive**
@@ -190,10 +224,9 @@ supports OpenAPI 3.1 (including `type: [T, "null"]` and `const`).
   tooling.
 
 **Negative**
-- The spec is still hand-written. Migrated operations are guarded by the
+- The spec is still hand-written. Every operation is guarded by the
   generated interface, request validation and response validation in the
-  contract tests. Routes that are not migrated yet are only guarded at the
-  route and method level.
+  contract tests.
 - Moving validation into the spec makes some errors stricter or reworded:
   JSON request bodies need `Content-Type: application/json`, and
   validation errors have the code `invalid_request` with generated
