@@ -40,6 +40,7 @@ func TestToAPIError(t *testing.T) {
 		{"group exists", fmt.Errorf("create g1: %w", kafkapkg.ErrGroupExists), 409, "", "kafka: consumer group already exists"},
 		{"not authorized", kafkapkg.ErrNotAuthorized, 403, "", kafkapkg.ErrNotAuthorized.Error()},
 		{"value too large", kafkapkg.ErrValueTooLarge, 413, "", fmt.Sprintf("value exceeds the %d MB download limit", kafkapkg.MaxRawDownloadMB)},
+		{"value masked", fmt.Errorf("fetch: %w", kafkapkg.ErrValueMasked), 403, "value_masked", "value is masked and cannot be downloaded"},
 		{"upstream", upstreamError("list brokers", errors.New("dial broker-7.internal:9092")), 502, "kafka_upstream", "upstream kafka error"},
 		{"cluster error unknown", clusterError("c1", "op", kafkapkg.ErrUnknownCluster), 404, "", "unknown cluster: c1"},
 		{"cluster error upstream", clusterError("c1", "op", errors.New("boom")), 502, "kafka_upstream", "upstream kafka error"},

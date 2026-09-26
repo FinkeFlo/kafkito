@@ -60,6 +60,9 @@ func clusterError(cluster, op string, err error) error {
 	return upstreamError(op, err)
 }
 
+// valueMaskedCode marks a refused raw download of a masked record.
+const valueMaskedCode = "value_masked"
+
 // sentinelErrors maps domain sentinel errors to their client representation.
 // Messages are the sentinels' own static texts, never the wrapped error chain.
 var sentinelErrors = []struct {
@@ -74,6 +77,7 @@ var sentinelErrors = []struct {
 	{kafkapkg.ErrGroupExists, http.StatusConflict, "", "kafka: " + kafkapkg.ErrGroupExists.Error()},
 	{kafkapkg.ErrNotAuthorized, http.StatusForbidden, "", kafkapkg.ErrNotAuthorized.Error()},
 	{kafkapkg.ErrValueTooLarge, http.StatusRequestEntityTooLarge, "", fmt.Sprintf("value exceeds the %d MB download limit", kafkapkg.MaxRawDownloadMB)},
+	{kafkapkg.ErrValueMasked, http.StatusForbidden, valueMaskedCode, kafkapkg.ErrValueMasked.Error()},
 }
 
 // toAPIError maps any error to its client representation. Unknown errors

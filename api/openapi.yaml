@@ -626,7 +626,8 @@ paths:
         (`<topic>-p<partition>-o<offset>.<ext>`). The content type is sniffed:
         `application/json` for valid JSON, `text/plain` for other UTF-8 and
         `application/octet-stream` otherwise. Values above 15 MB are rejected
-        with 413.
+        with 413. A value the cluster's `data_masking` rules change is refused
+        with 403 `value_masked`: the raw bytes would bypass the masking.
       responses:
         "200":
           description: Raw value bytes.
@@ -644,7 +645,16 @@ paths:
               schema: { type: string, format: binary }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+        "403":
+          description: >
+            RBAC or broker ACLs denied the read (see the shared Forbidden
+            response), or the record's value is masked by the cluster's
+            `data_masking` rules (`code: value_masked`).
+          headers:
+            X-Request-Id: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404": { $ref: "#/components/responses/NotFound" }
         "413": { $ref: "#/components/responses/PayloadTooLarge" }
         "502": { $ref: "#/components/responses/BadGateway" }
@@ -1354,9 +1364,9 @@ components:
             Machine-readable code where one exists, e.g. `kafka_upstream`,
             `production_confirmation_required`, `copy_concurrency_limit`,
             `kafka_message_too_large`, `kafka_not_authorized`, `rbac_denied`,
-            `topic_consumers_timeout`, `invalid_request` (the request does not
-            match this document; `error` names the parameter or body field
-            and the violated rule, never the submitted value).
+            `topic_consumers_timeout`, `value_masked`, `invalid_request` (the
+            request does not match this document; `error` names the parameter
+            or body field and the violated rule, never the submitted value).
         message:
           type: string
           description: Detail for 401 responses from the auth middleware.
@@ -1681,7 +1691,12 @@ components:
             UTF-8. Only the affected keys appear; they also remain in `headers`
             with the hex rendering. Use this map to reproduce a header
             byte-for-byte (see the produce endpoint's `headers_b64`).
-        masked: { type: boolean }
+        masked:
+          type: boolean
+          description: >
+            The cluster's `data_masking` rules changed the value. Masking runs
+            on the full decoded value; `value_b64` is omitted and the raw
+            download is refused with 403 `value_masked`.
         value_size_bytes:
           type: integer
           format: int64

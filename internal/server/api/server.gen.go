@@ -463,7 +463,7 @@ type Error struct {
 	// Action RBAC-denied action (403 only).
 	Action *string `json:"action,omitempty"`
 
-	// Code Machine-readable code where one exists, e.g. `kafka_upstream`, `production_confirmation_required`, `copy_concurrency_limit`, `kafka_message_too_large`, `kafka_not_authorized`, `rbac_denied`, `topic_consumers_timeout`, `invalid_request` (the request does not match this document; `error` names the parameter or body field and the violated rule, never the submitted value).
+	// Code Machine-readable code where one exists, e.g. `kafka_upstream`, `production_confirmation_required`, `copy_concurrency_limit`, `kafka_message_too_large`, `kafka_not_authorized`, `rbac_denied`, `topic_consumers_timeout`, `value_masked`, `invalid_request` (the request does not match this document; `error` names the parameter or body field and the violated rule, never the submitted value).
 	Code *string `json:"code,omitempty"`
 
 	// Error Human-readable message (`unauthorized`, `forbidden`, `not found`, ...).
@@ -7324,7 +7324,7 @@ func (response DownloadMessageRaw401JSONResponse) VisitDownloadMessageRawRespons
 	return err
 }
 
-type DownloadMessageRaw403JSONResponse struct{ ForbiddenJSONResponse }
+type DownloadMessageRaw403JSONResponse Error
 
 func (response DownloadMessageRaw403JSONResponse) VisitDownloadMessageRawResponse(w http.ResponseWriter) error {
 

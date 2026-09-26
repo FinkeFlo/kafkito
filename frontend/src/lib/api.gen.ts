@@ -465,7 +465,8 @@ export interface paths {
          *     (`<topic>-p<partition>-o<offset>.<ext>`). The content type is sniffed:
          *     `application/json` for valid JSON, `text/plain` for other UTF-8 and
          *     `application/octet-stream` otherwise. Values above 15 MB are rejected
-         *     with 413.
+         *     with 413. A value the cluster's `data_masking` rules change is refused
+         *     with 403 `value_masked`: the raw bytes would bypass the masking.
          */
         get: operations["downloadMessageRaw"];
         put?: never;
@@ -864,7 +865,7 @@ export interface components {
         Error: {
             /** @description Human-readable message (`unauthorized`, `forbidden`, `not found`, ...). */
             error: string;
-            /** @description Machine-readable code where one exists, e.g. `kafka_upstream`, `production_confirmation_required`, `copy_concurrency_limit`, `kafka_message_too_large`, `kafka_not_authorized`, `rbac_denied`, `topic_consumers_timeout`, `invalid_request` (the request does not match this document; `error` names the parameter or body field and the violated rule, never the submitted value). */
+            /** @description Machine-readable code where one exists, e.g. `kafka_upstream`, `production_confirmation_required`, `copy_concurrency_limit`, `kafka_message_too_large`, `kafka_not_authorized`, `rbac_denied`, `topic_consumers_timeout`, `value_masked`, `invalid_request` (the request does not match this document; `error` names the parameter or body field and the violated rule, never the submitted value). */
             code?: string;
             /** @description Detail for 401 responses from the auth middleware. */
             message?: string;
@@ -1123,6 +1124,7 @@ export interface components {
             headers_b64?: {
                 [key: string]: string;
             };
+            /** @description The cluster's `data_masking` rules changed the value. Masking runs on the full decoded value; `value_b64` is omitted and the raw download is refused with 403 `value_masked`. */
             masked?: boolean;
             /**
              * Format: int64
@@ -2466,7 +2468,16 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
+            /** @description RBAC or broker ACLs denied the read (see the shared Forbidden response), or the record's value is masked by the cluster's `data_masking` rules (`code: value_masked`). */
+            403: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             404: components["responses"]["NotFound"];
             413: components["responses"]["PayloadTooLarge"];
             502: components["responses"]["BadGateway"];
