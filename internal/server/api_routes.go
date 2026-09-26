@@ -74,13 +74,13 @@ func (g *generatedRoutes) mountMeta(r chi.Router) {
 func (g *generatedRoutes) mountClusters(r chi.Router) {
 	noBody := r.With(noRequestBody, g.validate)
 	noBody.Get("/clusters", g.w.ListClusters)
-	r.With(limitRequestBody(maxPrivateClusterHeaderBytes, http.StatusBadRequest), g.validate).
+	r.With(limitRequestBody(maxPrivateClusterHeaderBytes), g.validate).
 		Post("/clusters/_test", g.w.TestCluster)
 	noBody.Get("/clusters/{cluster}/capabilities", g.w.GetCapabilities)
 	noBody.Post("/clusters/{cluster}/capabilities/refresh", g.w.RefreshCapabilities)
 	noBody.Get("/clusters/{cluster}/brokers", g.w.ListBrokers)
 
-	jsonBody := r.With(limitRequestBody(maxJSONBodyBytes, http.StatusBadRequest), g.validate)
+	jsonBody := r.With(limitRequestBody(maxJSONBodyBytes), g.validate)
 	noBody.Get("/clusters/{cluster}/topics", g.w.ListTopics)
 	jsonBody.Post("/clusters/{cluster}/topics", g.w.CreateTopic)
 	noBody.Get("/clusters/{cluster}/topics/{topic}", g.w.DescribeTopic)
@@ -96,12 +96,12 @@ func (g *generatedRoutes) mountClusters(r chi.Router) {
 	noBody.Get("/clusters/{cluster}/topics/{topic}/messages/timeline", g.w.GetMessageTimeline)
 	noBody.Get("/clusters/{cluster}/topics/{topic}/messages/{partition}/{offset}/raw", g.w.DownloadMessageRaw)
 	noBody.Get("/clusters/{cluster}/topics/{topic}/sample", g.w.SampleMessages)
-	r.With(limitRequestBodyMsg(maxSearchBodyBytes, http.StatusBadRequest, "invalid json body: "), g.validate).
+	r.With(limitRequestBodyMsg(maxSearchBodyBytes, "invalid json body: "), g.validate).
 		Post("/clusters/{cluster}/topics/{topic}/messages/search", g.w.SearchMessages)
-	r.With(limitRequestBody(maxCopyBodyBytes, http.StatusBadRequest), g.validate).
+	r.With(limitRequestBody(maxCopyBodyBytes), g.validate).
 		Post("/clusters/{cluster}/topics/{topic}/copy", g.w.CopyMessages)
 
-	groupBody := r.With(limitRequestBody(maxGroupBodyBytes, http.StatusBadRequest), g.validate)
+	groupBody := r.With(limitRequestBody(maxGroupBodyBytes), g.validate)
 	noBody.Get("/clusters/{cluster}/groups", g.w.ListGroups)
 	groupBody.Post("/clusters/{cluster}/groups", g.w.CreateGroup)
 	noBody.Get("/clusters/{cluster}/groups/{group}", g.w.DescribeGroup)
@@ -111,18 +111,18 @@ func (g *generatedRoutes) mountClusters(r chi.Router) {
 	noBody.Get("/clusters/{cluster}/schemas/subjects", g.w.ListSubjects)
 	noBody.Delete("/clusters/{cluster}/schemas/subjects/{subject}", g.w.DeleteSubject)
 	noBody.Get("/clusters/{cluster}/schemas/subjects/{subject}/versions", g.w.ListSchemaVersions)
-	r.With(limitRequestBody(maxRegisterSchemaBodyBytes, http.StatusBadRequest), g.validate).
+	r.With(limitRequestBody(maxRegisterSchemaBodyBytes), g.validate).
 		Post("/clusters/{cluster}/schemas/subjects/{subject}/versions", g.w.RegisterSchema)
 	noBody.Get("/clusters/{cluster}/schemas/subjects/{subject}/versions/{version}", g.w.GetSchemaVersion)
 
 	// The ACL and SCRAM limits predate the shared message prefix.
-	aclBody := r.With(limitRequestBodyMsg(maxACLBodyBytes, http.StatusBadRequest, "invalid json: "), g.validate)
+	aclBody := r.With(limitRequestBodyMsg(maxACLBodyBytes, "invalid json: "), g.validate)
 	noBody.Get("/clusters/{cluster}/acls", g.w.ListAcls)
 	aclBody.Post("/clusters/{cluster}/acls", g.w.CreateAcl)
 	aclBody.Delete("/clusters/{cluster}/acls", g.w.DeleteAcl)
 
 	noBody.Get("/clusters/{cluster}/users", g.w.ListScramUsers)
-	r.With(limitRequestBodyMsg(maxSCRAMBodyBytes, http.StatusBadRequest, "invalid json: "), g.validate).
+	r.With(limitRequestBodyMsg(maxSCRAMBodyBytes, "invalid json: "), g.validate).
 		Post("/clusters/{cluster}/users", g.w.UpsertScramUser)
 	noBody.Delete("/clusters/{cluster}/users/{user}", g.w.DeleteScramUser)
 }

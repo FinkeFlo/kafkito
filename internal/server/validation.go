@@ -116,19 +116,19 @@ func noRequestBody(next http.Handler) http.Handler {
 }
 
 // limitRequestBody caps the request body at limit bytes before anything
-// (validator or handler) reads it. Exceeding the limit fails the read with an
-// *apiError carrying status and "invalid body: http: request body too large".
-func limitRequestBody(limit int64, status int) func(http.Handler) http.Handler {
-	return limitRequestBodyMsg(limit, status, "invalid body: ")
+// (validator or handler) reads it. Exceeding the limit fails the read with a
+// 400 *apiError "invalid body: http: request body too large".
+func limitRequestBody(limit int64) func(http.Handler) http.Handler {
+	return limitRequestBodyMsg(limit, "invalid body: ")
 }
 
 // limitRequestBodyMsg is limitRequestBody with a custom message prefix, for
 // endpoints whose documented limit message predates the shared one.
-func limitRequestBodyMsg(limit int64, status int, prefix string) func(http.Handler) http.Handler {
+func limitRequestBodyMsg(limit int64, prefix string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Body != nil && r.Body != http.NoBody {
-				r.Body = &limitedBody{rc: http.MaxBytesReader(w, r.Body, limit), status: status, prefix: prefix}
+				r.Body = &limitedBody{rc: http.MaxBytesReader(w, r.Body, limit), prefix: prefix}
 				r.GetBody = nil
 			}
 			next.ServeHTTP(w, r)
@@ -138,7 +138,6 @@ func limitRequestBodyMsg(limit int64, status int, prefix string) func(http.Handl
 
 type limitedBody struct {
 	rc     io.ReadCloser
-	status int
 	prefix string
 }
 
@@ -146,7 +145,7 @@ func (b *limitedBody) Read(p []byte) (int, error) {
 	n, err := b.rc.Read(p)
 	var mbe *http.MaxBytesError
 	if errors.As(err, &mbe) {
-		return n, &apiError{Status: b.status, Message: b.prefix + mbe.Error(), Err: mbe}
+		return n, &apiError{Status: http.StatusBadRequest, Message: b.prefix + mbe.Error(), Err: mbe}
 	}
 	return n, err
 }
