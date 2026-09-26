@@ -56,9 +56,8 @@ describe("buildJsonPath", () => {
   });
 });
 
-// Regression coverage for the array-scope behaviour that replaced the
-// ArrayScopePopover: picking a value inside an array always searches every
-// entry, so these cases used to be covered by array-scope-popover.test.tsx.
+// Picking a value inside an array always searches every entry of that
+// array, so array indices in the picked path become wildcards.
 describe("wildcardArrayIndices", () => {
   it("returns an empty trail unchanged", () => {
     expect(wildcardArrayIndices([])).toEqual([]);
