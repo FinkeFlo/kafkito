@@ -8,6 +8,8 @@ IMAGE ?= ghcr.io/finkeflo/kafkito:dev
 TAGS ?=
 # Pinned air version. Bump deliberately; keep .air.toml's reference in sync.
 AIR_VERSION ?= v1.65.1
+# Port for `make run-dev`.
+DEV_PORT ?= 37421
 
 help:
 	@echo "Targets:"
@@ -15,7 +17,7 @@ help:
 	@echo "  build              - build frontend then Go binary into $(BIN)"
 	@echo "  build-go           - build only the Go binary (skip frontend)"
 	@echo "  run                - build and run the binary"
-	@echo "  run-dev            - run with -tags devauth (auth disabled, dev only)"
+	@echo "  run-dev            - run with -tags devauth on 127.0.0.1:$(DEV_PORT) (auth disabled, dev only)"
 	@echo "  dev                - full local loop: Compose + backend (air) + frontend (Vite)"
 	@echo "  dev-down           - tear down the Compose dev stack"
 	@echo "  worktree-init      - write per-worktree .env.dev with a free port pair"
@@ -83,8 +85,10 @@ build-go:
 run: build
 	$(BIN)
 
+# Auth mode off (devauth) only starts on a loopback address, so bind
+# 127.0.0.1 and clear $PORT, which would override it with ":$PORT".
 run-dev:
-	go run -tags devauth ./cmd/kafkito
+	PORT= KAFKITO_SERVER_ADDR=127.0.0.1:$(DEV_PORT) go run -tags devauth ./cmd/kafkito
 
 test:
 	go test -race -count=1 $(if $(TAGS),-tags "$(TAGS)") $(PKG)

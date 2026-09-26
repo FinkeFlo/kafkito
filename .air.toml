@@ -13,6 +13,11 @@ env_files = [".env.dev"]
 [build]
   cmd = "go build -tags devauth -o ./tmp/kafkito ./cmd/kafkito"
   entrypoint = ["./tmp/kafkito"]
+  # The devauth build runs auth mode off, which the auth-mode guard only
+  # allows on a loopback address. $PORT (from .env.dev) would override
+  # server.addr with ":$PORT", and air re-adds it from env_files, so clear
+  # it here and bind 127.0.0.1 on the port the Vite proxy targets.
+  full_bin = "PORT= KAFKITO_SERVER_ADDR=127.0.0.1:${KAFKITO_BACKEND_PORT:-37421} ./tmp/kafkito"
   include_dir = ["cmd", "internal", "api"]
   include_ext = ["go", "yaml"]
   exclude_dir = ["frontend", "bin", "tmp", "dist", "node_modules", ".git", "deploy", "examples", "docs", ".worktrees"]
