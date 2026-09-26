@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { X } from "lucide-react";
-import { fetchTopicConsumers, fetchTopicDetail, type TopicDetail } from "@/lib/api";
+import type { TopicDetail } from "@/lib/api";
 import { Tag } from "@/components/Tag";
 import { KpiCard } from "@/components/KpiCard";
 import { Notice } from "@/components/Notice";
 import { useFormatters, type Formatters } from "@/lib/use-formatters";
+import { topicQueries } from "@/lib/queries/topics";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic")({
   component: TopicDetailLayout,
@@ -47,16 +48,14 @@ function TopicDetailLayout() {
   }, [cluster, topic]);
 
   const detailQuery = useQuery({
-    queryKey: ["topic", cluster, topic],
-    queryFn: () => fetchTopicDetail(cluster, topic),
+    ...topicQueries.detail(cluster, topic),
     enabled: !!cluster,
     refetchInterval: (query) =>
       query.state.data?.configs_error === "unauthorized" ? false : 5_000,
   });
 
   const consumersQuery = useQuery({
-    queryKey: ["topic-consumers", cluster, topic],
-    queryFn: () => fetchTopicConsumers(cluster, topic),
+    ...topicQueries.consumers(cluster, topic),
     enabled: !!cluster,
     staleTime: 10_000,
   });

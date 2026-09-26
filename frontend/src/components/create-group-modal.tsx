@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createGroup,
-  listACLs,
   type ACLEntry,
   type CreateGroupStrategy,
   type ResetOffsetResult,
@@ -12,6 +11,8 @@ import { Input } from "@/components/Input";
 import { Modal } from "@/components/Modal";
 import { Notice } from "@/components/Notice";
 import { localInputToMs, msToLocalInput } from "@/lib/datetime";
+import { aclQueries } from "@/lib/queries/acls";
+import { topicQueries } from "@/lib/queries/topics";
 
 // allowedGroupHints extracts the consumer-group name patterns the current
 // principal is allowed to use, from the cluster's ACLs (ALLOW on the GROUP
@@ -49,8 +50,7 @@ export function CreateGroupModal({
   const [err, setErr] = useState<string | null>(null);
 
   const aclsQuery = useQuery({
-    queryKey: ["acls", cluster],
-    queryFn: () => listACLs(cluster),
+    ...aclQueries.list(cluster),
     retry: false,
     staleTime: 60_000,
   });
@@ -103,7 +103,7 @@ export function CreateGroupModal({
       // error already surfaced via onError; keep the modal open
       return;
     }
-    await qc.invalidateQueries({ queryKey: ["topic-consumers", cluster, topic] });
+    await qc.invalidateQueries({ queryKey: topicQueries.consumers(cluster, topic).queryKey });
     onCreated?.();
     onClose();
   }

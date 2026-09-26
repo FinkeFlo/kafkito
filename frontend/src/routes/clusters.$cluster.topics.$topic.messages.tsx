@@ -3,15 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  fetchTopicDetail,
   fetchMessages,
-  fetchSample,
   searchMessages,
   downloadMessageRaw,
   RawValueMaskedError,
   type Message,
   type PartitionInfo,
-  type SampleResponse,
   type SearchMode,
   type SearchOp,
   type SearchDirection,
@@ -19,7 +16,6 @@ import {
   type SearchRequest,
 } from "@/lib/api";
 import {
-  hydrateTruncatedSampleMessages,
   isTooLargeToScan,
   MAX_HYDRATE_VALUE_BYTES,
   type HydratableEncoding,
@@ -38,6 +34,8 @@ import { useFormatters } from "@/lib/use-formatters";
 import { ReplayModal } from "@/components/replay-modal";
 import { BulkCopyPanel } from "@/components/bulk-copy-panel";
 import { StatusBox, StatusIcon } from "@/components/status-icon";
+import { messageQueries } from "@/lib/queries/messages";
+import { topicQueries } from "@/lib/queries/topics";
 
 interface MessagesSearch {
   partition: number;
@@ -134,8 +132,7 @@ function MessagesTab() {
   const [copyOpen, setCopyOpen] = useState(false);
 
   const detailQuery = useQuery({
-    queryKey: ["topic", cluster, topic],
-    queryFn: () => fetchTopicDetail(cluster, topic),
+    ...topicQueries.detail(cluster, topic),
     enabled: !!cluster,
     refetchInterval: 5_000,
   });
@@ -282,21 +279,9 @@ function MessagesPanel({
   // values the active tree can parse: pulling up to MAX_HYDRATE_VALUE_BYTES
   // per sample for the builder that will discard them is pure waste.
   const sampleEncoding: HydratableEncoding = mode === "xpath" ? "xml" : "json";
-  const sampleQuery = useQuery<SampleResponse>({
-    queryKey: ["sample", cluster, topic, sampleEncoding],
-    queryFn: async ({ signal }) => {
-      const res = await fetchSample(cluster, topic, 5, -1);
-      const messages = await hydrateTruncatedSampleMessages(
-        cluster,
-        topic,
-        res.messages,
-        signal,
-        sampleEncoding,
-      );
-      return { ...res, messages };
-    },
+  const sampleQuery = useQuery({
+    ...messageQueries.sample(cluster, topic, sampleEncoding),
     enabled: searchOpen && (mode === "jsonpath" || mode === "xpath"),
-    staleTime: 5 * 60_000,
   });
 
   const pathTree = useMemo(() => {
@@ -416,8 +401,7 @@ function MessagesPanel({
   );
 
   const msgsQuery = useQuery({
-    queryKey: ["messages", cluster, topic, params],
-    queryFn: () => fetchMessages(cluster, topic, params),
+    ...messageQueries.page(cluster, topic, params),
     refetchInterval: live ? 2_000 : false,
     enabled: !searchResult,
   });

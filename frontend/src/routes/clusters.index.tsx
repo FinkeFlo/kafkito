@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Network } from "lucide-react";
 import { clsx } from "clsx";
 import { useEffect, useMemo, useState } from "react";
-import { fetchClusters, type ClusterInfo } from "@/lib/api";
+import type { ClusterInfo } from "@/lib/api";
 import {
   listPrivateClusters,
   subscribePrivateClusters,
@@ -19,6 +19,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/button";
 import { formatRelative } from "@/lib/format";
 import { useFormatters } from "@/lib/use-formatters";
+import { clusterQueries } from "@/lib/queries/clusters";
 
 type ClusterRowInfo = ClusterInfo & { is_private?: boolean };
 
@@ -56,8 +57,7 @@ function isLimited(c: ClusterInfo): boolean {
 
 function HomePage() {
   const clustersQuery = useQuery({
-    queryKey: ["clusters"],
-    queryFn: fetchClusters,
+    ...clusterQueries.list(),
     staleTime: 10_000,
     refetchInterval: 30_000,
   });

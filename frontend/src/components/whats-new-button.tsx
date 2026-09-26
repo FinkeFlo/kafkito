@@ -1,7 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Sparkles } from "lucide-react";
-import { fetchInfo } from "@/lib/api";
 import { anyModalOpen } from "@/components/Modal";
 import { WhatsNewModal } from "@/components/whats-new-modal";
 import { CHANGELOG } from "@/content/changelog";
@@ -12,13 +11,10 @@ import {
   normalizeVersion,
   subscribeWhatsNew,
 } from "@/lib/whats-new";
+import { infoQueries } from "@/lib/queries/info";
 
 export function WhatsNewButton() {
-  const infoQuery = useQuery({
-    queryKey: ["info"],
-    queryFn: fetchInfo,
-    staleTime: 5 * 60_000,
-  });
+  const infoQuery = useQuery(infoQueries.info());
   const current = infoQuery.data?.version ? normalizeVersion(infoQuery.data.version) : undefined;
 
   const lastSeen = useSyncExternalStore(subscribeWhatsNew, getLastSeen, () => null);

@@ -3,7 +3,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { History, Plus, Trash2 } from "lucide-react";
 import {
-  fetchTopicDetail,
   fetchMessages,
   produceMessage,
   can,
@@ -20,6 +19,8 @@ import { Timestamp } from "@/components/timestamp";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useCluster } from "@/lib/use-cluster";
 import { StatusBox } from "@/components/status-icon";
+import { messageKeys, messageQueries } from "@/lib/queries/messages";
+import { topicQueries } from "@/lib/queries/topics";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic/produce")({
   component: ProduceTab,
@@ -29,8 +30,7 @@ function ProduceTab() {
   const { cluster, topic } = Route.useParams();
 
   const detailQuery = useQuery({
-    queryKey: ["topic", cluster, topic],
-    queryFn: () => fetchTopicDetail(cluster, topic),
+    ...topicQueries.detail(cluster, topic),
     enabled: !!cluster,
     refetchInterval: 5_000,
   });
@@ -80,8 +80,7 @@ function ProduceSection({
   // window from each partition's tail and pick the highest timestamp — the
   // latest record may live in any partition, not just partition 0.
   const latestProbeQuery = useQuery({
-    queryKey: ["produce-latest-probe", cluster, topic],
-    queryFn: () => fetchMessages(cluster, topic, { from: "end", limit: 1 }),
+    ...messageQueries.latestProbe(cluster, topic),
     enabled: !!cluster && rbacAllowsConsume,
     staleTime: 5_000,
   });
@@ -190,8 +189,8 @@ function ProduceSection({
         confirmProd,
       );
       setResult(res);
-      await qc.invalidateQueries({ queryKey: ["messages", cluster, topic] });
-      await qc.invalidateQueries({ queryKey: ["topic", cluster, topic] });
+      await qc.invalidateQueries({ queryKey: messageKeys.topic(cluster, topic) });
+      await qc.invalidateQueries({ queryKey: topicQueries.detail(cluster, topic).queryKey });
     } catch (e) {
       setError((e as Error).message);
     } finally {

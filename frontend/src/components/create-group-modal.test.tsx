@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { topicQueries } from "@/lib/queries/topics";
 import { CreateGroupModal } from "./create-group-modal";
 
 const createGroup = vi.hoisted(() => vi.fn());
@@ -111,7 +112,7 @@ describe("CreateGroupModal", () => {
     );
     await waitFor(() =>
       expect(invalidateQueries).toHaveBeenCalledWith({
-        queryKey: ["topic-consumers", "C", "t1"],
+        queryKey: topicQueries.consumers("C", "t1").queryKey,
       }),
     );
     await waitFor(() => expect(onCreated).toHaveBeenCalled());

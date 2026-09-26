@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Users } from "lucide-react";
-import { fetchTopicConsumers, type TopicConsumer } from "@/lib/api";
+import type { TopicConsumer } from "@/lib/api";
 import { Section } from "@/components/section";
 import { DataTable, type DataTableColumn } from "@/components/DataTable";
 import { Badge, type BadgeVariant } from "@/components/badge";
@@ -12,6 +12,7 @@ import { CreateGroupModal } from "@/components/create-group-modal";
 import { EmptyState } from "@/components/EmptyState";
 import { Notice } from "@/components/Notice";
 import { useFormatters } from "@/lib/use-formatters";
+import { topicQueries } from "@/lib/queries/topics";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic/consumers")({
   component: ConsumersTab,
@@ -26,8 +27,7 @@ function ConsumersPanel({ cluster, topic }: { cluster: string; topic: string }) 
   const fmt = useFormatters();
   const [createOpen, setCreateOpen] = useState(false);
   const query = useQuery({
-    queryKey: ["topic-consumers", cluster, topic],
-    queryFn: () => fetchTopicConsumers(cluster, topic),
+    ...topicQueries.consumers(cluster, topic),
     enabled: Boolean(cluster && topic),
     staleTime: 10_000,
   });

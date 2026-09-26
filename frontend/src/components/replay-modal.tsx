@@ -21,7 +21,7 @@
 // preview via a checkbox — never silently.
 import { useEffect, useId, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchTopics, produceMessage, RawValueTooLargeError, type Message } from "@/lib/api";
+import { produceMessage, RawValueTooLargeError, type Message } from "@/lib/api";
 import { produceEncodingFor, replayBlocker } from "@/lib/produce-encoding";
 import { useCluster, type ClusterListItem } from "@/lib/use-cluster";
 import { useFormatters } from "@/lib/use-formatters";
@@ -31,6 +31,7 @@ import { Button } from "./button";
 import { ConfirmDialog } from "./confirm-dialog";
 import { TopicCombobox } from "./topic-combobox";
 import { StatusBox } from "@/components/status-icon";
+import { topicQueries } from "@/lib/queries/topics";
 
 interface ReplayModalProps {
   open: boolean;
@@ -157,8 +158,7 @@ export function ReplayModal({
 
   // Load topics for the selected cluster (lazy).
   const topicsQuery = useQuery({
-    queryKey: ["topics", effectiveCluster],
-    queryFn: () => fetchTopics(effectiveCluster),
+    ...topicQueries.list(effectiveCluster),
     enabled: open && !!effectiveCluster,
     staleTime: 30_000,
   });

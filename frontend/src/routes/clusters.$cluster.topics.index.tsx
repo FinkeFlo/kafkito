@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Boxes, ChevronDown } from "lucide-react";
 import { clsx } from "clsx";
-import { fetchTopics, createTopic, can, type ClusterInfo, type TopicInfo } from "@/lib/api";
+import { createTopic, can, type ClusterInfo, type TopicInfo } from "@/lib/api";
 import { useAuth } from "@/auth/hooks";
 import { useCluster } from "@/lib/use-cluster";
 import { Tag } from "@/components/Tag";
@@ -20,6 +20,7 @@ import { Input } from "@/components/Input";
 import { Notice } from "@/components/Notice";
 import { useFuzzy, type HighlightRange } from "@/lib/fuzzy";
 import { useFormatters } from "@/lib/use-formatters";
+import { topicQueries } from "@/lib/queries/topics";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/")({
   component: TopicsPage,
@@ -30,8 +31,7 @@ function TopicsPage() {
   const clusterInfo = useMemo(() => clusters?.find((c) => c.name === cluster), [clusters, cluster]);
 
   const topicsQuery = useQuery({
-    queryKey: ["topics", cluster],
-    queryFn: () => fetchTopics(cluster!),
+    ...topicQueries.list(cluster!),
     enabled: !!cluster,
   });
 
@@ -394,7 +394,7 @@ function CreateTopicModal({ cluster, onClose }: { cluster: string; onClose: () =
       });
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["topics", cluster] });
+      qc.invalidateQueries({ queryKey: topicQueries.list(cluster).queryKey });
       onClose();
     },
     onError: (e: Error) => setErr(e.message),

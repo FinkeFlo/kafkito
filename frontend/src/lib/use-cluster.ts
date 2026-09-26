@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams, useRouterState } from "@tanstack/react-router";
-import { fetchClusters, type ClusterInfo } from "./api";
+import type { ClusterInfo } from "./api";
 import { computeSwitchTarget } from "./cluster-switch";
 import {
   listPrivateClusters,
   subscribePrivateClusters,
   type PrivateCluster,
 } from "./private-clusters";
+import { clusterQueries } from "@/lib/queries/clusters";
 
 const STORAGE_KEY = "kafkito.cluster";
 
@@ -87,8 +88,7 @@ export function useCluster(): UseClusterResult {
   const location = useRouterState({ select: (s) => s.location });
 
   const clustersQuery = useQuery({
-    queryKey: ["clusters"],
-    queryFn: fetchClusters,
+    ...clusterQueries.list(),
     refetchInterval: 10_000,
     staleTime: 5_000,
   });

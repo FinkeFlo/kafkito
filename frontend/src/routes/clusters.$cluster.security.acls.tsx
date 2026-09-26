@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ChevronDown, Shield, Trash2 } from "lucide-react";
-import { createACL, deleteACL, listACLs, type ACLEntry, type ACLSpec } from "@/lib/api";
+import { createACL, deleteACL, type ACLEntry, type ACLSpec } from "@/lib/api";
 import { Tag } from "@/components/Tag";
 import { KpiCard } from "@/components/KpiCard";
 import { DataTable, DataTableHead, DataTableRow, DataTableTh } from "@/components/DataTable";
@@ -17,6 +17,7 @@ import { Modal } from "@/components/Modal";
 import { Input } from "@/components/Input";
 import { Notice } from "@/components/Notice";
 import { useFuzzy } from "@/lib/fuzzy";
+import { aclQueries } from "@/lib/queries/acls";
 
 export const Route = createFileRoute("/clusters/$cluster/security/acls")({
   component: ACLsPage,
@@ -52,8 +53,7 @@ function ACLsBody({ cluster }: { cluster: string }) {
   const [banner, setBanner] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
 
   const q = useQuery({
-    queryKey: ["acls", cluster],
-    queryFn: () => listACLs(cluster),
+    ...aclQueries.list(cluster),
   });
 
   const delMut = useMutation({
@@ -64,7 +64,7 @@ function ACLsBody({ cluster }: { cluster: string }) {
         msg: `${n} ACL(s) deleted (${spec.principal} → ${spec.operation} on ${spec.resource_name})`,
       });
       setPending(null);
-      qc.invalidateQueries({ queryKey: ["acls", cluster] });
+      qc.invalidateQueries({ queryKey: aclQueries.list(cluster).queryKey });
     },
     onError: (e: Error) => setBanner({ kind: "err", msg: e.message }),
   });
@@ -249,7 +249,7 @@ function ACLsBody({ cluster }: { cluster: string }) {
           onDone={(msg) => {
             setBanner({ kind: "ok", msg });
             setShowCreate(false);
-            qc.invalidateQueries({ queryKey: ["acls", cluster] });
+            qc.invalidateQueries({ queryKey: aclQueries.list(cluster).queryKey });
           }}
           onError={(msg) => setBanner({ kind: "err", msg })}
         />
