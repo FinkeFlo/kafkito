@@ -427,16 +427,21 @@ func TestSearchCharacterization_SchemaRegistryDecodedValues(t *testing.T) {
 	assert.Len(t, ids.Messages, 2)
 }
 
-func TestSearchCharacterization_MatchesUnmaskedAndReturnsMasked(t *testing.T) {
+func TestSearchCharacterization_MatchesMaskedValue(t *testing.T) {
 	t.Parallel()
 	env := newKfakeEnv(t, ordersTopic, 3, func(c *config.ClusterConfig) {
 		c.DataMasking = []config.MaskingRule{{Fields: []string{"$.name"}, Replacement: "***"}}
 	})
 	env.produceOrdersFixture(t, 12)
 
-	res := searchTopic(t, env, SearchOptions{Partition: -1, Value: "rec-5"})
+	hidden := searchTopic(t, env, SearchOptions{Partition: -1, Value: "rec-5"})
+	assert.Empty(t, hidden.Messages, "masked content is not searchable")
+	assert.Equal(t, 12, hidden.Stats.Scanned)
 
-	require.Len(t, res.Messages, 1)
-	assert.True(t, res.Messages[0].Masked)
-	assert.JSONEq(t, `{"seq":5,"kind":"odd","name":"***"}`, res.Messages[0].Value)
+	// The matchers see the masked rendering, which is re-encoded JSON with
+	// sorted keys, exactly as the response shows it.
+	visible := searchTopic(t, env, SearchOptions{Partition: -1, Value: `"name":"***","seq":5}`})
+	require.Len(t, visible.Messages, 1)
+	assert.True(t, visible.Messages[0].Masked)
+	assert.JSONEq(t, `{"seq":5,"kind":"odd","name":"***"}`, visible.Messages[0].Value)
 }
