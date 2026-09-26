@@ -41,7 +41,7 @@ type ProduceResult struct {
 }
 
 // Produce writes one record to the given topic and waits for broker acknowledgement.
-func (r *Registry) Produce(ctx context.Context, cluster, topic string, req ProduceRequest) (*ProduceResult, error) {
+func (r *Messages) Produce(ctx context.Context, cluster, topic string, req ProduceRequest) (*ProduceResult, error) {
 	cl, err := r.Client(cluster)
 	if err != nil {
 		return nil, err
@@ -73,7 +73,7 @@ func (r *Registry) Produce(ctx context.Context, cluster, topic string, req Produ
 // and the first error encountered. A partial result is normal on error:
 // callers (e.g. the topic-copy job) report `produced` as progress before
 // surfacing err.
-func (r *Registry) ProduceBatch(ctx context.Context, cluster, topic string, reqs []ProduceRequest) (produced int, err error) {
+func (r *Messages) ProduceBatch(ctx context.Context, cluster, topic string, reqs []ProduceRequest) (produced int, err error) {
 	if len(reqs) == 0 {
 		return 0, nil
 	}

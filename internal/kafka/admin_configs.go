@@ -30,7 +30,7 @@ type AlterTopicConfigsResult struct {
 }
 
 // AlterTopicConfigs applies an incremental alter to the topic.
-func (r *Registry) AlterTopicConfigs(ctx context.Context, cluster, topic string, req AlterTopicConfigsRequest) ([]AlterTopicConfigsResult, error) {
+func (r *Topics) AlterTopicConfigs(ctx context.Context, cluster, topic string, req AlterTopicConfigsRequest) ([]AlterTopicConfigsResult, error) {
 	if strings.TrimSpace(topic) == "" {
 		return nil, fmt.Errorf("topic name required")
 	}

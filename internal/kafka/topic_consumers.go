@@ -64,7 +64,7 @@ type offsetFetcher func(ctx context.Context, group string) (map[int32]int64, err
 // clusters with thousands of groups this scales O(n) per request; consider an
 // async background poller in Registry that maintains a topic->groups index
 // (TTL'd, per-cluster) and serves reads from cache.
-func (r *Registry) ListTopicConsumers(ctx context.Context, cluster, topic string) ([]TopicConsumer, error) {
+func (r *Topics) ListTopicConsumers(ctx context.Context, cluster, topic string) ([]TopicConsumer, error) {
 	adm, err := r.Admin(cluster)
 	if err != nil {
 		return nil, err

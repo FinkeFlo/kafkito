@@ -69,10 +69,12 @@ type Connections struct {
 	srDecoders map[string]*SRDecoder
 }
 
-// Registry bundles the cluster connections with the domain operations
-// (topics, groups, messages, security, cluster info).
-type Registry struct {
+// Topics covers topic metadata, topic configs, records and the consumers
+// of a topic.
+type Topics struct {
 	*Connections
+	// stats supplies the collected metrics that enrich topic views.
+	stats *Clusters
 
 	// cfgCacheMu guards cfgCache.
 	cfgCacheMu sync.Mutex
@@ -81,17 +83,61 @@ type Registry struct {
 	// for cfgCacheTTLPermanent; successful reads for cfgCacheTTLSuccess.
 	// This avoids a Kafka round-trip on every frontend poll interval.
 	cfgCache map[string]topicConfigsCacheEntry
+}
+
+// Groups covers consumer groups and their committed offsets.
+type Groups struct {
+	*Connections
+}
+
+// Messages covers reading (consume, search, count, timeline, raw values)
+// and producing records.
+type Messages struct {
+	*Connections
+}
+
+// Security covers ACLs and SCRAM credentials.
+type Security struct {
+	*Connections
+}
+
+// Clusters covers the cluster overview, brokers, capabilities and the
+// background metrics collector.
+type Clusters struct {
+	*Connections
 
 	// metrics is lazily started; nil until StartMetrics is called.
 	// Protected by Connections.mu.
 	metrics *metricsCollector
 }
 
+// Registry bundles the cluster connections with the per-resource services.
+// The services are embedded, so their methods are also available on the
+// Registry itself.
+type Registry struct {
+	*Connections
+	*Topics
+	*Groups
+	*Messages
+	*Security
+	*Clusters
+}
+
 // NewRegistry constructs a registry from the configured clusters.
 func NewRegistry(cfg []config.ClusterConfig, log *slog.Logger) *Registry {
+	conns := newConnections(cfg, log)
+	clusters := &Clusters{Connections: conns}
 	return &Registry{
-		Connections: newConnections(cfg, log),
-		cfgCache:    make(map[string]topicConfigsCacheEntry),
+		Connections: conns,
+		Topics: &Topics{
+			Connections: conns,
+			stats:       clusters,
+			cfgCache:    make(map[string]topicConfigsCacheEntry),
+		},
+		Groups:   &Groups{Connections: conns},
+		Messages: &Messages{Connections: conns},
+		Security: &Security{Connections: conns},
+		Clusters: clusters,
 	}
 }
 
@@ -362,13 +408,7 @@ func (r *Connections) Ping(ctx context.Context, name string) error {
 // Close stops the metrics collector and releases all underlying Kafka
 // clients.
 func (r *Registry) Close() {
-	r.mu.Lock()
-	mc := r.metrics
-	r.metrics = nil
-	r.mu.Unlock()
-	if mc != nil {
-		mc.stop()
-	}
+	r.stopMetrics()
 	r.closeClients()
 }
 

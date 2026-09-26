@@ -99,7 +99,7 @@ type clusterState struct {
 
 type metricsCollector struct {
 	log      *slog.Logger
-	reg      *Registry
+	conns    *Connections
 	interval time.Duration
 	ctx      context.Context
 	cancel   context.CancelFunc
@@ -117,7 +117,7 @@ type metricsCollector struct {
 // The provided context governs collector lifetime: cancelling it (or
 // calling registry.Close) stops the background goroutine and waits for an
 // in-flight refresh to finish.
-func (r *Registry) StartMetrics(parent context.Context, interval time.Duration) {
+func (r *Clusters) StartMetrics(parent context.Context, interval time.Duration) {
 	if interval <= 0 {
 		interval = DefaultMetricsInterval
 	}
@@ -129,7 +129,7 @@ func (r *Registry) StartMetrics(parent context.Context, interval time.Duration) 
 	ctx, cancel := context.WithCancel(parent)
 	mc := &metricsCollector{
 		log:      r.log.With("component", "metrics"),
-		reg:      r,
+		conns:    r.Connections,
 		interval: interval,
 		ctx:      ctx,
 		cancel:   cancel,
@@ -202,7 +202,7 @@ func (mc *metricsCollector) refreshOne(cluster string) {
 	ctx, cancel := context.WithTimeout(mc.ctx, 12*time.Second)
 	defer cancel()
 
-	adm, err := mc.reg.Admin(cluster)
+	adm, err := mc.conns.Admin(cluster)
 	if err != nil {
 		// Cluster unreachable / unknown → clear freshness but keep the
 		// last-known snapshot so the UI doesn't flicker on a transient
@@ -561,7 +561,7 @@ func (s *clusterState) writePrev(topics []string, ends kadm.ListedOffsets, at ti
 // configured cluster, or (ClusterMetrics{}, false) when none is available
 // yet (collector not started, first refresh not finished, or cluster not
 // configured — e.g. ad-hoc private clusters).
-func (r *Registry) ClusterMetricsSnapshot(cluster string) (ClusterMetrics, bool) {
+func (r *Clusters) ClusterMetricsSnapshot(cluster string) (ClusterMetrics, bool) {
 	mc := r.metricsCollector()
 	if mc == nil {
 		return ClusterMetrics{}, false
@@ -580,16 +580,27 @@ func (r *Registry) ClusterMetricsSnapshot(cluster string) (ClusterMetrics, bool)
 	return state.snapshot, true
 }
 
-func (r *Registry) metricsCollector() *metricsCollector {
+func (r *Clusters) metricsCollector() *metricsCollector {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.metrics
 }
 
+// stopMetrics stops the metrics collector, if one is running.
+func (r *Clusters) stopMetrics() {
+	r.mu.Lock()
+	mc := r.metrics
+	r.metrics = nil
+	r.mu.Unlock()
+	if mc != nil {
+		mc.stop()
+	}
+}
+
 // applyTopicMetrics enriches a slice of TopicInfo with the latest cached
 // metrics for its cluster, if any. Unknown fields stay nil so callers can
 // distinguish "not yet measured" from "known zero".
-func (r *Registry) applyTopicMetrics(cluster string, topics []TopicInfo) {
+func (r *Clusters) applyTopicMetrics(cluster string, topics []TopicInfo) {
 	snap, ok := r.ClusterMetricsSnapshot(cluster)
 	if !ok {
 		return
@@ -617,7 +628,7 @@ func (r *Registry) applyTopicMetrics(cluster string, topics []TopicInfo) {
 
 // applyClusterAggregates copies per-cluster totals from the collector onto
 // the ClusterInfo. No-op when no snapshot is available.
-func (r *Registry) applyClusterAggregates(info *ClusterInfo) {
+func (r *Clusters) applyClusterAggregates(info *ClusterInfo) {
 	snap, ok := r.ClusterMetricsSnapshot(info.Name)
 	if !ok {
 		return

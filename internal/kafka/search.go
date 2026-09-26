@@ -213,7 +213,7 @@ const (
 // SearchMessages scans up to opts.Budget records across the selected partitions
 // and returns those matching the compiled predicate. It is a read-only op; it
 // never commits offsets.
-func (r *Registry) SearchMessages(ctx context.Context, cluster, topic string, opts SearchOptions) (*SearchResult, error) {
+func (r *Messages) SearchMessages(ctx context.Context, cluster, topic string, opts SearchOptions) (*SearchResult, error) {
 	cfg, ok := r.ConfigFor(cluster)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, cluster)
@@ -303,7 +303,7 @@ func (o SearchOptions) withDefaults() SearchOptions {
 // runSearch feeds the scanned records into sc until the ranges are drained,
 // the budget is spent, enough matches were found (StopOnLimit) or
 // opts.Timeout elapses. Budget and limit are checked after every poll.
-func (r *Registry) runSearch(ctx context.Context, s recordScan, opts SearchOptions, sc *searchScan) (budgetExhausted, timedOut bool, err error) {
+func (r *Messages) runSearch(ctx context.Context, s recordScan, opts SearchOptions, sc *searchScan) (budgetExhausted, timedOut bool, err error) {
 	pollCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 	for batch, err := range r.scanRecords(pollCtx, s) {

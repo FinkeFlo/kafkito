@@ -38,7 +38,7 @@ func parseSCRAMMechanism(s string) (kadm.ScramMechanism, error) {
 }
 
 // ListSCRAMUsers returns all users that have SCRAM credentials.
-func (r *Registry) ListSCRAMUsers(ctx context.Context, cluster string) ([]SCRAMUser, error) {
+func (r *Security) ListSCRAMUsers(ctx context.Context, cluster string) ([]SCRAMUser, error) {
 	adm, err := r.Admin(cluster)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (r *Registry) ListSCRAMUsers(ctx context.Context, cluster string) ([]SCRAMU
 // UpsertSCRAMUser creates or updates a SCRAM credential for the user.
 //
 // Iterations must be between 4096 and 16384. If zero we default to 8192.
-func (r *Registry) UpsertSCRAMUser(ctx context.Context, cluster, user, mechanism, password string, iterations int32) error {
+func (r *Security) UpsertSCRAMUser(ctx context.Context, cluster, user, mechanism, password string, iterations int32) error {
 	adm, err := r.Admin(cluster)
 	if err != nil {
 		return err
@@ -106,7 +106,7 @@ func (r *Registry) UpsertSCRAMUser(ctx context.Context, cluster, user, mechanism
 }
 
 // DeleteSCRAMUser removes a specific SCRAM mechanism credential for the user.
-func (r *Registry) DeleteSCRAMUser(ctx context.Context, cluster, user, mechanism string) error {
+func (r *Security) DeleteSCRAMUser(ctx context.Context, cluster, user, mechanism string) error {
 	adm, err := r.Admin(cluster)
 	if err != nil {
 		return err

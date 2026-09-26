@@ -64,7 +64,7 @@ type ResetOffsetsResult struct {
 // The group must be Empty or Dead; resetting offsets of an active group is
 // refused by the broker (GROUP_IS_NOT_EMPTY). We still pass the request through
 // so the broker-side error bubbles up cleanly.
-func (r *Registry) ResetOffsets(ctx context.Context, cluster, group string, req ResetOffsetsRequest) (*ResetOffsetsResult, error) {
+func (r *Groups) ResetOffsets(ctx context.Context, cluster, group string, req ResetOffsetsRequest) (*ResetOffsetsResult, error) {
 	adm, err := r.Admin(cluster)
 	if err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func (r *Registry) ResetOffsets(ctx context.Context, cluster, group string, req 
 // clamping), and commits them (unless DryRun) for the given group. The caller
 // supplies an already-acquired admin client and is responsible for any
 // group-state preconditions.
-func (r *Registry) resolveAndCommit(ctx context.Context, adm *kadm.Client, group string, req ResetOffsetsRequest) (*ResetOffsetsResult, error) {
+func (r *Groups) resolveAndCommit(ctx context.Context, adm *kadm.Client, group string, req ResetOffsetsRequest) (*ResetOffsetsResult, error) {
 	if strings.TrimSpace(req.Topic) == "" {
 		return nil, errors.New("reset offsets: topic required")
 	}
@@ -266,7 +266,7 @@ type CreateGroupRequest struct {
 // already exists (ErrGroupExists) and rejects the shift-by strategy. The
 // offset-resolution and commit logic is shared with ResetOffsets via
 // resolveAndCommit.
-func (r *Registry) CreateGroup(ctx context.Context, cluster string, req CreateGroupRequest) (*ResetOffsetsResult, error) {
+func (r *Groups) CreateGroup(ctx context.Context, cluster string, req CreateGroupRequest) (*ResetOffsetsResult, error) {
 	group := strings.TrimSpace(req.GroupID)
 	if group == "" {
 		return nil, errors.New("create group: group_id required")
@@ -339,7 +339,7 @@ func IsAuthorizationFailure(msg string) bool {
 }
 
 // DeleteGroup removes an empty/dead consumer group.
-func (r *Registry) DeleteGroup(ctx context.Context, cluster, group string) error {
+func (r *Groups) DeleteGroup(ctx context.Context, cluster, group string) error {
 	adm, err := r.Admin(cluster)
 	if err != nil {
 		return err

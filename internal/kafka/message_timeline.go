@@ -43,7 +43,7 @@ type MessageTimelineResult struct {
 // the approximate number of messages produced inside each slot, without
 // consuming any records. It works like CountMessages but samples offsets at
 // every time-slot edge instead of just the two range bounds.
-func (r *Registry) MessageTimeline(ctx context.Context, cluster, topic string, opts MessageTimelineOptions) (*MessageTimelineResult, error) {
+func (r *Messages) MessageTimeline(ctx context.Context, cluster, topic string, opts MessageTimelineOptions) (*MessageTimelineResult, error) {
 	adm, err := r.Admin(cluster)
 	if err != nil {
 		return nil, err

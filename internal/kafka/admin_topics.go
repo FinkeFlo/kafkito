@@ -25,7 +25,7 @@ type CreateTopicRequest struct {
 
 // CreateTopic creates a topic; returns an error if it already exists or the
 // broker rejects the request.
-func (r *Registry) CreateTopic(ctx context.Context, cluster string, req CreateTopicRequest) error {
+func (r *Topics) CreateTopic(ctx context.Context, cluster string, req CreateTopicRequest) error {
 	if strings.TrimSpace(req.Name) == "" {
 		return errors.New("topic name required")
 	}
@@ -60,7 +60,7 @@ func (r *Registry) CreateTopic(ctx context.Context, cluster string, req CreateTo
 }
 
 // DeleteTopic deletes a topic.
-func (r *Registry) DeleteTopic(ctx context.Context, cluster, topic string) error {
+func (r *Topics) DeleteTopic(ctx context.Context, cluster, topic string) error {
 	adm, err := r.Admin(cluster)
 	if err != nil {
 		return err
@@ -94,7 +94,7 @@ type DeleteRecordsResult struct {
 
 // DeleteRecords truncates the topic log. Offsets of -1 are resolved to the
 // current log-end offset before the request is issued.
-func (r *Registry) DeleteRecords(ctx context.Context, cluster, topic string, req DeleteRecordsRequest) ([]DeleteRecordsResult, error) {
+func (r *Topics) DeleteRecords(ctx context.Context, cluster, topic string, req DeleteRecordsRequest) ([]DeleteRecordsResult, error) {
 	if len(req.Partitions) == 0 {
 		return nil, errors.New("at least one partition required")
 	}

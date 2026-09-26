@@ -35,7 +35,7 @@ type MessageCountResult struct {
 // CountMessages resolves the selected time bounds to offset deltas and returns
 // the approximate number of messages inside that range without consuming any
 // records.
-func (r *Registry) CountMessages(ctx context.Context, cluster, topic string, opts CountMessagesOptions) (*MessageCountResult, error) {
+func (r *Messages) CountMessages(ctx context.Context, cluster, topic string, opts CountMessagesOptions) (*MessageCountResult, error) {
 	adm, err := r.Admin(cluster)
 	if err != nil {
 		return nil, err

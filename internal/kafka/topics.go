@@ -90,7 +90,7 @@ type TopicDetail struct {
 
 // ListTopics returns topic summaries for the named cluster.
 // Internal topics (starting with "__") are included and flagged.
-func (r *Registry) ListTopics(ctx context.Context, name string) ([]TopicInfo, error) {
+func (r *Topics) ListTopics(ctx context.Context, name string) ([]TopicInfo, error) {
 	adm, err := r.Admin(name)
 	if err != nil {
 		return nil, err
@@ -122,15 +122,15 @@ func (r *Registry) ListTopics(ctx context.Context, name string) ([]TopicInfo, er
 	// state entry, so applyTopicMetrics would otherwise no-op. ensureFresh
 	// runs an on-demand probe (cached for privateClusterMetricsTTL) and
 	// is a fast cache hit for configured clusters.
-	if mc := r.metricsCollector(); mc != nil {
+	if mc := r.stats.metricsCollector(); mc != nil {
 		mc.ensureFresh(ctx, name, privateClusterMetricsTTL, adm)
 	}
-	r.applyTopicMetrics(name, out)
+	r.stats.applyTopicMetrics(name, out)
 	return out, nil
 }
 
 // DescribeTopic returns full metadata + configs + offsets for a topic.
-func (r *Registry) DescribeTopic(ctx context.Context, cluster, topic string) (*TopicDetail, error) {
+func (r *Topics) DescribeTopic(ctx context.Context, cluster, topic string) (*TopicDetail, error) {
 	adm, err := r.Admin(cluster)
 	if err != nil {
 		return nil, err
@@ -198,7 +198,7 @@ func (r *Registry) DescribeTopic(ctx context.Context, cluster, topic string) (*T
 		Configs:           configs,
 		ConfigsError:      configsErr,
 	}
-	if snap, ok := r.ClusterMetricsSnapshot(cluster); ok {
+	if snap, ok := r.stats.ClusterMetricsSnapshot(cluster); ok {
 		if m, ok := snap.PerTopic[topic]; ok && m.HaveSize {
 			out.SizeBytes = ptrInt64(m.SizeBytes)
 		}
@@ -224,7 +224,7 @@ func classifyConfigsErr(err error) string {
 // Permanent errors ("unauthorized") are held for cfgCacheTTLPermanent to
 // avoid a Kafka round-trip on every frontend poll. Successful reads are cached
 // for cfgCacheTTLSuccess so config changes are still reflected quickly.
-func (r *Registry) describeCachedTopicConfigs(ctx context.Context, cluster, topic string, adm *kadm.Client) ([]TopicConfigEntry, string) {
+func (r *Topics) describeCachedTopicConfigs(ctx context.Context, cluster, topic string, adm *kadm.Client) ([]TopicConfigEntry, string) {
 	key := cluster + "\x00" + topic
 	now := time.Now()
 

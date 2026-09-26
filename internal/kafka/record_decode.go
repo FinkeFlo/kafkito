@@ -29,7 +29,7 @@ type recordDecoder struct {
 	masks bool
 }
 
-func (r *Registry) recordDecoder(cluster, topic string) recordDecoder {
+func (r *Messages) recordDecoder(cluster, topic string) recordDecoder {
 	mask := r.MaskingPolicy(cluster)
 	return recordDecoder{topic: topic, sr: r.srDecoderFor(cluster), mask: mask, masks: mask.AppliesTo(topic)}
 }

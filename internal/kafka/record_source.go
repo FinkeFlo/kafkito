@@ -60,7 +60,7 @@ type recordBatch struct {
 // yields ctx.Err() when ctx ends and a wrapped error when a fetch fails, and
 // stops after any error. The short-lived consumer client is created on the
 // first pull and always closed when the sequence ends.
-func (r *Registry) scanRecords(ctx context.Context, s recordScan) iter.Seq2[recordBatch, error] {
+func (r *Messages) scanRecords(ctx context.Context, s recordScan) iter.Seq2[recordBatch, error] {
 	return func(yield func(recordBatch, error) bool) {
 		cursors := s.cursors()
 		cl, err := r.scanClient(s, cursors)
@@ -112,7 +112,7 @@ func (s recordScan) cursors() map[int32]*scanCursor {
 	return out
 }
 
-func (r *Registry) scanClient(s recordScan, cursors map[int32]*scanCursor) (*kgo.Client, error) {
+func (r *Messages) scanClient(s recordScan, cursors map[int32]*scanCursor) (*kgo.Client, error) {
 	offsets := make(map[int32]kgo.Offset, len(cursors))
 	for p, c := range cursors {
 		offsets[p] = kgo.NewOffset().At(c.pos)
