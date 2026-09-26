@@ -33,9 +33,10 @@ const fixtureBaseTS int64 = 1_700_000_000_000
 
 // kfakeEnv is an in-memory Kafka cluster plus a Registry pointed at it.
 type kfakeEnv struct {
-	reg   *Registry
-	cl    *kgo.Client
-	topic string
+	reg     *Registry
+	cl      *kgo.Client
+	topic   string
+	brokers []string
 }
 
 // newKfakeEnv starts a kfake cluster with one topic of the given partition
@@ -46,7 +47,13 @@ func newKfakeEnv(t *testing.T, topic string, partitions int32, mutate func(*conf
 	c, err := kfake.NewCluster(kfake.NumBrokers(1), kfake.SeedTopics(partitions, topic))
 	require.NoError(t, err)
 	t.Cleanup(c.Close)
+	return kfakeEnvFor(t, c, topic, mutate)
+}
 
+// kfakeEnvFor builds the Registry and the producer client for an already
+// started kfake cluster whose topic exists.
+func kfakeEnvFor(t *testing.T, c *kfake.Cluster, topic string, mutate func(*config.ClusterConfig)) *kfakeEnv {
+	t.Helper()
 	cfg := config.ClusterConfig{Name: kfakeCluster, Brokers: c.ListenAddrs()}
 	if mutate != nil {
 		mutate(&cfg)
@@ -62,7 +69,7 @@ func newKfakeEnv(t *testing.T, topic string, partitions int32, mutate func(*conf
 	)
 	require.NoError(t, err)
 	t.Cleanup(cl.Close)
-	return &kfakeEnv{reg: reg, cl: cl, topic: topic}
+	return &kfakeEnv{reg: reg, cl: cl, topic: topic, brokers: c.ListenAddrs()}
 }
 
 // produce writes recs one by one (so each gets its own batch and keeps its
@@ -75,6 +82,27 @@ func (e *kfakeEnv) produce(t *testing.T, recs ...*kgo.Record) {
 		r.Topic = e.topic
 		res := e.cl.ProduceSync(ctx, r)
 		require.NoError(t, res.FirstErr())
+	}
+}
+
+// produceTransactional writes every record in its own committed transaction,
+// so each record is followed by a commit marker offset.
+func (e *kfakeEnv) produceTransactional(t *testing.T, recs ...*kgo.Record) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cl, err := kgo.NewClient(
+		kgo.SeedBrokers(e.brokers...),
+		kgo.RecordPartitioner(kgo.ManualPartitioner()),
+		kgo.TransactionalID("kafkito-test-"+e.topic),
+	)
+	require.NoError(t, err)
+	defer cl.Close()
+	for _, r := range recs {
+		r.Topic = e.topic
+		require.NoError(t, cl.BeginTransaction())
+		require.NoError(t, cl.ProduceSync(ctx, r).FirstErr())
+		require.NoError(t, cl.EndTransaction(ctx, kgo.TryCommit))
 	}
 }
 

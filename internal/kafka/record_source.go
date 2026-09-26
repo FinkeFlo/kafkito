@@ -111,6 +111,9 @@ func (r *Registry) scanClient(s recordScan, cursors map[int32]*scanCursor) (*kgo
 	opts := append(clientOpts(s.cfg, r.log.With("cluster", s.cluster, "role", s.role)),
 		kgo.ConsumePartitions(map[string]map[int32]kgo.Offset{s.topic: offsets}),
 		kgo.FetchMaxWait(500*time.Millisecond),
+		// Transaction markers take up offsets too. Without them a range whose
+		// last offset is a marker would never be seen to end.
+		kgo.KeepControlRecords(),
 	)
 	cl, err := kgo.NewClient(opts...)
 	if err != nil {
@@ -133,6 +136,7 @@ func (s recordScan) fetchError(fetches kgo.Fetches) error {
 
 // inRange returns the records inside their partition's current chunk and
 // marks a chunk done once its last offset, or any later one, shows up.
+// Control records (transaction markers) only count for the latter.
 func inRange(fetches kgo.Fetches, cursors map[int32]*scanCursor) []*kgo.Record {
 	var batch []*kgo.Record
 	fetches.EachRecord(func(rec *kgo.Record) {
@@ -143,7 +147,7 @@ func inRange(fetches kgo.Fetches, cursors map[int32]*scanCursor) []*kgo.Record {
 		if rec.Offset >= c.upper-1 {
 			c.done = true
 		}
-		if rec.Offset < c.upper {
+		if rec.Offset < c.upper && !rec.Attrs.IsControl() {
 			batch = append(batch, rec)
 		}
 	})

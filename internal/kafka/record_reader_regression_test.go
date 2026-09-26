@@ -4,6 +4,7 @@
 package kafka
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -124,6 +125,55 @@ func TestConsume_FromEndDominantPartitionIsNotCappedByFairShare(t *testing.T) {
 	}
 	want := append(append(valuesOf("p1", 29), valuesOf("p2", 9)...), valuesOf("p0", 19)...)
 	assert.Equal(t, want, all, "paging returns every record once, newest first")
+}
+
+// A range whose last offset is a transaction commit marker used to wait for
+// the whole timeout: the client drops control records, so the reader never
+// saw the last offset of the range and never marked it done.
+func TestRecordReaders_RangeEndingInTransactionMarkerDoesNotWaitForTimeout(t *testing.T) {
+	t.Parallel()
+	env := newKfakeEnv(t, "transactional", 1, nil)
+	// Offsets 0, 2, 4 hold the records, 1, 3, 5 the commit markers.
+	env.produceTransactional(t,
+		&kgo.Record{Timestamp: time.UnixMilli(fixtureBaseTS), Value: []byte("r-0")},
+		&kgo.Record{Timestamp: time.UnixMilli(fixtureBaseTS + 1000), Value: []byte("r-1")},
+		&kgo.Record{Timestamp: time.UnixMilli(fixtureBaseTS + 2000), Value: []byte("r-2")},
+	)
+	const timeout = 10 * time.Second
+	fast := func(t *testing.T, start time.Time) {
+		t.Helper()
+		assert.Less(t, time.Since(start), 3*time.Second, "waited for the timeout")
+	}
+
+	for name, from := range map[string]ConsumeFrom{"from start": FromStart, "from end": FromEnd} {
+		t.Run("consume "+name, func(t *testing.T) {
+			t.Parallel()
+			start := time.Now()
+			res := consumePage(t, env, ConsumeOptions{Partition: -1, Limit: 50, From: from, Timeout: timeout})
+			fast(t, start)
+			assert.ElementsMatch(t, []string{"r-0", "r-1", "r-2"}, values(res.Messages))
+		})
+	}
+	for _, dir := range []SearchDirection{DirOldestFirst, DirNewestFirst} {
+		t.Run("search "+string(dir), func(t *testing.T) {
+			t.Parallel()
+			start := time.Now()
+			res := searchTopic(t, env, SearchOptions{Partition: -1, Limit: 50, Direction: dir, Value: "r-", Timeout: timeout})
+			fast(t, start)
+			assert.False(t, res.Stats.TimedOut)
+			assert.Equal(t, 3, res.Stats.Scanned)
+			assert.Equal(t, 3, res.Stats.Matched)
+		})
+	}
+	t.Run("raw value of a marker offset", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		start := time.Now()
+		_, err := env.reg.FetchRawMessageValue(ctx, kfakeCluster, env.topic, 0, 5)
+		fast(t, start)
+		assert.ErrorContains(t, err, "record not found")
+	})
 }
 
 func values(msgs []Message) []string {
