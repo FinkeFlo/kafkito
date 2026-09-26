@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/twmb/franz-go/pkg/kgo"
 )
 
 // Regression tests for bugs found while pinning the record readers.
@@ -34,5 +35,36 @@ func TestConsume_ShortForwardPageDoesNotWaitForTimeout(t *testing.T) {
 			assert.False(t, res.HasMore)
 			assert.Less(t, time.Since(start), 3*time.Second, "short forward page waited for the timeout")
 		})
+	}
+}
+
+// A record that fails to parse at the very end of a scanned range used to
+// skip the "range done" bookkeeping, so the search waited for its whole
+// timeout and reported timed_out even though every record had been scanned.
+func TestSearch_ParseErrorOnLastRecordDoesNotWaitForTimeout(t *testing.T) {
+	t.Parallel()
+	env := newKfakeEnv(t, "tail-broken", 1, nil)
+	for i, v := range []string{`{"a":1}`, `{"a":2}`, `{broken`} {
+		env.produce(t, &kgo.Record{Timestamp: time.UnixMilli(fixtureBaseTS + int64(i)), Value: []byte(v)})
+	}
+	queries := map[string]SearchOptions{
+		"jsonpath": {Mode: SearchModeJSONPath, Path: "$.a", Op: OpGte, Value: "1"},
+		"js":       {Mode: SearchModeJS, Value: "JSON.parse(value).a >= 1"},
+	}
+	for name, q := range queries {
+		for _, dir := range []SearchDirection{DirOldestFirst, DirNewestFirst} {
+			t.Run(name+"/"+string(dir), func(t *testing.T) {
+				t.Parallel()
+				q.Partition, q.Limit, q.Direction, q.Timeout = -1, 500, dir, 10*time.Second
+				start := time.Now()
+				res := searchTopic(t, env, q)
+				assert.Less(t, time.Since(start), 3*time.Second, "search waited for the timeout")
+				assert.False(t, res.Stats.TimedOut)
+				assert.False(t, res.Stats.MoreAvailable)
+				assert.Equal(t, 3, res.Stats.Scanned)
+				assert.Equal(t, 2, res.Stats.Matched)
+				assert.Equal(t, 1, res.Stats.ParseErrors)
+			})
+		}
 	}
 }
