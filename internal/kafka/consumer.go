@@ -477,6 +477,11 @@ func buildWindows(
 					b = s
 				}
 				e, ok := endMap[p]
+				// A forward cursor continues a time-range query, so the
+				// exclusive upper time bound still applies.
+				if o, has := toOff[p]; has && opts.ToTSMs > 0 && o < e {
+					e = o
+				}
 				if !ok || e <= b {
 					continue
 				}
