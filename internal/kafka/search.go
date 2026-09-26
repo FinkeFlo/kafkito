@@ -455,6 +455,12 @@ scan:
 				lowestOffset[p] = rec.Offset
 			}
 			scanned++
+			// The chunk (newest-first) or the whole range (oldest-first) is
+			// complete once the record at upperBounds-1 has been seen. Mark
+			// it before matching so a parse error cannot skip it.
+			if rec.Offset == ub-1 {
+				chunkDone[p] = true
+			}
 			// Match against the full, untruncated record content: truncating
 			// first (as the consume/list path does) would silently hide
 			// contains-matches past maxMessageValueBytes and would corrupt
@@ -494,16 +500,6 @@ scan:
 					}
 				}
 				matches = append(matches, msg)
-			}
-			// In newest-first mode, the chunk is complete once we've observed
-			// the record at upperBounds-1.
-			if opts.Direction == DirNewestFirst && rec.Offset == ub-1 {
-				chunkDone[p] = true
-			}
-			// In oldest-first mode the chunk extends to rng.End; completion
-			// happens when rec.Offset == ub-1.
-			if opts.Direction == DirOldestFirst && rec.Offset == ub-1 {
-				chunkDone[p] = true
 			}
 		})
 		if scanned >= opts.Budget {
