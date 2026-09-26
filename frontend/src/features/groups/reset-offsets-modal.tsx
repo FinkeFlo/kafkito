@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Notice } from "@/components/ui/Notice";
 import { Timestamp } from "@/components/ui/timestamp";
-import { LagBadge } from "@/components/lag-badge";
+import { LagBadge } from "@/features/groups/lag-badge";
 import { localInputToMs, msToLocalInput } from "@/lib/datetime";
 import { groupQueries } from "@/lib/queries/groups";
 
