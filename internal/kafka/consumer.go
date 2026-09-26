@@ -109,7 +109,7 @@ type ConsumeResult struct {
 	// buildWindows), so this only fires on a genuine fetch problem, never
 	// on legitimately running out of history. Callers should surface this
 	// so "latest" pages don't silently pass off an incomplete tail as
-	// complete — see internal/server/clusters.go's "partial" response field.
+	// complete — see the "partial" field of the consumeMessages response.
 	Partial bool
 }
 
