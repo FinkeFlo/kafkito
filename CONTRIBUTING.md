@@ -23,6 +23,22 @@ GitHub Actions.
    targets (`make test`, `make api-check`, `make frontend-check`); only
    golangci-lint runs via its GitHub Action, pinned to the same version.
    `make actionlint` lints the GitHub workflows.
+
+   `make frontend-check` runs Biome (lint and format, including the
+   accessibility rules and the file-naming convention), TypeScript, knip
+   (unused files, exports and dependencies), the production build and Vitest.
+   The Vitest run includes the repo-wide checks in `frontend/src/__checks__/`
+   (design tokens, contrast, query keys, route orphans, date formatting).
+
+   `make e2e` is opt-in: it starts Kafka via Compose and a `devauth` build of
+   kafkito, then runs the Playwright walks in `frontend/e2e/` (including axe
+   accessibility scans). After a failed run, stop the binary with
+   `make e2e-down`. See
+   [`frontend/e2e/README.md`](https://github.com/FinkeFlo/kafkito/blob/main/frontend/e2e/README.md).
+
+   CI jobs: `go`, `frontend`, `api-breaking` (oasdiff against the base
+   branch, PRs only), `docker-build`, `actionlint` and `dco` in `ci.yml`;
+   `playwright` in `e2e.yml`; the secret scans in `secret-scan.yml`.
 3. Changing the HTTP API? Edit `api/openapi.yaml` (the contract, see ADR-0005)
    and run `make api-generate` to refresh the generated server interface and
    frontend types. A new endpoint then needs its strict handler method, its

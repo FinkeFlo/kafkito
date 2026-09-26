@@ -18,15 +18,20 @@ against a local Kafka. **Never deploy this variant.**
 
 ```sh
 docker run --rm -p 37421:37421 \
+  -e KAFKITO_INSECURE_AUTH_OFF=true \
   -e KAFKITO_KAFKA_BROKERS=host.docker.internal:9092 \
   ghcr.io/finkeflo/kafkito:latest-local
 ```
+
+Auth mode `off` only starts on a loopback address. Inside a container
+kafkito listens on all interfaces, so `KAFKITO_INSECURE_AUTH_OFF=true`
+acknowledges that; the `-p` mapping above still decides who can reach it.
 
 Open http://localhost:37421 in your browser. Connect kafkito to a
 broker on your host (`host.docker.internal:9092`), or run a Kafka
 container alongside it on a shared docker network.
 
-### Production image (OIDC / JWT)
+### Production image (JWT)
 
 ```sh
 docker run --rm -p 37421:37421 \
@@ -35,9 +40,9 @@ docker run --rm -p 37421:37421 \
   ghcr.io/finkeflo/kafkito:latest
 ```
 
-The default image enforces auth. Use `KAFKITO_AUTH_MODE=mock` for
-JWT-validation testing, or wire in your own OIDC issuer for
-real-world deploys.
+The default image enforces auth and does not start without
+`KAFKITO_AUTH_MODE`. Use `KAFKITO_AUTH_MODE=mock` for JWT-validation
+testing. A generic OIDC mode is pending review, see #100.
 
 ### SAP BTP / XSUAA
 
@@ -55,8 +60,11 @@ Requires Go 1.26+ and Bun 1.4+:
 ```sh
 git clone https://github.com/FinkeFlo/kafkito && cd kafkito
 make build
-KAFKITO_KAFKA_BROKERS=localhost:9092 ./bin/kafkito
+KAFKITO_AUTH_MODE=mock KAFKITO_KAFKA_BROKERS=localhost:9092 ./bin/kafkito
 ```
+
+`make build` produces the default build, which needs an auth mode (see
+[Configuration](#configuration)).
 
 ### Local development (hot-reload)
 
@@ -93,6 +101,8 @@ YAML file → `KAFKITO_*` variables → `$PORT`.
 | `KAFKITO_TEST_CONNECTION_TIMEOUT` | `server.test_connection_timeout` | `15s`     | Go duration (`30s`, `2m`) for the private-cluster "Test connection" probe. `0` means the default; invalid or negative values fail startup. |
 | `KAFKITO_SERVER_FRAME_ANCESTORS`  | `server.frame_ancestors`         | `'none'`  | CSP `frame-ancestors` source list, see [Security headers](#security-headers). |
 | `KAFKITO_KAFKA_BROKERS`           | —                                | —         | Env-only shortcut: when no `clusters` are configured, defines one cluster named `local` from a comma-separated broker list. |
+| `KAFKITO_AUTH_MODE`               | `auth.mode`                      | `off`     | `mock` (default build), `xsuaa` (`-btp` build) or `off` (only in `-tags devauth` builds such as the `-local` image). A mode the build does not include fails startup, so the default build needs this set. |
+| `KAFKITO_INSECURE_AUTH_OFF`       | —                                | —         | `true` allows mode `off` on a non-loopback address. Ignored on Cloud Foundry, where `off` always fails startup. |
 
 An invalid listen address (for example `PORT=abc`) fails startup with exit
 code 2.
@@ -151,15 +161,15 @@ policy allows no inline scripts or styles and no third-party origins.
 - **Single static binary** — no JVM, no side-car containers, ~50 MB RAM footprint.
 - **Graceful with limited permissions** — works with read-only ACLs on individual topics; does not require cluster-admin rights.
 - **Built-in RBAC & data masking** — YAML-policy based, OSS, no enterprise gating.
-- **Powerful message browser** — JavaScript-DSL filters, Avro/Protobuf/JSON/Text encodings, Schema-Registry aware.
-- **Cloud-native ready** — stateless, 12-Factor, OIDC/JWT auth, distroless image.
+- **Powerful message browser** — JavaScript-DSL filters, JSON/text/binary values, Schema-Registry aware (Avro and JSON Schema decoding; Protobuf payloads are detected but not decoded yet).
+- **Cloud-native ready** — stateless, 12-Factor, JWT auth (XSUAA build), distroless image.
 
 ## Tech Stack
 
 | Layer | Tech |
 |---|---|
-| Backend | Go 1.26 · Chi · OpenAPI 3.1 · `twmb/franz-go` + `kadm` + `sr` · `dop251/goja` · `knadh/koanf` · `log/slog` |
-| Frontend | React 19 · Vite · TanStack Router · shadcn/ui · Tailwind · Bun |
+| Backend | Go 1.26 · Chi · OpenAPI 3.1 (`oapi-codegen`, `kin-openapi`) · `twmb/franz-go` + `kadm` · `dop251/goja` · `knadh/koanf` · `log/slog` |
+| Frontend | React 19 · Vite · TanStack Router · TanStack Query · Tailwind · Radix UI primitives · Bun |
 | Distribution | Single Go binary (`//go:embed`-ed SPA) · distroless multi-arch Docker image |
 
 ## Project Status
