@@ -9,8 +9,11 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/twmb/franz-go/pkg/kadm"
+	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
 // --- Topic admin --------------------------------------------------------------
@@ -29,10 +32,11 @@ func (r *Topics) CreateTopic(ctx context.Context, cluster string, req CreateTopi
 	if strings.TrimSpace(req.Name) == "" {
 		return errors.New("topic name required")
 	}
-	adm, err := r.Admin(cluster)
+	cl, err := r.Client(cluster)
 	if err != nil {
 		return err
 	}
+	adm := kadm.NewClient(cl)
 	var cfgs map[string]*string
 	if len(req.Configs) > 0 {
 		cfgs = make(map[string]*string, len(req.Configs))
@@ -56,7 +60,42 @@ func (r *Topics) CreateTopic(ctx context.Context, cluster string, req CreateTopi
 	if resp.Err != nil {
 		return fmt.Errorf("create topic %q: %w", req.Name, resp.Err)
 	}
+	waitForTopicMetadata(ctx, cl, req.Name)
 	return nil
+}
+
+// topicVisibleTimeout bounds how long CreateTopic waits for brokers to list
+// a new topic. The create itself has succeeded either way.
+const topicVisibleTimeout = 5 * time.Second
+
+// waitForTopicMetadata waits until a broker reports the topic without an
+// error, the condition ListTopics uses. The UI refetches the topic list as
+// soon as the create returns, and two things would hide the new topic from
+// that list: brokers apply the controller's record asynchronously, and
+// kadm serves topic lists from the client's metadata cache (MetadataMinAge).
+// The direct, uncached request also stores the topic in that cache, so the
+// next cached list includes it.
+func waitForTopicMetadata(ctx context.Context, cl *kgo.Client, topic string) {
+	ctx, cancel := context.WithTimeout(ctx, topicVisibleTimeout)
+	defer cancel()
+	req := kmsg.NewPtrMetadataRequest()
+	rt := kmsg.NewMetadataRequestTopic()
+	rt.Topic = kmsg.StringPtr(topic)
+	req.Topics = append(req.Topics, rt)
+	for {
+		if resp, err := req.RequestWith(ctx, cl); err == nil {
+			for _, t := range resp.Topics {
+				if t.Topic != nil && *t.Topic == topic && t.ErrorCode == 0 {
+					return
+				}
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
 }
 
 // DeleteTopic deletes a topic.
