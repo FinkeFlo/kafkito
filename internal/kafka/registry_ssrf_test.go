@@ -4,7 +4,7 @@
 package kafka
 
 // registry_ssrf_test.go contains focused unit tests for the SSRF-hardening
-// changes in clientOpts (finding #4, MEDIUM): ad-hoc clusters receive a
+// changes in clientOpts: ad-hoc clusters receive a
 // GuardedDialContext dialer; operator-configured clusters do not.
 
 import (
@@ -153,7 +153,7 @@ func TestClientOpts_ConfiguredCluster_TLSEnabled_UsesDialTLSConfigPath(t *testin
 	cl.Close()
 }
 
-// TestAdhocPrefixMatchesConfigConstant guards the finding-#1 safety invariant:
+// TestAdhocPrefixMatchesConfigConstant guards a safety invariant:
 // the ad-hoc detection in internal/kafka (AdhocPrefix) and the validation guard in
 // internal/config (AdhocClusterPrefix) are two independent "__adhoc_" constants.
 // They must stay equal or operator-config validation and ad-hoc routing could

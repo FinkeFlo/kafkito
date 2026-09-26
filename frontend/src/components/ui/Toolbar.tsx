@@ -12,10 +12,8 @@ export interface ToolbarProps {
 }
 
 /**
- * Filter / action row that sits above data-dense surfaces. Replaces the
- * hand-rolled `<div className="flex flex-wrap items-center gap-2">` blocks
- * scattered across `routes/topics.tsx`, `routes/groups.tsx`, and
- * `routes/index.tsx`.
+ * Filter / action row that sits above data-dense surfaces: search on the
+ * left, filters in the middle, actions pushed to the right.
  */
 export function Toolbar({ search, filters, actions, className }: ToolbarProps) {
   return (

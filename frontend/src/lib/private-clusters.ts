@@ -1,8 +1,8 @@
 // Private cluster configurations stored in the user's browser
 // (localStorage). The server is stateless for private clusters — every
 // request that targets one carries its configuration in the
-// X-Kafkito-Cluster header. See docs/plans/per-user-clusters.md and the
-// Go side (internal/server/private_cluster.go, internal/kafka/adhoc.go).
+// X-Kafkito-Cluster header. The Go side lives in
+// internal/server/private_cluster.go and internal/kafka/adhoc.go.
 //
 // Security note: passwords are stored in cleartext in localStorage. This is
 // documented in the UI. A future Webcrypto-based passphrase layer can wrap

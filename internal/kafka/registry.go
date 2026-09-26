@@ -287,7 +287,7 @@ func (r *Connections) Client(name string) (*kgo.Client, error) {
 //
 // For ad-hoc (private) clusters a dial-time SSRF guard is installed via a
 // single kgo.Dialer so that broker connections cannot be redirected to the
-// cloud metadata endpoint by DNS rebinding (finding #4). When TLS is enabled
+// cloud metadata endpoint by DNS rebinding. When TLS is enabled
 // for an ad-hoc cluster the TLS handshake is performed INSIDE that guarded
 // dialer (see guardedTLSDialer) rather than via kgo.DialTLSConfig: franz-go
 // rejects setting both kgo.Dialer and kgo.DialTLSConfig together. Operator-
@@ -320,7 +320,7 @@ func clientOpts(cfg config.ClusterConfig, log *slog.Logger) []kgo.Opt {
 	}
 
 	// Ad-hoc clusters originate from untrusted user-supplied broker addresses,
-	// so the dial is guarded against DNS-rebinding SSRF (finding #4, MEDIUM).
+	// so the dial is guarded against DNS-rebinding SSRF.
 	// Operator-configured clusters are intentionally unguarded — they may
 	// legitimately point at localhost or internal addresses.
 	if IsAdhoc(cfg.Name) {

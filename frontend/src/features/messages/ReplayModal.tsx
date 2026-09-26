@@ -51,7 +51,7 @@ type FullValueState =
   | { status: "ready"; base64: string }
   | { status: "error"; message: string };
 
-// Mirrors internal/server/clusters.go's maxProduceBodyBytes (15 MiB): the
+// Mirrors internal/server/messages.go's maxProduceBodyBytes (15 MiB): the
 // whole produce JSON body (key + value + headers) must fit under that cap
 // once decompressed server-side — gzip (see lib/api.ts's maybeGzipBody)
 // only shrinks bytes on the wire, not this ceiling. Base64 inflates raw
