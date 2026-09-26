@@ -27,4 +27,21 @@ output-options:
     - getCapabilities
     - refreshCapabilities
     - listBrokers
+    # topics
+    - listTopics
+    - createTopic
+    - describeTopic
+    - deleteTopic
+    - listTopicConsumers
+    - alterTopicConfigs
+    - deleteRecords
+    # messages
+    - consumeMessages
+    - produceMessage
+    - countMessages
+    - getMessageTimeline
+    - downloadMessageRaw
+    - sampleMessages
+    - searchMessages
+    - copyMessages
 output: internal/server/api/server.gen.go

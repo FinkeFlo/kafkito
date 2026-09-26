@@ -83,10 +83,6 @@ func toAPIError(err error) *apiError {
 	if errors.As(err, &ae) {
 		return ae
 	}
-	var pe *paramError
-	if errors.As(err, &pe) {
-		return &apiError{Status: pe.status, Message: pe.msg}
-	}
 	if ve := requestValidationError(err); ve != nil {
 		return ve
 	}

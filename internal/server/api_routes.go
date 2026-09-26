@@ -29,6 +29,7 @@ import (
 type generatedRoutes struct {
 	w        *gen.ServerInterfaceWrapper
 	validate func(http.Handler) http.Handler
+	errs     errorWriter
 }
 
 func newGeneratedRoutes(impl gen.StrictServerInterface, errs errorWriter) (*generatedRoutes, error) {
@@ -49,6 +50,7 @@ func newGeneratedRoutes(impl gen.StrictServerInterface, errs errorWriter) (*gene
 	return &generatedRoutes{
 		w:        &gen.ServerInterfaceWrapper{Handler: strict, ErrorHandlerFunc: errs.writeError},
 		validate: validate,
+		errs:     errs,
 	}, nil
 }
 
@@ -75,4 +77,25 @@ func (g *generatedRoutes) mountClusters(r chi.Router) {
 	noBody.Get("/clusters/{cluster}/capabilities", g.w.GetCapabilities)
 	noBody.Post("/clusters/{cluster}/capabilities/refresh", g.w.RefreshCapabilities)
 	noBody.Get("/clusters/{cluster}/brokers", g.w.ListBrokers)
+
+	jsonBody := r.With(limitRequestBody(maxJSONBodyBytes, http.StatusBadRequest), g.validate)
+	noBody.Get("/clusters/{cluster}/topics", g.w.ListTopics)
+	jsonBody.Post("/clusters/{cluster}/topics", g.w.CreateTopic)
+	noBody.Get("/clusters/{cluster}/topics/{topic}", g.w.DescribeTopic)
+	noBody.Delete("/clusters/{cluster}/topics/{topic}", g.w.DeleteTopic)
+	noBody.Get("/clusters/{cluster}/topics/{topic}/consumers", g.w.ListTopicConsumers)
+	jsonBody.Patch("/clusters/{cluster}/topics/{topic}/configs", g.w.AlterTopicConfigs)
+	jsonBody.Delete("/clusters/{cluster}/topics/{topic}/records", g.w.DeleteRecords)
+
+	noBody.Get("/clusters/{cluster}/topics/{topic}/messages", g.w.ConsumeMessages)
+	r.With(produceBody(g.errs), g.validate).
+		Post("/clusters/{cluster}/topics/{topic}/messages", g.w.ProduceMessage)
+	noBody.Get("/clusters/{cluster}/topics/{topic}/messages/count", g.w.CountMessages)
+	noBody.Get("/clusters/{cluster}/topics/{topic}/messages/timeline", g.w.GetMessageTimeline)
+	noBody.Get("/clusters/{cluster}/topics/{topic}/messages/{partition}/{offset}/raw", g.w.DownloadMessageRaw)
+	noBody.Get("/clusters/{cluster}/topics/{topic}/sample", g.w.SampleMessages)
+	r.With(limitRequestBodyMsg(maxSearchBodyBytes, http.StatusBadRequest, "invalid json body: "), g.validate).
+		Post("/clusters/{cluster}/topics/{topic}/messages/search", g.w.SearchMessages)
+	r.With(limitRequestBody(maxCopyBodyBytes, http.StatusBadRequest), g.validate).
+		Post("/clusters/{cluster}/topics/{topic}/copy", g.w.CopyMessages)
 }

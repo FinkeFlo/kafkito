@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -61,10 +62,18 @@ func rbacMiddleware(policy *rbac.Policy) func(http.Handler) http.Handler {
 			}
 
 			if bodyField != "" {
-				bodyBytes, err := io.ReadAll(r.Body)
+				// Runs before the route's own body limit, so it caps the read
+				// itself, at the limit of the routes that name a body field
+				// (create topic, create group).
+				bodyBytes, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxJSONBodyBytes))
 				_ = r.Body.Close()
 				if err != nil {
-					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "failed to read request body"})
+					msg := "failed to read request body"
+					var mbe *http.MaxBytesError
+					if errors.As(err, &mbe) {
+						msg = "invalid body: " + mbe.Error()
+					}
+					writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg})
 					return
 				}
 				var fields map[string]json.RawMessage

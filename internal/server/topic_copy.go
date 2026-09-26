@@ -8,13 +8,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
-	"github.com/go-chi/chi/v5"
+	gen "github.com/FinkeFlo/kafkito/internal/server/api"
 )
 
 // copyBatchSize is the number of records fetched from the source cluster in
@@ -36,10 +37,10 @@ const copyValidateTimeout = 5 * time.Second
 
 // copyProgressInterval bounds how long the SSE stream may stay silent while
 // the job is making progress that produces no events (pages whose records are
-// all filtered out by the time window or skipped as unreproducible). A write
-// to the stream is the only way to notice the client is gone, so this also
-// bounds how long a job keeps running after the browser went away — see the
-// disconnect discussion in copyMessages.
+// all filtered out by the time window or skipped as unreproducible). Once the
+// request deadline has fired, a write to the stream is the only way to notice
+// the client is gone, so this also bounds how long a job keeps running after
+// the browser went away — see the disconnect discussion in CopyMessages.
 const copyProgressInterval = 2 * time.Second
 
 // maxEmptyPageRetries / emptyPageRetryDelay guard against silently truncating a
@@ -88,36 +89,36 @@ func releaseCopySlot() {
 	}
 }
 
-// copyRequest is the JSON body for POST /topics/{topic}/copy.
-type copyRequest struct {
-	// DestCluster names a server-configured cluster. Mutually exclusive with
-	// DestClusterConfig.
-	DestCluster string `json:"dest_cluster"`
+// copyRegistry is the part of *kafkapkg.Registry the copy job uses. Tests
+// substitute a fake to drive the SSE stream without a broker.
+type copyRegistry interface {
+	ConfigFor(name string) (config.ClusterConfig, bool)
+	UseAdhoc(cfg config.ClusterConfig) (string, error)
+	DescribeTopic(ctx context.Context, cluster, topic string) (*kafkapkg.TopicDetail, error)
+	ConsumeMessages(ctx context.Context, cluster, topic string, opts kafkapkg.ConsumeOptions) (*kafkapkg.ConsumeResult, error)
+	ProduceBatch(ctx context.Context, cluster, topic string, reqs []kafkapkg.ProduceRequest) (int, error)
+}
 
-	// DestClusterConfig allows the caller to pass an ad-hoc (private) cluster
-	// configuration inline. Used when the destination is a browser-side private
-	// cluster whose details are not known to the server. Mutually exclusive
-	// with DestCluster.
-	DestClusterConfig *config.ClusterConfig `json:"dest_cluster_config,omitempty"`
+// copyJob is a validated copy request.
+type copyJob struct {
+	srcCluster, srcTopic   string
+	destCluster, destTopic string
+	// adhocDest is set when the destination came from dest_cluster_config.
+	adhocDest bool
 
-	DestTopic string `json:"dest_topic"`
-
-	// Partition selects a single source partition. nil / absent = all partitions.
-	Partition *int32 `json:"partition,omitempty"`
-
-	// FromTSMs / ToTSMs are UNIX millisecond timestamps bounding which source
-	// messages to copy. FromTSMs is inclusive, ToTSMs exclusive (matching
-	// internal/kafka's timeline convention). Zero means "no bound"; for ToTSMs the
-	// handler substitutes the job's start time, see copyMessages.
-	FromTSMs int64 `json:"from_ts_ms,omitempty"`
-	ToTSMs   int64 `json:"to_ts_ms,omitempty"`
-
-	// Limit caps the total number of messages to copy. Zero means no limit.
-	Limit int64 `json:"limit,omitempty"`
-
-	// PreservePartition routes each record to the same partition on the
-	// destination topic as it came from on the source.
-	PreservePartition bool `json:"preserve_partition,omitempty"`
+	// partition selects a single source partition; nil = all partitions.
+	partition *int32
+	// fromTSMs / toTSMs bound the source record timestamps: fromTSMs is
+	// inclusive, toTSMs exclusive (matching internal/kafka's timeline
+	// convention). Zero means "no bound"; for toTSMs the job substitutes its
+	// start time, see CopyMessages.
+	fromTSMs, toTSMs int64
+	// limit caps the number of copied records; zero means no limit.
+	limit int64
+	// preservePartition routes each record to its source partition number.
+	preservePartition bool
+	// user is the RBAC subject recorded in the X-Kafkito-User header.
+	user string
 }
 
 // copyProgressEvent is the SSE payload emitted while copying.
@@ -130,11 +131,42 @@ type copyProgressEvent struct {
 	Error   string `json:"error,omitempty"`
 }
 
-// copyMessages reads records from the source topic and reproduces them on the
+// copyStream is the SSE response body: the read side of the pipe the copy
+// goroutine writes events into. The generated response writer closes it when
+// it stops reading (stream finished or a write to the client failed), which
+// stops the job.
+type copyStream struct {
+	*io.PipeReader
+	stop context.CancelFunc
+}
+
+func (s copyStream) Close() error {
+	s.stop()
+	return s.PipeReader.Close()
+}
+
+// copyStreamResponse streams the copy progress as text/event-stream. The
+// generated 200 response writes Content-Type, reads the body in chunks and
+// flushes after each one; this wrapper adds the caching headers.
+type copyStreamResponse struct {
+	body copyStream
+}
+
+func (c copyStreamResponse) VisitCopyMessagesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
+	// The only error is a failed write to a client that went away. The
+	// status is already sent, the job is stopped by the body's Close, and
+	// reporting it would log a spurious 500.
+	_ = gen.CopyMessages200TexteventStreamResponse{Body: c.body}.VisitCopyMessagesResponse(w)
+	return nil
+}
+
+// CopyMessages reads records from the source topic and reproduces them on the
 // destination topic, streaming SSE progress events to the caller.
 //
-// Route: POST /clusters/{cluster}/topics/{topic}/copy
-// The source cluster is already resolved by the upstream middleware.
+// The source cluster ({cluster} in the URL) is already resolved by the
+// upstream middleware, and the RBAC middleware checked topic:consume on it.
 //
 // The copy is a snapshot: when the caller sets no to_ts_ms, the job's own start
 // time becomes the exclusive upper bound, so records produced to the source
@@ -147,56 +179,23 @@ type copyProgressEvent struct {
 //
 // Records the destination cannot receive verbatim are counted as skipped, never
 // silently altered; see copyProduceRequest.
-func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
-	srcCluster := chi.URLParam(r, "cluster")
-	srcTopic := chi.URLParam(r, "topic")
-
-	// Parse request body.
-	var req copyRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxCopyBodyBytes))
-	if err := dec.Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body: " + err.Error()})
-		return
-	}
-
-	// Validate destination.
-	req.DestTopic = strings.TrimSpace(req.DestTopic)
-	if req.DestTopic == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "dest_topic is required"})
-		return
-	}
-	if req.DestCluster == "" && req.DestClusterConfig == nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "dest_cluster or dest_cluster_config is required"})
-		return
-	}
-	if req.DestCluster != "" && req.DestClusterConfig != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "dest_cluster and dest_cluster_config are mutually exclusive"})
-		return
-	}
-
-	// Resolve destination cluster name. For named clusters and for ad-hoc
-	// configs this is the same deterministic internal registry name used
-	// for the source (resolvePrivateClusterParam rewrites the source's
-	// {cluster} URL param the same way), so comparing the two below
-	// correctly detects "same actual cluster" even across differently
-	// labelled private-cluster configs that point at the same broker.
-	destCluster, err := a.resolveDestCluster(req)
+//
+// Streaming: everything that can fail is checked before the stream opens, so
+// it is still a JSON error response. Then a goroutine runs the job and writes
+// events into an io.Pipe whose read side is the response body. The job stops
+// when the client goes away — the request context is cancelled, or a write to
+// the client fails and the response writer closes the body — and releases its
+// concurrency slot when the goroutine ends.
+func (s *apiServer) CopyMessages(ctx context.Context, req gen.CopyMessagesRequestObject) (gen.CopyMessagesResponseObject, error) {
+	r := httpRequestFromContext(ctx)
+	job, err := s.copyJobFor(req, r)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
-		return
-	}
-
-	// Refuse to copy a topic into itself: even with the snapshot upper bound
-	// this reads its own writes within the first page, and the intent is
-	// almost certainly a mistake.
-	if destCluster == srcCluster && req.DestTopic == srcTopic {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "dest_cluster/dest_topic must differ from the source"})
-		return
+		return nil, err
 	}
 
 	// Prod-cluster check for the DESTINATION.
-	if !a.requireProdConfirmation(w, r, destCluster) {
-		return
+	if err := prodConfirmationError(s.copyReg, job.destCluster, r); err != nil {
+		return nil, err
 	}
 
 	// RBAC for the DESTINATION: resolvePermission/rbacMiddleware only checks
@@ -207,15 +206,12 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 	// Ad-hoc/private destinations bypass RBAC entirely, same as elsewhere:
 	// the caller supplies their own credentials and the broker enforces its
 	// own ACLs.
-	if req.DestClusterConfig == nil && a.policy.Enabled() {
-		user := rbacSubject(r, a.policy)
-		if !a.policy.Allow(user, destCluster, "topic", req.DestTopic, "produce") {
-			writeJSON(w, http.StatusForbidden, map[string]any{
-				"error":    "forbidden",
-				"resource": "topic:" + req.DestTopic,
-				"action":   "produce",
-			})
-			return
+	if !job.adhocDest && s.policy.Enabled() {
+		if !s.policy.Allow(job.user, job.destCluster, "topic", job.destTopic, "produce") {
+			resource, action := "topic:"+job.destTopic, "produce"
+			return gen.CopyMessages403JSONResponse{ForbiddenJSONResponse: gen.ForbiddenJSONResponse{
+				Error: "forbidden", Resource: &resource, Action: &action,
+			}}, nil
 		}
 	}
 
@@ -223,68 +219,124 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 	// stream: shedding load is cheaper than starting a job we then have to
 	// abandon, and a 429 is a far clearer signal than a stalled stream.
 	if !tryAcquireCopySlot() {
-		w.Header().Set("Retry-After", "30")
-		writeJSON(w, http.StatusTooManyRequests, map[string]string{
-			"error": fmt.Sprintf("too many concurrent copy jobs (limit %d): retry shortly", maxConcurrentCopies),
-			"code":  "copy_concurrency_limit",
-		})
-		return
+		code, retryAfter := "copy_concurrency_limit", 30
+		return gen.CopyMessages429JSONResponse{
+			Body: gen.Error{
+				Error: fmt.Sprintf("too many concurrent copy jobs (limit %d): retry shortly", maxConcurrentCopies),
+				Code:  &code,
+			},
+			Headers: gen.CopyMessages429ResponseHeaders{RetryAfter: &retryAfter},
+		}, nil
 	}
-	defer releaseCopySlot()
+	started := false
+	defer func() {
+		if !started {
+			releaseCopySlot()
+		}
+	}()
 
 	// Everything that can be checked up front must be checked up front: once
 	// the SSE headers are out the status is 200 and a problem can only be
 	// reported as an error event, which the UI shows after the user already
 	// believes the copy started.
-	if !a.validateCopyDestination(w, r, req, srcCluster, srcTopic, destCluster) {
-		return
+	if err := s.validateCopyDestination(ctx, job); err != nil {
+		return nil, err
 	}
 
 	// Decouple the job from the 30 s request-timeout middleware
 	// (middleware.Timeout in server.go), which would otherwise kill a copy
 	// after half a minute. context.WithoutCancel strips the parent's deadline
-	// AND its cancellation — including the cancellation the net/http server
-	// performs when the client goes away — while keeping all key-value pairs
-	// (auth principal, private cluster config, …). So the request context is
-	// deliberately not a disconnect signal here.
-	//
-	// A failed write to the SSE stream is the only disconnect signal we get.
-	// sendEvent reports it and every caller aborts the job, which means
-	// disconnect is detected at a granularity of one fetched page or one
-	// copyProgressInterval heartbeat, whichever comes first — not instantly.
-	opCtx, opCancel := context.WithTimeout(
-		context.WithoutCancel(r.Context()),
-		4*time.Hour,
-	)
-	defer opCancel()
+	// AND its cancellation while keeping all key-value pairs (auth principal,
+	// private cluster config, …). A client disconnect is wired back in
+	// explicitly below; the request deadline is deliberately not.
+	jobCtx, jobCancel := context.WithTimeout(context.WithoutCancel(ctx), 4*time.Hour)
+	// net/http cancels the request context when the client goes away (and
+	// when the handler returns). Once the 30 s deadline has fired the context
+	// is done for good and a later disconnect only shows up as a failed
+	// write, which the response writer turns into a Close of the body.
+	stopOnDisconnect := context.AfterFunc(ctx, func() {
+		if errors.Is(ctx.Err(), context.Canceled) {
+			jobCancel()
+		}
+	})
 
-	// SSE headers — must be written before the first Flush.
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("X-Accel-Buffering", "no")
-	w.WriteHeader(http.StatusOK)
+	pr, pw := io.Pipe()
+	started = true
+	go func() {
+		defer releaseCopySlot()
+		defer stopOnDisconnect()
+		defer jobCancel()
+		defer pw.Close() //nolint:errcheck // closing the write side of a pipe cannot fail
+		s.runCopy(jobCtx, pw, job)
+	}()
+	return copyStreamResponse{body: copyStream{PipeReader: pr, stop: jobCancel}}, nil
+}
 
-	flusher, canFlush := w.(http.Flusher)
-	if canFlush {
-		flusher.Flush()
+// copyJobFor validates the request body and resolves the destination cluster.
+func (s *apiServer) copyJobFor(req gen.CopyMessagesRequestObject, r *http.Request) (copyJob, error) {
+	body := req.Body
+	job := copyJob{
+		srcCluster:        req.Cluster,
+		srcTopic:          req.Topic,
+		destTopic:         strings.TrimSpace(body.DestTopic),
+		partition:         body.Partition,
+		fromTSMs:          deref(body.FromTsMs),
+		toTSMs:            deref(body.ToTsMs),
+		limit:             deref(body.Limit),
+		preservePartition: deref(body.PreservePartition),
+		user:              rbacSubject(r, s.policy),
+	}
+	if job.destTopic == "" {
+		return job, badRequest("dest_topic is required")
+	}
+	destCluster := deref(body.DestCluster)
+	if destCluster == "" && body.DestClusterConfig == nil {
+		return job, badRequest("dest_cluster or dest_cluster_config is required")
+	}
+	if destCluster != "" && body.DestClusterConfig != nil {
+		return job, badRequest("dest_cluster and dest_cluster_config are mutually exclusive")
 	}
 
+	// Resolve the destination cluster name. For named clusters and for
+	// ad-hoc configs this is the same deterministic internal registry name
+	// used for the source (resolvePrivateClusterParam rewrites the source's
+	// {cluster} URL param the same way), so comparing the two below
+	// correctly detects "same actual cluster" even across differently
+	// labelled private-cluster configs that point at the same broker.
+	if cfg := body.DestClusterConfig; cfg != nil {
+		if err := validatePrivateClusterConfig(*cfg); err != nil {
+			return job, badRequest(fmt.Errorf("dest_cluster_config: %w", err).Error())
+		}
+		name, err := s.copyReg.UseAdhoc(*cfg)
+		if err != nil {
+			return job, badRequest(fmt.Errorf("dest_cluster_config: %w", err).Error())
+		}
+		job.destCluster, job.adhocDest = name, true
+	} else {
+		job.destCluster = strings.TrimSpace(destCluster)
+	}
+
+	// Refuse to copy a topic into itself: even with the snapshot upper bound
+	// this reads its own writes within the first page, and the intent is
+	// almost certainly a mistake.
+	if job.destCluster == job.srcCluster && job.destTopic == job.srcTopic {
+		return job, badRequest("dest_cluster/dest_topic must differ from the source")
+	}
+	return job, nil
+}
+
+// runCopy runs the copy loop, writing progress events to w. It returns when
+// the copy is complete, failed (reported as a final error event), ctx is done
+// or a write to w fails.
+func (s *apiServer) runCopy(ctx context.Context, w io.Writer, job copyJob) {
 	lastEvent := time.Now()
 	sendEvent := func(ev copyProgressEvent) bool {
 		lastEvent = time.Now()
 		b, _ := json.Marshal(ev)
 		_, werr := fmt.Fprintf(w, "data: %s\n\n", b)
-		if canFlush {
-			flusher.Flush()
-		}
 		return werr == nil
 	}
 
-	// user is stable for the whole request; resolve it once rather than on
-	// every produced record.
-	user := rbacSubject(r, a.policy)
-
-	// Copy loop.
 	var (
 		copied       int64
 		skipped      int64
@@ -301,19 +353,19 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 		donePartitions = map[int32]bool{}
 	)
 
-	// The effective upper bound is always set (see the doc comment), so page
+	// The effective upper bound is always set (see CopyMessages), so page
 	// one is offset-clamped by resolveTimestampOffsets inside ConsumeMessages
 	// and later (cursor-driven) pages are clamped by the filter below.
-	toTSMs := req.ToTSMs
+	toTSMs := job.toTSMs
 	if toTSMs == 0 {
 		toTSMs = time.Now().UnixMilli()
 	}
 
-	if req.Partition != nil {
-		partitionOpt = *req.Partition
+	if job.partition != nil {
+		partitionOpt = *job.partition
 	}
 
-	if req.FromTSMs > 0 {
+	if job.fromTSMs > 0 {
 		from = kafkapkg.FromTimestamp
 	} else {
 		from = kafkapkg.FromStart
@@ -326,11 +378,11 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for req.Limit <= 0 || copied < req.Limit {
+	for job.limit <= 0 || copied < job.limit {
 
 		batchLimit := copyBatchSize
-		if req.Limit > 0 {
-			remaining := req.Limit - copied
+		if job.limit > 0 {
+			remaining := job.limit - copied
 			if remaining < int64(batchLimit) {
 				batchLimit = int(remaining)
 			}
@@ -340,7 +392,7 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 			Partition: partitionOpt,
 			Limit:     batchLimit,
 			From:      from,
-			FromTSMs:  req.FromTSMs,
+			FromTSMs:  job.fromTSMs,
 			ToTSMs:    toTSMs,
 			Timeout:   15 * time.Second,
 		}
@@ -355,11 +407,10 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 			opts.PartitionOffsets = c.Partitions
 		}
 
-		page, consumeErr := a.reg.ConsumeMessages(opCtx, srcCluster, srcTopic, opts)
+		page, consumeErr := s.copyReg.ConsumeMessages(ctx, job.srcCluster, job.srcTopic, opts)
 		if consumeErr != nil {
 			if errors.Is(consumeErr, context.Canceled) || errors.Is(consumeErr, context.DeadlineExceeded) {
-				// Safety ceiling hit (the client-disconnect path aborts via a
-				// failed sendEvent instead).
+				// Client gone or safety ceiling hit.
 				return
 			}
 			sendEvent(copyProgressEvent{Copied: copied, Skipped: skipped, Done: true, Error: "consume: " + consumeErr.Error()})
@@ -378,7 +429,7 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 			}
 			select {
 			case <-time.After(emptyPageRetryDelay):
-			case <-opCtx.Done():
+			case <-ctx.Done():
 				return
 			}
 			continue
@@ -412,7 +463,7 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			produceReq, ok := copyProduceRequest(msg, req.PreservePartition, user)
+			produceReq, ok := copyProduceRequest(msg, job.preservePartition, job.user)
 			if !ok {
 				skipped++
 				continue
@@ -421,11 +472,11 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 		}
 		// batchLimit already shrank the fetch to the remaining allowance, and
 		// each message yields at most one record, so the batch cannot overshoot
-		// req.Limit.
+		// job.limit.
 
 		if len(batch) > 0 {
-			produceCtx, produceCancel := context.WithTimeout(opCtx, copyProduceTimeout)
-			produced, produceErr := a.reg.ProduceBatch(produceCtx, destCluster, req.DestTopic, batch)
+			produceCtx, produceCancel := context.WithTimeout(ctx, copyProduceTimeout)
+			produced, produceErr := s.copyReg.ProduceBatch(produceCtx, job.destCluster, job.destTopic, batch)
 			produceCancel()
 
 			// produced counts broker-acked records, which is exactly what
@@ -479,7 +530,7 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 }
 
 // validateCopyDestination checks the destination topic before the SSE stream
-// opens, writing a JSON error and reporting false when the copy cannot work.
+// opens, returning a 400 when the copy cannot work.
 //
 // Both checks used to fail mid-stream: a missing destination topic surfaced as
 // a produce error after the first page, and preserve_partition against a
@@ -490,55 +541,45 @@ func (a *clusterAPI) copyMessages(w http.ResponseWriter, r *http.Request) {
 // Describe ACL, timeout) is deliberately NOT fatal here: it is indistinguishable
 // from a transient blip, and the copy loop reports real broker failures as
 // error events anyway. Only a positive "this topic does not exist" is a 400.
-func (a *clusterAPI) validateCopyDestination(
-	w http.ResponseWriter,
-	r *http.Request,
-	req copyRequest,
-	srcCluster, srcTopic, destCluster string,
-) bool {
-	ctx, cancel := context.WithTimeout(r.Context(), copyValidateTimeout)
+func (s *apiServer) validateCopyDestination(ctx context.Context, job copyJob) error {
+	ctx, cancel := context.WithTimeout(ctx, copyValidateTimeout)
 	defer cancel()
 
-	destDetail, err := a.reg.DescribeTopic(ctx, destCluster, req.DestTopic)
+	destDetail, err := s.copyReg.DescribeTopic(ctx, job.destCluster, job.destTopic)
 	switch {
 	case errors.Is(err, kafkapkg.ErrUnknownCluster):
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unknown dest_cluster: " + destCluster})
-		return false
+		return badRequest("unknown dest_cluster: " + job.destCluster)
 	case err != nil && isTopicMissingErr(err):
-		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": fmt.Sprintf("dest_topic %q does not exist on cluster %q: create it first (kafkito does not auto-create the destination)", req.DestTopic, destCluster),
-		})
-		return false
+		return badRequest(fmt.Sprintf("dest_topic %q does not exist on cluster %q: create it first (kafkito does not auto-create the destination)", job.destTopic, job.destCluster))
 	case err != nil:
-		a.log.WarnContext(ctx, "copy: destination pre-flight check skipped",
-			"cluster", destCluster, "topic", req.DestTopic, "err", err)
-		return true
+		s.log.WarnContext(ctx, "copy: destination pre-flight check skipped",
+			"cluster", job.destCluster, "topic", job.destTopic, "err", err)
+		return nil
 	}
 
-	if !req.PreservePartition {
-		return true
+	if !job.preservePartition {
+		return nil
 	}
 
 	// preserve_partition writes each record to its source partition index, so
 	// the destination must be at least as wide as the widest source partition
 	// being copied.
 	var required int32
-	if req.Partition != nil && *req.Partition >= 0 {
-		required = *req.Partition
+	if job.partition != nil && *job.partition >= 0 {
+		required = *job.partition
 	} else {
-		srcDetail, srcErr := a.reg.DescribeTopic(ctx, srcCluster, srcTopic)
+		srcDetail, srcErr := s.copyReg.DescribeTopic(ctx, job.srcCluster, job.srcTopic)
 		if srcErr != nil {
-			a.log.WarnContext(ctx, "copy: preserve_partition pre-flight check skipped",
-				"cluster", srcCluster, "topic", srcTopic, "err", srcErr)
-			return true
+			s.log.WarnContext(ctx, "copy: preserve_partition pre-flight check skipped",
+				"cluster", job.srcCluster, "topic", job.srcTopic, "err", srcErr)
+			return nil
 		}
 		required = highestPartition(srcDetail.Partitions)
 	}
-	if err := checkDestPartitions(req.DestTopic, len(destDetail.Partitions), required); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
-		return false
+	if err := checkDestPartitions(job.destTopic, len(destDetail.Partitions), required); err != nil {
+		return badRequest(err.Error())
 	}
-	return true
+	return nil
 }
 
 // highestPartition returns the largest partition index in parts, or -1 when
@@ -682,22 +723,4 @@ func produceEncodingFor(rendered, b64, encoding string) (value, produceEncoding 
 	default: // "null", "json", "xml", "text"
 		return rendered, "text", true
 	}
-}
-
-// resolveDestCluster returns the internal cluster name to use for producing to
-// the destination. For named clusters the name is used directly (the registry
-// will return ErrUnknownCluster if it isn't configured). For ad-hoc configs the
-// cluster is registered on demand via UseAdhoc.
-func (a *clusterAPI) resolveDestCluster(req copyRequest) (string, error) {
-	if req.DestClusterConfig != nil {
-		if err := validatePrivateClusterConfig(*req.DestClusterConfig); err != nil {
-			return "", fmt.Errorf("dest_cluster_config: %w", err)
-		}
-		name, err := a.reg.UseAdhoc(*req.DestClusterConfig)
-		if err != nil {
-			return "", fmt.Errorf("dest_cluster_config: %w", err)
-		}
-		return name, nil
-	}
-	return strings.TrimSpace(req.DestCluster), nil
 }
