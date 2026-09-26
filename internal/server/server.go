@@ -18,6 +18,7 @@ import (
 	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/FinkeFlo/kafkito/internal/rbac"
+	gen "github.com/FinkeFlo/kafkito/internal/server/api"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -35,6 +36,8 @@ type Options struct {
 
 	// copyRegistry replaces Registry for the copy job in tests.
 	copyRegistry copyRegistry
+	// strictMiddlewares run around every generated handler in tests.
+	strictMiddlewares []gen.StrictMiddlewareFunc
 }
 
 // New returns a ready-to-serve http.Handler.
@@ -69,7 +72,7 @@ func New(opts Options) http.Handler {
 		copyReg:         copyReg,
 		log:             handlerLog,
 		testConnTimeout: opts.Config.Server.TestConnectionTimeout,
-	}, errorWriter{log: handlerLog})
+	}, errorWriter{log: handlerLog}, opts.strictMiddlewares...)
 	if err != nil {
 		// The document is embedded and covered by tests; failing here is a
 		// build defect, not a runtime condition.
