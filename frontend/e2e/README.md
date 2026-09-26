@@ -57,6 +57,10 @@ Makefile :: e2e, e2e-up, e2e-test, e2e-down
   the local fixture broker — type the confirm phrase, hit Escape, assert
   focus restoration. The point is to walk the gating UI, not to exercise
   mutation code (we have Go integration tests for that).
+  The exception is `topic-data.spec.ts`: produce and bulk copy only add
+  records, so it really runs them, against its own fixture topics
+  (`e2e-copy-source`, `e2e-copy-dest`, `e2e-produce-target`) that
+  `seed.sh` recreates on every run.
 - Cluster name in URLs is `KAFKITO_E2E_CLUSTER` (defaults to `local` —
   the auto-cluster name from the `KAFKITO_KAFKA_BROKERS` shortcut).
 - `clusters.spec.ts` tests private-cluster connections against the fixture

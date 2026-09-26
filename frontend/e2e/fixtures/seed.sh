@@ -8,6 +8,9 @@
 #   topic e2e-large-message    1 partition, 1 JSON message ~100 KB (large-messages walk)
 #   topic e2e-large-message-xml 1 partition, 1 XML message ~100 KB (large-messages walk)
 #   topic e2e-root-array       1 partition, 1 JSON message whose value is an array
+#   topic e2e-copy-source      1 partition, 1500 messages (bulk-copy walk: three copy pages)
+#   topic e2e-copy-dest        1 partition, empty (bulk-copy walk destination)
+#   topic e2e-produce-target   1 partition, empty (produce / search walk)
 #   consumer group e2e-idle-group  in Empty state (consumed once, then exited)
 #
 # Idempotent: safe to re-run; topics are recreated, the consumer is run
@@ -232,6 +235,9 @@ main() {
   recreate_topic "e2e-large-message" 1
   recreate_topic "e2e-large-message-xml" 1
   recreate_topic "e2e-root-array" 1
+  recreate_topic "e2e-copy-source" 1
+  recreate_topic "e2e-copy-dest" 1
+  recreate_topic "e2e-produce-target" 1
 
   echo "seed: producing fixture messages"
   now_ms=$(( $(date +%s) * 1000 ))
@@ -243,6 +249,7 @@ main() {
     for i in $(seq 7 12); do printf '%s\tseed-message-%s\n' "$((now_ms - 1 * day_ms))" "$i"; done
   } | produce_spread_lines "e2e-walk-target"
   produce_lines "e2e-walk-large" 50
+  produce_lines "e2e-copy-source" 1500
   produce_large_json "e2e-large-message"
   produce_large_xml "e2e-large-message-xml"
   produce_root_array_json "e2e-root-array"
