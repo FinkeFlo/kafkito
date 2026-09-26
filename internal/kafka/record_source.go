@@ -186,15 +186,17 @@ func isContextErr(err error) bool {
 // sortMessages orders msgs newest first (timestamp desc, partition asc,
 // offset desc) or oldest first (timestamp, partition, offset ascending).
 func sortMessages(msgs []Message, newestFirst bool) {
+	slices.SortFunc(msgs, func(a, b Message) int { return compareMessages(a, b, newestFirst) })
+}
+
+func compareMessages(a, b Message, newestFirst bool) int {
 	sign := 1
 	if newestFirst {
 		sign = -1
 	}
-	slices.SortFunc(msgs, func(a, b Message) int {
-		return cmp.Or(
-			sign*cmp.Compare(a.Timestamp, b.Timestamp),
-			cmp.Compare(a.Partition, b.Partition),
-			sign*cmp.Compare(a.Offset, b.Offset),
-		)
-	})
+	return cmp.Or(
+		sign*cmp.Compare(a.Timestamp, b.Timestamp),
+		cmp.Compare(a.Partition, b.Partition),
+		sign*cmp.Compare(a.Offset, b.Offset),
+	)
 }
