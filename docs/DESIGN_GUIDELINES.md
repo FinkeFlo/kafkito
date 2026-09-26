@@ -291,7 +291,8 @@ routes.
 | `<PageHeader>` | `eyebrow?` + `title` + `subtitle?` + `actions?` |
 | `<KpiCard>` | `label` + `value` + `unit?` + `delta?` |
 | `<Tag>` | Small mono tag, `variant="neutral" \| "info"` |
-| `<StatusDot>` | 2×2 colored circle |
+| `<StatusDot>` | 2×2 status mark, shape-coded per intent (filled disc = healthy, bold × = unreachable, ring = warning, small ring = unknown) with an `aria-label` |
+| `<StatusIcon>` / `<StatusBox>` | Labelled lucide outcome icon (✓ circle / triangle / ⊗ / info) and the compact result box built on it; use for submit results and load errors |
 | `<StateBadge>` | Consumer-group state pill |
 | `<DataTable>` | Styled `<table>` with built-in `<thead>` / row styles, sort headers, and skeleton/empty body states |
 | `<Toolbar>` | Filter / action row: `search?` (left), `filters?` (centre), `actions?` (right, `ml-auto`). Replaces hand-rolled `flex flex-wrap items-center gap-2` blocks |
@@ -344,12 +345,15 @@ All tables use `<DataTable>`. Rules:
 | State | Color |
 |---|---|
 | Reachable / stable / allow | `success` (or `tint-green`) |
-| Warning / rebalancing / lag 1–5k | `warning` (or `tint-amber`) |
-| Unreachable / dead / lag > 5k / deny / destructive | `danger` (or `tint-red`) |
+| Warning / rebalancing / lag 1k–10k | `warning` (or `tint-amber`) |
+| Unreachable / dead / lag ≥ 10k / deny / destructive | `danger` (or `tint-red`) |
 | Unknown / empty / internal | `muted` |
 
-Thresholds (lag 5 000, CPU 70 %, disk 80 %) live in `src/lib/format.ts` as
-named constants — use them, never hard-code.
+Thresholds (lag 1 000 / 10 000) live in `src/lib/format.ts` — use them,
+never hard-code.
+
+The colour in this table is never the whole signal; see § 9 "Never colour
+alone".
 
 ### 6.6 Iconography
 
@@ -456,8 +460,30 @@ unless each has been implemented and visually checked.
   and is clipped by `overflow:hidden` ancestors — see § 4.4).
 - Every icon-only button has `aria-label`.
 - Every modal traps focus and closes on `Escape`.
-- Every status color is paired with a text label or icon — never
-  color-alone signaling.
+- **Never colour alone (WCAG 1.4.1).** Red-green colour blindness is
+  common. Every status, outcome or selection carries
+  a second cue that survives greyscale: visible text, a distinct icon
+  shape, or both. Two states must never differ only by red vs green (or
+  amber vs red). Screen readers need the same meaning, so the icon has
+  an `aria-label` or the text is in the accessible name.
+  - ✅ `<StateBadge state="Dead" />` — the word is the signal, the tint
+    is decoration.
+  - ✅ `<StatusDot reachable={false} />` — a bold × instead of the
+    healthy filled disc, named "unhealthy".
+  - ✅ `<StatusBox intent="danger">{error}</StatusBox>` — labelled ⊗
+    icon; success gets a ✓ circle.
+  - ✅ `<LagBadge>` — `▲` elevated, `▲▲` critical, plus an sr-only
+    level.
+  - ✅ Selected rows get a check mark or bold text, not just a tint.
+  - ❌ `<span className="h-2 w-2 rounded-full bg-danger" />` next to a
+    name, with a green twin for "OK".
+  - ❌ `<div className="bg-success-subtle text-success">{message}</div>`
+    vs. the same box in `danger` for failures.
+  - ❌ `+`/`−` prefixes that mean "good"/"bad" rather than a real
+    increase or decrease.
+
+  `frontend/e2e/status-indicators.spec.ts` clicks through the status
+  pages and fails if an indicator loses its name, text or icon.
 - Disabled controls must explain *why* they are disabled via
   `aria-describedby` + a visible `<Notice>` or an `sr-only` `<span>`. Do
   not rely on `title=` alone for load-bearing reason copy.
@@ -591,6 +617,8 @@ mutations, SCRAM rotate). Setup + scope: `frontend/e2e/README.md`.
 14. ❌ Modals that don't trap focus or don't close on Escape.
 15. ❌ Copy that yells. No all-caps sentences; eyebrows and table headers
     are the only exceptions.
+16. ❌ Status by colour alone — a bare coloured dot, a tinted box without
+    an icon, or two states that differ only by red vs green (§ 9).
 
 ---
 
@@ -614,6 +642,7 @@ a review, treat it as drift and bring it in line.
 | initial | Guidelines established alongside Direction A redesign | — |
 | 2026-04-26 | Direction-A delivery: WCAG-AA token sweep (focus-on-accent, accent-foreground, border-hover, dark overlay); new primitives (Toolbar, Modal, Input, Notice); kebab/PascalCase consolidation; Button variant rename destructive→danger; PageHeader eyebrow; Incidents-(24h) → Unreachable now semantic fix; outline-based focus indicator | (this PR — link added by author) |
 | 2026-05-02 | Hardening: German strings stripped (English-only), `confirmPhrase` parity on Reset-Offsets and Delete-Records, ErrorState retry migrated to canonical `<Button>`, focus-indicator escapes removed (TimezoneToggle/SearchInput/CommandPalette), Radix headless-primitive carve-out in § 1 | (this PR — link added by author) |
+| 2026-09-26 | Accessibility: Biome a11y rules on; axe scans in light and dark replace the contrast scanner; token-pair contrast test; "never colour alone" rule with StatusIcon / StatusBox and shape-coded StatusDot | (this PR — link added by author) |
 
 Add a row on every change. Small tweaks to tokens or primitives are
 fine; major shifts (new visual language, new nav model) require a design
