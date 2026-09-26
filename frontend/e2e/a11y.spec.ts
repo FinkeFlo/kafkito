@@ -209,6 +209,14 @@ const STATES: State[] = [
       await expect(page.getByRole("dialog", { name: "Add private cluster" })).toBeVisible();
     },
   },
+  {
+    ...route("topics"),
+    name: "user-menu",
+    open: async (page) => {
+      await page.getByRole("button", { name: /^Account menu for / }).click();
+      await expect(page.getByLabel("Account and settings")).toBeVisible();
+    },
+  },
 ];
 
 for (const theme of THEMES) {
