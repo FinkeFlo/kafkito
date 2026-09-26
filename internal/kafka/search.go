@@ -313,7 +313,7 @@ func (r *Registry) runSearch(ctx context.Context, s recordScan, opts SearchOptio
 		if err != nil {
 			return false, false, err
 		}
-		for _, rec := range batch {
+		for _, rec := range batch.records {
 			sc.visit(ctx, rec)
 		}
 		if sc.scanned >= opts.Budget {

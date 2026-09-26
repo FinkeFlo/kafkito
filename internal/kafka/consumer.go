@@ -157,9 +157,10 @@ type pageWindow struct {
 // using a short-lived kgo.Client. For multi-partition (-1) calls with
 // from=end, each non-empty partition gets a fair share (ceil(limit/K)
 // + buffer) of records, then the merged result is sorted newest-first
-// by timestamp and truncated to limit. Single-partition calls and
-// forward calls (from=start, from=offset, from=timestamp) bypass the
-// fair-share math and consume up to limit records straight.
+// by timestamp and truncated to limit. Forward calls (from=start,
+// from=offset, from=timestamp) bypass the fair-share math: they read on
+// until every partition is drained or has read past the page's last
+// record, then merge oldest-first and truncate to limit.
 //
 // The returned ConsumeResult.NextCursor, when non-nil, encodes the
 // per-partition boundary offsets for the next page in the same
@@ -246,17 +247,18 @@ func (o ConsumeOptions) direction() CursorDirection {
 }
 
 // collectWindows reads the page windows and returns the decoded records per
-// partition. It stops once the page is full (forward: limit records;
-// backward: every window complete), the windows are drained or the deadline
-// passes; a timeout is not an error, the page is then just short.
+// partition. It stops once the page can be cut (forward: see
+// forwardPageSettled; backward: every window complete), the windows are
+// drained or the deadline passes; a timeout is not an error, the page is
+// then just short.
 func (r *Registry) collectWindows(ctx context.Context, deadline time.Time, s recordScan, opts ConsumeOptions, windows map[int32]pageWindow) (map[int32][]Message, error) {
 	pollCtx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
 	s.ranges = windowRanges(windows)
 	dec := r.recordDecoder(s.cluster, s.topic)
 	collected := make(map[int32][]Message, len(windows))
+	drained := make(map[int32]bool, len(windows))
 	forward := opts.direction() == CursorForward
-	total := 0
 	for batch, err := range r.scanRecords(pollCtx, s) {
 		if isContextErr(err) {
 			break
@@ -264,15 +266,47 @@ func (r *Registry) collectWindows(ctx context.Context, deadline time.Time, s rec
 		if err != nil {
 			return nil, err
 		}
-		for _, rec := range batch {
+		for _, rec := range batch.records {
 			collected[rec.Partition] = append(collected[rec.Partition], dec.message(ctx, rec))
 		}
-		total += len(batch)
-		if forward && total >= opts.Limit || !forward && windowsFull(windows, collected) {
+		for _, p := range batch.drained {
+			drained[p] = true
+		}
+		if forward && forwardPageSettled(windows, collected, drained, opts.Limit) || !forward && windowsFull(windows, collected) {
 			break
 		}
 	}
 	return collected, nil
+}
+
+// forwardPageSettled reports whether an oldest-first page can be cut: every
+// window is drained or has already read past the page's last record, so no
+// unread record can rank inside the page. Polls may return one partition's
+// records long before another's, so the page size alone is not enough.
+//
+// A partition's records arrive in offset order and, as everywhere in the
+// merge, timestamps are taken as non-decreasing within a partition, so its
+// next unread record ranks at or after {last timestamp, p, last offset + 1}.
+func forwardPageSettled(windows map[int32]pageWindow, collected map[int32][]Message, drained map[int32]bool, limit int) bool {
+	var page []Message
+	for p := range windows {
+		if drained[p] {
+			continue
+		}
+		got := collected[p]
+		if len(got) == 0 {
+			return false
+		}
+		if page == nil {
+			page = mergePage(collected, false, limit)
+		}
+		last := got[len(got)-1]
+		next := Message{Timestamp: last.Timestamp, Partition: p, Offset: last.Offset + 1}
+		if len(page) < limit || compareMessages(next, page[len(page)-1], false) < 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // refillCappedWindows widens the from=end windows that the fair share may
@@ -571,7 +605,9 @@ func (r *Registry) FetchRawMessageValue(ctx context.Context, cluster, topic stri
 		if err != nil {
 			return nil, fmt.Errorf("poll fetches: %w", err)
 		}
-		rec = batch[0]
+		if len(batch.records) > 0 {
+			rec = batch.records[0]
+		}
 	}
 	if rec == nil {
 		return nil, fmt.Errorf("record not found: partition %d offset %d", partition, offset)
