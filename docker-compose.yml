@@ -37,6 +37,10 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_LOG_RETENTION_HOURS: 24
+      # ACLs need an authorizer. Every PLAINTEXT client is User:ANONYMOUS,
+      # which is a super user, so nothing is denied and the ACL pages work.
+      KAFKA_AUTHORIZER_CLASS_NAME: org.apache.kafka.metadata.authorizer.StandardAuthorizer
+      KAFKA_SUPER_USERS: User:ANONYMOUS
       CLUSTER_ID: kafkito-dev-cluster-1
     healthcheck:
       test:
