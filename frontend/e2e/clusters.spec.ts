@@ -1,23 +1,8 @@
-import { networkInterfaces } from "node:os";
 import { test, expect, type Page } from "@playwright/test";
+import { hostAddress } from "./fixtures/host-address";
 
 const CLUSTER = process.env.KAFKITO_E2E_CLUSTER ?? "local";
 const KAFKA_HOST_PORT = 39092;
-
-// The backend refuses loopback brokers for private clusters (SSRF guard), so
-// the connection test dials the fixture broker through a private host
-// address. The docker compose broker is published on all host interfaces.
-function hostAddress(): string {
-  const override = process.env.KAFKITO_E2E_HOST_IP;
-  if (override) return override;
-  const privateV4 = /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/;
-  for (const addrs of Object.values(networkInterfaces())) {
-    for (const a of addrs ?? []) {
-      if (a.family === "IPv4" && !a.internal && privateV4.test(a.address)) return a.address;
-    }
-  }
-  throw new Error("no private IPv4 host address found; set KAFKITO_E2E_HOST_IP");
-}
 
 async function openAddClusterDialog(page: Page) {
   await page.goto("/settings/clusters");
