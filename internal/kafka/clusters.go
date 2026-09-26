@@ -32,7 +32,7 @@ type ClusterInfo struct {
 // Describe returns ClusterInfo for every configured cluster, each probed
 // with the given per-cluster timeout. If probeCaps is true, the capability
 // probe is also attached (using the 60s cache).
-func (r *Registry) Describe(ctx context.Context, probeTimeout time.Duration) []ClusterInfo {
+func (r *Clusters) Describe(ctx context.Context, probeTimeout time.Duration) []ClusterInfo {
 	configs := r.ConfigsOrdered()
 	out := make([]ClusterInfo, 0, len(configs))
 	for _, c := range configs {

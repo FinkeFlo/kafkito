@@ -167,7 +167,7 @@ type pageWindow struct {
 // direction. Callers may pass this value through DecodeCursor and into
 // ConsumeOptions.PartitionOffsets / CursorUpperBounds to fetch the
 // next page.
-func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, opts ConsumeOptions) (*ConsumeResult, error) {
+func (r *Messages) ConsumeMessages(ctx context.Context, cluster, topic string, opts ConsumeOptions) (*ConsumeResult, error) {
 	cfg, ok := r.ConfigFor(cluster)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, cluster)
@@ -251,7 +251,7 @@ func (o ConsumeOptions) direction() CursorDirection {
 // forwardPageSettled; backward: every window complete), the windows are
 // drained or the deadline passes; a timeout is not an error, the page is
 // then just short.
-func (r *Registry) collectWindows(ctx context.Context, deadline time.Time, s recordScan, opts ConsumeOptions, windows map[int32]pageWindow) (map[int32][]Message, error) {
+func (r *Messages) collectWindows(ctx context.Context, deadline time.Time, s recordScan, opts ConsumeOptions, windows map[int32]pageWindow) (map[int32][]Message, error) {
 	pollCtx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
 	s.ranges = windowRanges(windows)
@@ -317,7 +317,7 @@ func forwardPageSettled(windows map[int32]pageWindow, collected map[int32][]Mess
 // would still rank inside the page. Widening such a window to limit records
 // always suffices, because no page holds more than limit records of one
 // partition, so a single round is enough.
-func (r *Registry) refillCappedWindows(ctx context.Context, deadline time.Time, s recordScan, opts ConsumeOptions, windows map[int32]pageWindow, collected map[int32][]Message) error {
+func (r *Messages) refillCappedWindows(ctx context.Context, deadline time.Time, s recordScan, opts ConsumeOptions, windows map[int32]pageWindow, collected map[int32][]Message) error {
 	page := mergePage(collected, true, opts.Limit)
 	extra := make(map[int32]pageWindow)
 	for p, w := range windows {
@@ -588,7 +588,7 @@ type RawMessageValue struct {
 // Returns ErrValueTooLarge when the record's value exceeds maxRawDownloadBytes
 // and ErrValueMasked when the cluster's masking policy changes the record's
 // value: the raw bytes would bypass the masking.
-func (r *Registry) FetchRawMessageValue(ctx context.Context, cluster, topic string, partition int32, offset int64) (*RawMessageValue, error) {
+func (r *Messages) FetchRawMessageValue(ctx context.Context, cluster, topic string, partition int32, offset int64) (*RawMessageValue, error) {
 	cfg, ok := r.ConfigFor(cluster)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, cluster)

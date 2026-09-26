@@ -46,7 +46,7 @@ var capCaches sync.Map // key: cluster name
 
 // Capabilities returns the capability probe result for the named cluster,
 // using a 60-second cache.
-func (r *Registry) Capabilities(ctx context.Context, cluster string) (*Capabilities, error) {
+func (r *Clusters) Capabilities(ctx context.Context, cluster string) (*Capabilities, error) {
 	if _, ok := r.ConfigFor(cluster); !ok {
 		return nil, ErrUnknownCluster
 	}
@@ -65,11 +65,11 @@ func (r *Registry) Capabilities(ctx context.Context, cluster string) (*Capabilit
 }
 
 // RefreshCapabilities invalidates the cache entry for one cluster.
-func (r *Registry) RefreshCapabilities(cluster string) {
+func (r *Clusters) RefreshCapabilities(cluster string) {
 	capCaches.Delete(cluster)
 }
 
-func (r *Registry) probeCapabilities(ctx context.Context, cluster string) (*Capabilities, error) {
+func (r *Clusters) probeCapabilities(ctx context.Context, cluster string) (*Capabilities, error) {
 	adm, err := r.Admin(cluster)
 	if err != nil {
 		return nil, err

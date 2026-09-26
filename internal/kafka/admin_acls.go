@@ -28,7 +28,7 @@ type ACLEntry struct {
 }
 
 // ListACLs describes every ACL visible to the current principal.
-func (r *Registry) ListACLs(ctx context.Context, cluster string) ([]ACLEntry, error) {
+func (r *Security) ListACLs(ctx context.Context, cluster string) ([]ACLEntry, error) {
 	adm, err := r.Admin(cluster)
 	if err != nil {
 		return nil, err
@@ -151,7 +151,7 @@ func (s ACLSpec) applyToBuilder(b *kadm.ACLBuilder) error {
 }
 
 // CreateACL creates a single ACL on the cluster.
-func (r *Registry) CreateACL(ctx context.Context, cluster string, spec ACLSpec) error {
+func (r *Security) CreateACL(ctx context.Context, cluster string, spec ACLSpec) error {
 	adm, err := r.Admin(cluster)
 	if err != nil {
 		return err
@@ -180,7 +180,7 @@ func (r *Registry) CreateACL(ctx context.Context, cluster string, spec ACLSpec) 
 }
 
 // DeleteACL deletes a single ACL on the cluster matching the exact filter.
-func (r *Registry) DeleteACL(ctx context.Context, cluster string, spec ACLSpec) (int, error) {
+func (r *Security) DeleteACL(ctx context.Context, cluster string, spec ACLSpec) (int, error) {
 	adm, err := r.Admin(cluster)
 	if err != nil {
 		return 0, err

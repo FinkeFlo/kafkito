@@ -26,7 +26,7 @@ type BrokerInfo struct {
 // The controller flag is set on the broker whose ID matches the cluster's
 // reported controller; if the controller is unknown (-1), no broker is
 // flagged.
-func (r *Registry) ListBrokers(ctx context.Context, name string) ([]BrokerInfo, error) {
+func (r *Clusters) ListBrokers(ctx context.Context, name string) ([]BrokerInfo, error) {
 	adm, err := r.Admin(name)
 	if err != nil {
 		return nil, err

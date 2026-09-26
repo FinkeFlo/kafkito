@@ -60,7 +60,7 @@ type GroupDetail struct {
 
 // ListGroups returns the groups on the cluster, sorted by GroupID.
 // Lag is computed per-group; a group with a fetch-offsets error returns LagKnown=false.
-func (r *Registry) ListGroups(ctx context.Context, cluster string) ([]GroupInfo, error) {
+func (r *Groups) ListGroups(ctx context.Context, cluster string) ([]GroupInfo, error) {
 	adm, err := r.Admin(cluster)
 	if err != nil {
 		return nil, err
@@ -142,7 +142,7 @@ func logEndOffset(ends kadm.ListedOffsets, topic string, p int32) int64 {
 }
 
 // DescribeGroup returns the full detail of a single consumer group.
-func (r *Registry) DescribeGroup(ctx context.Context, cluster, group string) (*GroupDetail, error) {
+func (r *Groups) DescribeGroup(ctx context.Context, cluster, group string) (*GroupDetail, error) {
 	adm, err := r.Admin(cluster)
 	if err != nil {
 		return nil, err

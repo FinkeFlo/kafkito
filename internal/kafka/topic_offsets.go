@@ -42,7 +42,7 @@ type topicOffsets struct {
 
 // readerOffsets loads the offsets a record reader needs, within the admin
 // budget of an interactive request.
-func (r *Registry) readerOffsets(ctx context.Context, cluster, topic string, q offsetsQuery) (*topicOffsets, error) {
+func (r *Messages) readerOffsets(ctx context.Context, cluster, topic string, q offsetsQuery) (*topicOffsets, error) {
 	adm, err := r.Admin(cluster)
 	if err != nil {
 		return nil, err
