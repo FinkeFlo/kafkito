@@ -137,7 +137,12 @@ func resolvePrivateClusterParam(reg *kafkapkg.Registry) func(http.Handler) http.
 				next.ServeHTTP(w, r)
 				return
 			}
-			if chi.URLParam(r, "cluster") != config.PrivateClusterSentinel {
+			cluster, err := pathParam(r, "cluster")
+			if err != nil {
+				writeInvalidPathParam(w, "cluster")
+				return
+			}
+			if cluster != config.PrivateClusterSentinel {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -155,12 +160,7 @@ func resolvePrivateClusterParam(reg *kafkapkg.Registry) func(http.Handler) http.
 				})
 				return
 			}
-			for i, k := range rctx.URLParams.Keys {
-				if k == "cluster" {
-					rctx.URLParams.Values[i] = effective
-					break
-				}
-			}
+			setPathParam(r, "cluster", effective)
 			next.ServeHTTP(w, r)
 		})
 	}

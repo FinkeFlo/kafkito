@@ -43,7 +43,8 @@ func rbacSubject(r *http.Request, policy *rbac.Policy) string {
 
 // rbacMiddleware enforces RBAC for cluster routes. The identity is resolved
 // from the configured header; the resource/action is derived from the matched
-// chi route pattern and HTTP method.
+// chi route pattern and HTTP method, the resource names from the path
+// parameters as the handler binds them (see pathParam).
 func rbacMiddleware(policy *rbac.Policy) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -52,6 +53,12 @@ func rbacMiddleware(policy *rbac.Policy) func(http.Handler) http.Handler {
 
 			if !policy.Enabled() {
 				next.ServeHTTP(w, r)
+				return
+			}
+			// Never decide on a name the binding cannot decode; the
+			// binding would reject it too.
+			if k := undecodablePathParam(r); k != "" {
+				writeInvalidPathParam(w, k)
 				return
 			}
 
@@ -92,7 +99,7 @@ func rbacMiddleware(policy *rbac.Policy) func(http.Handler) http.Handler {
 				r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 			}
 
-			cluster := chi.URLParam(r, "cluster")
+			cluster, _ := pathParam(r, "cluster")
 			// Private clusters bypass RBAC entirely: the user supplies their
 			// own Kafka credentials via the X-Kafkito-Cluster header, and the
 			// broker enforces its own ACLs.
@@ -127,11 +134,20 @@ func resolvePermission(r *http.Request) (resType, resName, action, bodyField str
 	method := r.Method
 	pattern := rctx.RoutePattern()
 
-	topic := chi.URLParam(r, "topic")
-	group := chi.URLParam(r, "group")
-	subject := chi.URLParam(r, "subject")
-	user := chi.URLParam(r, "user")
-	cluster := chi.URLParam(r, "cluster")
+	// rbacMiddleware rejects undecodable parameters before it gets here;
+	// the fallback is "", never the raw value.
+	param := func(key string) string {
+		v, err := pathParam(r, key)
+		if err != nil {
+			return ""
+		}
+		return v
+	}
+	topic := param("topic")
+	group := param("group")
+	subject := param("subject")
+	user := param("user")
+	cluster := param("cluster")
 
 	switch {
 	// Clusters

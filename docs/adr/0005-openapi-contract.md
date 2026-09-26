@@ -95,6 +95,15 @@ supports OpenAPI 3.1 (including `type: [T, "null"]` and `const`).
   private-cluster-param middleware. The relative paths keep the chi route
   patterns unchanged, because RBAC resolves permissions from those patterns.
   A test asserts the pattern, chain and permission of every operation.
+- **Path parameters are read as the binding reads them.** chi routes on
+  `r.URL.RawPath` when it is set, so its parameters may still be
+  percent-encoded; the generated wrappers then decode them once with
+  `url.PathUnescape`. Middleware that acts on a path parameter (RBAC, the
+  private-cluster rewrite, the request log) reads it through `pathParam`,
+  which applies the same rule, so it sees exactly the name the handler
+  gets. RBAC answers `400` for a parameter that does not decode instead of
+  deciding on it. `TestGeneratedBinding_PathParamRule` fails if a codegen
+  upgrade changes the binding's rule.
 - **Request validation.** Each generated route runs
   `github.com/oapi-codegen/nethttp-middleware` (kin-openapi) after its group
   middleware, so every operation is validated. The rules
