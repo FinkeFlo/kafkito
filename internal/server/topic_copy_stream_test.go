@@ -37,7 +37,7 @@ type blockingCopyRegistry struct {
 
 	calls     atomic.Int32
 	cancelled atomic.Bool // the blocked call saw its context end
-	produced  atomic.Int32
+	produced  atomic.Int64
 	once      sync.Once
 	unblock   sync.Once
 }
@@ -80,7 +80,7 @@ func (f *blockingCopyRegistry) ConsumeMessages(ctx context.Context, _, _ string,
 }
 
 func (f *blockingCopyRegistry) ProduceBatch(_ context.Context, _, _ string, reqs []kafkapkg.ProduceRequest) (int, error) {
-	f.produced.Add(int32(len(reqs)))
+	f.produced.Add(int64(len(reqs)))
 	return len(reqs), nil
 }
 
@@ -176,7 +176,7 @@ func TestCopyStream_EventsArriveIncrementally(t *testing.T) {
 	}
 	assert.Equal(t, copyProgressEvent{Copied: 1, Done: true}, last)
 	_, err = r.ReadByte()
-	assert.ErrorIs(t, err, io.EOF, "the stream ends after the done event")
+	require.ErrorIs(t, err, io.EOF, "the stream ends after the done event")
 	assert.Eventually(t, func() bool { return len(copySlots) == 0 }, 5*time.Second, 10*time.Millisecond, "slot released")
 }
 
@@ -226,7 +226,7 @@ func TestCopyStream_ClientAbortStopsJobAndFreesSlot(t *testing.T) {
 	next.ServeHTTP(rec, newCopyRequest("/api/v1/clusters/src/topics/orders/copy", copyStreamBody))
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.Contains(t, rec.Body.String(), `"done":true`)
-	assert.Equal(t, int32(2), fake2.produced.Load()+fake.produced.Load())
+	assert.Equal(t, int64(2), fake2.produced.Load()+fake.produced.Load())
 }
 
 // failingWriter accepts the first write and fails every later one, like a
