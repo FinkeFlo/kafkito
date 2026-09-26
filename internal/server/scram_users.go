@@ -24,7 +24,7 @@ var scramMechanisms = []gen.DeleteScramUserParamsMechanism{gen.DeleteScramUserPa
 func (s *apiServer) ListScramUsers(ctx context.Context, req gen.ListScramUsersRequestObject) (gen.ListScramUsersResponseObject, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	users, err := s.reg.ListSCRAMUsers(ctx, req.Cluster)
+	users, err := s.scram.ListSCRAMUsers(ctx, req.Cluster)
 	if err != nil {
 		return nil, clusterError(req.Cluster, "list SCRAM users", err)
 	}
@@ -37,7 +37,7 @@ func (s *apiServer) UpsertScramUser(ctx context.Context, req gen.UpsertScramUser
 	b := req.Body
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	if err := s.reg.UpsertSCRAMUser(ctx, req.Cluster, b.User, string(b.Mechanism), b.Password, deref(b.Iterations)); err != nil {
+	if err := s.scram.UpsertSCRAMUser(ctx, req.Cluster, b.User, string(b.Mechanism), b.Password, deref(b.Iterations)); err != nil {
 		return nil, scramError(req.Cluster, "upsert SCRAM user", err)
 	}
 	return gen.UpsertScramUser200JSONResponse{Ok: true, User: b.User, Mechanism: string(b.Mechanism)}, nil
@@ -56,7 +56,7 @@ func (s *apiServer) DeleteScramUser(ctx context.Context, req gen.DeleteScramUser
 	deleted := 0
 	var lastErr error
 	for _, m := range mechs {
-		if err := s.reg.DeleteSCRAMUser(ctx, req.Cluster, req.User, string(m)); err != nil {
+		if err := s.scram.DeleteSCRAMUser(ctx, req.Cluster, req.User, string(m)); err != nil {
 			lastErr = err
 			continue
 		}

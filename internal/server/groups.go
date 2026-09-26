@@ -25,7 +25,7 @@ const maxGroupBodyBytes = maxJSONBodyBytes
 func (s *apiServer) ListGroups(ctx context.Context, req gen.ListGroupsRequestObject) (gen.ListGroupsResponseObject, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	groups, err := s.reg.ListGroups(ctx, req.Cluster)
+	groups, err := s.groups.ListGroups(ctx, req.Cluster)
 	if err != nil {
 		return nil, clusterError(req.Cluster, "list groups", err)
 	}
@@ -40,7 +40,7 @@ func (s *apiServer) ListGroups(ctx context.Context, req gen.ListGroupsRequestObj
 func (s *apiServer) CreateGroup(ctx context.Context, req gen.CreateGroupRequestObject) (gen.CreateGroupResponseObject, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	res, err := s.reg.CreateGroup(ctx, req.Cluster, *req.Body)
+	res, err := s.groups.CreateGroup(ctx, req.Cluster, *req.Body)
 	if err != nil {
 		switch {
 		case errors.Is(err, kafkapkg.ErrUnknownCluster):
@@ -65,7 +65,7 @@ func (s *apiServer) CreateGroup(ctx context.Context, req gen.CreateGroupRequestO
 func (s *apiServer) DescribeGroup(ctx context.Context, req gen.DescribeGroupRequestObject) (gen.DescribeGroupResponseObject, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	d, err := s.reg.DescribeGroup(ctx, req.Cluster, req.Group)
+	d, err := s.groups.DescribeGroup(ctx, req.Cluster, req.Group)
 	if err != nil {
 		return nil, clusterError(req.Cluster, "describe group", err)
 	}
@@ -76,7 +76,7 @@ func (s *apiServer) DescribeGroup(ctx context.Context, req gen.DescribeGroupRequ
 func (s *apiServer) DeleteGroup(ctx context.Context, req gen.DeleteGroupRequestObject) (gen.DeleteGroupResponseObject, error) {
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
-	if err := s.reg.DeleteGroup(ctx, req.Cluster, req.Group); err != nil {
+	if err := s.groups.DeleteGroup(ctx, req.Cluster, req.Group); err != nil {
 		return nil, clusterError(req.Cluster, "delete group", err)
 	}
 	return gen.DeleteGroup200JSONResponse{Deleted: req.Group}, nil
@@ -84,12 +84,12 @@ func (s *apiServer) DeleteGroup(ctx context.Context, req gen.DeleteGroupRequestO
 
 // ResetGroupOffsets issues an offset reset for a single group and topic.
 func (s *apiServer) ResetGroupOffsets(ctx context.Context, req gen.ResetGroupOffsetsRequestObject) (gen.ResetGroupOffsetsResponseObject, error) {
-	if err := prodConfirmationError(s.reg, req.Cluster, httpRequestFromContext(ctx)); err != nil {
+	if err := prodConfirmationError(s.configs, req.Cluster, httpRequestFromContext(ctx)); err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	res, err := s.reg.ResetOffsets(ctx, req.Cluster, req.Group, *req.Body)
+	res, err := s.groups.ResetOffsets(ctx, req.Cluster, req.Group, *req.Body)
 	if err != nil {
 		if msg := err.Error(); !errors.Is(err, kafkapkg.ErrUnknownCluster) &&
 			(strings.Contains(msg, "required") || strings.Contains(msg, "unknown strategy") || strings.Contains(msg, "not found")) {

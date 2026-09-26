@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/FinkeFlo/kafkito/internal/config"
-	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/FinkeFlo/kafkito/internal/netguard"
 	"github.com/go-chi/chi/v5"
 )
@@ -129,7 +128,7 @@ func validateClusterPolicy(cfg config.ClusterConfig) error {
 // RBAC observes the sentinel value and can bypass policy enforcement; all
 // downstream handlers, in contrast, observe the real registry name and
 // operate normally against the ad-hoc cluster.
-func resolvePrivateClusterParam(reg *kafkapkg.Registry) func(http.Handler) http.Handler {
+func resolvePrivateClusterParam(reg adhocClusters) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			rctx := chi.RouteContext(r.Context())

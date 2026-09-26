@@ -320,7 +320,7 @@ func TestAPIOps_PrivateClusterParam(t *testing.T) {
 	reg := kafkapkg.NewRegistry([]config.ClusterConfig{{Name: "static", Brokers: []string{"127.0.0.1:1"}}}, slog.Default())
 	t.Cleanup(reg.Close)
 	var got []string
-	impl := &apiServer{reg: reg, copyReg: reg, policy: rbac.Compile(config.RBACConfig{})}
+	impl := &apiServer{stores: registryStores(reg), policy: rbac.Compile(config.RBACConfig{})}
 	routes, err := newGeneratedRoutes(impl, errorWriter{log: slog.Default()}, recordCluster(&got))
 	require.NoError(t, err)
 	// Same group middleware as server.New.

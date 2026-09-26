@@ -20,8 +20,8 @@ const maxRegisterSchemaBodyBytes = 2 << 20
 
 // schemaRegistry returns the Schema Registry client of cluster. For a
 // private cluster it is built from the X-Kafkito-Cluster config.
-func (s *apiServer) schemaRegistry(cluster string) (*kafkapkg.SchemaRegistryClient, error) {
-	sr, err := s.reg.SchemaRegistry(cluster)
+func (s *apiServer) schemaRegistry(cluster string) (schemaClient, error) {
+	sr, err := s.schemas.SchemaRegistry(cluster)
 	switch {
 	case err == nil:
 		return sr, nil

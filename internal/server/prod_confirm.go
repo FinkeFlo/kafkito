@@ -6,8 +6,6 @@ package server
 import (
 	"net/http"
 	"strings"
-
-	"github.com/FinkeFlo/kafkito/internal/config"
 )
 
 // ProdConfirmHeader is the request header the frontend must set to "true"
@@ -24,9 +22,7 @@ const ProdConfirmHeader = "X-Kafkito-Confirm-Prod"
 // ProdConfirmHeader: true, and nil when the request may proceed. Unknown
 // clusters are allowed through here; the caller's own lookup
 // (Client/Admin/etc.) will report ErrUnknownCluster as usual.
-func prodConfirmationError(reg interface {
-	ConfigFor(name string) (config.ClusterConfig, bool)
-}, cluster string, r *http.Request) *apiError {
+func prodConfirmationError(reg clusterConfigs, cluster string, r *http.Request) *apiError {
 	cfg, ok := reg.ConfigFor(cluster)
 	if !ok || !cfg.IsProd {
 		return nil

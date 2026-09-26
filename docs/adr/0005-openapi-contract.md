@@ -209,7 +209,10 @@ supports OpenAPI 3.1 (including `type: [T, "null"]` and `const`).
 3. Implement the new `StrictServerInterface` method on `apiServer` in the
    file for its resource (`topics.go`, `groups.go`, ...). Return the
    generated response types, and errors as `apiError` or through
-   `upstreamError`/`clusterError`.
+   `upstreamError`/`clusterError`. Handlers reach Kafka only through the
+   narrow store interfaces in `internal/server/stores.go`; a new Kafka
+   operation goes on its service in `internal/kafka` (`Topics`, `Groups`,
+   `Messages`, `Security`, `Clusters`) and on the matching store interface.
 4. Mount the generated wrapper method in `internal/server/api_routes.go` on
    the right group, with `noRequestBody` or a body limit
    (`limitRequestBody`/`limitRequestBodyMsg`) in front of `g.validate`. If

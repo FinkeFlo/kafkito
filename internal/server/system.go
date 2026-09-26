@@ -24,8 +24,7 @@ import (
 type apiServer struct {
 	version         string
 	policy          *rbac.Policy
-	reg             *kafkapkg.Registry // nil without kafka configuration
-	copyReg         copyRegistry       // reg, or a test fake
+	stores          // all nil without kafka configuration
 	log             *slog.Logger
 	testConnTimeout time.Duration
 }
@@ -58,7 +57,7 @@ func (s *apiServer) GetHealth(context.Context, gen.GetHealthRequestObject) (gen.
 // the endpoint returns 503. Without a Registry or clusters it still returns
 // 200 ("server up, no kafka configured").
 func (s *apiServer) GetReadiness(ctx context.Context, _ gen.GetReadinessRequestObject) (gen.GetReadinessResponseObject, error) {
-	if s.reg == nil || len(s.reg.Names()) == 0 {
+	if s.clusters == nil || len(s.clusters.Names()) == 0 {
 		note := "no kafka clusters configured"
 		return gen.GetReadiness200JSONResponse{
 			Status:   gen.ReadinessResponseStatusOk,
@@ -68,7 +67,7 @@ func (s *apiServer) GetReadiness(ctx context.Context, _ gen.GetReadinessRequestO
 	}
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	infos := s.reg.Describe(ctx, 1*time.Second)
+	infos := s.clusters.Describe(ctx, 1*time.Second)
 	for _, c := range infos {
 		if !c.Reachable {
 			return gen.GetReadiness503JSONResponse{Status: gen.ReadinessResponseStatusDegraded, Clusters: infos}, nil

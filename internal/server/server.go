@@ -60,16 +60,15 @@ func New(opts Options) http.Handler {
 
 	policy := rbac.Compile(opts.Config.RBAC)
 
-	copyReg := opts.copyRegistry
-	if copyReg == nil && opts.Registry != nil {
-		copyReg = opts.Registry
+	st := registryStores(opts.Registry)
+	if opts.copyRegistry != nil {
+		st.copyReg = opts.copyRegistry
 	}
 
 	generated, err := newGeneratedRoutes(&apiServer{
 		version:         opts.Version,
 		policy:          policy,
-		reg:             opts.Registry,
-		copyReg:         copyReg,
+		stores:          st,
 		log:             handlerLog,
 		testConnTimeout: opts.Config.Server.TestConnectionTimeout,
 	}, errorWriter{log: handlerLog}, opts.strictMiddlewares...)
@@ -91,7 +90,7 @@ func New(opts Options) http.Handler {
 				v1.Group(func(g chi.Router) {
 					g.Use(privateClusterMiddleware)
 					g.Use(rbacMiddleware(policy))
-					g.Use(resolvePrivateClusterParam(opts.Registry))
+					g.Use(resolvePrivateClusterParam(opts.Registry.Connections))
 					generated.mountClusters(g)
 				})
 			}
