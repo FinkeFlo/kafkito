@@ -269,6 +269,10 @@ function TimelineBarChart({
                 rx={2}
                 fill="var(--color-accent)"
                 opacity={isSelected || isHovered ? 1 : 0.65}
+                // The outline marks the selection by shape, not by opacity alone.
+                stroke={isSelected ? "var(--color-text)" : undefined}
+                strokeWidth={isSelected ? 1.5 : undefined}
+                data-selected={isSelected || undefined}
                 className="transition-opacity"
               />
               {/* Count label: only on the same cadence as the x-axis date
@@ -353,7 +357,7 @@ function TimelineDetailTable({
                 className={
                   "cursor-pointer " +
                   (highlighted === i
-                    ? "bg-[var(--color-surface-subtle)]"
+                    ? "bg-[var(--color-surface-subtle)] font-semibold"
                     : "hover:bg-[var(--color-surface-subtle)]")
                 }
               >
