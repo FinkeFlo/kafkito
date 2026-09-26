@@ -1,36 +1,35 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock the low-level HTTP layer so we can assert the exact request path that
-// fetchMessages builds from its params (query-string serialization).
-const fetchAPI = vi.fn();
-vi.mock("./api-http", () => ({
-  clusterPath: (cluster: string, subpath: string) =>
-    `/api/v1/clusters/${encodeURIComponent(cluster)}${subpath.startsWith("/") ? subpath : "/" + subpath}`,
-  fetchAPI: (...args: unknown[]) => fetchAPI(...args),
-}));
+// Stub fetch so we can assert the exact request path that fetchMessages
+// builds from its params (query-string serialization).
+const fetchMock = vi.fn();
 
 import { fetchMessageCount, fetchMessages } from "./api";
 
 function okResponse() {
-  return {
-    ok: true,
+  return new Response(JSON.stringify({ messages: [] }), {
     status: 200,
-    json: async () => ({ messages: [] }),
-  } as unknown as Response;
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 function lastPath(): string {
-  const call = fetchAPI.mock.calls.at(-1);
-  return call?.[1] as string;
+  const call = fetchMock.mock.calls.at(-1);
+  return String(call?.[0]);
 }
 
+beforeEach(() => {
+  vi.stubGlobal("fetch", fetchMock);
+});
+
 afterEach(() => {
-  fetchAPI.mockReset();
+  fetchMock.mockReset();
+  vi.unstubAllGlobals();
 });
 
 describe("fetchMessages query serialization", () => {
   it("sends a single offset when one partition is selected", async () => {
-    fetchAPI.mockResolvedValue(okResponse());
+    fetchMock.mockImplementation(async () => okResponse());
     await fetchMessages("c1", "t1", { partition: 0, from: "offset", offset: 223 });
     const path = lastPath();
     expect(path).toContain("partition=0");
@@ -40,7 +39,7 @@ describe("fetchMessages query serialization", () => {
   });
 
   it("serializes partitionOffsets as p:o pairs for all partitions", async () => {
-    fetchAPI.mockResolvedValue(okResponse());
+    fetchMock.mockImplementation(async () => okResponse());
     await fetchMessages("c1", "t1", {
       from: "offset",
       partitionOffsets: { 0: 5, 1: 5, 2: 5 },
@@ -56,7 +55,7 @@ describe("fetchMessages query serialization", () => {
   });
 
   it("omits partition_offsets when the map is empty", async () => {
-    fetchAPI.mockResolvedValue(okResponse());
+    fetchMock.mockImplementation(async () => okResponse());
     await fetchMessages("c1", "t1", { from: "offset", partitionOffsets: {} });
     expect(lastPath()).not.toContain("partition_offsets");
   });
@@ -64,7 +63,7 @@ describe("fetchMessages query serialization", () => {
 
 describe("fetchMessageCount query serialization", () => {
   it("omits partition for all-partitions requests", async () => {
-    fetchAPI.mockResolvedValue(okResponse());
+    fetchMock.mockImplementation(async () => okResponse());
     await fetchMessageCount("c1", "t1", { from_ts_ms: 100, to_ts_ms: 200 });
     const params = new URLSearchParams(lastPath().split("?")[1] ?? "");
     expect(params.has("partition")).toBe(false);
@@ -73,7 +72,7 @@ describe("fetchMessageCount query serialization", () => {
   });
 
   it("serializes a concrete partition when selected", async () => {
-    fetchAPI.mockResolvedValue(okResponse());
+    fetchMock.mockImplementation(async () => okResponse());
     await fetchMessageCount("c1", "t1", { partition: 3 });
     const params = new URLSearchParams(lastPath().split("?")[1] ?? "");
     expect(params.get("partition")).toBe("3");

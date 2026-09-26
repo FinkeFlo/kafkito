@@ -39,7 +39,9 @@ RPC features such as bidirectional streaming.
   `frontend/src/lib/api.gen.ts` (`bun run api:generate` /
   `make api-generate`). The file is committed and excluded from Biome.
   `api.ts` keeps its fetch wrappers and exported type names, but these are
-  now aliases of the generated schemas.
+  now aliases of the generated schemas. The wrappers call a typed
+  `openapi-fetch` client (`api-client.ts`) built on the same types, so paths,
+  parameters and bodies are checked against the spec at compile time.
 - **Gates.**
   - Redocly lint of the spec (`make api-lint`, CI).
   - A drift check: regenerate the types and `git diff --exit-code`
