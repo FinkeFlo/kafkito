@@ -44,6 +44,39 @@ test.describe("Topics", () => {
     await expect(page.getByRole("row", { name: new RegExp(CREATE_DRAFT_NAME) })).toHaveCount(0);
   });
 
+  test("a created topic shows up in the list without a reload", async ({ page }) => {
+    const name = `e2e-create-${Date.now()}`;
+    const listPath = `/api/v1/clusters/${encodeURIComponent(CLUSTER)}/topics`;
+    try {
+      await page.goto(`/clusters/${encodeURIComponent(CLUSTER)}/topics`);
+      await expect(page.getByRole("row", { name: new RegExp(FIXTURE_TOPIC) })).toBeVisible();
+      let loads = 0;
+      page.on("load", () => loads++);
+
+      await page.getByRole("button", { name: /^\+ New topic$/ }).click();
+      const dialog = page.getByRole("dialog", { name: /create topic on/i });
+      await dialog.getByLabel("Name").fill(name);
+
+      // The list is fresh for 30 s (staleTime) and never polls, so only the
+      // mutation's invalidation can refetch it this quickly.
+      const created = page.waitForResponse(
+        (res) => res.request().method() === "POST" && new URL(res.url()).pathname === listPath,
+      );
+      const refetch = page.waitForRequest(
+        (req) => req.method() === "GET" && new URL(req.url()).pathname === listPath,
+      );
+      await dialog.getByRole("button", { name: /^create$/i }).click();
+      expect((await created).ok()).toBe(true);
+      await refetch;
+
+      await expect(dialog).toBeHidden();
+      await expect(page.getByRole("row", { name: new RegExp(name) })).toBeVisible();
+      expect(loads).toBe(0);
+    } finally {
+      await page.request.delete(`${listPath}/${encodeURIComponent(name)}`);
+    }
+  });
+
   test("topic detail loads with KPIs and sub-tab navigation", async ({ page }) => {
     await page.goto(
       `/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(FIXTURE_TOPIC)}`,
