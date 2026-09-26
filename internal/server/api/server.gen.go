@@ -775,12 +775,14 @@ type SearchRequest struct {
 	// Partition Absent or -1 = all partitions.
 	Partition *int32 `json:"partition,omitempty"`
 
-	// Path JSONPath / XPath expression or JS filter source.
-	Path        *string               `json:"path,omitempty"`
-	StopOnLimit *bool                 `json:"stop_on_limit,omitempty"`
-	ToTsMs      *int64                `json:"to_ts_ms,omitempty"`
-	Value       *string               `json:"value,omitempty"`
-	Zones       *[]SearchRequestZones `json:"zones,omitempty"`
+	// Path JSONPath or XPath expression for modes `jsonpath` and `xpath`; unused otherwise.
+	Path        *string `json:"path,omitempty"`
+	StopOnLimit *bool   `json:"stop_on_limit,omitempty"`
+	ToTsMs      *int64  `json:"to_ts_ms,omitempty"`
+
+	// Value Search text for mode `contains`, comparison value for `jsonpath` and `xpath` (not needed with op `exists`), JS filter source for mode `js`.
+	Value *string               `json:"value,omitempty"`
+	Zones *[]SearchRequestZones `json:"zones,omitempty"`
 }
 
 // SearchRequestDirection defines model for SearchRequest.Direction.

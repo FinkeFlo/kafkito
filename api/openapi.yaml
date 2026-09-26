@@ -1812,9 +1812,11 @@ components:
         direction: { type: string, enum: [newest_first, oldest_first] }
         stop_on_limit: { type: boolean, default: true }
         mode: { type: string, enum: [contains, jsonpath, xpath, js] }
-        path: { type: string, maxLength: 2048, description: JSONPath / XPath expression or JS filter source. }
+        path: { type: string, maxLength: 2048, description: "JSONPath or XPath expression for modes `jsonpath` and `xpath`; unused otherwise." }
         op: { type: string, enum: [exists, eq, ne, contains, regex, gt, lt, gte, lte] }
-        value: { type: string }
+        value:
+          type: string
+          description: "Search text for mode `contains`, comparison value for `jsonpath` and `xpath` (not needed with op `exists`), JS filter source for mode `js`."
         zones:
           type: array
           items: { type: string, enum: [value, key, headers] }
