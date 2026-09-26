@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { clsx } from "clsx";
-import { Button } from "@/components/button";
+import { Button } from "@/components/ui/button";
 
 export function ErrorState({
   title,

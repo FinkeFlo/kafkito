@@ -3,12 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Server } from "lucide-react";
 import { useCluster } from "@/lib/use-cluster";
 import type { BrokerInfo } from "@/lib/api";
-import { KpiCard } from "@/components/KpiCard";
-import { EmptyState } from "@/components/EmptyState";
-import { ErrorState } from "@/components/ErrorState";
-import { DataTable, DataTableHead, DataTableRow, DataTableTh } from "@/components/DataTable";
-import { Tag } from "@/components/Tag";
-import { StatusDot } from "@/components/StatusDot";
+import { KpiCard } from "@/components/ui/KpiCard";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { DataTable, DataTableHead, DataTableRow, DataTableTh } from "@/components/ui/DataTable";
+import { Tag } from "@/components/ui/Tag";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { brokerQueries } from "@/lib/queries/brokers";
 
 export const Route = createFileRoute("/clusters/$cluster/brokers/")({

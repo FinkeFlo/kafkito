@@ -4,7 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { clsx } from "clsx";
 import { useCluster, type ClusterListItem } from "@/lib/use-cluster";
 import { useFuzzy } from "@/lib/fuzzy";
-import { StatusDot } from "./StatusDot";
+import { StatusDot } from "@/components/ui/StatusDot";
 
 function brokersHint(c: ClusterListItem | null): string {
   if (!c) return "";

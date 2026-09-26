@@ -7,12 +7,12 @@ import {
   type ResetOffsetResult,
   type ResetStrategy,
 } from "@/lib/api";
-import { Button } from "@/components/button";
-import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Input } from "@/components/Input";
-import { Modal } from "@/components/Modal";
-import { Notice } from "@/components/Notice";
-import { Timestamp } from "@/components/timestamp";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Input } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
+import { Notice } from "@/components/ui/Notice";
+import { Timestamp } from "@/components/ui/timestamp";
 import { LagBadge } from "@/components/lag-badge";
 import { localInputToMs, msToLocalInput } from "@/lib/datetime";
 import { groupQueries } from "@/lib/queries/groups";

@@ -3,8 +3,8 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { alterTopicConfigs, can, type Capabilities, type TopicConfigEntry } from "@/lib/api";
 import { useAuth } from "@/auth/hooks";
-import { Notice } from "@/components/Notice";
-import { StatusBox, StatusIcon } from "@/components/status-icon";
+import { Notice } from "@/components/ui/Notice";
+import { StatusBox, StatusIcon } from "@/components/ui/status-icon";
 import { clusterQueries } from "@/lib/queries/clusters";
 import { topicQueries } from "@/lib/queries/topics";
 

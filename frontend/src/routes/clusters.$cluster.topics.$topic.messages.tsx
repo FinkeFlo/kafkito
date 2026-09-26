@@ -27,13 +27,13 @@ import { dedupeMessages } from "@/lib/dedupe-messages";
 import { PathSense } from "@/components/path-sense";
 import { ValueBody } from "@/components/value-body";
 import { prettyValue } from "@/lib/format";
-import { Button } from "@/components/button";
-import { Timestamp } from "@/components/timestamp";
+import { Button } from "@/components/ui/button";
+import { Timestamp } from "@/components/ui/timestamp";
 import { MessageRangeCountPreview } from "@/components/message-range-count-preview";
 import { useFormatters } from "@/lib/use-formatters";
 import { ReplayModal } from "@/components/replay-modal";
 import { BulkCopyPanel } from "@/components/bulk-copy-panel";
-import { StatusBox, StatusIcon } from "@/components/status-icon";
+import { StatusBox, StatusIcon } from "@/components/ui/status-icon";
 import { messageQueries } from "@/lib/queries/messages";
 import { topicQueries } from "@/lib/queries/topics";
 

@@ -26,11 +26,11 @@ import { produceEncodingFor, replayBlocker } from "@/lib/produce-encoding";
 import { useCluster, type ClusterListItem } from "@/lib/use-cluster";
 import { useFormatters } from "@/lib/use-formatters";
 import { useMessageRawValue } from "@/lib/use-message-raw-value";
-import { Modal } from "./Modal";
-import { Button } from "./button";
-import { ConfirmDialog } from "./confirm-dialog";
+import { Modal } from "@/components/ui/Modal";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TopicCombobox } from "./topic-combobox";
-import { StatusBox } from "@/components/status-icon";
+import { StatusBox } from "@/components/ui/status-icon";
 import { topicQueries } from "@/lib/queries/topics";
 
 interface ReplayModalProps {

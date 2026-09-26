@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { MessageTimelineSlot } from "@/lib/api";
 import { useFormatters } from "@/lib/use-formatters";
-import { Timestamp } from "@/components/timestamp";
+import { Timestamp } from "@/components/ui/timestamp";
 import { useTimeZone } from "@/lib/use-timezone";
 import { messageQueries } from "@/lib/queries/messages";
 import { topicQueries } from "@/lib/queries/topics";
