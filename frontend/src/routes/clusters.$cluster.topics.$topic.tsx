@@ -106,7 +106,7 @@ function TopicDetailLayout() {
         </div>
       )}
 
-      <nav className="flex items-center gap-1 border-b border-border">
+      <nav aria-label="Topic sections" className="flex items-center gap-1 border-b border-border">
         {TABS.map((tab) => (
           <Link
             key={tab.id}
