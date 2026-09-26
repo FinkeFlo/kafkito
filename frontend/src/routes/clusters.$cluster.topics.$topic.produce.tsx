@@ -19,6 +19,7 @@ import { Input } from "@/components/Input";
 import { Timestamp } from "@/components/timestamp";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useCluster } from "@/lib/use-cluster";
+import { StatusBox } from "@/components/status-icon";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic/produce")({
   component: ProduceTab,
@@ -373,21 +374,13 @@ function ProduceSection({
           )}
         </div>
 
-        {templateError && (
-          <div className="rounded-md border border-danger/30 bg-danger-subtle p-2 text-xs text-danger">
-            {templateError}
-          </div>
-        )}
-        {error && (
-          <div className="rounded-md border border-danger/30 bg-danger-subtle p-2 text-xs text-danger">
-            {error}
-          </div>
-        )}
+        {templateError && <StatusBox intent="danger">{templateError}</StatusBox>}
+        {error && <StatusBox intent="danger">{error}</StatusBox>}
         {result && (
-          <div className="rounded-md border border-success/30 bg-success-subtle p-2 text-xs text-success">
+          <StatusBox intent="success">
             Produced · partition {result.partition} · offset {result.offset} ·{" "}
             <Timestamp value={result.timestamp_ms} className="text-xs text-success" />
-          </div>
+          </StatusBox>
         )}
 
         <div className="flex items-center gap-2 pt-2">

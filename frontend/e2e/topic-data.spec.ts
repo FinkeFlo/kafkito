@@ -82,7 +82,7 @@ test.describe("Topic data (produce, search, raw download, bulk copy)", () => {
 
     await page.getByRole("button", { name: "Start copy" }).click();
     await expect(
-      page.getByText(`✓ Done — ${COPY_TOTAL.toLocaleString("en-US")} messages copied`),
+      page.getByText(`Done — ${COPY_TOTAL.toLocaleString("en-US")} messages copied`),
     ).toBeVisible({ timeout: 60_000 });
 
     const progress = await page.evaluate(

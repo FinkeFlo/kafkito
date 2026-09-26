@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, Info, XCircle, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StatusIcon } from "./status-icon";
 
 export type NoticeIntent = "info" | "success" | "warning" | "danger";
 
@@ -47,13 +47,6 @@ const iconBgByIntent: Record<NoticeIntent, string> = {
   danger: "bg-panel",
 };
 
-const defaultIcon: Record<NoticeIntent, LucideIcon> = {
-  info: Info,
-  success: CheckCircle2,
-  warning: AlertTriangle,
-  danger: XCircle,
-};
-
 const ariaRole: Record<NoticeIntent, "status" | "alert"> = {
   info: "status",
   success: "status",
@@ -64,11 +57,10 @@ const ariaRole: Record<NoticeIntent, "status" | "alert"> = {
 /**
  * Tinted callout used for degraded-capability banners (`limited` paths in
  * groups / topics / acls), inline error explanations, and success
- * confirmations that aren't transient toasts. Pairs colour with an icon
- * so the intent survives monochrome rendering.
+ * confirmations that aren't transient toasts. Pairs colour with a
+ * shape-coded, labelled icon so the intent survives monochrome rendering.
  */
 export function Notice({ intent, title, children, icon, actions, className }: NoticeProps) {
-  const Icon = defaultIcon[intent];
   return (
     <div
       role={ariaRole[intent]}
@@ -79,14 +71,14 @@ export function Notice({ intent, title, children, icon, actions, className }: No
       )}
     >
       <div
-        aria-hidden="true"
+        aria-hidden={icon ? true : undefined}
         className={cn(
           "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
           iconBgByIntent[intent],
           iconToneByIntent[intent],
         )}
       >
-        {icon ?? <Icon className="h-4 w-4" />}
+        {icon ?? <StatusIcon intent={intent} className="h-4 w-4" />}
       </div>
       <div className="min-w-0 flex-1 space-y-1">
         {title ? (

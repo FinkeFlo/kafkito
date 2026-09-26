@@ -11,6 +11,7 @@ import { Button } from "./button";
 import { Input } from "./Input";
 import { ConfirmDialog } from "./confirm-dialog";
 import { TopicCombobox } from "./topic-combobox";
+import { StatusBox } from "./status-icon";
 import { getPrivateClusterByName, toBackendClusterConfig } from "@/lib/private-clusters";
 
 interface BulkCopyPanelProps {
@@ -153,6 +154,31 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
   // The server refuses new jobs once too many copies run at once; api.ts hands
   // that to us as an `HTTP 429: <detail>` error string.
   const rateLimited = !!error && error.startsWith("HTTP 429");
+
+  const progressIntent = error ? "danger" : stopped ? "warning" : progress?.done ? "success" : null;
+  const progressBody = (
+    <>
+      {error ? (
+        rateLimited ? (
+          // Keep the server's own wording reachable via the tooltip.
+          <span title={error}>Too many copies are running right now — try again in a moment.</span>
+        ) : (
+          `Error: ${error}`
+        )
+      ) : stopped ? (
+        `Stopped after ${copied.toLocaleString()} message${copied === 1 ? "" : "s"} — the server may copy a few more before it notices.`
+      ) : progress?.done ? (
+        `Done — ${copied.toLocaleString()} message${copied === 1 ? "" : "s"} copied`
+      ) : (
+        `Copying… ${copied.toLocaleString()} messages so far`
+      )}
+      {skipped > 0 && (
+        <span title={SKIPPED_TOOLTIP}>
+          {` (${skipped.toLocaleString()} skipped — not reproducible byte-for-byte)`}
+        </span>
+      )}
+    </>
+  );
 
   return (
     <>
@@ -322,41 +348,14 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
         </label>
 
         {/* Progress */}
-        {(progress || stopped) && (
-          <div
-            className={`rounded-md border p-2 text-xs ${
-              error
-                ? "border-danger/30 bg-danger-subtle text-danger"
-                : stopped
-                  ? "border-warning/30 bg-warning-subtle text-warning"
-                  : progress?.done
-                    ? "border-success/30 bg-success-subtle text-success"
-                    : "border-border bg-panel text-text"
-            }`}
-          >
-            {error ? (
-              rateLimited ? (
-                // Keep the server's own wording reachable via the tooltip.
-                <span title={error}>
-                  Too many copies are running right now — try again in a moment.
-                </span>
-              ) : (
-                `Error: ${error}`
-              )
-            ) : stopped ? (
-              `Stopped after ${copied.toLocaleString()} message${copied === 1 ? "" : "s"} — the server may copy a few more before it notices.`
-            ) : progress?.done ? (
-              `✓ Done — ${copied.toLocaleString()} message${copied === 1 ? "" : "s"} copied`
-            ) : (
-              `Copying… ${copied.toLocaleString()} messages so far`
-            )}
-            {skipped > 0 && (
-              <span title={SKIPPED_TOOLTIP}>
-                {` (${skipped.toLocaleString()} skipped — not reproducible byte-for-byte)`}
-              </span>
-            )}
-          </div>
-        )}
+        {(progress || stopped) &&
+          (progressIntent ? (
+            <StatusBox intent={progressIntent}>{progressBody}</StatusBox>
+          ) : (
+            <div className="rounded-md border border-border bg-panel p-2 text-xs text-text">
+              {progressBody}
+            </div>
+          ))}
 
         {/* Actions */}
         <div className="flex items-center gap-2">

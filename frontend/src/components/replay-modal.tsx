@@ -30,6 +30,7 @@ import { Modal } from "./Modal";
 import { Button } from "./button";
 import { ConfirmDialog } from "./confirm-dialog";
 import { TopicCombobox } from "./topic-combobox";
+import { StatusBox } from "@/components/status-icon";
 
 interface ReplayModalProps {
   open: boolean;
@@ -269,10 +270,10 @@ export function ReplayModal({
           </p>
 
           {blocker && (
-            <div className="rounded-md border border-danger/30 bg-danger-subtle p-2 text-xs text-danger">
+            <StatusBox intent="danger">
               <div className="font-semibold">Replay not possible</div>
               <p className="mt-0.5">{blocker.reason}</p>
-            </div>
+            </StatusBox>
           )}
 
           {!blocker && message.value_truncated && fullValue.status === "fetching" && (
@@ -283,14 +284,14 @@ export function ReplayModal({
           )}
 
           {!blocker && message.value_truncated && fullValue.status === "ready" && (
-            <div className="rounded-md border border-success/30 bg-success-subtle p-2 text-xs text-success">
+            <StatusBox intent="success">
               Full value ({fmt.bytes(message.value_size_bytes ?? 0)}) loaded — replay will send the
               complete record, not just the 64&nbsp;KB preview.
-            </div>
+            </StatusBox>
           )}
 
           {!blocker && message.value_truncated && fullValue.status === "error" && (
-            <div className="rounded-md border border-warning/30 bg-warning-subtle p-2 text-xs text-warning">
+            <StatusBox intent="warning">
               <div className="font-semibold">Only a 64&nbsp;KB preview is available</div>
               <p className="mt-0.5">
                 Could not recover the full value ({fmt.bytes(message.value_size_bytes ?? 0)} total):{" "}
@@ -305,7 +306,7 @@ export function ReplayModal({
                 />
                 Replay the truncated 64&nbsp;KB preview anyway (not byte-for-byte)
               </label>
-            </div>
+            </StatusBox>
           )}
 
           <div>
@@ -349,15 +350,11 @@ export function ReplayModal({
             />
           </div>
 
-          {error && (
-            <div className="rounded-md border border-danger/30 bg-danger-subtle p-2 text-xs text-danger">
-              {error}
-            </div>
-          )}
+          {error && <StatusBox intent="danger">{error}</StatusBox>}
           {result && (
-            <div className="rounded-md border border-success/30 bg-success-subtle p-2 text-xs text-success">
-              ✓ Replayed to partition {result.partition}, offset {result.offset}
-            </div>
+            <StatusBox intent="success">
+              Replayed to partition {result.partition}, offset {result.offset}
+            </StatusBox>
           )}
         </div>
       </Modal>
