@@ -40,7 +40,8 @@ function sonnerExternalStyles(): Plugin {
 
 const FRONTEND_PORT = Number(process.env.KAFKITO_FRONTEND_PORT ?? 37422);
 const BACKEND_PORT = Number(process.env.KAFKITO_BACKEND_PORT ?? 37421);
-const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
+// The dev backend binds 127.0.0.1 only; "localhost" may resolve to ::1 first.
+const BACKEND_URL = `http://127.0.0.1:${BACKEND_PORT}`;
 
 export default defineConfig({
   plugins: [

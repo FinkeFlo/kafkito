@@ -80,6 +80,8 @@ Open the Vite URL printed in the `[frontend]` stream
 `internal/`, or `api/` rebuild automatically; frontend changes hot-reload
 through Vite. Press Ctrl-C in the `make dev` terminal to stop both
 processes (the Compose stack stays up — tear it down with `make dev-down`).
+The backend listens on `127.0.0.1` only, because auth mode `off` requires a
+loopback address; Vite proxies `/api` to it.
 
 Multiple git worktrees can run `make dev` in parallel; each calls
 `make worktree-init` once to claim a free port pair, and they share the
