@@ -20,6 +20,12 @@ endpoints that back the web UI — stable, documented, scriptable.
   client-supplied header never overrides a validated token. Note that the
   devauth `off` mode injects a synthetic `dev-user` principal. With no RBAC
   configured, every authenticated caller has full access.
+- RBAC permissions name a resource as `type:pattern` (for example
+  `group:team-*`). The pattern is `*` (every name), a prefix ending in `*`,
+  or an exact name. It is matched against the decoded resource name from
+  the path or body, literally: a group, subject or user named `*` is only
+  covered by the pattern `*`. The topic, consumer group and topic consumer
+  lists only return the names the user may view.
 - Every response carries an `X-Request-Id` header. It reuses the inbound
   `X-Vcap-Request-Id`, `traceparent` trace-id or `X-Request-Id` when present,
   and matches the `request_id` field in the server logs.

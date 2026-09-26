@@ -55,9 +55,9 @@ func rbacMiddleware(policy *rbac.Policy) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			// Never decide on a name the binding cannot decode; the
-			// binding would reject it too.
-			if k := undecodablePathParam(r); k != "" {
+			// Never decide on a name the binding cannot decode or on an
+			// empty one (the "any name" case); the binding rejects both.
+			if k := invalidPathParam(r); k != "" {
 				writeInvalidPathParam(w, k)
 				return
 			}
@@ -134,8 +134,8 @@ func resolvePermission(r *http.Request) (resType, resName, action, bodyField str
 	method := r.Method
 	pattern := rctx.RoutePattern()
 
-	// rbacMiddleware rejects undecodable parameters before it gets here;
-	// the fallback is "", never the raw value.
+	// rbacMiddleware rejects undecodable and empty parameters before it
+	// gets here; the fallback is "", never the raw value.
 	param := func(key string) string {
 		v, err := pathParam(r, key)
 		if err != nil {
@@ -152,7 +152,7 @@ func resolvePermission(r *http.Request) (resType, resName, action, bodyField str
 	switch {
 	// Clusters
 	case strings.HasSuffix(pattern, "/clusters") && method == http.MethodGet:
-		return "cluster", "*", "view", ""
+		return "cluster", "", "view", ""
 	case strings.HasSuffix(pattern, "/capabilities") && method == http.MethodGet:
 		return "cluster", cluster, "view", ""
 	case strings.HasSuffix(pattern, "/capabilities/refresh") && method == http.MethodPost:
@@ -216,11 +216,11 @@ func resolvePermission(r *http.Request) (resType, resName, action, bodyField str
 
 	// ACLs
 	case strings.HasSuffix(pattern, "/acls") && method == http.MethodGet:
-		return "acl", "*", "view", ""
+		return "acl", "", "view", ""
 	case strings.HasSuffix(pattern, "/acls") && method == http.MethodPost:
-		return "acl", "*", "edit", ""
+		return "acl", "", "edit", ""
 	case strings.HasSuffix(pattern, "/acls") && method == http.MethodDelete:
-		return "acl", "*", "delete", ""
+		return "acl", "", "delete", ""
 
 	// Users
 	case strings.HasSuffix(pattern, "/users") && method == http.MethodGet:

@@ -205,8 +205,7 @@ func TestHeader_DefaultsToConfiguredHeaderConstant(t *testing.T) {
 // TestMatchName pins the exported glob-match contract used by HTTP
 // handlers (filterTopicsByRBAC, filterGroupsByRBAC) to filter list
 // results. The CVE class is "an attacker name matches a more
-// restrictive glob"; the empty-target row pins the intentional
-// list-operation wildcard documented on matchResName.
+// restrictive glob"; names are literal, so "*" and "" are names too.
 func TestMatchName(t *testing.T) {
 	t.Parallel()
 
@@ -222,8 +221,16 @@ func TestMatchName(t *testing.T) {
 		{name: "prefix_glob_empty_body_after_prefix_allowed", pattern: "topic-*", target: "topic-", want: true},
 		{name: "exact_equality_hit", pattern: "exact", target: "exact", want: true},
 		{name: "exact_equality_miss", pattern: "exact", target: "different", want: false},
-		{name: "empty_target_intentional_wildcard_for_list_ops", pattern: "topic-*", target: "", want: true},
+		{name: "empty_name_is_literal", pattern: "topic-*", target: "", want: false},
+		{name: "empty_name_hit_by_wildcard_pattern", pattern: "*", target: "", want: true},
 		{name: "empty_pattern_does_not_wildcard", pattern: "", target: "anything", want: false},
+		// "*" as a target is a concrete name, not a wildcard.
+		{name: "star_target_misses_prefix_glob", pattern: "team-*", target: "*", want: false},
+		{name: "star_target_misses_exact_name", pattern: "team-a", target: "*", want: false},
+		{name: "star_target_hit_by_wildcard_pattern", pattern: "*", target: "*", want: true},
+		{name: "star_target_misses_star_prefix_glob", pattern: "a*", target: "*", want: false},
+		{name: "star_inside_target_literal", pattern: "team-*", target: "team-*", want: true},
+		{name: "star_inside_target_not_a_glob", pattern: "team-a", target: "team-*", want: false},
 	}
 
 	for _, tc := range cases {
@@ -233,6 +240,64 @@ func TestMatchName(t *testing.T) {
 			got := MatchName(tc.pattern, tc.target)
 
 			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+// TestMatchResName pins the Allow target contract: an empty target is the
+// server's "any name" case (list operations), every other target is a
+// concrete name matched literally.
+func TestMatchResName(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name, pattern, target string
+		want                  bool
+	}{
+		{name: "star_target_misses_prefix_glob", pattern: "team-*", target: "*", want: false},
+		{name: "star_target_hit_by_wildcard_pattern", pattern: "*", target: "*", want: true},
+		{name: "star_target_misses_exact_name", pattern: "team-a", target: "*", want: false},
+		{name: "empty_target_is_any_name", pattern: "team-*", target: "", want: true},
+		{name: "empty_target_exact_pattern", pattern: "team-a", target: "", want: true},
+		{name: "prefix_glob_hit", pattern: "team-*", target: "team-a", want: true},
+		{name: "prefix_glob_miss", pattern: "team-*", target: "other", want: false},
+		{name: "exact_hit", pattern: "team-a", target: "team-a", want: true},
+		{name: "exact_miss", pattern: "team-a", target: "team-b", want: false},
+		{name: "wildcard_pattern", pattern: "*", target: "anything", want: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, matchResName(tc.pattern, tc.target))
+		})
+	}
+}
+
+// TestAllow_StarNameIsLiteral: a resource named "*" is only allowed by a
+// grant that matches it, i.e. the wildcard.
+func TestAllow_StarNameIsLiteral(t *testing.T) {
+	t.Parallel()
+
+	policy := func(resource string) *Policy {
+		return Compile(config.RBACConfig{
+			Enabled:  true,
+			Roles:    []config.RoleConfig{{Name: "r", Permissions: []config.PermissionConfig{{Resource: resource, Actions: []string{"*"}}}}},
+			Subjects: []config.SubjectConfig{{User: "u", Roles: []string{"r"}}},
+		})
+	}
+	for _, tc := range []struct {
+		resource string
+		want     bool
+	}{
+		{"group:team-*", false},
+		{"group:team-a", false},
+		{"group:*", true},
+		{"group", true},
+		{"*", true},
+	} {
+		t.Run(tc.resource, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, policy(tc.resource).Allow("u", "c", "group", "*", "delete"))
 		})
 	}
 }
