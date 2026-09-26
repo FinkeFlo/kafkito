@@ -68,3 +68,24 @@ func TestSearch_ParseErrorOnLastRecordDoesNotWaitForTimeout(t *testing.T) {
 		}
 	}
 }
+
+// Forward cursor pages ("Load more" in a time range, every copy-job page
+// after the first) used to ignore the upper time bound, so paging leaked
+// records at or after to_ts and has_more stayed true until the topic end.
+func TestConsume_ForwardCursorPagesKeepUpperTimeBound(t *testing.T) {
+	t.Parallel()
+	env, _ := newOrdersEnv(t)
+	for name, from := range map[string]ConsumeFrom{"from timestamp": FromTimestamp, "from start": FromStart} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			opts := ConsumeOptions{Partition: -1, Limit: 3, From: from, FromTSMs: fixtureBaseTS + 2_000, ToTSMs: fixtureBaseTS + 14_000}
+			pages := consumeAllPages(t, env, opts)
+			var got []int
+			for _, p := range pageSeqs(t, pages) {
+				got = append(got, p...)
+			}
+			assert.Equal(t, seqRange(2, 13), got)
+			assert.False(t, pages[len(pages)-1].HasMore)
+		})
+	}
+}
