@@ -32,12 +32,14 @@ type generatedRoutes struct {
 	errs     errorWriter
 }
 
-func newGeneratedRoutes(impl gen.StrictServerInterface, errs errorWriter) (*generatedRoutes, error) {
+// extra strict middlewares run inside withHTTPRequest (tests use them to
+// observe the bound request objects).
+func newGeneratedRoutes(impl gen.StrictServerInterface, errs errorWriter, extra ...gen.StrictMiddlewareFunc) (*generatedRoutes, error) {
 	validate, err := newRequestValidator(errs)
 	if err != nil {
 		return nil, err
 	}
-	strict := gen.NewStrictHandlerWithOptions(impl, []gen.StrictMiddlewareFunc{withHTTPRequest}, gen.StrictHTTPServerOptions{
+	strict := gen.NewStrictHandlerWithOptions(impl, append(extra, withHTTPRequest), gen.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			var ae *apiError
 			if !errors.As(err, &ae) {
