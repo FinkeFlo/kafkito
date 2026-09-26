@@ -386,7 +386,8 @@ func (r *Registry) Admin(name string) (*kadm.Client, error) {
 // handshake, so callers must budget time × broker_count when probing
 // remote SaaS clusters (e.g. Confluent Cloud advertises N brokers via
 // `bN-pkc-…` hostnames). The user-facing Test connection handler in
-// internal/server/clusters.go uses a 15s budget for that reason.
+// internal/server/clusters_api.go uses a 15s default budget
+// (config.DefaultTestConnectionTimeout) for that reason.
 func (r *Registry) Ping(ctx context.Context, name string) error {
 	cl, err := r.Client(name)
 	if err != nil {

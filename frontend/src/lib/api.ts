@@ -216,7 +216,7 @@ export async function fetchSample(
   );
 }
 
-// PROD_CONFIRM_HEADER must match internal/server/clusters.go's
+// PROD_CONFIRM_HEADER must match internal/server/prod_confirm.go's
 // ProdConfirmHeader. Sent only after the user confirms the production
 // warning dialog; the backend is the actual enforcement point — it rejects
 // mutating calls against is_prod clusters that omit this header, regardless
@@ -235,7 +235,7 @@ const GZIP_PRODUCE_THRESHOLD_BYTES = 256 * 1024;
  * to benefit — mainly the base64-encoded full value recovered for a
  * truncated message replay. This only reduces bytes actually transferred;
  * the server still enforces the same decompressed-size cap either way (see
- * internal/server/clusters.go's maxProduceBodyBytes), so compression cannot
+ * internal/server/messages.go's maxProduceBodyBytes), so compression cannot
  * be used to sneak a too-large value past the limit.
  *
  * Falls back to sending the body uncompressed — without Content-Encoding —

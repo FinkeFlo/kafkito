@@ -67,7 +67,7 @@ const (
 const maxConcurrentCopies = 4
 
 // copySlots is the concurrency semaphore for copy jobs. Package-level (rather
-// than a field on clusterAPI) so it caps the process, not a handler instance,
+// than a field on apiServer) so it caps the process, not a handler instance,
 // and so tests can fill or replace it.
 var copySlots = make(chan struct{}, maxConcurrentCopies)
 
