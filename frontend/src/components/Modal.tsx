@@ -114,9 +114,12 @@ export function Modal({
     modalStack.push(stackEntry);
 
     // Move focus into the panel on next paint so the panel is mounted.
+    // A field that already took focus (autoFocus, or a fast user) keeps it;
+    // stealing it would drop keystrokes typed in between.
     const focusFrame = window.requestAnimationFrame(() => {
       const panel = panelRef.current;
       if (!panel) return;
+      if (panel.contains(document.activeElement)) return;
       const focusable = focusableInside(panel);
       if (focusable.length > 0) {
         focusable[0].focus();
