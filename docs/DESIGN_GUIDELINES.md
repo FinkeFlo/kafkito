@@ -33,9 +33,9 @@ Before writing any frontend code, do these five things:
 
 | Concern | Choice | Notes |
 |---|---|---|
-| Framework | React 19 + TypeScript 5.7 | function components, no class components |
-| Build | Vite 6 | |
-| Routing | TanStack Router (file-based) | `src/routes/*.tsx` — never hand-edit `routeTree.gen.ts` |
+| Framework | React 19 + TypeScript 7 | function components, no class components |
+| Build | Vite 8 | |
+| Routing | TanStack Router (file-based) | `src/routes/*.tsx` — `routeTree.gen.ts` is generated (gitignored); never hand-edit it |
 | Data | TanStack Query v5 | every server read goes through `useQuery`; every write through `useMutation` |
 | Styles | Tailwind v4 via `@tailwindcss/vite` | tokens in `src/index.css` under `@theme` |
 | Icons | `lucide-react` | no other icon libraries |
@@ -160,7 +160,7 @@ Every route renders as children of `<Shell>` (in `src/features/shell/Shell.tsx`)
 The page body itself follows this pattern:
 
 ```tsx
-export function Route = createFileRoute("/my-page")({
+export const Route = createFileRoute("/my-page")({
   component: MyPage,
 });
 
@@ -236,41 +236,38 @@ bypass it.
 
 ### 5.1 What Shell provides
 
-- Header with logo, cluster pill, ⌘K search, timezone chip, theme toggle, user chip
+- Header with logo and version, cluster pill, ⌘K search, "What's new",
+  theme toggle and user menu (timezone and other preferences)
 - Underlined tab bar for primary nav
 - `<Outlet />` for the active route
-- Manages theme (light/dark) via `useTheme()` in `src/lib/theme.ts`
-- Manages global cluster selection via URL search param `?cluster=`
+- Manages theme (light/dark) via `useTheme()` in `src/lib/use-theme.ts`
+  (re-exported from `src/lib/theme.ts`)
+- Reads the active cluster from the URL path (`/clusters/$cluster/…`) via
+  `useCluster()` in `src/lib/use-cluster.ts`
 
 ### 5.2 Adding a top-level route
 
-1. Add the file: `src/routes/my-page.tsx`
+1. Add the file: `src/routes/my-page.tsx`, or
+   `src/routes/clusters.$cluster.my-page.tsx` for a cluster-scoped page.
 2. Add the nav entry in `Shell.tsx` **only if** the route should be
    globally visible. Secondary routes (Settings, Brokers) stay out of the
    primary tab bar and are reached via the cluster detail page or an
    overflow menu.
-3. Run `bun run routes:generate` (or rely on `bun run build`).
-4. Commit `routeTree.gen.ts`.
+3. Run `bun run routes:generate` (or rely on `bun run build`). The
+   generated `routeTree.gen.ts` is gitignored; do not commit it.
 
 ### 5.3 Cluster selection
 
-All multi-cluster-aware routes accept `?cluster=<name>` as a search
-param. Schema:
+The active cluster is a path segment: cluster-scoped routes live under
+`/clusters/$cluster/…` (files `src/routes/clusters.$cluster.*.tsx`, with
+`clusters.$cluster.tsx` as the layout). Read it in the component with the
+shared hook, which also resolves private (browser-stored) clusters:
 
 ```tsx
-export const Route = createFileRoute("/my-page")({
-  validateSearch: (s: Record<string, unknown>) => ({
-    cluster: typeof s.cluster === "string" ? s.cluster : undefined,
-  }),
-  component: MyPage,
-});
+const { cluster } = useCluster();
 ```
 
-Read in the component:
-
-```tsx
-const { cluster } = Route.useSearch();
-```
+`useSearch` params are for view state such as filters, not for the cluster.
 
 **Never** introduce a per-page cluster picker. The pill in the header is
 the only way to change the active cluster.
@@ -297,18 +294,29 @@ Every entry lives in `src/components/ui/<Name>.tsx`, except `<Shell>`
 | `<Shell>` | Header + nav + outlet |
 | `<PageHeader>` | `eyebrow?` + `title` + `subtitle?` + `actions?` |
 | `<KpiCard>` | `label` + `value` + `unit?` + `delta?` |
-| `<Tag>` | Small mono tag, `variant="neutral" \| "info"` |
+| `<Tag>` | Small mono tag, `variant="neutral" \| "info" \| "warn" \| "danger" \| "success"` |
+| `<Badge>` | Rounded status pill with optional `leadingIcon` |
 | `<StatusDot>` | 2×2 status mark, shape-coded per intent (filled disc = healthy, bold × = unreachable, ring = warning, small ring = unknown) with an `aria-label` |
 | `<StatusIcon>` / `<StatusBox>` | Labelled lucide outcome icon (✓ circle / triangle / ⊗ / info) and the compact result box built on it; use for submit results and load errors |
 | `<StateBadge>` | Consumer-group state pill |
 | `<DataTable>` | Styled `<table>` with built-in `<thead>` / row styles, sort headers, and skeleton/empty body states |
 | `<Toolbar>` | Filter / action row: `search?` (left), `filters?` (centre), `actions?` (right, `ml-auto`). Replaces hand-rolled `flex flex-wrap items-center gap-2` blocks |
-| `<EmptyState>` | Icon + heading + CTA |
-| `<ErrorState>` | Icon + detail + retry |
+| `<EmptyState>` | `icon?` + `title` + `description?` + `action?` |
+| `<ErrorState>` | `title` + `detail?` + `onRetry?` (renders the retry `<Button>`) |
 | `<Modal>` | `open` + `onClose` + `title` + `children` + `actions?` + `size?` (`sm \| md \| lg`) + `ariaDescribedBy?`; centered panel with backdrop, focus-trap, body-scroll lock, Escape-to-close, focus-restore |
 | `<Notice>` | `intent="info" \| "success" \| "warning" \| "danger"` + `title?` + `children` + `icon?` + `actions?`; tinted callout for degraded-capability banners and inline explanations. Always pairs colour with an icon |
 | `<Button>` | `variant="primary" \| "secondary" \| "danger" \| "ghost"` + `size="sm" \| "md"` + `leadingIcon?` / `trailingIcon?` + `loading?` |
 | `<Input>` | `h-9` text input + `invalid?` (switches border to `border-danger`) + `leadingIcon?` / `trailingIcon?`. Does **not** set `outline-none`; the global `:focus-visible` rule is the focus indicator |
+| `<IconButton>` | Icon-only button, `variant="ghost" \| "secondary" \| "danger"` + `size="sm" \| "md"`; always pass an `aria-label` |
+| `<SearchInput>` | Filter box with optional `count` (visible / total) and `/` shortcut |
+| `<ConfirmDialog>` | Confirmation modal for destructive actions; `confirmPhrase?` makes the user type a phrase first |
+| `<Card>` / `<Section>` | Bordered panel (`hero?`, `flush?`) and titled page section with `actions?` |
+| `<Skeleton>` | Loading placeholder block |
+| `<Timestamp>` | Formats a date in the user's timezone setting; use it instead of raw `Date` formatting |
+| `<MonoId>` | Monospace identifier, optionally shortened and copyable |
+| `<Highlight>` | Marks match ranges inside a string |
+| `<Tooltip>` | Radix tooltip wrapper (`content`, `side?`, `align?`); `<TooltipProvider>` is mounted once at the root |
+| `<Toaster>` | `sonner` toast container, mounted once at the root |
 
 If it's not in the list and doesn't exist yet, **write it first as a
 component**, then use it. No inlined duplications of table chrome, modal
@@ -452,8 +460,8 @@ unless each has been implemented and visually checked.
 4. **Degraded** (partial capability, e.g. missing ACLs in Kafka). Amber
    `<Notice>` at the top of the view explaining which permission is
    missing and how to fix it. This is a kafkito-specific pattern — see
-   existing `limited` code paths in `groups.tsx` and `topics.tsx` for
-   precedent.
+   the existing `limited` code paths in `clusters.$cluster.groups.index.tsx`
+   and `clusters.index.tsx` for precedent.
 5. **Populated.** The happy path.
 
 ---
@@ -518,8 +526,9 @@ src/
 ├── routes/                  ← one file per route; file-based routing
 │   ├── __root.tsx
 │   ├── index.tsx
-│   ├── topics.tsx
-│   └── topics_.$topic.tsx
+│   ├── clusters.$cluster.tsx                   ← layout for every cluster-scoped page
+│   ├── clusters.$cluster.topics.index.tsx
+│   └── clusters.$cluster.topics.$topic.messages.tsx
 ├── components/
 │   └── ui/                  ← generic, domain-free primitives (Button, Modal, DataTable, …)
 ├── features/                ← components that belong to one domain
@@ -527,10 +536,16 @@ src/
 │   ├── messages/            ← message browser: MessageRow, RangePicker, ValueBody, replay, bulk copy
 │   └── shell/               ← app chrome rendered by __root: Shell, CommandPalette, ClusterPill, UserMenu, What's new
 ├── lib/
-│   ├── api.ts               ← don't touch without a backend reason
+│   ├── api.ts               ← endpoint functions; don't touch without a backend reason
+│   ├── api-client.ts        ← openapi-fetch client + request headers middleware
+│   ├── api.gen.ts           ← generated from api/openapi.yaml (make api-generate)
+│   ├── queries/             ← queryOptions() factories, one module per resource
 │   ├── format.ts            ← formatters + thresholds
-│   ├── theme.ts             ← useTheme hook
+│   ├── use-theme.ts         ← useTheme hook
 │   └── utils.ts             ← cn() and tiny helpers
+├── auth/                    ← AuthProvider, auth hooks, transport (apiFetch)
+├── content/                 ← static content such as the changelog
+├── __checks__/              ← source-level checks run with the unit tests
 └── index.css                ← tokens only; no component CSS
 ```
 
@@ -551,7 +566,8 @@ Tests sit next to the component they cover (`Button.tsx` +
 `Button.test.tsx`).
 
 **Never** create `styles/`, `hooks/` (put hooks in `lib/`), `types/`
-(types live next to the code that owns them or in `lib/api.ts`),
+(types live next to the code that owns them or in `lib/api.ts`; the
+existing `src/types/` only holds ambient `.d.ts` declarations for tooling),
 `assets/` (put images in `public/`).
 
 ### 10.2 Naming
@@ -593,9 +609,10 @@ bun run test            # vitest, incl. static checks in src/__checks__
 ```
 
 `src/__checks__/` holds source-level checks that run with the unit tests:
-undeclared `var(--color-*)` tokens, route files without a parent layout,
-and raw Date formatters that bypass `<Timestamp>` (opt out per line with
-`// allow-raw-date: <reason>`).
+undeclared `var(--color-*)` tokens, WCAG AA contrast of the token pairs,
+route files without a parent layout, query keys defined outside
+`src/lib/queries/`, and raw Date formatters that bypass `<Timestamp>` (opt
+out per line with `// allow-raw-date: <reason>`).
 
 If any of these fails, the commit is not done.
 
@@ -624,7 +641,7 @@ Copy this into the PR description and tick each box.
 - [ ] bun run lint passes
 - [ ] bun run build passes
 - [ ] bun run test passes
-- [ ] routeTree.gen.ts regenerated and committed
+- [ ] routeTree.gen.ts regenerated (it is gitignored, not committed)
 - [ ] Every TODO(backend): comment is also listed in the PR body
 ```
 
@@ -646,7 +663,7 @@ mutations, SCRAM rotate). Setup + scope: `frontend/e2e/README.md`.
 6. ❌ Inline `<style>` tags in TSX files.
 7. ❌ Fabricating data to make a design look full.
 8. ❌ `alert()`, `confirm()`, or `prompt()` — use `<Modal>` /
-   `<ConfirmDialog>` / `useToast()` instead.
+   `<ConfirmDialog>` / `toast()` from `sonner` instead.
 9. ❌ `useEffect` for data fetching.
 10. ❌ Full-page loading spinners.
 11. ❌ Emoji in UI chrome.
@@ -683,6 +700,7 @@ a review, treat it as drift and bring it in line.
 | 2026-05-02 | Hardening: German strings stripped (English-only), `confirmPhrase` parity on Reset-Offsets and Delete-Records, ErrorState retry migrated to canonical `<Button>`, focus-indicator escapes removed (TimezoneToggle/SearchInput/CommandPalette), Radix headless-primitive carve-out in § 1 | (this PR — link added by author) |
 | 2026-09-26 | Accessibility: Biome a11y rules on; axe scans in light and dark replace the contrast scanner; token-pair contrast test; "never colour alone" rule with StatusIcon / StatusBox and shape-coded StatusDot | (this PR — link added by author) |
 | 2026-09-26 | Frontend layout: primitives move to `components/ui/`, domain components to `features/<domain>/` (groups, messages, shell); PascalCase component files enforced by Biome `useFilenamingConvention`; MessageRow and RangePicker extracted from the messages route | (this PR — link added by author) |
+| 2026-09-26 | Docs sync: cluster lives in the URL path, full `components/ui` inventory, route and `lib/` paths updated, `routeTree.gen.ts` is not committed | (this PR — link added by author) |
 
 Add a row on every change. Small tweaks to tokens or primitives are
 fine; major shifts (new visual language, new nav model) require a design
