@@ -30,6 +30,15 @@
         "noUnusedVariables": "error",
         "noUnusedImports": "error"
       },
+      "style": {
+        "useFilenamingConvention": {
+          "level": "error",
+          "options": {
+            "requireAscii": true,
+            "filenameCases": ["kebab-case"]
+          }
+        }
+      },
       "suspicious": {
         "noExplicitAny": "off",
         "noArrayIndexKey": "warn"
@@ -44,5 +53,33 @@
         }
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["src/components/**/*.tsx", "src/features/**/*.tsx", "src/auth/**/*.tsx"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useFilenamingConvention": {
+              "level": "error",
+              "options": {
+                "requireAscii": true,
+                "filenameCases": ["PascalCase"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/routes/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useFilenamingConvention": "off"
+          }
+        }
+      }
+    }
+  ]
 }
