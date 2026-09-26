@@ -55,9 +55,10 @@ func TestSearch_ParseErrorOnLastRecordDoesNotWaitForTimeout(t *testing.T) {
 		for _, dir := range []SearchDirection{DirOldestFirst, DirNewestFirst} {
 			t.Run(name+"/"+string(dir), func(t *testing.T) {
 				t.Parallel()
-				q.Partition, q.Limit, q.Direction, q.Timeout = -1, 500, dir, 10*time.Second
+				opts := q
+				opts.Partition, opts.Limit, opts.Direction, opts.Timeout = -1, 500, dir, 10*time.Second
 				start := time.Now()
-				res := searchTopic(t, env, q)
+				res := searchTopic(t, env, opts)
 				assert.Less(t, time.Since(start), 3*time.Second, "search waited for the timeout")
 				assert.False(t, res.Stats.TimedOut)
 				assert.False(t, res.Stats.MoreAvailable)
