@@ -5,9 +5,10 @@
 
 // Package kafka wraps the franz-go client/kadm admin for kafkito.
 //
-// A Registry owns one *kgo.Client + kadm.Client per configured cluster.
+// Connections owns one *kgo.Client + kadm.Client per configured cluster.
 // Clients are created lazily on first use and reused for the process'
-// lifetime. Call Close() on shutdown to release all connections.
+// lifetime. Registry bundles Connections with the domain operations; call
+// Registry.Close() on shutdown to release all connections.
 package kafka
 
 import (
@@ -25,9 +26,7 @@ import (
 	"github.com/FinkeFlo/kafkito/internal/masking"
 	"github.com/FinkeFlo/kafkito/internal/netguard"
 	"github.com/twmb/franz-go/pkg/kadm"
-	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
-	"github.com/twmb/franz-go/pkg/kmsg"
 	"github.com/twmb/franz-go/pkg/sasl/plain"
 	"github.com/twmb/franz-go/pkg/sasl/scram"
 )
@@ -43,44 +42,11 @@ var ErrUnknownCluster = errors.New("unknown cluster")
 // the 413 it returns when a produce exceeds it.
 const ProducerBatchMaxBytes = 10 << 20 // 10 MiB
 
-// TopicInfo is a lightweight view of a Kafka topic for list pages. Metric
-// fields are filled in best-effort from the metrics collector; a nil pointer
-// means "not yet known" (distinct from "zero") so the frontend can render
-// a placeholder instead of a misleading 0.
-type TopicInfo struct {
-	Name              string   `json:"name"`
-	Partitions        int      `json:"partitions"`
-	ReplicationFactor int      `json:"replication_factor"`
-	IsInternal        bool     `json:"is_internal"`
-	Messages          *int64   `json:"messages,omitempty"`
-	SizeBytes         *int64   `json:"size_bytes,omitempty"`
-	RetentionMs       *int64   `json:"retention_ms,omitempty"` // -1 == infinite (retention.ms=-1)
-	RatePerSec        *float64 `json:"rate_per_sec,omitempty"`
-	Lag               *int64   `json:"lag,omitempty"`
-}
-
-// ClusterInfo describes a configured cluster and whether it is currently reachable.
-type ClusterInfo struct {
-	Name           string        `json:"name"`
-	Reachable      bool          `json:"reachable"`
-	Error          string        `json:"error,omitempty"`
-	IsProd         bool          `json:"is_prod"`
-	AuthType       string        `json:"auth_type"`
-	TLS            bool          `json:"tls"`
-	SchemaRegistry bool          `json:"schema_registry"`
-	Capabilities   *Capabilities `json:"capabilities,omitempty"`
-	// Aggregate counts and metrics (filled best-effort from the metrics
-	// collector; nil when unknown yet or when the cluster is unreachable).
-	Brokers         *int     `json:"brokers,omitempty"`
-	Topics          *int     `json:"topics,omitempty"`
-	Groups          *int     `json:"groups,omitempty"`
-	TotalMessages   *int64   `json:"total_messages,omitempty"`
-	TotalLag        *int64   `json:"total_lag,omitempty"`
-	TotalRatePerSec *float64 `json:"total_rate_per_sec,omitempty"`
-}
-
-// Registry is the kafkito-wide set of Kafka clients, keyed by cluster name.
-type Registry struct {
+// Connections is the kafkito-wide set of cluster configs and Kafka clients,
+// keyed by cluster name. It also owns what every domain operation needs per
+// cluster: ad-hoc (private) cluster registration, the Schema Registry
+// decoder and the masking policy.
+type Connections struct {
 	log      *slog.Logger
 	ordered  []config.ClusterConfig
 	clusters map[string]config.ClusterConfig
@@ -101,6 +67,12 @@ type Registry struct {
 
 	srMu       sync.Mutex
 	srDecoders map[string]*SRDecoder
+}
+
+// Registry bundles the cluster connections with the domain operations
+// (topics, groups, messages, security, cluster info).
+type Registry struct {
+	*Connections
 
 	// cfgCacheMu guards cfgCache.
 	cfgCacheMu sync.Mutex
@@ -111,28 +83,20 @@ type Registry struct {
 	cfgCache map[string]topicConfigsCacheEntry
 
 	// metrics is lazily started; nil until StartMetrics is called.
+	// Protected by Connections.mu.
 	metrics *metricsCollector
 }
 
-// topicConfigsCacheEntry holds one cached DescribeTopicConfigs outcome.
-type topicConfigsCacheEntry struct {
-	configs    []TopicConfigEntry
-	configsErr string
-	expiry     time.Time
-}
-
-const (
-	// cfgCacheTTLPermanent is used for errors that are unlikely to resolve on
-	// their own (e.g. missing ACL). Long enough to suppress poll-driven spam
-	// without permanently hiding a fix by the cluster admin.
-	cfgCacheTTLPermanent = 60 * time.Second
-	// cfgCacheTTLSuccess is used for successful reads. Short enough that a
-	// config change is reflected quickly.
-	cfgCacheTTLSuccess = 10 * time.Second
-)
-
 // NewRegistry constructs a registry from the configured clusters.
 func NewRegistry(cfg []config.ClusterConfig, log *slog.Logger) *Registry {
+	return &Registry{
+		Connections: newConnections(cfg, log),
+		cfgCache:    make(map[string]topicConfigsCacheEntry),
+	}
+}
+
+// newConnections builds the connection set from the configured clusters.
+func newConnections(cfg []config.ClusterConfig, log *slog.Logger) *Connections {
 	m := make(map[string]config.ClusterConfig, len(cfg))
 	ordered := make([]config.ClusterConfig, len(cfg))
 	copy(ordered, cfg)
@@ -156,21 +120,20 @@ func NewRegistry(cfg []config.ClusterConfig, log *slog.Logger) *Registry {
 				slog.String("url", c.SchemaRegistry.URL))
 		}
 	}
-	return &Registry{
+	return &Connections{
 		log:        log,
 		ordered:    ordered,
 		clusters:   m,
 		masking:    policies,
 		clients:    make(map[string]*kgo.Client),
 		srDecoders: make(map[string]*SRDecoder),
-		cfgCache:   make(map[string]topicConfigsCacheEntry),
 	}
 }
 
 // srDecoderFor returns a cached *SRDecoder for the cluster, or nil when the
 // cluster has no Schema Registry configured. Decoders are cached for the
 // lifetime of the registry.
-func (r *Registry) srDecoderFor(cluster string) *SRDecoder {
+func (r *Connections) srDecoderFor(cluster string) *SRDecoder {
 	r.srMu.Lock()
 	defer r.srMu.Unlock()
 	if d, ok := r.srDecoders[cluster]; ok {
@@ -188,7 +151,7 @@ func (r *Registry) srDecoderFor(cluster string) *SRDecoder {
 
 // MaskingPolicy returns the compiled masking policy for the named cluster.
 // Returns an empty policy if the cluster is unknown or no rules configured.
-func (r *Registry) MaskingPolicy(cluster string) *masking.Policy {
+func (r *Connections) MaskingPolicy(cluster string) *masking.Policy {
 	if p, ok := r.masking[cluster]; ok && p != nil {
 		return p
 	}
@@ -197,7 +160,7 @@ func (r *Registry) MaskingPolicy(cluster string) *masking.Policy {
 }
 
 // Names returns the configured cluster names in config order.
-func (r *Registry) Names() []string {
+func (r *Connections) Names() []string {
 	out := make([]string, 0, len(r.ordered))
 	for _, c := range r.ordered {
 		out = append(out, c.Name)
@@ -206,7 +169,7 @@ func (r *Registry) Names() []string {
 }
 
 // ConfigsOrdered returns cluster configs in the order they were registered.
-func (r *Registry) ConfigsOrdered() []config.ClusterConfig {
+func (r *Connections) ConfigsOrdered() []config.ClusterConfig {
 	out := make([]config.ClusterConfig, len(r.ordered))
 	copy(out, r.ordered)
 	return out
@@ -215,7 +178,7 @@ func (r *Registry) ConfigsOrdered() []config.ClusterConfig {
 // ConfigFor returns the ClusterConfig registered under the given internal
 // name (static or ad-hoc/private). Used by the HTTP layer to check
 // cluster-level flags (e.g. IsProd) before performing a mutating operation.
-func (r *Registry) ConfigFor(name string) (config.ClusterConfig, bool) {
+func (r *Connections) ConfigFor(name string) (config.ClusterConfig, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	cfg, ok := r.clusters[name]
@@ -223,7 +186,7 @@ func (r *Registry) ConfigFor(name string) (config.ClusterConfig, bool) {
 }
 
 // Client returns (or creates) a kgo.Client for the given cluster name.
-func (r *Registry) Client(name string) (*kgo.Client, error) {
+func (r *Connections) Client(name string) (*kgo.Client, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -370,7 +333,7 @@ func guardedTLSDialer(tlsCfg config.TLSConfig) func(ctx context.Context, network
 }
 
 // Admin returns a kadm.Client bound to the named cluster's kgo.Client.
-func (r *Registry) Admin(name string) (*kadm.Client, error) {
+func (r *Connections) Admin(name string) (*kadm.Client, error) {
 	cl, err := r.Client(name)
 	if err != nil {
 		return nil, err
@@ -388,7 +351,7 @@ func (r *Registry) Admin(name string) (*kadm.Client, error) {
 // `bN-pkc-…` hostnames). The user-facing Test connection handler in
 // internal/server/clusters_api.go uses a 15s default budget
 // (config.DefaultTestConnectionTimeout) for that reason.
-func (r *Registry) Ping(ctx context.Context, name string) error {
+func (r *Connections) Ping(ctx context.Context, name string) error {
 	cl, err := r.Client(name)
 	if err != nil {
 		return err
@@ -396,285 +359,8 @@ func (r *Registry) Ping(ctx context.Context, name string) error {
 	return cl.Ping(ctx)
 }
 
-// PartitionInfo describes a single topic partition.
-type PartitionInfo struct {
-	Partition   int32   `json:"partition"`
-	Leader      int32   `json:"leader"`
-	Replicas    []int32 `json:"replicas"`
-	ISR         []int32 `json:"isr"`
-	StartOffset int64   `json:"start_offset"`
-	EndOffset   int64   `json:"end_offset"`
-	Messages    int64   `json:"messages"`
-}
-
-// TopicConfigEntry is a single topic-level config override/default.
-type TopicConfigEntry struct {
-	Name      string `json:"name"`
-	Value     string `json:"value"`
-	IsDefault bool   `json:"is_default"`
-	Source    string `json:"source,omitempty"`
-	Sensitive bool   `json:"sensitive"`
-}
-
-// TopicDetail is the full metadata view for one topic.
-type TopicDetail struct {
-	Name              string             `json:"name"`
-	IsInternal        bool               `json:"is_internal"`
-	Partitions        []PartitionInfo    `json:"partitions"`
-	ReplicationFactor int                `json:"replication_factor"`
-	Messages          int64              `json:"messages"`
-	Configs           []TopicConfigEntry `json:"configs"`
-	// ConfigsError signals that DescribeConfigs failed for this topic and
-	// callers should treat Configs as incomplete. Empty when configs were
-	// read successfully. Known codes: "unauthorized" (missing
-	// DescribeConfigs ACL on the topic), "unavailable" (any other broker
-	// error). UI surfaces this so users see "permission missing" instead
-	// of a silently empty retention / configs view.
-	ConfigsError string `json:"configs_error,omitempty"`
-	// SizeBytes is the leader-replica byte sum from the metrics collector.
-	// Nil when the collector has no snapshot yet for this topic, distinct
-	// from "known zero".
-	SizeBytes *int64 `json:"size_bytes,omitempty"`
-}
-
-// ListTopics returns topic summaries for the named cluster.
-// Internal topics (starting with "__") are included and flagged.
-func (r *Registry) ListTopics(ctx context.Context, name string) ([]TopicInfo, error) {
-	adm, err := r.Admin(name)
-	if err != nil {
-		return nil, err
-	}
-	md, err := adm.Metadata(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("metadata: %w", err)
-	}
-	out := make([]TopicInfo, 0, len(md.Topics))
-	for topicName, t := range md.Topics {
-		if t.Err != nil {
-			r.log.Warn("topic metadata error", "topic", topicName, "err", t.Err)
-			continue
-		}
-		rf := 0
-		for _, p := range t.Partitions {
-			if n := len(p.Replicas); n > rf {
-				rf = n
-			}
-		}
-		out = append(out, TopicInfo{
-			Name:              topicName,
-			Partitions:        len(t.Partitions),
-			ReplicationFactor: rf,
-			IsInternal:        t.IsInternal,
-		})
-	}
-	// For private (browser-stored) clusters the periodic collector has no
-	// state entry, so applyTopicMetrics would otherwise no-op. ensureFresh
-	// runs an on-demand probe (cached for privateClusterMetricsTTL) and
-	// is a fast cache hit for configured clusters.
-	if mc := r.metricsCollector(); mc != nil {
-		mc.ensureFresh(ctx, name, privateClusterMetricsTTL, adm)
-	}
-	r.applyTopicMetrics(name, out)
-	return out, nil
-}
-
-// DescribeTopic returns full metadata + configs + offsets for a topic.
-func (r *Registry) DescribeTopic(ctx context.Context, cluster, topic string) (*TopicDetail, error) {
-	adm, err := r.Admin(cluster)
-	if err != nil {
-		return nil, err
-	}
-
-	md, err := adm.Metadata(ctx, topic)
-	if err != nil {
-		return nil, fmt.Errorf("metadata: %w", err)
-	}
-	t, ok := md.Topics[topic]
-	if !ok {
-		return nil, fmt.Errorf("topic not found: %s", topic)
-	}
-	if t.Err != nil {
-		return nil, fmt.Errorf("topic error: %w", t.Err)
-	}
-
-	starts, err := adm.ListStartOffsets(ctx, topic)
-	if err != nil {
-		return nil, fmt.Errorf("list start offsets: %w", err)
-	}
-	ends, err := adm.ListEndOffsets(ctx, topic)
-	if err != nil {
-		return nil, fmt.Errorf("list end offsets: %w", err)
-	}
-
-	parts := make([]PartitionInfo, 0, len(t.Partitions))
-	rf := 0
-	var total int64
-	for _, p := range t.Partitions {
-		if n := len(p.Replicas); n > rf {
-			rf = n
-		}
-		var startOff, endOff int64
-		if so, ok := starts.Lookup(topic, p.Partition); ok {
-			startOff = so.Offset
-		}
-		if eo, ok := ends.Lookup(topic, p.Partition); ok {
-			endOff = eo.Offset
-		}
-		msgs := endOff - startOff
-		if msgs < 0 {
-			msgs = 0
-		}
-		total += msgs
-		parts = append(parts, PartitionInfo{
-			Partition:   p.Partition,
-			Leader:      p.Leader,
-			Replicas:    append([]int32{}, p.Replicas...),
-			ISR:         append([]int32{}, p.ISR...),
-			StartOffset: startOff,
-			EndOffset:   endOff,
-			Messages:    msgs,
-		})
-	}
-
-	configs, configsErr := r.describeCachedTopicConfigs(ctx, cluster, topic, adm)
-
-	out := &TopicDetail{
-		Name:              topic,
-		IsInternal:        t.IsInternal,
-		Partitions:        parts,
-		ReplicationFactor: rf,
-		Messages:          total,
-		Configs:           configs,
-		ConfigsError:      configsErr,
-	}
-	if snap, ok := r.ClusterMetricsSnapshot(cluster); ok {
-		if m, ok := snap.PerTopic[topic]; ok && m.HaveSize {
-			out.SizeBytes = ptrInt64(m.SizeBytes)
-		}
-	}
-	return out, nil
-}
-
-// classifyConfigsErr maps a DescribeConfigs error to a short, UI-friendly
-// code stored in TopicDetail.ConfigsError. Empty means "not classifiable"
-// (caller should fall back to a generic code).
-func classifyConfigsErr(err error) string {
-	if err == nil {
-		return ""
-	}
-	if errors.Is(err, kerr.TopicAuthorizationFailed) ||
-		errors.Is(err, kerr.ClusterAuthorizationFailed) {
-		return "unauthorized"
-	}
-	return "unavailable"
-}
-
-// describeCachedTopicConfigs calls DescribeTopicConfigs and caches the result.
-// Permanent errors ("unauthorized") are held for cfgCacheTTLPermanent to
-// avoid a Kafka round-trip on every frontend poll. Successful reads are cached
-// for cfgCacheTTLSuccess so config changes are still reflected quickly.
-func (r *Registry) describeCachedTopicConfigs(ctx context.Context, cluster, topic string, adm *kadm.Client) ([]TopicConfigEntry, string) {
-	key := cluster + "\x00" + topic
-	now := time.Now()
-
-	r.cfgCacheMu.Lock()
-	if e, ok := r.cfgCache[key]; ok && now.Before(e.expiry) {
-		r.cfgCacheMu.Unlock()
-		return e.configs, e.configsErr
-	}
-	r.cfgCacheMu.Unlock()
-
-	configs := []TopicConfigEntry{}
-	var configsErr string
-
-	rcs, err := adm.DescribeTopicConfigs(ctx, topic)
-	if err == nil {
-		for _, rc := range rcs {
-			if rc.Err != nil {
-				if code := classifyConfigsErr(rc.Err); code != "" && configsErr == "" {
-					configsErr = code
-				}
-				continue
-			}
-			for _, c := range rc.Configs {
-				val := ""
-				if c.Value != nil {
-					val = *c.Value
-				}
-				isDefault := c.Source == kmsg.ConfigSourceDefaultConfig ||
-					c.Source == kmsg.ConfigSourceStaticBrokerConfig ||
-					c.Source == kmsg.ConfigSourceDynamicDefaultBrokerConfig
-				configs = append(configs, TopicConfigEntry{
-					Name:      c.Key,
-					Value:     val,
-					IsDefault: isDefault,
-					Source:    c.Source.String(),
-					Sensitive: c.Sensitive,
-				})
-			}
-		}
-	} else {
-		configsErr = classifyConfigsErr(err)
-		if configsErr == "" {
-			configsErr = "unavailable"
-		}
-		r.log.Warn("describe topic configs failed", "cluster", cluster, "topic", topic, "err", err)
-	}
-
-	ttl := cfgCacheTTLSuccess
-	if configsErr == "unauthorized" {
-		ttl = cfgCacheTTLPermanent
-	}
-
-	r.cfgCacheMu.Lock()
-	r.cfgCache[key] = topicConfigsCacheEntry{
-		configs:    configs,
-		configsErr: configsErr,
-		expiry:     now.Add(ttl),
-	}
-	r.cfgCacheMu.Unlock()
-
-	return configs, configsErr
-}
-
-// Describe returns ClusterInfo for every configured cluster, each probed
-// with the given per-cluster timeout. If probeCaps is true, the capability
-// probe is also attached (using the 60s cache).
-func (r *Registry) Describe(ctx context.Context, probeTimeout time.Duration) []ClusterInfo {
-	configs := r.ConfigsOrdered()
-	out := make([]ClusterInfo, 0, len(configs))
-	for _, c := range configs {
-		pctx, cancel := context.WithTimeout(ctx, probeTimeout)
-		err := r.Ping(pctx, c.Name)
-		cancel()
-		authType := strings.ToLower(strings.TrimSpace(c.Auth.Type))
-		if authType == "" {
-			authType = "none"
-		}
-		info := ClusterInfo{
-			Name:           c.Name,
-			Reachable:      err == nil,
-			IsProd:         c.IsProd,
-			AuthType:       authType,
-			TLS:            c.TLS.Enabled,
-			SchemaRegistry: strings.TrimSpace(c.SchemaRegistry.URL) != "",
-		}
-		if err != nil {
-			info.Error = err.Error()
-		} else {
-			cctx, ccancel := context.WithTimeout(ctx, 4*time.Second)
-			if caps, err := r.Capabilities(cctx, c.Name); err == nil {
-				info.Capabilities = caps
-			}
-			ccancel()
-			r.applyClusterAggregates(&info)
-		}
-		out = append(out, info)
-	}
-	return out
-}
-
-// Close releases all underlying Kafka clients.
+// Close stops the metrics collector and releases all underlying Kafka
+// clients.
 func (r *Registry) Close() {
 	r.mu.Lock()
 	mc := r.metrics
@@ -683,6 +369,11 @@ func (r *Registry) Close() {
 	if mc != nil {
 		mc.stop()
 	}
+	r.closeClients()
+}
+
+// closeClients releases all underlying Kafka clients.
+func (r *Connections) closeClients() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for name, cl := range r.clients {
