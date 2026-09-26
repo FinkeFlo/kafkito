@@ -79,3 +79,18 @@ kafkito is a single-binary Kafka management UI (see ADR-0001). We need a stack t
   "Connect-RPC generated client" in the State / data row).
 - **Go package layout:** application packages live under `internal/` (no
   public Go API); `pkg/` is reserved for code intended for external import.
+
+### 2026-09-26
+
+- **UI kit:** shadcn/ui is not used. The UI is built from kafkito's own
+  primitives in `frontend/src/components/ui/`, styled with Tailwind CSS v4
+  and the design tokens in `frontend/src/index.css` (this replaces the
+  "shadcn/ui" part of the UI kit row). Radix UI headless primitives
+  (`@radix-ui/react-*`, no shadcn) may be added for behaviour that is hard
+  to get right by hand, such as focus management and collision-aware
+  positioning; each one is wrapped in `components/ui/`, and kafkito paints
+  the whole visual layer. Toasts use `sonner`, icons `lucide-react`. The
+  rules and the component inventory are in
+  [DESIGN_GUIDELINES.md](../DESIGN_GUIDELINES.md) (§ 1 and § 6).
+- **Kafka client:** the `sr` package is not used; Schema Registry calls go
+  through a small HTTP client in `internal/kafka/schema_registry.go`.
