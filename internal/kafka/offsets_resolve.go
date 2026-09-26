@@ -20,8 +20,8 @@ type timestampOffsetLister interface {
 // keys mean "no record produced at-or-after the given timestamp on that
 // partition" (i.e., the bound is past the high-watermark).
 //
-// Used by both ConsumeMessages (for the time-range messages-view feature)
-// and SearchMessages (for the same predicate-search feature).
+// Used by loadTopicOffsets for every record reader and range count. Unset
+// bounds yield nil maps without an admin call.
 func resolveTimestampOffsets(
 	ctx context.Context,
 	adm timestampOffsetLister,

@@ -6,7 +6,6 @@ package kafka
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 )
 
@@ -54,7 +53,7 @@ func (r *Registry) MessageTimeline(ctx context.Context, cluster, topic string, o
 
 func messageTimelineWithAdmin(
 	ctx context.Context,
-	adm messageCountAdmin,
+	adm topicOffsetsAdmin,
 	cluster, topic string,
 	opts MessageTimelineOptions,
 ) (*MessageTimelineResult, error) {
@@ -79,47 +78,9 @@ func messageTimelineWithAdmin(
 	admCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 
-	md, err := adm.Metadata(admCtx, topic)
+	offs, err := loadTopicOffsets(admCtx, adm, cluster, topic, offsetsQuery{partition: opts.Partition})
 	if err != nil {
-		return nil, fmt.Errorf("fetch metadata for topic %q on cluster %q: %w", topic, cluster, err)
-	}
-	t, ok := md.Topics[topic]
-	if !ok || t.Err != nil {
-		return nil, fmt.Errorf("topic %q not found on cluster %q", topic, cluster)
-	}
-
-	allParts := make([]int32, 0, len(t.Partitions))
-	for _, p := range t.Partitions {
-		allParts = append(allParts, p.Partition)
-	}
-	sort.Slice(allParts, func(i, j int) bool { return allParts[i] < allParts[j] })
-
-	parts := allParts
-	if opts.Partition >= 0 {
-		if !containsPartition(allParts, opts.Partition) {
-			return nil, fmt.Errorf("partition %d not found in topic %q on cluster %q", opts.Partition, topic, cluster)
-		}
-		parts = []int32{opts.Partition}
-	}
-
-	starts, err := adm.ListStartOffsets(admCtx, topic)
-	if err != nil {
-		return nil, fmt.Errorf("list start offsets for topic %q on cluster %q: %w", topic, cluster, err)
-	}
-	ends, err := adm.ListEndOffsets(admCtx, topic)
-	if err != nil {
-		return nil, fmt.Errorf("list end offsets for topic %q on cluster %q: %w", topic, cluster, err)
-	}
-
-	startMap := make(map[int32]int64, len(parts))
-	endMap := make(map[int32]int64, len(parts))
-	for _, p := range parts {
-		if so, ok := starts.Lookup(topic, p); ok {
-			startMap[p] = so.Offset
-		}
-		if eo, ok := ends.Lookup(topic, p); ok {
-			endMap[p] = eo.Offset
-		}
+		return nil, err
 	}
 
 	edges := make([]int64, numSlots+1)
@@ -137,17 +98,17 @@ func messageTimelineWithAdmin(
 		if err != nil {
 			return nil, fmt.Errorf("resolve offsets at ts=%d for topic %q on cluster %q: %w", ts, topic, cluster, err)
 		}
-		m := make(map[int32]int64, len(parts))
-		for _, p := range parts {
+		m := make(map[int32]int64, len(offs.parts))
+		for _, p := range offs.parts {
 			if o, ok := listed.Lookup(topic, p); ok {
 				m[p] = o.Offset
 			} else {
 				// Absent means no record was produced at-or-after ts on this
 				// partition, i.e. ts is past the high-watermark.
-				m[p] = endMap[p]
+				m[p] = offs.end[p]
 			}
-			if m[p] < startMap[p] {
-				m[p] = startMap[p]
+			if m[p] < offs.start[p] {
+				m[p] = offs.start[p]
 			}
 		}
 		offsetAt[i] = m
@@ -161,7 +122,7 @@ func messageTimelineWithAdmin(
 	}
 	for i := 0; i < numSlots; i++ {
 		var total int64
-		for _, p := range parts {
+		for _, p := range offs.parts {
 			delta := offsetAt[i+1][p] - offsetAt[i][p]
 			if delta > 0 {
 				total += delta
