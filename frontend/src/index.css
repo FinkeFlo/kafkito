@@ -187,7 +187,7 @@ body {
  * so the indicator carves out of the accent / danger fill. The default
  * `--color-focus = --color-accent` works against every canvas surface
  * (`--color-bg`, `--color-panel`, `--color-subtle`, `--color-hover`)
- * in both modes — see the contrast report for measured ratios.
+ * in both modes — `src/__checks__/contrast.test.ts` asserts the ratios.
  *
  * `docs/DESIGN_GUIDELINES.md` § 4.4 documents this rule as the canonical
  * focus indicator. */

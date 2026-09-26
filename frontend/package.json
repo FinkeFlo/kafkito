@@ -13,7 +13,6 @@
     "knip": "tsr generate && knip",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check:contrast": "node scripts/check-contrast.mjs",
     "api:generate": "bunx openapi-typescript@7.13.0 ../api/openapi.yaml -o src/lib/api.gen.ts --default-non-nullable false"
   },
   "dependencies": {

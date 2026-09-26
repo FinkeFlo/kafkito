@@ -18,7 +18,7 @@ export interface NoticeProps {
 // Plain tint surfaces (no `/40` opacity). The token table designs these
 // for AA-compliant body text on `text-text` in both light and dark
 // modes; using the un-opacified surface removes the opacity-composition
-// uncertainty that the contrast script can't model. `info` uses the
+// uncertainty that a token-level contrast check can't model. `info` uses the
 // accent-subtle tint so it does not visually collide with `warning`
 // (the previous mapping shared the amber surface).
 const surfaceByIntent: Record<NoticeIntent, string> = {

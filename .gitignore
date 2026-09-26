@@ -59,6 +59,3 @@ NEXT_STEPS.md
 
 # Local git worktrees
 .worktrees/
-
-# Generated contrast report (output of frontend/scripts/check-contrast.mjs)
-frontend/scripts/contrast-report.html

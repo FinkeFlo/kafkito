@@ -463,11 +463,12 @@ unless each has been implemented and visually checked.
   not rely on `title=` alone for load-bearing reason copy.
 - Tables that can be sorted or filtered announce that through the column
   header's `aria-sort` attribute.
-- Contrast: all tokens are validated for WCAG AA at the token level.
-  Don't stack `muted` text on `subtle` background — it drops below AA.
-  (The `check:contrast` scanner does not currently model this specific
-  pair as a usage failure, so the rule remains a hand-enforced
-  contract — review it during PR.)
+- Contrast: the design-token pairs (text on surfaces, status tints, focus
+  ring, strong border) are asserted against WCAG AA in both modes by
+  `frontend/src/__checks__/contrast.test.ts`; add a pair there when you
+  introduce a new foreground/background combination. Rendered pages are
+  scanned with axe in light and dark theme by `frontend/e2e/a11y.spec.ts`,
+  which fails on any `serious` or `critical` violation.
 
 ---
 
