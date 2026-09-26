@@ -55,6 +55,8 @@ frontend/e2e/csp.spec.ts            fails on any Content-Security-Policy violati
 frontend/e2e/a11y.spec.ts           axe scan of the main routes and dialogs in light and dark theme
                                     (fixtures/axe.ts); fails on serious/critical violations
 frontend/e2e/status-indicators.spec.ts  every status indicator keeps a non-colour cue (WCAG 1.4.1)
+frontend/e2e/private-cluster-storage.spec.ts  seeds kafkito.private-clusters.v1 and walks the stored
+                                    connections; secrets must stay out of the console and the page
 frontend/e2e/vision-deficiency.spec.ts  opt-in: set KAFKITO_E2E_VISION_DIR to capture the status pages
                                     under deuteranopia / protanopia emulation (Chromium CDP)
 Makefile :: e2e, e2e-up, e2e-test, e2e-down
@@ -74,13 +76,18 @@ Makefile :: e2e, e2e-up, e2e-test, e2e-down
     `e2e-produce-target`) that `seed.sh` recreates on every run.
   - `groups.spec.ts`: creates a consumer group with a unique name, resets
     its offsets and deletes it.
+  - `topics.spec.ts`: creates a topic with a unique name, finds it in the
+    list without a reload and deletes it through the API afterwards.
   - `acls.spec.ts`: creates an ACL rule for a unique principal, finds it
     in the list and deletes it.
   - `scram-users.spec.ts`: creates a SCRAM user with a unique name,
     rotates its password and deletes the credential.
+  - The mutation walks require the list refetch caused by the mutation's
+    query invalidation and no full page load.
 - Cluster name in URLs is `KAFKITO_E2E_CLUSTER` (defaults to `local` —
   the cluster defined in `fixtures/kafkito-e2e.yaml`).
-- `clusters.spec.ts` and `status-indicators.spec.ts` test private-cluster
+- `clusters.spec.ts`, `status-indicators.spec.ts` and
+  `private-cluster-storage.spec.ts` test private-cluster
   connections against the fixture broker through the host's private IPv4
   address (`fixtures/host-address.ts`), because the backend refuses
   loopback brokers for private clusters. It picks the first RFC 1918
