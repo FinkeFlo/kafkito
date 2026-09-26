@@ -4,6 +4,7 @@
 package kafka
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -89,4 +90,55 @@ func TestConsume_ForwardCursorPagesKeepUpperTimeBound(t *testing.T) {
 			assert.False(t, pages[len(pages)-1].HasMore)
 		})
 	}
+}
+
+// A from=end page caps every partition at its fair share (limit/K + 8). When
+// one partition holds most of the newest records, the cap used to cut it off
+// and the page was filled with older records of other partitions instead,
+// so the page was not the newest N and later pages broke newest-first order.
+func TestConsume_FromEndDominantPartitionIsNotCappedByFairShare(t *testing.T) {
+	t.Parallel()
+	env := newKfakeEnv(t, "bursts", 3, nil)
+	// Bursts: p0 oldest, then p2, then p1 with the 30 newest records.
+	burst := func(p int32, n int, baseTS int64) {
+		for i := range n {
+			env.produce(t, &kgo.Record{
+				Partition: p,
+				Timestamp: time.UnixMilli(baseTS + int64(i)),
+				Value:     []byte(fmt.Sprintf("p%d-%d", p, i)),
+			})
+		}
+	}
+	burst(0, 20, fixtureBaseTS)
+	burst(2, 10, fixtureBaseTS+1_000)
+	burst(1, 30, fixtureBaseTS+2_000)
+
+	opts := ConsumeOptions{Partition: -1, Limit: 30, From: FromEnd}
+	first := consumePage(t, env, opts)
+	assert.Equal(t, valuesOf("p1", 29), values(first.Messages), "the newest 30 records are all on p1")
+	assert.False(t, first.Partial)
+
+	var all []string
+	for _, page := range consumeAllPages(t, env, opts) {
+		all = append(all, values(page.Messages)...)
+	}
+	want := append(append(valuesOf("p1", 29), valuesOf("p2", 9)...), valuesOf("p0", 19)...)
+	assert.Equal(t, want, all, "paging returns every record once, newest first")
+}
+
+func values(msgs []Message) []string {
+	out := make([]string, 0, len(msgs))
+	for _, m := range msgs {
+		out = append(out, m.Value)
+	}
+	return out
+}
+
+// valuesOf returns "<prefix>-<i>" for i from hi down to 0.
+func valuesOf(prefix string, hi int) []string {
+	var out []string
+	for i := hi; i >= 0; i-- {
+		out = append(out, fmt.Sprintf("%s-%d", prefix, i))
+	}
+	return out
 }

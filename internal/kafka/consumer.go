@@ -191,22 +191,18 @@ func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, o
 	}
 
 	direction := opts.direction()
-	collected, err := r.collectWindows(ctx, recordScan{
-		cluster: cluster, topic: topic, role: "consume", cfg: cfg,
-		ranges: windowRanges(windows), drainAfter: 2,
-	}, opts, windows)
+	deadline := time.Now().Add(opts.Timeout)
+	scan := recordScan{cluster: cluster, topic: topic, role: "consume", cfg: cfg, drainAfter: 2}
+	collected, err := r.collectWindows(ctx, deadline, scan, opts, windows)
 	if err != nil {
 		return nil, err
 	}
-
-	merged := make([]Message, 0)
-	for _, msgs := range collected {
-		merged = append(merged, msgs...)
+	if direction == CursorBackward && windowsFull(windows, collected) {
+		if err := r.refillCappedWindows(ctx, deadline, scan, opts, windows, collected); err != nil {
+			return nil, err
+		}
 	}
-	sortMessages(merged, direction == CursorBackward)
-	if len(merged) > opts.Limit {
-		merged = merged[:opts.Limit]
-	}
+	merged := mergePage(collected, direction == CursorBackward, opts.Limit)
 
 	prev := opts.CursorUpperBounds
 	if direction == CursorForward {
@@ -250,11 +246,12 @@ func (o ConsumeOptions) direction() CursorDirection {
 
 // collectWindows reads the page windows and returns the decoded records per
 // partition. It stops once the page is full (forward: limit records;
-// backward: every window complete), the windows are drained or opts.Timeout
-// elapses; a timeout is not an error, the page is then just short.
-func (r *Registry) collectWindows(ctx context.Context, s recordScan, opts ConsumeOptions, windows map[int32]pageWindow) (map[int32][]Message, error) {
-	pollCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
+// backward: every window complete), the windows are drained or the deadline
+// passes; a timeout is not an error, the page is then just short.
+func (r *Registry) collectWindows(ctx context.Context, deadline time.Time, s recordScan, opts ConsumeOptions, windows map[int32]pageWindow) (map[int32][]Message, error) {
+	pollCtx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
+	s.ranges = windowRanges(windows)
 	dec := r.recordDecoder(s.cluster, s.topic)
 	collected := make(map[int32][]Message, len(windows))
 	forward := opts.direction() == CursorForward
@@ -275,6 +272,57 @@ func (r *Registry) collectWindows(ctx context.Context, s recordScan, opts Consum
 		}
 	}
 	return collected, nil
+}
+
+// refillCappedWindows widens the from=end windows that the fair share may
+// have cut short and reads the extra records into collected.
+//
+// A capped partition's unread records are all older than its oldest
+// collected one, so they can only matter if a record just below the window
+// would still rank inside the page. Widening such a window to limit records
+// always suffices, because no page holds more than limit records of one
+// partition, so a single round is enough.
+func (r *Registry) refillCappedWindows(ctx context.Context, deadline time.Time, s recordScan, opts ConsumeOptions, windows map[int32]pageWindow, collected map[int32][]Message) error {
+	page := mergePage(collected, true, opts.Limit)
+	extra := make(map[int32]pageWindow)
+	for p, w := range windows {
+		got := collected[p]
+		if w.begin <= w.trueBegin || len(got) == 0 {
+			continue
+		}
+		below := Message{Timestamp: got[0].Timestamp, Partition: p, Offset: w.begin - 1}
+		if len(page) == opts.Limit && compareMessages(below, page[len(page)-1], true) > 0 {
+			continue
+		}
+		extra[p] = pageWindow{begin: max(w.trueBegin, w.begin-int64(opts.Limit-len(got))), stop: w.begin}
+	}
+	if len(extra) == 0 {
+		return nil
+	}
+	more, err := r.collectWindows(ctx, deadline, s, opts, extra)
+	if err != nil {
+		return err
+	}
+	for p, e := range extra {
+		w := windows[p]
+		w.begin = e.begin
+		windows[p] = w
+		collected[p] = append(more[p], collected[p]...)
+	}
+	return nil
+}
+
+// mergePage merges the collected records, sorts them and cuts to limit.
+func mergePage(collected map[int32][]Message, newestFirst bool, limit int) []Message {
+	merged := make([]Message, 0)
+	for _, msgs := range collected {
+		merged = append(merged, msgs...)
+	}
+	sortMessages(merged, newestFirst)
+	if len(merged) > limit {
+		merged = merged[:limit]
+	}
+	return merged
 }
 
 // windowsFull reports whether every window has collected all its records

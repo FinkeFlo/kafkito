@@ -16,96 +16,108 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestIntegration_Consume_FromEnd_BalancedAcrossPartitions produces an
-// uneven 60/30/10 distribution across 3 partitions and asserts that the
-// "last 30 across all partitions" query returns records from every
-// partition (proportionally), ordered newest-first.
+// TestIntegration_Consume_FromEnd_BalancedAcrossPartitions checks that the
+// "last N across all partitions" page is exactly the N newest records of the
+// topic, ordered newest-first, whatever the distribution across partitions:
 //
-// This test reproduces Issue 1: kafka-ui returns mixed partitions for
-// the equivalent query, but kafkito's pre-fix implementation returned
-// records biased to whichever partition's broker responded first.
+//   - interleaved: records alternate between partitions (60/30/10), so every
+//     partition must show up in the page (the original kafka-ui parity goal:
+//     a single partition must not dominate just because its broker answered
+//     first);
+//   - bursts: each partition is written in one burst and the last burst is
+//     the largest, so the newest page belongs to a single partition and must
+//     not be padded with older records of the other partitions.
+//
+// Records are produced sequentially, so a partition's burst order is
+// deterministic. The expected page is derived from the topic itself by
+// reading every record and sorting newest-first.
 func TestIntegration_Consume_FromEnd_BalancedAcrossPartitions(t *testing.T) {
 	broker := startBroker(t)
 	reg := newRegistry(t, broker)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
+	scenarios := map[string][]int32{
+		"interleaved": interleaved(10, []int32{0, 1, 0, 2, 0, 1, 0, 1, 0, 0}),
+		"bursts":      append(append(repeat(0, 60), repeat(2, 10)...), repeat(1, 30)...),
+	}
+	for name, order := range scenarios {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			topic := "it-consume-balance-" + name
+			require.NoError(t, reg.CreateTopic(ctx, "it", CreateTopicRequest{Name: topic, Partitions: 3, ReplicationFactor: 1}))
+			for i, p := range order {
+				_, err := reg.Produce(ctx, "it", topic, ProduceRequest{
+					Partition: int32Ptr(p),
+					Key:       fmt.Sprintf("k%03d", i),
+					Value:     fmt.Sprintf(`{"p":%d,"i":%d}`, p, i),
+				})
+				require.NoError(t, err)
+			}
 
-	topic := "it-consume-balance"
-	require.NoError(t, reg.CreateTopic(ctx, "it", CreateTopicRequest{
-		Name:              topic,
-		Partitions:        3,
-		ReplicationFactor: 1,
-	}))
-
-	// Produce uneven counts across partitions: 60 to p0, 30 to p1, 10 to p2.
-	dist := map[int32]int{0: 60, 1: 30, 2: 10}
-	produced := 0
-	for p, n := range dist {
-		for i := 0; i < n; i++ {
-			_, err := reg.Produce(ctx, "it", topic, ProduceRequest{
-				Partition: int32Ptr(p),
-				Key:       fmt.Sprintf("p%d-k%03d", p, i),
-				Value:     fmt.Sprintf(`{"p":%d,"i":%d}`, p, i),
+			want := newestAcrossPartitions(ctx, t, reg, topic, 3, 30)
+			res, err := reg.ConsumeMessages(ctx, "it", topic, ConsumeOptions{
+				Partition: -1, Limit: 30, From: FromEnd, Timeout: 8 * time.Second,
 			})
 			require.NoError(t, err)
-			produced++
-		}
+			require.False(t, res.Partial)
+			require.Equal(t, positions(want), positions(res.Messages), "page must be the 30 newest records, newest first")
+
+			if name == "interleaved" {
+				got := map[int32]int{}
+				for _, m := range res.Messages {
+					got[m.Partition]++
+				}
+				require.Len(t, got, 3, "every partition must be represented (got %v)", got)
+			}
+		})
 	}
-	require.Equal(t, 100, produced)
+}
 
-	// Wait briefly so all records are visible at end-offsets.
-	time.Sleep(500 * time.Millisecond)
-
-	// Pull the "last 30 across all partitions".
-	res, err := reg.ConsumeMessages(ctx, "it", topic, ConsumeOptions{
-		Partition: -1,
-		Limit:     30,
-		From:      FromEnd,
-		Timeout:   8 * time.Second,
+// newestAcrossPartitions reads every record of topic and returns the n
+// newest, ordered newest-first (timestamp desc, partition asc, offset desc).
+func newestAcrossPartitions(ctx context.Context, t *testing.T, reg *Registry, topic string, partitions int32, n int) []Message {
+	t.Helper()
+	var all []Message
+	for p := range partitions {
+		res, err := reg.ConsumeMessages(ctx, "it", topic, ConsumeOptions{Partition: p, Limit: 500, From: FromStart, Timeout: 8 * time.Second})
+		require.NoError(t, err)
+		require.False(t, res.HasMore)
+		all = append(all, res.Messages...)
+	}
+	sort.Slice(all, func(i, j int) bool {
+		if all[i].Timestamp != all[j].Timestamp {
+			return all[i].Timestamp > all[j].Timestamp
+		}
+		if all[i].Partition != all[j].Partition {
+			return all[i].Partition < all[j].Partition
+		}
+		return all[i].Offset > all[j].Offset
 	})
-	require.NoError(t, err)
-	require.Len(t, res.Messages, 30, "want exactly 30 messages")
+	return all[:n]
+}
 
-	// Coverage: every partition with at least 10 records must contribute
-	// at least 4 records. The regression we are guarding against returned
-	// ~30/0/0 (single partition dominated). The exact post-fix split
-	// depends on per-partition timestamp clustering — produce-rate skew
-	// often makes one partition's newest records temporally older than
-	// another's, so after the global newest-first sort the higher-rate
-	// partition can drop below its 1/K=10 share. Threshold of 4 still
-	// proves "all three partitions represented", which is the user-
-	// visible parity goal kafka-ui exhibits.
-	got := map[int32]int{}
-	for _, m := range res.Messages {
-		got[m.Partition]++
+func positions(msgs []Message) []string {
+	out := make([]string, 0, len(msgs))
+	for _, m := range msgs {
+		out = append(out, fmt.Sprintf("p%d@%d", m.Partition, m.Offset))
 	}
-	for p, total := range dist {
-		minWant := 4
-		if total < minWant {
-			minWant = total
-		}
-		require.GreaterOrEqualf(t, got[p], minWant,
-			"partition %d should contribute at least %d records (got %d, dist %+v)",
-			p, minWant, got[p], got)
-	}
+	return out
+}
 
-	// Ordering: newest-first by timestamp (ties broken by partition asc, offset desc).
-	sorted := make([]Message, len(res.Messages))
-	copy(sorted, res.Messages)
-	sort.SliceStable(sorted, func(i, j int) bool {
-		if sorted[i].Timestamp != sorted[j].Timestamp {
-			return sorted[i].Timestamp > sorted[j].Timestamp
-		}
-		if sorted[i].Partition != sorted[j].Partition {
-			return sorted[i].Partition < sorted[j].Partition
-		}
-		return sorted[i].Offset > sorted[j].Offset
-	})
-	for i := range sorted {
-		require.Equalf(t, sorted[i], res.Messages[i],
-			"messages[%d] not in newest-first order", i)
+func interleaved(rounds int, pattern []int32) []int32 {
+	var out []int32
+	for range rounds {
+		out = append(out, pattern...)
 	}
+	return out
+}
+
+func repeat(p int32, n int) []int32 {
+	out := make([]int32, n)
+	for i := range out {
+		out[i] = p
+	}
+	return out
 }
 
 // int32Ptr is a tiny helper for the integration tests in this file.
