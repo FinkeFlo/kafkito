@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import type { BrokerInfo, GroupInfo, SCRAMUser, Subject, TopicInfo } from "../lib/api";
-import { useCluster } from "../lib/use-cluster";
-import { useFuzzy } from "../lib/fuzzy";
-import { latestVersion } from "../lib/schema-version";
+import type { BrokerInfo, GroupInfo, SCRAMUser, Subject, TopicInfo } from "@/lib/api";
+import { useCluster } from "@/lib/use-cluster";
+import { useFuzzy } from "@/lib/fuzzy";
+import { latestVersion } from "@/lib/schema-version";
 import { Boxes, FileJson, Home, Search, Server, Shield, UserCog, Users } from "lucide-react";
 import { brokerQueries } from "@/lib/queries/brokers";
 import { groupQueries } from "@/lib/queries/groups";
