@@ -246,6 +246,11 @@ kafkito always injects `X-Kafkito-Source: true` and, when an identity is
 available, `X-Kafkito-User: <subject>`, overwriting those keys if you supplied
 them.
 
+The body may be gzip-compressed with `Content-Encoding: gzip`. The body is
+capped at 15 MiB of JSON either way (after decompression); a larger body
+returns `413` `request body exceeds the 15 MB produce limit`. Unknown fields are
+rejected with `400`.
+
 ```bash
 # Zero-length value (not a tombstone) plus a binary header
 curl -s -X POST "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages" \
@@ -347,7 +352,7 @@ Status codes returned **before** the stream starts:
 | Code | Meaning                                                                                                                                                                  |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 200  | Job started; body is `text/event-stream`.                                                                                                                                |
-| 400  | Invalid body, missing `dest_topic`, both or neither destination field, destination equal to the source cluster+topic (would never terminate), unknown `dest_cluster`, `dest_topic` does not exist (the destination is never auto-created), or `preserve_partition` with too few destination partitions. |
+| 400  | Invalid body (including unknown fields or a body over 32 KiB), missing `dest_topic`, both or neither destination field, destination equal to the source cluster+topic (would never terminate), unknown `dest_cluster`, `dest_topic` does not exist (the destination is never auto-created), or `preserve_partition` with too few destination partitions. |
 | 403  | RBAC denied consume on the source or produce on the destination.                                                                                                          |
 | 428  | Destination cluster is marked `is_prod` and the `X-Kafkito-Confirm-Prod: true` header is missing.                                                                         |
 | 429  | Too many concurrent copy jobs server-wide; body carries `code: copy_concurrency_limit` and the response has a `Retry-After` header. Copies hold broker connections for their whole run, so the server sheds load instead of queueing. |
@@ -475,6 +480,10 @@ and the violated rule, but never the submitted value:
 JSON request bodies on those endpoints must be sent with
 `Content-Type: application/json` (a `charset` parameter is fine); other
 content types return `400` `request body: unsupported Content-Type`.
+
+On those endpoints `X-Kafkito-Confirm-Prod` must be exactly `true` when sent;
+any other value returns `400` before the production check runs. Omit the
+header to get the `428` `production_confirmation_required` response.
 
 Status codes used by the server:
 

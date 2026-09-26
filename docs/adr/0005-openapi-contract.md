@@ -134,15 +134,48 @@ supports OpenAPI 3.1 (including `type: [T, "null"]` and `const`).
   SASL mechanism needs are checked in `validateClusterPolicy`, for both
   the `_test` body and the `X-Kafkito-Cluster` header. The header is
   decoded by `privateClusterMiddleware` and is not schema-validated.
-- **Streaming.** oapi-codegen v2.8.0 streams `text/event-stream` responses
-  natively (the strict response type takes an `io.Reader` and flushes).
-  The SSE endpoints (live consume, topic copy progress) can therefore be
-  migrated the same way, but the response writer must keep the request
-  log middleware's `Flush` passthrough.
-- **Open points for later migrations.** Request bodies that are read
-  before the leaf (the RBAC middleware peeks at some JSON bodies) or that
-  are compressed (gzip produce bodies) need their size limit and decoding
-  in front of the validator, the same way `_test` does today.
+- **Body limits before body readers.** Every body is capped before
+  anything reads it. JSON bodies (create topic, alter configs, delete
+  records) are capped at 1 MiB, search at 1 MiB and copy at 32 KiB, each
+  with its previous 400 message. Produce has its own middleware in front of
+  the validator. It caps the wire bytes, decompresses a
+  `Content-Encoding: gzip` body, caps the decompressed JSON at 15 MiB (413)
+  and hands the validator and the handler the plain body. The RBAC
+  middleware reads the create-topic body to find the topic name before any
+  route runs. That read is capped at the same 1 MiB, and the bytes it read
+  become the body again for the validator and the handler.
+- **Streaming (topic copy).** oapi-codegen v2.8.0 streams
+  `text/event-stream` responses natively. The generated response writes
+  `Content-Type: text/event-stream`, reads the `io.Reader` body in 4 KiB
+  chunks, calls `http.Flusher.Flush` after each one and closes the body if
+  it is an `io.ReadCloser`. The request log middleware forwards `Flush`.
+  `CopyMessages` uses this as follows:
+  - Everything that can fail is checked before the stream opens, so the
+    failure is still a JSON error with its status. That covers body rules,
+    destination resolution, production confirmation, destination RBAC,
+    the concurrency slot (429 `copy_concurrency_limit`) and the destination
+    topic.
+  - The job runs in a goroutine and writes its events into an `io.Pipe`.
+    The read side of the pipe is the response body. The event format
+    (`data: {json}` plus a blank line) is unchanged, and the response
+    wrapper adds `Cache-Control: no-cache` and `X-Accel-Buffering: no`.
+    The stream has no `Content-Length`.
+  - The job context is `context.WithoutCancel(ctx)` with a 4 h ceiling, so
+    the 30 s `middleware.Timeout` deadline does not end a copy.
+    `context.AfterFunc` wires only a real cancellation back in, which is
+    how net/http reports a client disconnect.
+  - After the deadline has fired, a disconnect shows up only as a failed
+    write. The generated writer then stops reading and closes the body.
+    The body's `Close` cancels the job, and the job's next pipe write
+    returns `io.ErrClosedPipe`.
+  - The goroutine closes the pipe and releases the concurrency slot in its
+    deferred calls, so every way out frees the slot. If the handler
+    returns before the goroutine starts, it releases the slot itself.
+  - Tests use an `httptest` server and a registry fake that blocks the job.
+    They cover the first events arriving while the job still runs, a
+    client abort ending the goroutine and freeing the slot, a failed write
+    after the deadline stopping the job, the job outliving the deadline,
+    the headers, and events matching `CopyProgressEvent`.
 
 ## Consequences
 
