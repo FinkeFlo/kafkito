@@ -71,6 +71,11 @@ services:
       retries: 6
       start_period: 15s
 
+  # Dev container with auth disabled, like the -local image: a devauth
+  # build defaults to auth mode off. Inside the container kafkito must
+  # listen on all interfaces, so KAFKITO_INSECURE_AUTH_OFF acknowledges the
+  # non-loopback bind, and the port is published on 127.0.0.1 only so it
+  # stays reachable from this machine alone.
   kafkito:
     profiles: ["app"]
     build:
@@ -78,14 +83,16 @@ services:
       dockerfile: Dockerfile
       args:
         VERSION: 0.0.0-dev
+        BUILD_TAGS: devauth
     container_name: kafkito
     depends_on:
       kafka:
         condition: service_healthy
     ports:
-      - "37421:37421"
+      - "127.0.0.1:37421:37421"
     environment:
       PORT: "37421"
+      KAFKITO_INSECURE_AUTH_OFF: "true"
       KAFKITO_KAFKA_BROKERS: "kafka:9092"
 
   keycloak:
