@@ -332,3 +332,36 @@ func produceError(cluster, topic string, partition *int32, err error) error {
 	}
 	return upstreamError("produce message", err)
 }
+
+func injectKafkitoProduceHeaders(req *kafkapkg.ProduceRequest, user string) {
+	if req.Headers == nil {
+		req.Headers = make(map[string]string)
+	}
+	req.Headers["X-Kafkito-Source"] = "true"
+	if user != "" {
+		req.Headers["X-Kafkito-User"] = user
+	}
+}
+
+func isClientProduceErr(msg string) bool {
+	return strings.Contains(msg, "invalid base64") ||
+		strings.Contains(msg, "unsupported encoding")
+}
+
+// isInvalidPartitionErr reports whether a produce failed because the requested
+// partition does not exist on the topic. franz-go raises this from the
+// partitioner (see internal/kafka's explicitOrKeyPartitioner), so the wording comes
+// from kgo rather than kafkito.
+func isInvalidPartitionErr(msg string) bool {
+	return strings.Contains(msg, "invalid record partitioning choice")
+}
+
+// isSearchClientErr reports whether a search error originates from bad
+// caller-supplied input (400) rather than a broker-side failure (502).
+// Used by searchMessages.
+func isSearchClientErr(msg string) bool {
+	return strings.Contains(msg, "jsonpath") || strings.Contains(msg, "xpath") ||
+		strings.Contains(msg, "regex") || strings.Contains(msg, "numeric op") ||
+		strings.Contains(msg, "unknown search mode") || strings.Contains(msg, "unknown operator") ||
+		strings.Contains(msg, "js filter")
+}

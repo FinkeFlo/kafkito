@@ -12,6 +12,7 @@ import (
 	"time"
 
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
+	"github.com/FinkeFlo/kafkito/internal/rbac"
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
 )
 
@@ -152,4 +153,26 @@ func (s *apiServer) DeleteRecords(ctx context.Context, req gen.DeleteRecordsRequ
 		return nil, clusterError(req.Cluster, "delete records", err)
 	}
 	return gen.DeleteRecords200JSONResponse{Results: res}, nil
+}
+
+// filterTopicsByRBAC removes topics from the list the user is not allowed to
+// view. When the user has '*' access, the list is returned unchanged.
+func filterTopicsByRBAC(topics []kafkapkg.TopicInfo, policy *rbac.Policy, user, cluster string) []kafkapkg.TopicInfo {
+	globs, all := policy.AllowedResourceNames(user, cluster, "topic", "view")
+	if all {
+		return topics
+	}
+	if len(globs) == 0 {
+		return []kafkapkg.TopicInfo{}
+	}
+	out := make([]kafkapkg.TopicInfo, 0, len(topics))
+	for _, t := range topics {
+		for _, glob := range globs {
+			if rbac.MatchName(glob, t.Name) {
+				out = append(out, t)
+				break
+			}
+		}
+	}
+	return out
 }

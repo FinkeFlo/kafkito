@@ -97,6 +97,63 @@ actions:
       x-go-type: kafka.SearchStats
       x-go-type-import:
         path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.GroupInfo
+    update:
+      x-go-type: kafka.GroupInfo
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.GroupDetail
+    update:
+      x-go-type: kafka.GroupDetail
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.CreateGroupRequest
+    update:
+      x-go-type: kafka.CreateGroupRequest
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.ResetOffsetsRequest
+    update:
+      x-go-type: kafka.ResetOffsetsRequest
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.ResetOffsetsResponse
+    update:
+      x-go-type: kafka.ResetOffsetsResult
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  # components.parameters.Subject takes the Go name Subject.
+  - target: $.components.schemas.Subject
+    update:
+      x-go-name: SchemaSubject
+      x-go-type: kafka.Subject
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.SchemaVersion
+    update:
+      x-go-type: kafka.SchemaVersion
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.RegisterSchemaRequest
+    update:
+      x-go-type: kafka.RegisterSchemaRequest
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.RegisterSchemaResponse
+    update:
+      x-go-type: kafka.RegisterSchemaResponse
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.ACLEntry
+    update:
+      x-go-type: kafka.ACLEntry
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.SCRAMUser
+    update:
+      x-go-type: kafka.SCRAMUser
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/kafka
   # The header is decoded and validated by privateClusterMiddleware; the
   # generated binding only passes the raw value through.
   - target: $.components.parameters.PrivateClusterHeader.schema

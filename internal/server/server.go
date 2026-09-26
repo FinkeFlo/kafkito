@@ -90,11 +90,6 @@ func New(opts Options) http.Handler {
 					g.Use(rbacMiddleware(policy))
 					g.Use(resolvePrivateClusterParam(opts.Registry))
 					generated.mountClusters(g)
-					(&clusterAPI{
-						reg:    opts.Registry,
-						policy: policy,
-						log:    handlerLog,
-					}).mount(g)
 				})
 			}
 		})
