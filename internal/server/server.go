@@ -34,6 +34,8 @@ type Options struct {
 	// auth middleware (used by tests).
 	Auth auth.Validator
 
+	// stores replaces the stores wired from Registry in tests.
+	stores *stores
 	// copyRegistry replaces Registry for the copy job in tests.
 	copyRegistry copyRegistry
 	// strictMiddlewares run around every generated handler in tests.
@@ -61,6 +63,9 @@ func New(opts Options) http.Handler {
 	policy := rbac.Compile(opts.Config.RBAC)
 
 	st := registryStores(opts.Registry)
+	if opts.stores != nil {
+		st = *opts.stores
+	}
 	if opts.copyRegistry != nil {
 		st.copyReg = opts.copyRegistry
 	}
@@ -86,11 +91,11 @@ func New(opts Options) http.Handler {
 				v1.Use(auth.MiddlewareFor(opts.Auth), capturePrincipal)
 			}
 			generated.mountMeta(v1)
-			if opts.Registry != nil {
+			if opts.Registry != nil || opts.stores != nil {
 				v1.Group(func(g chi.Router) {
 					g.Use(privateClusterMiddleware)
 					g.Use(rbacMiddleware(policy))
-					g.Use(resolvePrivateClusterParam(opts.Registry.Connections))
+					g.Use(resolvePrivateClusterParam(st.clusters))
 					generated.mountClusters(g)
 				})
 			}
