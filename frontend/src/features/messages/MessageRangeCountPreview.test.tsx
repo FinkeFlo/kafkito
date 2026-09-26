@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   MESSAGE_RANGE_COUNT_DEBOUNCE_MS,
   MessageRangeCountPreview,
-} from "./message-range-count-preview";
+} from "./MessageRangeCountPreview";
 
 const fetchMessageCount = vi.hoisted(() => vi.fn());
 

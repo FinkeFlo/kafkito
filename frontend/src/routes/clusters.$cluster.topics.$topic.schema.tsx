@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { FileJson } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Tag } from "@/components/ui/Tag";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
 import { schemaQueries } from "@/lib/queries/schemas";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic/schema")({

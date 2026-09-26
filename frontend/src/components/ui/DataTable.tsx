@@ -9,7 +9,7 @@ import {
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
 import { cn } from "@/lib/utils";
-import { Skeleton } from "./skeleton";
+import { Skeleton } from "./Skeleton";
 
 /**
  * Two table APIs are supported on the same primitive so the kebab and

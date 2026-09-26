@@ -7,13 +7,13 @@ import {
   type ResetOffsetResult,
   type ResetStrategy,
 } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Notice } from "@/components/ui/Notice";
-import { Timestamp } from "@/components/ui/timestamp";
-import { LagBadge } from "@/features/groups/lag-badge";
+import { Timestamp } from "@/components/ui/Timestamp";
+import { LagBadge } from "@/features/groups/LagBadge";
 import { localInputToMs, msToLocalInput } from "@/lib/datetime";
 import { groupQueries } from "@/lib/queries/groups";
 

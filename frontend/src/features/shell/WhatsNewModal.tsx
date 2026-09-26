@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { CHANGELOG, type ChangelogEntry, type ChangelogItemType } from "@/content/changelog";
 import { normalizeVersion } from "@/lib/whats-new";

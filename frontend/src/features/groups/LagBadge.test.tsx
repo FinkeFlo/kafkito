@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { LagBadge } from "./lag-badge";
+import { LagBadge } from "./LagBadge";
 
 const lagThresholdWarning = 1_000;
 const lagThresholdDanger = 10_000;

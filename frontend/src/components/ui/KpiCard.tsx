@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { clsx } from "clsx";
-import { StatusIcon } from "./status-icon";
+import { StatusIcon } from "./StatusIcon";
 
 type DeltaIntent = "good" | "bad" | "neutral";
 

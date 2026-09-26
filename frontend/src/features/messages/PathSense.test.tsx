@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createEvent, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { PathSense } from "./path-sense";
+import { PathSense } from "./PathSense";
 import type { PathInfo, PathTree } from "@/lib/path-tree";
 
 // PathTree is a Map<string, PathInfo>; an empty Map means toRows(tree)

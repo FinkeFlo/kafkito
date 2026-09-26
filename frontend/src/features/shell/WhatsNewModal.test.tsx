@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { WhatsNewModal } from "./whats-new-modal";
+import { WhatsNewModal } from "./WhatsNewModal";
 
 describe("WhatsNewModal", () => {
   it("renders the title and the latest entry's items with type badges", () => {

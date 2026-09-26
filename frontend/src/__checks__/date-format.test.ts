@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-// Dates must render through <Timestamp> (src/components/ui/timestamp.tsx).
+// Dates must render through <Timestamp> (src/components/ui/Timestamp.tsx).
 // Flags raw Date formatters in non-test .ts/.tsx files under src:
 //   - `.toLocaleDateString(` / `.toLocaleTimeString(` anywhere
 //   - `new Date(...).toLocaleString(` (bare `x.toLocaleString(` is usually
@@ -15,7 +15,7 @@ import { dirname, join } from "node:path";
 
 const SRC_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-const ALLOWED_FILES = new Set(["lib/format.ts", "components/ui/timestamp.tsx"]);
+const ALLOWED_FILES = new Set(["lib/format.ts", "components/ui/Timestamp.tsx"]);
 
 const RAW_DATE =
   /\.toLocale(Date|Time)String\(|new Date\([^)]*\)\.toLocaleString\(|new Date\([^)]*\)\.(toString|toISOString|toDateString|toTimeString)\(/;
@@ -39,7 +39,7 @@ describe("date formatting", () => {
         hits.push(`src/${file}:${i + 1}: ${line.trim()}`);
       });
     }
-    // Fix: use <Timestamp value={msOrIso} /> from "@/components/ui/timestamp",
+    // Fix: use <Timestamp value={msOrIso} /> from "@/components/ui/Timestamp",
     // or whitelist the line with `// allow-raw-date: <reason>`.
     expect(hits).toEqual([]);
   });
