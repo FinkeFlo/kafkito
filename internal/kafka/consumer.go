@@ -172,7 +172,7 @@ type pageWindow struct {
 // ConsumeOptions.PartitionOffsets / CursorUpperBounds to fetch the
 // next page.
 func (r *Registry) ConsumeMessages(ctx context.Context, cluster, topic string, opts ConsumeOptions) (*ConsumeResult, error) {
-	cfg, ok := r.clusters[cluster]
+	cfg, ok := r.ConfigFor(cluster)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, cluster)
 	}
@@ -889,7 +889,7 @@ type RawMessageValue struct {
 //
 // Returns ErrValueTooLarge when the record's value exceeds maxRawDownloadBytes.
 func (r *Registry) FetchRawMessageValue(ctx context.Context, cluster, topic string, partition int32, offset int64) (*RawMessageValue, error) {
-	cfg, ok := r.clusters[cluster]
+	cfg, ok := r.ConfigFor(cluster)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, cluster)
 	}
