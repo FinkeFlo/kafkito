@@ -1,0 +1,2440 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`api wire contract > error messages for JSON error bodies 1`] = `
+{
+  "alterTopicConfigs": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "createACL": {
+    "error": "Error: {"error":"boom","code":"x"}
+",
+  },
+  "createGroup": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "createTopic": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "deleteACL": {
+    "error": "Error: {"error":"boom","code":"x"}
+",
+  },
+  "deleteGroup": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "deleteSCRAMUser(all)": {
+    "error": "Error: {"error":"boom","code":"x"}
+",
+  },
+  "deleteSCRAMUser(mechanism)": {
+    "error": "Error: {"error":"boom","code":"x"}
+",
+  },
+  "deleteSubject(permanent)": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "deleteSubject(soft)": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "downloadMessageRaw": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "fetchBrokers": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "fetchClusters": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "fetchGroupDetail": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "fetchGroups": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "fetchInfo": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "fetchMessageCount(none)": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "fetchMessageCount(params)": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "fetchMessageRawBase64": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "fetchMessageTimeline(all)": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "fetchMessageTimeline(p0)": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "fetchMessages(all params)": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "fetchMessages(none)": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "fetchMessages(partitionOffsets)": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "fetchSample(3,1)": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "fetchSample(default)": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "fetchTopicConsumers": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "fetchTopicDetail": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "fetchTopics": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "getSchemaVersion(3)": {
+    "error": "Error: {"error":"boom","code":"x"}
+",
+  },
+  "getSchemaVersion(latest)": {
+    "error": "Error: {"error":"boom","code":"x"}
+",
+  },
+  "listACLs": {
+    "error": "Error: {"error":"boom","code":"x"}
+",
+  },
+  "listSCRAMUsers": {
+    "error": "Error: {"error":"boom","code":"x"}
+",
+  },
+  "listSubjects": {
+    "error": "Error: {"error":"boom","code":"x"}
+",
+  },
+  "produceMessage(confirm)": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "produceMessage(gzip)": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "produceMessage(no confirm)": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "resetGroupOffsets(confirm)": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "resetGroupOffsets(no confirm)": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "searchMessages": {
+    "error": "Error: {"error":"boom","code":"x"}
+",
+  },
+  "testCluster": {
+    "error": "Error: HTTP 500: boom",
+  },
+  "upsertSCRAMUser": {
+    "error": "Error: {"error":"boom","code":"x"}
+",
+  },
+}
+`;
+
+exports[`api wire contract > error messages for empty error bodies 1`] = `
+{
+  "alterTopicConfigs": {
+    "error": "Error: HTTP 503",
+  },
+  "createACL": {
+    "error": "Error: ",
+  },
+  "createGroup": {
+    "error": "Error: HTTP 503",
+  },
+  "createTopic": {
+    "error": "Error: HTTP 503",
+  },
+  "deleteACL": {
+    "error": "Error: ",
+  },
+  "deleteGroup": {
+    "error": "Error: HTTP 503",
+  },
+  "deleteSCRAMUser(all)": {
+    "error": "Error: ",
+  },
+  "deleteSCRAMUser(mechanism)": {
+    "error": "Error: ",
+  },
+  "deleteSubject(permanent)": {
+    "error": "Error: HTTP 503",
+  },
+  "deleteSubject(soft)": {
+    "error": "Error: HTTP 503",
+  },
+  "downloadMessageRaw": {
+    "error": "Error: HTTP 503",
+  },
+  "fetchBrokers": {
+    "error": "Error: HTTP 503",
+  },
+  "fetchClusters": {
+    "error": "Error: HTTP 503",
+  },
+  "fetchGroupDetail": {
+    "error": "Error: HTTP 503",
+  },
+  "fetchGroups": {
+    "error": "Error: HTTP 503",
+  },
+  "fetchInfo": {
+    "error": "Error: HTTP 503",
+  },
+  "fetchMessageCount(none)": {
+    "error": "Error: HTTP 503",
+  },
+  "fetchMessageCount(params)": {
+    "error": "Error: HTTP 503",
+  },
+  "fetchMessageRawBase64": {
+    "error": "Error: HTTP 503",
+  },
+  "fetchMessageTimeline(all)": {
+    "error": "Error: HTTP 503",
+  },
+  "fetchMessageTimeline(p0)": {
+    "error": "Error: HTTP 503",
+  },
+  "fetchMessages(all params)": {
+    "error": "Error: HTTP 503",
+  },
+  "fetchMessages(none)": {
+    "error": "Error: HTTP 503",
+  },
+  "fetchMessages(partitionOffsets)": {
+    "error": "Error: HTTP 503",
+  },
+  "fetchSample(3,1)": {
+    "error": "Error: HTTP 503",
+  },
+  "fetchSample(default)": {
+    "error": "Error: HTTP 503",
+  },
+  "fetchTopicConsumers": {
+    "error": "Error: HTTP 503",
+  },
+  "fetchTopicDetail": {
+    "error": "Error: HTTP 503",
+  },
+  "fetchTopics": {
+    "error": "Error: HTTP 503",
+  },
+  "getSchemaVersion(3)": {
+    "error": "Error: ",
+  },
+  "getSchemaVersion(latest)": {
+    "error": "Error: ",
+  },
+  "listACLs": {
+    "error": "Error: ",
+  },
+  "listSCRAMUsers": {
+    "error": "Error: ",
+  },
+  "listSubjects": {
+    "error": "Error: ",
+  },
+  "produceMessage(confirm)": {
+    "error": "Error: HTTP 503",
+  },
+  "produceMessage(gzip)": {
+    "error": "Error: HTTP 503",
+  },
+  "produceMessage(no confirm)": {
+    "error": "Error: HTTP 503",
+  },
+  "resetGroupOffsets(confirm)": {
+    "error": "Error: HTTP 503",
+  },
+  "resetGroupOffsets(no confirm)": {
+    "error": "Error: HTTP 503",
+  },
+  "searchMessages": {
+    "error": "Error: Service Unavailable",
+  },
+  "testCluster": {
+    "error": "Error: HTTP 503",
+  },
+  "upsertSCRAMUser": {
+    "error": "Error: ",
+  },
+}
+`;
+
+exports[`api wire contract > error messages for plain-text error bodies 1`] = `
+{
+  "alterTopicConfigs": {
+    "error": "Error: HTTP 502",
+  },
+  "createACL": {
+    "error": "Error: bad gateway page",
+  },
+  "createGroup": {
+    "error": "Error: HTTP 502",
+  },
+  "createTopic": {
+    "error": "Error: HTTP 502",
+  },
+  "deleteACL": {
+    "error": "Error: bad gateway page",
+  },
+  "deleteGroup": {
+    "error": "Error: HTTP 502",
+  },
+  "deleteSCRAMUser(all)": {
+    "error": "Error: bad gateway page",
+  },
+  "deleteSCRAMUser(mechanism)": {
+    "error": "Error: bad gateway page",
+  },
+  "deleteSubject(permanent)": {
+    "error": "Error: HTTP 502",
+  },
+  "deleteSubject(soft)": {
+    "error": "Error: HTTP 502",
+  },
+  "downloadMessageRaw": {
+    "error": "Error: HTTP 502",
+  },
+  "fetchBrokers": {
+    "error": "Error: HTTP 502",
+  },
+  "fetchClusters": {
+    "error": "Error: HTTP 502",
+  },
+  "fetchGroupDetail": {
+    "error": "Error: HTTP 502",
+  },
+  "fetchGroups": {
+    "error": "Error: HTTP 502",
+  },
+  "fetchInfo": {
+    "error": "Error: HTTP 502",
+  },
+  "fetchMessageCount(none)": {
+    "error": "Error: HTTP 502",
+  },
+  "fetchMessageCount(params)": {
+    "error": "Error: HTTP 502",
+  },
+  "fetchMessageRawBase64": {
+    "error": "Error: HTTP 502",
+  },
+  "fetchMessageTimeline(all)": {
+    "error": "Error: HTTP 502",
+  },
+  "fetchMessageTimeline(p0)": {
+    "error": "Error: HTTP 502",
+  },
+  "fetchMessages(all params)": {
+    "error": "Error: HTTP 502",
+  },
+  "fetchMessages(none)": {
+    "error": "Error: HTTP 502",
+  },
+  "fetchMessages(partitionOffsets)": {
+    "error": "Error: HTTP 502",
+  },
+  "fetchSample(3,1)": {
+    "error": "Error: HTTP 502",
+  },
+  "fetchSample(default)": {
+    "error": "Error: HTTP 502",
+  },
+  "fetchTopicConsumers": {
+    "error": "Error: HTTP 502",
+  },
+  "fetchTopicDetail": {
+    "error": "Error: HTTP 502",
+  },
+  "fetchTopics": {
+    "error": "Error: HTTP 502",
+  },
+  "getSchemaVersion(3)": {
+    "error": "Error: bad gateway page",
+  },
+  "getSchemaVersion(latest)": {
+    "error": "Error: bad gateway page",
+  },
+  "listACLs": {
+    "error": "Error: bad gateway page",
+  },
+  "listSCRAMUsers": {
+    "error": "Error: bad gateway page",
+  },
+  "listSubjects": {
+    "error": "Error: bad gateway page",
+  },
+  "produceMessage(confirm)": {
+    "error": "Error: HTTP 502",
+  },
+  "produceMessage(gzip)": {
+    "error": "Error: HTTP 502",
+  },
+  "produceMessage(no confirm)": {
+    "error": "Error: HTTP 502",
+  },
+  "resetGroupOffsets(confirm)": {
+    "error": "Error: HTTP 502",
+  },
+  "resetGroupOffsets(no confirm)": {
+    "error": "Error: HTTP 502",
+  },
+  "searchMessages": {
+    "error": "Error: bad gateway page",
+  },
+  "testCluster": {
+    "error": "Error: HTTP 502",
+  },
+  "upsertSCRAMUser": {
+    "error": "Error: bad gateway page",
+  },
+}
+`;
+
+exports[`api wire contract > requests for a private cluster 1`] = `
+{
+  "alterTopicConfigs": {
+    "requests": [
+      {
+        "body": "{"set":{"retention.ms":"1000"},"delete":["cleanup.policy"]}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "PATCH",
+        "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/configs",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "createACL": {
+    "requests": [
+      {
+        "body": "{"resource_type":"topic","resource_name":"orders/v1 %2F #x ?y","pattern_type":"literal","principal":"User:alice","host":"*","operation":"read","permission_type":"allow"}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/__private__/acls",
+      },
+    ],
+    "result": undefined,
+  },
+  "createGroup": {
+    "requests": [
+      {
+        "body": "{"group_id":"grp/ä %","topic":"orders/v1 %2F #x ?y","strategy":"earliest","dry_run":false}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/__private__/groups",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "createTopic": {
+    "requests": [
+      {
+        "body": "{"name":"orders/v1 %2F #x ?y","partitions":3,"replication_factor":1}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/__private__/topics",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "deleteACL": {
+    "requests": [
+      {
+        "body": "{"resource_type":"topic","resource_name":"orders/v1 %2F #x ?y","pattern_type":"literal","principal":"User:alice","host":"*","operation":"read","permission_type":"allow"}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "DELETE",
+        "url": "/api/v1/clusters/__private__/acls",
+      },
+    ],
+    "result": 1,
+  },
+  "deleteGroup": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-csrf-token": "tok",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "DELETE",
+        "url": "/api/v1/clusters/__private__/groups/grp%2F%C3%A4%20%25",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "deleteSCRAMUser(all)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-csrf-token": "tok",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "DELETE",
+        "url": "/api/v1/clusters/__private__/users/alice%2Fb%25%23",
+      },
+    ],
+    "result": undefined,
+  },
+  "deleteSCRAMUser(mechanism)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-csrf-token": "tok",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "DELETE",
+        "url": "/api/v1/clusters/__private__/users/alice%2Fb%25%23?mechanism=SCRAM-SHA-512",
+      },
+    ],
+    "result": undefined,
+  },
+  "deleteSubject(permanent)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-csrf-token": "tok",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "DELETE",
+        "url": "/api/v1/clusters/__private__/schemas/subjects/sub%2Fj%20%23%25?permanent=true",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "deleteSubject(soft)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-csrf-token": "tok",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "DELETE",
+        "url": "/api/v1/clusters/__private__/schemas/subjects/sub%2Fj%20%23%25",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "downloadMessageRaw": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages/0/5/raw",
+      },
+    ],
+    "result": undefined,
+  },
+  "fetchBrokers": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/brokers",
+      },
+    ],
+    "result": [],
+  },
+  "fetchClusters": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters",
+      },
+    ],
+    "result": [],
+  },
+  "fetchGroupDetail": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/groups/grp%2F%C3%A4%20%25",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchGroups": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/groups",
+      },
+    ],
+    "result": [],
+  },
+  "fetchInfo": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/info",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchMessageCount(none)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages/count",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchMessageCount(params)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages/count?partition=1&from_ts_ms=1&to_ts_ms=2",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchMessageRawBase64": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages/0/5/raw",
+      },
+    ],
+    "result": "eyJjbHVzdGVycyI6W10sInRvcGljcyI6W10sImJyb2tlcnMiOltdLCJ0b3BpYyI6eyJuYW1lIjoidCJ9LCJjb25zdW1lcnMiOltdLCJtZXNzYWdlcyI6W10sImdyb3VwcyI6W10sInN1YmplY3RzIjpbXSwiYWNscyI6W10sInVzZXJzIjpbXSwiZGVsZXRlZCI6MX0=",
+  },
+  "fetchMessageTimeline(all)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages/timeline?from_ts_ms=1&to_ts_ms=9&slot_ms=3",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchMessageTimeline(p0)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages/timeline?partition=0&from_ts_ms=1&to_ts_ms=9&slot_ms=3",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchMessages(all params)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages?partition=2&limit=50&from=offset&offset=10&from_ts_ms=1&to_ts_ms=2&cursor=a%2Bb%2Fc%3D+d",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchMessages(none)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchMessages(partitionOffsets)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages?from=offset&partition_offsets=0%3A5%2C1%3A7",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchSample(3,1)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/sample?n=3&partition=1",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchSample(default)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/sample?n=5&partition=-1",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchTopicConsumers": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/consumers",
+      },
+    ],
+    "result": [],
+  },
+  "fetchTopicDetail": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy",
+      },
+    ],
+    "result": {
+      "name": "t",
+    },
+  },
+  "fetchTopics": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/topics",
+      },
+    ],
+    "result": [],
+  },
+  "getSchemaVersion(3)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/schemas/subjects/sub%2Fj%20%23%25/versions/3",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "getSchemaVersion(latest)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/schemas/subjects/sub%2Fj%20%23%25/versions/latest",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "listACLs": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/acls",
+      },
+    ],
+    "result": [],
+  },
+  "listSCRAMUsers": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/users",
+      },
+    ],
+    "result": [],
+  },
+  "listSubjects": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/__private__/schemas/subjects",
+      },
+    ],
+    "result": [],
+  },
+  "produceMessage(confirm)": {
+    "requests": [
+      {
+        "body": "{"key":"k","value":"{\\"a\\":1}","headers":{"h":"v"}}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-kafkito-confirm-prod": "true",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "produceMessage(gzip)": {
+    "requests": [
+      {
+        "body": "<307242 chars>",
+        "credentials": "include",
+        "gzip": true,
+        "headers": {
+          "content-encoding": "gzip",
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-kafkito-confirm-prod": "true",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "produceMessage(no confirm)": {
+    "requests": [
+      {
+        "body": "{"key":"k","value":"{\\"a\\":1}","headers":{"h":"v"}}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "resetGroupOffsets(confirm)": {
+    "requests": [
+      {
+        "body": "{"topic":"orders/v1 %2F #x ?y","strategy":"latest"}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-kafkito-confirm-prod": "true",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/__private__/groups/grp%2F%C3%A4%20%25/reset-offsets",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "resetGroupOffsets(no confirm)": {
+    "requests": [
+      {
+        "body": "{"topic":"orders/v1 %2F #x ?y","strategy":"earliest","dry_run":true}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/__private__/groups/grp%2F%C3%A4%20%25/reset-offsets",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "searchMessages": {
+    "requests": [
+      {
+        "body": "{"mode":"contains","path":"","op":"eq","value":"x","limit":5}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages/search",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "testCluster": {
+    "requests": [
+      {
+        "body": "<285 chars>",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/_test",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "upsertSCRAMUser": {
+    "requests": [
+      {
+        "body": "{"user":"alice/b%#","mechanism":"SCRAM-SHA-256","password":"pw"}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/__private__/users",
+      },
+    ],
+    "result": undefined,
+  },
+}
+`;
+
+exports[`api wire contract > requests for a shared cluster 1`] = `
+{
+  "alterTopicConfigs": {
+    "requests": [
+      {
+        "body": "{"set":{"retention.ms":"1000"},"delete":["cleanup.policy"]}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "PATCH",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/configs",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "createACL": {
+    "requests": [
+      {
+        "body": "{"resource_type":"topic","resource_name":"orders/v1 %2F #x ?y","pattern_type":"literal","principal":"User:alice","host":"*","operation":"read","permission_type":"allow"}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/acls",
+      },
+    ],
+    "result": undefined,
+  },
+  "createGroup": {
+    "requests": [
+      {
+        "body": "{"group_id":"grp/ä %","topic":"orders/v1 %2F #x ?y","strategy":"earliest","dry_run":false}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/groups",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "createTopic": {
+    "requests": [
+      {
+        "body": "{"name":"orders/v1 %2F #x ?y","partitions":3,"replication_factor":1}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "deleteACL": {
+    "requests": [
+      {
+        "body": "{"resource_type":"topic","resource_name":"orders/v1 %2F #x ?y","pattern_type":"literal","principal":"User:alice","host":"*","operation":"read","permission_type":"allow"}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "DELETE",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/acls",
+      },
+    ],
+    "result": 1,
+  },
+  "deleteGroup": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-csrf-token": "tok",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "DELETE",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/groups/grp%2F%C3%A4%20%25",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "deleteSCRAMUser(all)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-csrf-token": "tok",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "DELETE",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/users/alice%2Fb%25%23",
+      },
+    ],
+    "result": undefined,
+  },
+  "deleteSCRAMUser(mechanism)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-csrf-token": "tok",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "DELETE",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/users/alice%2Fb%25%23?mechanism=SCRAM-SHA-512",
+      },
+    ],
+    "result": undefined,
+  },
+  "deleteSubject(permanent)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-csrf-token": "tok",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "DELETE",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/schemas/subjects/sub%2Fj%20%23%25?permanent=true",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "deleteSubject(soft)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-csrf-token": "tok",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "DELETE",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/schemas/subjects/sub%2Fj%20%23%25",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "downloadMessageRaw": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages/0/5/raw",
+      },
+    ],
+    "result": undefined,
+  },
+  "fetchBrokers": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/brokers",
+      },
+    ],
+    "result": [],
+  },
+  "fetchClusters": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters",
+      },
+    ],
+    "result": [],
+  },
+  "fetchGroupDetail": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/groups/grp%2F%C3%A4%20%25",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchGroups": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/groups",
+      },
+    ],
+    "result": [],
+  },
+  "fetchInfo": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/info",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchMessageCount(none)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages/count",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchMessageCount(params)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages/count?partition=1&from_ts_ms=1&to_ts_ms=2",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchMessageRawBase64": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages/0/5/raw",
+      },
+    ],
+    "result": "eyJjbHVzdGVycyI6W10sInRvcGljcyI6W10sImJyb2tlcnMiOltdLCJ0b3BpYyI6eyJuYW1lIjoidCJ9LCJjb25zdW1lcnMiOltdLCJtZXNzYWdlcyI6W10sImdyb3VwcyI6W10sInN1YmplY3RzIjpbXSwiYWNscyI6W10sInVzZXJzIjpbXSwiZGVsZXRlZCI6MX0=",
+  },
+  "fetchMessageTimeline(all)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages/timeline?from_ts_ms=1&to_ts_ms=9&slot_ms=3",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchMessageTimeline(p0)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages/timeline?partition=0&from_ts_ms=1&to_ts_ms=9&slot_ms=3",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchMessages(all params)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages?partition=2&limit=50&from=offset&offset=10&from_ts_ms=1&to_ts_ms=2&cursor=a%2Bb%2Fc%3D+d",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchMessages(none)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchMessages(partitionOffsets)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages?from=offset&partition_offsets=0%3A5%2C1%3A7",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchSample(3,1)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/sample?n=3&partition=1",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchSample(default)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/sample?n=5&partition=-1",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "fetchTopicConsumers": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/consumers",
+      },
+    ],
+    "result": [],
+  },
+  "fetchTopicDetail": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics/orders%2Fv1%20%252F%20%23x%20%3Fy",
+      },
+    ],
+    "result": {
+      "name": "t",
+    },
+  },
+  "fetchTopics": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "accept": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics",
+      },
+    ],
+    "result": [],
+  },
+  "getSchemaVersion(3)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/schemas/subjects/sub%2Fj%20%23%25/versions/3",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "getSchemaVersion(latest)": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/schemas/subjects/sub%2Fj%20%23%25/versions/latest",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "listACLs": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/acls",
+      },
+    ],
+    "result": [],
+  },
+  "listSCRAMUsers": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/users",
+      },
+    ],
+    "result": [],
+  },
+  "listSubjects": {
+    "requests": [
+      {
+        "credentials": "include",
+        "headers": {
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "GET",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/schemas/subjects",
+      },
+    ],
+    "result": [],
+  },
+  "produceMessage(confirm)": {
+    "requests": [
+      {
+        "body": "{"key":"k","value":"{\\"a\\":1}","headers":{"h":"v"}}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-kafkito-confirm-prod": "true",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "produceMessage(gzip)": {
+    "requests": [
+      {
+        "body": "<307242 chars>",
+        "credentials": "include",
+        "gzip": true,
+        "headers": {
+          "content-encoding": "gzip",
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-kafkito-confirm-prod": "true",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "produceMessage(no confirm)": {
+    "requests": [
+      {
+        "body": "{"key":"k","value":"{\\"a\\":1}","headers":{"h":"v"}}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "resetGroupOffsets(confirm)": {
+    "requests": [
+      {
+        "body": "{"topic":"orders/v1 %2F #x ?y","strategy":"latest"}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-kafkito-confirm-prod": "true",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/groups/grp%2F%C3%A4%20%25/reset-offsets",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "resetGroupOffsets(no confirm)": {
+    "requests": [
+      {
+        "body": "{"topic":"orders/v1 %2F #x ?y","strategy":"earliest","dry_run":true}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/groups/grp%2F%C3%A4%20%25/reset-offsets",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "searchMessages": {
+    "requests": [
+      {
+        "body": "{"mode":"contains","path":"","op":"eq","value":"x","limit":5}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/messages/search",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "testCluster": {
+    "requests": [
+      {
+        "body": "<285 chars>",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/_test",
+      },
+    ],
+    "result": {
+      "acls": [],
+      "brokers": [],
+      "clusters": [],
+      "consumers": [],
+      "deleted": 1,
+      "groups": [],
+      "messages": [],
+      "subjects": [],
+      "topic": {
+        "name": "t",
+      },
+      "topics": [],
+      "users": [],
+    },
+  },
+  "upsertSCRAMUser": {
+    "requests": [
+      {
+        "body": "{"user":"alice/b%#","mechanism":"SCRAM-SHA-256","password":"pw"}",
+        "credentials": "include",
+        "headers": {
+          "content-type": "application/json",
+          "x-csrf-token": "tok",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        "method": "POST",
+        "url": "/api/v1/clusters/prod%2Feu%20%231%20%25/users",
+      },
+    ],
+    "result": undefined,
+  },
+}
+`;
+
+exports[`api wire contract > streams bulk-copy progress events and aborts the stream 1`] = `
+{
+  "events": [
+    {
+      "copied": 1,
+      "done": false,
+    },
+    {
+      "copied": 2,
+      "done": true,
+    },
+  ],
+  "requests": [
+    {
+      "body": "{"dest_cluster":"prod/eu #1 %","dest_topic":"d","limit":2}",
+      "credentials": "include",
+      "headers": {
+        "content-type": "application/json",
+        "x-csrf-token": "tok",
+        "x-kafkito-cluster": "eyJuYW1lIjoibWluZS9kZXYgIzIgJSIsImlzX3Byb2QiOnRydWUsImJyb2tlcnMiOlsiYnJva2VyLTE6OTA5MyIsImJyb2tlci0yOjkwOTMiXSwiYXV0aCI6eyJ0eXBlIjoic2NyYW0tc2hhLTUxMiIsInVzZXJuYW1lIjoic3ZjIiwicGFzc3dvcmQiOiJzM2NyM3QifSwidGxzIjp7ImVuYWJsZWQiOnRydWUsImluc2VjdXJlX3NraXBfdmVyaWZ5IjpmYWxzZX0sInNjaGVtYV9yZWdpc3RyeSI6eyJ1cmwiOiJodHRwczovL3NyLmV4YW1wbGUiLCJ1c2VybmFtZSI6InNyIiwicGFzc3dvcmQiOiJzcnB3In19",
+        "x-kafkito-confirm-prod": "true",
+        "x-requested-with": "XMLHttpRequest",
+      },
+      "method": "POST",
+      "url": "/api/v1/clusters/__private__/topics/orders%2Fv1%20%252F%20%23x%20%3Fy/copy",
+    },
+  ],
+}
+`;
