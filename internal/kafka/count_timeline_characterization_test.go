@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/twmb/franz-go/pkg/kgo"
 )
 
 // The tests in this file pin CountMessages and MessageTimeline against an
@@ -89,6 +90,36 @@ func TestTimelineCharacterization_Slots(t *testing.T) {
 		Partition: 5, FromTSMs: fixtureBaseTS, ToTSMs: fixtureBaseTS + 1, SlotMs: 1,
 	})
 	require.EqualError(t, err, `partition 5 not found in topic "orders" on cluster "kf"`)
+}
+
+func TestRawValueCharacterization(t *testing.T) {
+	t.Parallel()
+	env, fx := newOrdersEnv(t)
+	ctx := context.Background()
+
+	raw, err := env.reg.FetchRawMessageValue(ctx, kfakeCluster, env.topic, 0, 3)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"seq":6,"kind":"even","name":"rec-6"}`, string(raw.Value))
+	assert.Equal(t, "application/json", raw.ContentType)
+	assert.Equal(t, "json", raw.Extension)
+	assert.Equal(t, fixtureRecord{Seq: 6, Partition: 0, Offset: 3, Timestamp: fixtureBaseTS + 6_000}, fx[6])
+
+	bin := newKfakeEnv(t, "bin", 1, nil)
+	bin.produce(t, &kgo.Record{Value: []byte{0xff, 0x00, 0xfe}}, &kgo.Record{Value: []byte("plain")})
+	raw, err = bin.reg.FetchRawMessageValue(ctx, kfakeCluster, "bin", 0, 0)
+	require.NoError(t, err)
+	assert.Equal(t, &RawMessageValue{Value: []byte{0xff, 0x00, 0xfe}, ContentType: "application/octet-stream", Extension: "bin"}, raw)
+	raw, err = bin.reg.FetchRawMessageValue(ctx, kfakeCluster, "bin", 0, 1)
+	require.NoError(t, err)
+	assert.Equal(t, "text/plain; charset=utf-8", raw.ContentType)
+
+	short, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cancel()
+	_, err = env.reg.FetchRawMessageValue(short, kfakeCluster, env.topic, 2, 100)
+	require.Error(t, err, "an offset past the end waits for the context and fails")
+
+	_, err = env.reg.FetchRawMessageValue(ctx, "nope", env.topic, 0, 0)
+	require.ErrorIs(t, err, ErrUnknownCluster)
 }
 
 // TestRecordReaders_CloseTheirClients runs every record reader repeatedly and
