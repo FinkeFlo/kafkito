@@ -42,7 +42,7 @@ docker run --rm -p 37421:37421 \
 
 The default image enforces auth and does not start without
 `KAFKITO_AUTH_MODE`. Use `KAFKITO_AUTH_MODE=mock` for JWT-validation
-testing. A generic OIDC mode is pending review, see #100.
+testing. A generic OIDC mode is in progress (#95).
 
 ### SAP BTP / XSUAA
 
