@@ -3,13 +3,18 @@ package server
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/twmb/franz-go/pkg/kfake"
 
@@ -186,4 +191,110 @@ func topicMessageCases(t *testing.T) []handlerCase {
 // nowMs is an hour from now in epoch milliseconds.
 func nowMs() string {
 	return strconv.FormatInt(time.Now().Add(time.Hour).UnixMilli(), 10)
+}
+
+// Validation errors of topic and message operations name the field and the
+// rule, never the value: neither a password inside a copy request's
+// dest_cluster_config nor the X-Kafkito-Cluster header of the private source
+// cluster reaches the response or any log line.
+func TestTopicMessageOps_ValidationErrorsNeverLeakCredentials(t *testing.T) {
+	t.Parallel()
+
+	header := encodeHeader(t, config.ClusterConfig{
+		Brokers: []string{unreachableBroker},
+		Auth:    config.AuthConfig{Type: "plain", Username: "leak-user", Password: leakPassword},
+	})
+	destCfg := func(extra string) string {
+		return `{"dest_topic":"t","dest_cluster_config":{"brokers":["` + unreachableBroker + `"],"auth":{"type":"plain","username":"u","password":"` + leakPassword + `"}` + extra + `}}`
+	}
+	const priv = "/api/v1/clusters/__private__/topics/orders"
+	for i, tc := range []struct{ method, path, body string }{
+		{http.MethodPost, priv + "/copy", destCfg(`,"tls":"` + leakPassword + `"`)},
+		{http.MethodPost, priv + "/copy", `{"dest_topic":"t","dest_cluster_config":{"brokers":["` + unreachableBroker + `"],"auth":{"type":"` + leakPassword + `","password":"` + leakPassword + `"}}}`},
+		{http.MethodPost, priv + "/copy", `{"dest_topic":"t","dest_cluster_config":{"auth":{"password":"` + leakPassword + `"}}}`},
+		{http.MethodPost, priv + "/copy", `{"dest_topic":"t","dest_cluster_config":{"brokers":["` + leakPassword + `"`},
+		{http.MethodPost, priv + "/copy", `{"dest_topic":1,"password":"` + leakPassword + `"}`},
+		{http.MethodPost, priv + "/messages", `{"value":"x","value_encoding":"` + leakPassword + `"}`},
+		{http.MethodPost, priv + "/messages/search", `{"mode":"` + leakPassword + `"}`},
+		{http.MethodPost, "/api/v1/clusters/__private__/topics", `{"name":"x","configs":"` + leakPassword + `"}`},
+		{http.MethodGet, priv + "/messages?from=" + leakPassword, ""},
+		{http.MethodGet, priv + "/messages/0/" + leakPassword + "/raw", ""},
+	} {
+		logs := &syncBuffer{}
+		logger := slog.New(slog.NewJSONHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+		reg := kafkapkg.NewRegistry(nil, logger)
+		h := New(Options{Version: "x", Logger: logger, Registry: reg, Config: config.Defaults()})
+
+		var body io.Reader = http.NoBody
+		if tc.body != "" {
+			body = strings.NewReader(tc.body)
+		}
+		req := httptest.NewRequest(tc.method, tc.path, body)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(PrivateClusterHeader, header)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		reg.Close()
+
+		require.Equal(t, http.StatusBadRequest, rec.Code, "case %d: %s", i, rec.Body.String())
+		for _, secret := range []string{leakPassword, header} {
+			assert.NotContains(t, rec.Body.String(), secret, "case %d: response leaks", i)
+			assert.NotContains(t, logs.String(), secret, "case %d: logs leak", i)
+		}
+	}
+}
+
+// Cursor paging of the message list works as before: forward pages from
+// from=start and backward pages from from=end each continue where the
+// previous one stopped, and a cursor that contradicts from is rejected.
+func TestConsumeMessages_CursorPaging(t *testing.T) {
+	t.Parallel()
+	h := kfakeServer(t, "paged")
+	const path = "/api/v1/clusters/kf/topics/paged/messages"
+	for i := range 5 {
+		rec := sendBody(h, http.MethodPost, path, strings.NewReader(`{"value":"m`+strconv.Itoa(i)+`"}`), nil)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	type page struct {
+		Messages []struct {
+			Offset int64 `json:"offset"`
+		} `json:"messages"`
+		HasMore    bool    `json:"has_more"`
+		NextCursor *string `json:"next_cursor"`
+	}
+	get := func(query string) page {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path+"?"+query, nil))
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		var p page
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &p))
+		return p
+	}
+	offsets := func(p page) []int64 {
+		var out []int64
+		for _, m := range p.Messages {
+			out = append(out, m.Offset)
+		}
+		return out
+	}
+
+	first := get("from=start&limit=2")
+	assert.Equal(t, []int64{0, 1}, offsets(first))
+	require.NotNil(t, first.NextCursor)
+	second := get("limit=2&cursor=" + url.QueryEscape(*first.NextCursor))
+	assert.Equal(t, []int64{2, 3}, offsets(second))
+
+	latest := get("from=end&limit=2")
+	assert.ElementsMatch(t, []int64{3, 4}, offsets(latest))
+	require.True(t, latest.HasMore)
+	require.NotNil(t, latest.NextCursor)
+	older := get("from=end&limit=2&cursor=" + url.QueryEscape(*latest.NextCursor))
+	assert.ElementsMatch(t, []int64{1, 2}, offsets(older))
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path+"?from=start&cursor="+url.QueryEscape(*latest.NextCursor), nil))
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.JSONEq(t, `{"error":"cursor direction backward conflicts with from=start"}`, rec.Body.String())
 }
