@@ -72,14 +72,15 @@ func (r rawMessageResponse) VisitDownloadMessageRawResponse(w http.ResponseWrite
 
 // DownloadMessageRaw returns the raw value bytes of a single record without
 // any string/base64 conversion. Values larger than 15 MB are rejected with
-// 413 so a single oversized record cannot exhaust process memory.
+// 413 so a single oversized record cannot exhaust process memory; values the
+// cluster's masking policy changes are refused with 403 value_masked.
 func (s *apiServer) DownloadMessageRaw(ctx context.Context, req gen.DownloadMessageRawRequestObject) (gen.DownloadMessageRawResponseObject, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
 	raw, err := s.reg.FetchRawMessageValue(ctx, req.Cluster, req.Topic, req.Partition, req.Offset)
 	if err != nil {
-		if errors.Is(err, kafkapkg.ErrValueTooLarge) {
+		if errors.Is(err, kafkapkg.ErrValueTooLarge) || errors.Is(err, kafkapkg.ErrValueMasked) {
 			return nil, err
 		}
 		return nil, clusterError(req.Cluster, "download message raw", err)

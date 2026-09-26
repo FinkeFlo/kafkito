@@ -102,6 +102,12 @@ large JSON/XML record just because truncation broke its structure) is wrong
 far more often. Fetch the full value via the raw-download endpoint to get a
 definitive answer.
 
+`masked: true` marks a value the cluster's `data_masking` rules changed. The
+rules run on the full decoded value (Schema-Registry decoded where
+applicable), so a masked field is masked even past the 64 KB preview; a masked
+value carries no `value_b64`, and its raw download is refused (see below).
+Masking applies to values only, not to keys or headers.
+
 `headers` holds header values as text. A header value that is not valid UTF-8
 is rendered there as `0x…` hex — display only — and its raw bytes are also
 returned in the optional `headers_b64` map (standard base64, only the affected
@@ -148,6 +154,7 @@ Status codes:
 | ------ | ----------------------------------------------------------------- |
 | `200`  | Value returned in the body.                                       |
 | `400`  | `partition` is not an int32, or `offset` is not a non-negative int64. |
+| `403`  | RBAC denied the read, or the value is masked (`code: value_masked`). |
 | `404`  | Unknown cluster.                                                  |
 | `413`  | Value is larger than the 15 MB download cap.                      |
 | `502`  | Broker error, or no record at that partition/offset.              |
@@ -155,6 +162,14 @@ Status codes:
 The 15 MB cap is fixed (not configurable) so a single oversized record cannot
 exhaust process memory. `400`/`404`/`413` respond with `{ "error": "..." }`;
 `502` responds with `{ "error": "upstream kafka error", "code": "kafka_upstream" }`.
+
+Masked values are not downloadable: when the cluster's `data_masking` rules
+change the value of the record (checked on the same decoded rendering
+`GET .../messages` masks, so such a record comes back there with
+`masked: true`), the endpoint responds `403` with
+`{ "error": "value is masked and cannot be downloaded", "code": "value_masked" }`.
+Records of topics without a masking rule, and records the rules leave
+unchanged, are served as before.
 
 The body is always the **raw wire bytes**. For a Schema-Registry encoded
 record that means the Avro/Protobuf payload including the 5-byte magic +
@@ -211,6 +226,7 @@ Notes:
 - JS mode receives a parsed JSON object as `parsed` and can express arbitrarily complex predicates. The server enforces a short per-message timeout for JS filters.
 - Use `zones` to control where the scanner looks (`value`, `headers`, `key`).
 - Matching runs against each record's full, untruncated content, so `contains`/`jsonpath`/`xpath`/`js` all find hits anywhere in large values (there is no size limit on what is *searched*). Only the message previews in the response stay capped at 64 KB per value, same as `GET .../messages` — use the raw-download endpoint to fetch a full value for a hit.
+- On topics with a `data_masking` rule, the value is matched in its **masked** form — the same rendering `GET .../messages` returns — so masked content is not searchable in clear text. Keys and headers are not masked and are matched as they are. Parse errors on such topics report `value could not be evaluated (details withheld: data masking applies to this topic)` in `parse_error_offsets[].error` instead of the parser's message, which can quote the value.
 
 ### Produce
 
