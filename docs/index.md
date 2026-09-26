@@ -14,7 +14,7 @@ consumer groups, schemas, ACLs, and RBAC-aware operations in one place.
 - **UI documentation:** [Getting started in the UI](ui/getting-started-ui.md)
 - **Quickstart:** see the [README](https://github.com/FinkeFlo/kafkito/blob/main/README.md)
 - **HTTP API:** [API reference](API.md)
-- **Design notes:** [ADR overview](adr/0001-greenfield-apache2.md)
+- **Design notes:** [Architecture](architecture.md), [ADR overview](adr/0001-greenfield-apache2.md)
 
 ## Related docs
 
@@ -25,6 +25,9 @@ consumer groups, schemas, ACLs, and RBAC-aware operations in one place.
 | [UI: Features overview](ui/features-overview.md) | What each UI area can do (Fleet, Topics, Groups, Schemas, Security, Brokers, Settings) |
 | [UI: Workflows](ui/workflows.md) | Practical flows like finding messages, checking lag, and understanding offsets |
 | [API](API.md) | REST endpoints and examples |
+| [Architecture](architecture.md) | Request flow, error mapping, record reading, private clusters |
+| [Design guidelines](DESIGN_GUIDELINES.md) | Frontend tokens, components and layout rules |
+| [Contributing](contributing.md) | DCO, local checks, API changes, releases |
 | [ADR-0001](adr/0001-greenfield-apache2.md) | Project foundation |
 | [ADR-0002](adr/0002-tech-stack.md) | Chosen stack |
 | [ADR-0003](adr/0003-cloud-foundry-readiness.md) | Cloud Foundry readiness |

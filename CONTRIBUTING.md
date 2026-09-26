@@ -28,7 +28,7 @@ GitHub Actions.
    frontend types. A new endpoint then needs its strict handler method, its
    mount in `internal/server/api_routes.go` and an `apiOps` test entry; the
    steps are in
-   [ADR-0005, "Adding an endpoint"](docs/adr/0005-openapi-contract.md#adding-an-endpoint).
+   [ADR-0005, "Adding an endpoint"](https://github.com/FinkeFlo/kafkito/blob/main/docs/adr/0005-openapi-contract.md#adding-an-endpoint).
 4. Open a PR with a clear description and a Test plan.
 5. Sign off your commits (`-s`).
 

@@ -40,7 +40,16 @@ markdown_extensions:
       alternate_style: true
   - pymdownx.highlight:
       anchor_linenums: true
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  # Lets docs/contributing.md include the root CONTRIBUTING.md verbatim.
+  - pymdownx.snippets:
+      base_path:
+        - CONTRIBUTING.md
+      check_paths: true
 
 nav:
   - Home: index.md
@@ -50,6 +59,9 @@ nav:
       - Features Overview: ui/features-overview.md
       - Workflows: ui/workflows.md
   - API: API.md
+  - Architecture: architecture.md
+  - Design Guidelines: DESIGN_GUIDELINES.md
+  - Contributing: contributing.md
   - Architecture Decisions:
       - ADR-0001: adr/0001-greenfield-apache2.md
       - ADR-0002: adr/0002-tech-stack.md
