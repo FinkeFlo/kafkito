@@ -12,11 +12,13 @@
 // ReplayModal's full-value fetch, since most rows are never expanded and an
 // automatic fetch for every truncated row would be wasteful.
 //
-// Two cases deliberately do *not* offer the button:
+// Three cases deliberately do *not* offer the button:
 //
 //   - Schema-Registry values. The list value is the *decoded* JSON rendering,
 //     but /raw returns the raw Avro/Protobuf wire bytes, which JSON.parse can
 //     never read. Offering the button there would guarantee an error.
+//   - Masked values. The server refuses their raw download, since the raw
+//     bytes would bypass the masking.
 //   - Values above JsonInteractive's own SIZE_LIMIT_BYTES. Downloading them
 //     would succeed only for the tree renderer to refuse them, so say so up
 //     front with a disabled button and a visible reason.
@@ -62,8 +64,9 @@ export function ValueBody({
   // stays "json" for truncated JSON instead of degrading to "text".
   const isTruncatedJson = m.value_truncated === true && m.value_encoding === "json";
   const isSchemaRegistry = !!m.value_sr;
+  const isMasked = m.masked === true;
   const tooLargeForTree = (m.value_size_bytes ?? 0) > SIZE_LIMIT_BYTES;
-  const canLoadFull = isTruncatedJson && !isSchemaRegistry && !tooLargeForTree;
+  const canLoadFull = isTruncatedJson && !isSchemaRegistry && !isMasked && !tooLargeForTree;
 
   // Hooks must run unconditionally, so the query is declared before any of
   // the branches below can return. `enabled` keeps it inert until the user
@@ -115,7 +118,12 @@ export function ValueBody({
       <div>
         <ValuePre m={m} />
         <div className="mt-2 flex flex-col gap-2">
-          {isSchemaRegistry ? (
+          {isMasked ? (
+            <p className="text-[11px] text-muted">
+              Click to filter is not available for masked values — the full value can&apos;t be
+              loaded. Enter the path manually instead.
+            </p>
+          ) : isSchemaRegistry ? (
             <p className="text-[11px] text-muted">
               Click to filter is not available for Schema Registry values — the full record is only
               downloadable in its encoded wire format. Enter the path manually instead.

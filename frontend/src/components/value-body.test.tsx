@@ -184,4 +184,12 @@ describe("ValueBody", () => {
     expect(screen.getByText(/not available for schema registry values/i)).toBeInTheDocument();
     expect(fetchMessageRawBase64).not.toHaveBeenCalled();
   });
+
+  it("does not offer the button for masked values, whose raw download is refused", () => {
+    renderValueBody(message({ masked: true }));
+
+    expect(screen.queryByRole("button", { name: LOAD_BUTTON })).not.toBeInTheDocument();
+    expect(screen.getByText(/not available for masked values/i)).toBeInTheDocument();
+    expect(fetchMessageRawBase64).not.toHaveBeenCalled();
+  });
 });
