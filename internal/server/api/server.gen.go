@@ -980,7 +980,7 @@ type ListSubjectsParams struct {
 
 // DeleteSubjectParams defines parameters for DeleteSubject.
 type DeleteSubjectParams struct {
-	// Permanent `true` performs a hard delete.
+	// Permanent `true` performs a hard delete. Only `true` and `false` are accepted.
 	Permanent *bool `form:"permanent,omitempty" json:"permanent,omitempty"`
 
 	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
