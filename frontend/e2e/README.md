@@ -17,11 +17,14 @@ Schema Registry   not started for e2e (not needed by current walks)
 kafkito (Go)      subprocess on PORT=47421       : 47421 (host)  ← Playwright targets here
                   built with -tags devauth so KAFKITO_AUTH_MODE=off is allowed
                   serves the embedded frontend; Vite is NOT involved
+                  configured by fixtures/kafkito-e2e.yaml (KAFKITO_CONFIG)
 ```
 
 `make dev` keeps using `:37421` (kafkito) and `:37422` (Vite). Both can
 coexist with `make e2e` because the e2e kafkito binds a different port
-and uses the fresh local Kafka cluster (auto-named `local`).
+and uses the fresh local Kafka cluster (named `local` in
+`fixtures/kafkito-e2e.yaml`, which also holds the `data_masking` rule the
+masking walk needs).
 
 ## Quickstart (local)
 
@@ -46,6 +49,7 @@ To override the port: `make e2e E2E_PORT=47431`.
 docker-compose.yml                  apache/kafka:3.8.1 + cp-schema-registry (existing)
 frontend/playwright.config.ts       Playwright bootstrap (testDir = ./e2e)
 frontend/e2e/fixtures/seed.sh       seeds the broker via `docker exec kafkito-kafka`
+frontend/e2e/fixtures/kafkito-e2e.yaml  kafkito config: cluster `local` + data_masking for e2e-masked
 frontend/e2e/*.spec.ts              the actual walks
 frontend/e2e/csp.spec.ts            fails on any Content-Security-Policy violation (needs the Go-served build)
 Makefile :: e2e, e2e-up, e2e-test, e2e-down
@@ -70,7 +74,7 @@ Makefile :: e2e, e2e-up, e2e-test, e2e-down
   - `scram-users.spec.ts`: creates a SCRAM user with a unique name,
     rotates its password and deletes the credential.
 - Cluster name in URLs is `KAFKITO_E2E_CLUSTER` (defaults to `local` —
-  the auto-cluster name from the `KAFKITO_KAFKA_BROKERS` shortcut).
+  the cluster defined in `fixtures/kafkito-e2e.yaml`).
 - `clusters.spec.ts` tests private-cluster connections against the fixture
   broker through the host's private IPv4 address, because the backend
   refuses loopback brokers for private clusters. It picks the first
