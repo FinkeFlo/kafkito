@@ -1246,10 +1246,11 @@ export interface components {
             stop_on_limit?: boolean;
             /** @enum {string} */
             mode?: "contains" | "jsonpath" | "xpath" | "js";
-            /** @description JSONPath / XPath expression or JS filter source. */
+            /** @description JSONPath or XPath expression for modes `jsonpath` and `xpath`; unused otherwise. */
             path?: string;
             /** @enum {string} */
             op?: "exists" | "eq" | "ne" | "contains" | "regex" | "gt" | "lt" | "gte" | "lte";
+            /** @description Search text for mode `contains`, comparison value for `jsonpath` and `xpath` (not needed with op `exists`), JS filter source for mode `js`. */
             value?: string;
             zones?: ("value" | "key" | "headers")[];
             /** Format: int64 */
