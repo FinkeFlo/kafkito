@@ -224,10 +224,6 @@ e2e-up:
 		cat $(E2E_LOG); \
 		exit 1; \
 	fi
-	@curl -fsS -o /dev/null \
-		-H 'X-Kafkito-Cluster: {"id":"warmup","name":"warmup","brokers":["localhost:1"],"auth":{"type":"none"},"tls":{"enabled":false},"created_at":0,"updated_at":0}' \
-		http://localhost:$(E2E_PORT)/api/v1/clusters/__private__/topics 2>/dev/null || true
-	@echo "e2e: warmup adhoc-cluster probe issued (pre-triggers dial-and-fail goroutines)"
 	bash frontend/e2e/fixtures/seed.sh
 
 e2e-test:
