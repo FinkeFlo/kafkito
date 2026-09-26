@@ -94,9 +94,28 @@ func (s *apiServer) RegisterSchema(ctx context.Context, req gen.RegisterSchemaRe
 }
 
 // DeleteSubject deletes a subject, soft by default.
+// strictPermanentFlag accepts only the literal `true` and `false` for the
+// deleteSubject permanent flag. The binding would also take 1, t or TRUE
+// (strconv.ParseBool), which used to mean a soft delete; a hard delete
+// cannot be undone, so those spellings are rejected instead.
+func strictPermanentFlag(r *http.Request) error {
+	if r == nil {
+		return nil
+	}
+	for _, v := range r.URL.Query()["permanent"] {
+		if v != "true" && v != "false" {
+			return &apiError{Status: http.StatusBadRequest, Code: invalidRequestCode, Message: `parameter "permanent" in query: must be true or false`}
+		}
+	}
+	return nil
+}
+
 func (s *apiServer) DeleteSubject(ctx context.Context, req gen.DeleteSubjectRequestObject) (gen.DeleteSubjectResponseObject, error) {
 	sr, err := s.schemaRegistry(req.Cluster)
 	if err != nil {
+		return nil, err
+	}
+	if err := strictPermanentFlag(httpRequestFromContext(ctx)); err != nil {
 		return nil, err
 	}
 	permanent := deref(req.Params.Permanent)

@@ -979,7 +979,7 @@ paths:
         - in: query
           name: permanent
           schema: { type: boolean, default: false }
-          description: "`true` performs a hard delete."
+          description: "`true` performs a hard delete. Only `true` and `false` are accepted."
       responses:
         "200":
           description: Deleted

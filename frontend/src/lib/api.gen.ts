@@ -2842,7 +2842,7 @@ export interface operations {
     deleteSubject: {
         parameters: {
             query?: {
-                /** @description `true` performs a hard delete. */
+                /** @description `true` performs a hard delete. Only `true` and `false` are accepted. */
                 permanent?: boolean;
             };
             header?: {
