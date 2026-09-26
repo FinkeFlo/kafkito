@@ -615,8 +615,9 @@ function MessagesPanel({
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm">
       <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] p-3">
         <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
-          <label>Partition</label>
+          <label htmlFor="browse-partition">Partition</label>
           <select
+            id="browse-partition"
             value={partition}
             onChange={(e) => setPartition(Number(e.target.value))}
             className="rounded border border-[var(--color-border)] px-2 py-1 text-xs"
@@ -630,8 +631,9 @@ function MessagesPanel({
           </select>
         </div>
         <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
-          <label>From</label>
+          <label htmlFor="browse-from">From</label>
           <select
+            id="browse-from"
             value={from}
             onChange={(e) => setFrom(e.target.value as "end" | "start" | "offset")}
             className="rounded border border-[var(--color-border)] px-2 py-1 text-xs"
@@ -644,6 +646,7 @@ function MessagesPanel({
           {from === "offset" && (
             <>
               <input
+                aria-label="Start offset"
                 value={offsetDraft}
                 onChange={(e) => setOffsetDraft(e.target.value)}
                 onKeyDown={(e) => {
@@ -675,8 +678,9 @@ function MessagesPanel({
           )}
         </div>
         <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
-          <label>Limit</label>
+          <label htmlFor="browse-limit">Limit</label>
           <input
+            id="browse-limit"
             type="number"
             min={1}
             max={500}
@@ -692,8 +696,11 @@ function MessagesPanel({
             className="w-20 rounded border border-[var(--color-border)] px-2 py-1 text-xs"
           />
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
-          <label>Range</label>
+        <fieldset
+          aria-labelledby="browse-range"
+          className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--color-text-muted)]"
+        >
+          <span id="browse-range">Range</span>
           <RangePicker
             mode={browseRangeMode}
             preset={browsePreset}
@@ -707,7 +714,7 @@ function MessagesPanel({
             }}
             disabled={!!searchResult}
           />
-        </div>
+        </fieldset>
         <MessageRangeCountPreview
           cluster={cluster}
           topic={topic}
@@ -717,8 +724,9 @@ function MessagesPanel({
           live={live}
         />
         <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
-          <label>Sort</label>
+          <label htmlFor="browse-sort">Sort</label>
           <select
+            id="browse-sort"
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value as "newest" | "oldest")}
             className="rounded border border-[var(--color-border)] px-2 py-1 text-xs"
@@ -739,6 +747,7 @@ function MessagesPanel({
           Live
         </label>
         <button
+          type="button"
           onClick={() => setSearchOpen((v) => !v)}
           className={`rounded border px-2 py-1 text-xs ${
             searchOpen
@@ -749,6 +758,7 @@ function MessagesPanel({
           {searchOpen ? "Close search" : "Search"}
         </button>
         <button
+          type="button"
           onClick={() => msgsQuery.refetch()}
           className="ml-auto rounded border border-[var(--color-border)] px-2 py-1 text-xs hover:border-[var(--color-border-strong)]"
           disabled={!!searchResult}
@@ -770,6 +780,7 @@ function MessagesPanel({
             <div className="flex items-center gap-3 rounded border border-border bg-panel p-2 text-xs">
               <span>Path replaced by click.</span>
               <button
+                type="button"
                 onClick={() => {
                   setPath(undoToast.previous.path);
                   setOp(undoToast.previous.op);
@@ -901,8 +912,11 @@ function MessagesPanel({
           )}
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <label className="font-medium">Range</label>
+            <label className="font-medium" htmlFor="search-range">
+              Range
+            </label>
             <select
+              id="search-range"
               value={rangeMode}
               onChange={(e) => setRangeMode(e.target.value as typeof rangeMode)}
               className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1"
@@ -916,6 +930,7 @@ function MessagesPanel({
                 {(["5m", "15m", "1h", "6h", "24h", "7d", "30d", "today", "yesterday"] as const).map(
                   (p) => (
                     <button
+                      type="button"
                       key={p}
                       onClick={() => setPreset(p)}
                       className={`rounded border px-2 py-1 ${
@@ -934,6 +949,7 @@ function MessagesPanel({
               <>
                 <input
                   type="datetime-local"
+                  aria-label="Search range from"
                   value={customFrom}
                   onChange={(e) => setCustomFrom(e.target.value)}
                   className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1"
@@ -941,6 +957,7 @@ function MessagesPanel({
                 <span>→</span>
                 <input
                   type="datetime-local"
+                  aria-label="Search range to"
                   value={customTo}
                   onChange={(e) => setCustomTo(e.target.value)}
                   className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1"
@@ -951,8 +968,11 @@ function MessagesPanel({
 
           <div className="flex flex-wrap items-center gap-3 text-xs">
             <div className="flex items-center gap-1.5">
-              <label className="font-medium">Direction</label>
+              <label className="font-medium" htmlFor="search-direction">
+                Direction
+              </label>
               <select
+                id="search-direction"
                 value={direction}
                 onChange={(e) => setDirection(e.target.value as SearchDirection)}
                 className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1"
@@ -981,6 +1001,7 @@ function MessagesPanel({
             </label>
             <div className="flex items-center gap-1.5">
               <label
+                htmlFor="search-budget"
                 className={`font-medium ${
                   budgetUnlimited ? "text-[var(--color-text-subtle)]" : ""
                 }`}
@@ -988,6 +1009,7 @@ function MessagesPanel({
                 Max messages to scan
               </label>
               <input
+                id="search-budget"
                 type="number"
                 min={1}
                 max={1000000}
@@ -1001,6 +1023,7 @@ function MessagesPanel({
               />
             </div>
             <button
+              type="button"
               onClick={() => runSearch()}
               disabled={
                 searching ||
@@ -1013,6 +1036,7 @@ function MessagesPanel({
             </button>
             {searching && (
               <button
+                type="button"
                 onClick={stopSearch}
                 className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1 hover:border-[var(--color-border-strong)]"
               >
@@ -1021,6 +1045,7 @@ function MessagesPanel({
             )}
             {searchResult && !searching && (
               <button
+                type="button"
                 onClick={clearSearch}
                 className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1 hover:border-[var(--color-border-strong)]"
               >
@@ -1084,6 +1109,7 @@ function MessagesPanel({
                 <span className="ml-auto flex items-center gap-3">
                   {searchResult.stats.more_available && (
                     <button
+                      type="button"
                       onClick={() => runSearch(true)}
                       className="rounded border border-[var(--color-border)] px-2 py-1 hover:border-[var(--color-border-strong)]"
                     >
@@ -1135,6 +1161,7 @@ function MessagesPanel({
         <div className="m-3 flex items-center gap-2 rounded border border-accent/40 bg-accent-subtle p-2 text-xs text-accent">
           <span>Tip: click any value in a JSON message to filter by it.</span>
           <button
+            type="button"
             onClick={dismissCoachmark}
             className="ml-auto rounded border border-border px-2 py-0.5 hover:border-border-strong"
           >
@@ -1152,6 +1179,7 @@ function MessagesPanel({
       {!inSearchMode && tailCursor && !live && (
         <div className="flex flex-col items-center gap-2 p-4">
           <button
+            type="button"
             onClick={loadMore}
             disabled={loadingMore}
             className="rounded-md border border-[var(--color-border)] bg-[var(--color-panel)] px-4 py-2 text-sm font-medium text-[var(--color-text)] transition-colors hover:border-[var(--color-border-hover)] disabled:cursor-not-allowed disabled:opacity-50"
@@ -1217,19 +1245,14 @@ function MessageRow({
   return (
     <div
       data-testid="message-row"
-      className="cursor-pointer px-4 py-2 text-xs transition-colors hover:bg-[var(--color-surface-hover)]"
-      onClick={() => setOpen(!open)}
-      role="button"
-      tabIndex={0}
-      aria-expanded={open}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          setOpen(!open);
-        }
-      }}
+      className="px-4 py-2 text-xs transition-colors hover:bg-[var(--color-surface-hover)]"
     >
-      <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="flex w-full cursor-pointer flex-wrap items-center gap-2 text-left"
+      >
         <span className="font-mono text-[var(--color-text-subtle)]" aria-hidden="true">
           {open ? "▾" : "▸"}
         </span>
@@ -1267,9 +1290,9 @@ function MessageRow({
           </span>
         )}
         <span className="flex-1 truncate font-mono text-[var(--color-text)]">{preview}</span>
-      </div>
+      </button>
       {open && (
-        <div className="mt-3 space-y-3" onClick={(e) => e.stopPropagation()}>
+        <div className="mt-3 space-y-3">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <DetailSection
               label={`key · ${m.key === undefined ? "none" : m.key_encoding}`}
@@ -1294,6 +1317,7 @@ function MessageRow({
             action={
               <div className="flex items-center gap-1.5">
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setReplayOpen(true);
@@ -1304,6 +1328,7 @@ function MessageRow({
                   Replay to…
                 </button>
                 <button
+                  type="button"
                   onClick={copyValue}
                   className="rounded border border-[var(--color-border)] px-2 py-1 text-[11px] hover:border-[var(--color-border-strong)]"
                   title="Copy value to clipboard"
@@ -1313,6 +1338,7 @@ function MessageRow({
                 {m.value_truncated && m.masked && (
                   <>
                     <button
+                      type="button"
                       disabled
                       aria-describedby={`download-masked-${m.partition}-${m.offset}`}
                       className="rounded border border-[var(--color-border)] px-2 py-1 text-[11px] disabled:opacity-50"
@@ -1329,6 +1355,7 @@ function MessageRow({
                 )}
                 {m.value_truncated && !m.masked && (
                   <button
+                    type="button"
                     onClick={downloadFull}
                     disabled={downloading}
                     className="rounded border border-[var(--color-border)] px-2 py-1 text-[11px] hover:border-[var(--color-border-strong)] disabled:opacity-50"

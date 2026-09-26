@@ -177,33 +177,25 @@ function ThemeRow() {
     <SettingRow
       label="Theme"
       control={
-        <div
-          role="radiogroup"
-          aria-label="Theme"
-          className="inline-flex rounded-md border border-border bg-bg p-0.5"
-        >
-          {THEME_OPTIONS.map((opt) => {
+        <SegmentedControl
+          label="Theme"
+          value={preference}
+          onChange={setPreference}
+          options={THEME_OPTIONS.map((opt) => {
             const Icon = THEME_ICON[opt.value];
-            const active = preference === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => setPreference(opt.value)}
-                title={opt.label}
-                className={clsx(
-                  "inline-flex h-6 w-7 items-center justify-center rounded transition-colors",
-                  active ? "bg-panel text-text" : "text-muted hover:text-text",
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" aria-hidden />
-                <span className="sr-only">{opt.label}</span>
-              </button>
-            );
+            return {
+              value: opt.value,
+              title: opt.label,
+              content: (
+                <>
+                  <Icon className="h-3.5 w-3.5" aria-hidden />
+                  <span className="sr-only">{opt.label}</span>
+                </>
+              ),
+            };
           })}
-        </div>
+          itemClassName="w-7"
+        />
       }
     />
   );
@@ -223,30 +215,14 @@ function TimezoneRow() {
       label="Timezone"
       hint={hint}
       control={
-        <div
-          role="radiogroup"
-          aria-label="Timezone"
-          className="inline-flex rounded-md border border-border bg-bg p-0.5 text-[11px] font-semibold uppercase tracking-wide"
-        >
-          {TIMEZONE_OPTIONS.map((opt) => {
-            const active = mode === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => setMode(opt.value)}
-                className={clsx(
-                  "inline-flex h-6 items-center justify-center rounded px-2 transition-colors",
-                  active ? "bg-panel text-text" : "text-muted hover:text-text",
-                )}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
+        <SegmentedControl
+          label="Timezone"
+          value={mode}
+          onChange={setMode}
+          options={TIMEZONE_OPTIONS.map((opt) => ({ value: opt.value, content: opt.label }))}
+          className="text-[11px] font-semibold uppercase tracking-wide"
+          itemClassName="px-2"
+        />
       }
     />
   );
@@ -269,30 +245,14 @@ function NumberFormatRow() {
       label="Numbers"
       hint={hint}
       control={
-        <div
-          role="radiogroup"
-          aria-label="Number format"
-          className="inline-flex rounded-md border border-border bg-bg p-0.5 text-[11px] font-semibold uppercase tracking-wide"
-        >
-          {NUMBER_FORMAT_OPTIONS.map((opt) => {
-            const active = preference === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => setPreference(opt.value)}
-                className={clsx(
-                  "inline-flex h-6 items-center justify-center rounded px-2 transition-colors",
-                  active ? "bg-panel text-text" : "text-muted hover:text-text",
-                )}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
+        <SegmentedControl
+          label="Number format"
+          value={preference}
+          onChange={setPreference}
+          options={NUMBER_FORMAT_OPTIONS.map((opt) => ({ value: opt.value, content: opt.label }))}
+          className="text-[11px] font-semibold uppercase tracking-wide"
+          itemClassName="px-2"
+        />
       }
     />
   );
@@ -346,6 +306,59 @@ function ConfirmDestructiveRow() {
         </select>
       }
     />
+  );
+}
+
+// Native radios (visually hidden) instead of `role="radio"` buttons: the
+// browser provides the arrow-key roving focus a radio group needs, and the
+// focus ring moves to the visible label via `has-[:focus-visible]`.
+function SegmentedControl<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+  className,
+  itemClassName,
+}: {
+  label: string;
+  value: T;
+  onChange: (value: T) => void;
+  options: { value: T; content: React.ReactNode; title?: string }[];
+  className?: string;
+  itemClassName?: string;
+}) {
+  const name = useId();
+  return (
+    <fieldset
+      aria-label={label}
+      className={clsx("inline-flex rounded-md border border-border bg-bg p-0.5", className)}
+    >
+      {options.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <label
+            key={opt.value}
+            title={opt.title}
+            className={clsx(
+              "inline-flex h-6 cursor-pointer items-center justify-center rounded transition-colors",
+              "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus",
+              active ? "bg-panel text-text" : "text-muted hover:text-text",
+              itemClassName,
+            )}
+          >
+            <input
+              type="radio"
+              name={name}
+              value={opt.value}
+              checked={active}
+              onChange={() => onChange(opt.value)}
+              className="sr-only"
+            />
+            {opt.content}
+          </label>
+        );
+      })}
+    </fieldset>
   );
 }
 

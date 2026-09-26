@@ -14,7 +14,6 @@ export interface SearchInputProps {
   className?: string;
   /** ARIA label if the input has no visible label. */
   ariaLabel?: string;
-  autoFocus?: boolean;
 }
 
 /**
@@ -31,7 +30,6 @@ export function SearchInput({
   shortcut = true,
   className,
   ariaLabel,
-  autoFocus,
 }: SearchInputProps) {
   const ref = useRef<HTMLInputElement>(null);
 
@@ -73,7 +71,6 @@ export function SearchInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={ariaLabel}
-        autoFocus={autoFocus}
         className="flex-1 bg-transparent text-sm text-text placeholder:text-subtle-text"
       />
       {showCount && (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -117,6 +117,11 @@ export function CommandPalette() {
       unsubscribe();
     };
   }, []);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -345,18 +350,23 @@ export function CommandPalette() {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-[var(--color-text)]/50 p-4 pt-[10vh]"
-      onClick={() => setOpen(false)}
-    >
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh]">
       <div
-        className="w-full max-w-xl overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        aria-hidden="true"
+        className="fixed inset-0 bg-[var(--color-text)]/50"
+        onClick={() => setOpen(false)}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
+        className="relative w-full max-w-xl overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-2xl"
       >
         <div className="flex items-center gap-2 border-b border-[var(--color-border)] px-3 py-2">
           <Search className="h-4 w-4 text-[var(--color-text-subtle)]" />
           <input
-            autoFocus
+            ref={inputRef}
+            aria-label="Find anything"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
@@ -387,6 +397,7 @@ export function CommandPalette() {
           )}
           {renderItems.map((it, i) => (
             <button
+              type="button"
               key={`${it.kind}-${it.label}-${i}`}
               onMouseEnter={() => setSel(i)}
               onClick={() => pick(it)}

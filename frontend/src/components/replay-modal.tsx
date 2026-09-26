@@ -19,7 +19,7 @@
 // that instead. If the fetch fails (e.g. the value exceeds the 15 MB raw-
 // download cap), the user must explicitly opt in to replaying the truncated
 // preview via a checkbox — never silently.
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchTopics, produceMessage, RawValueTooLargeError, type Message } from "@/lib/api";
 import { produceEncodingFor, replayBlocker } from "@/lib/produce-encoding";
@@ -234,6 +234,7 @@ export function ReplayModal({
   };
 
   const labelCls = "text-[11px] font-semibold uppercase tracking-wider text-muted";
+  const fieldId = useId();
   const canReplay =
     !!effectiveCluster && !!destTopic.trim() && !busy && !blocker && !truncatedNotResolved;
 
@@ -308,8 +309,11 @@ export function ReplayModal({
           )}
 
           <div>
-            <label className={`mb-1 block ${labelCls}`}>Destination cluster</label>
+            <label htmlFor={`${fieldId}-cluster`} className={`mb-1 block ${labelCls}`}>
+              Destination cluster
+            </label>
             <select
+              id={`${fieldId}-cluster`}
               value={effectiveCluster}
               onChange={(e) => {
                 setDestCluster(e.target.value);
@@ -329,8 +333,11 @@ export function ReplayModal({
           </div>
 
           <div>
-            <label className={`mb-1 block ${labelCls}`}>Destination topic</label>
+            <label htmlFor={`${fieldId}-topic`} className={`mb-1 block ${labelCls}`}>
+              Destination topic
+            </label>
             <TopicCombobox
+              id={`${fieldId}-topic`}
               value={destTopic}
               onChange={(v) => {
                 setDestTopic(v);

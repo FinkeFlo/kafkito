@@ -97,7 +97,12 @@ export function MessageRangeCountPreview({
         </span>
       )}
       {!live && query.isFetching && (
-        <span aria-label="updating" title="updating" className="text-[10px] text-subtle-text">
+        <span
+          role="img"
+          aria-label="updating"
+          title="updating"
+          className="text-[10px] text-subtle-text"
+        >
           …
         </span>
       )}

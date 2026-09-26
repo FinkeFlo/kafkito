@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { KeyRound, Trash2 } from "lucide-react";
 import {
   deleteSCRAMUser,
@@ -242,6 +242,7 @@ function UpsertModal({
   const [mechanism, setMechanism] = useState<SCRAMMechanism>(toMechanism(defaultMechanism));
   const [password, setPassword] = useState("");
   const [iterations, setIterations] = useState(8192);
+  const fieldId = useId();
 
   const mut = useMutation({
     mutationFn: () => upsertSCRAMUser(cluster, { user, mechanism, password, iterations }),
@@ -277,8 +278,11 @@ function UpsertModal({
     >
       <div className="space-y-3 text-sm">
         <div>
-          <label className="block text-xs font-medium text-muted">User</label>
+          <label htmlFor={`${fieldId}-user`} className="block text-xs font-medium text-muted">
+            User
+          </label>
           <Input
+            id={`${fieldId}-user`}
             value={user}
             onChange={(e) => setUser(e.target.value)}
             readOnly={rotating}
@@ -287,8 +291,11 @@ function UpsertModal({
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted">Mechanism</label>
+          <label htmlFor={`${fieldId}-mechanism`} className="block text-xs font-medium text-muted">
+            Mechanism
+          </label>
           <select
+            id={`${fieldId}-mechanism`}
             value={mechanism}
             onChange={(e) => setMechanism(toMechanism(e.target.value))}
             disabled={rotating}
@@ -302,8 +309,11 @@ function UpsertModal({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted">Password</label>
+          <label htmlFor={`${fieldId}-password`} className="block text-xs font-medium text-muted">
+            Password
+          </label>
           <Input
+            id={`${fieldId}-password`}
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -313,10 +323,11 @@ function UpsertModal({
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted">
+          <label htmlFor={`${fieldId}-iterations`} className="block text-xs font-medium text-muted">
             Iterations <span className="text-subtle-text">(4096–16384, default 8192)</span>
           </label>
           <Input
+            id={`${fieldId}-iterations`}
             type="number"
             min={4096}
             max={16384}

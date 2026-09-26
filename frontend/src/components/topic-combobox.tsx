@@ -5,6 +5,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 interface TopicComboboxProps {
+  /** Id of the text input, so a sibling `<label htmlFor>` can name it. */
+  id?: string;
   value: string;
   onChange: (value: string) => void;
   /** Full topic list for the destination cluster; filtered client-side. */
@@ -19,6 +21,7 @@ interface TopicComboboxProps {
 const maxSuggestions = 30;
 
 export function TopicCombobox({
+  id,
   value,
   onChange,
   topics,
@@ -51,6 +54,7 @@ export function TopicCombobox({
   return (
     <div ref={fieldRef} className="relative">
       <input
+        id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => setMenuOpen(true)}

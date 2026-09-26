@@ -2,7 +2,7 @@
 // current topic to another cluster / topic.  Streams progress via SSE from
 // the server-side POST /copy endpoint so the copy runs entirely server-side
 // and is not limited by browser timeouts or memory.
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Square, Play } from "lucide-react";
 import { copyMessages, fetchTopics, type CopyProgressEvent, type CopyRequest } from "@/lib/api";
@@ -145,6 +145,7 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
 
   const canStart = !!effectiveCluster && !!destTopic.trim() && !running;
   const labelCls = "text-[11px] font-semibold uppercase tracking-wider text-muted";
+  const fieldId = useId();
 
   const copied = progress?.copied ?? 0;
   const skipped = progress?.skipped ?? 0;
@@ -159,8 +160,11 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
         <div className="grid gap-4 sm:grid-cols-2">
           {/* Destination cluster */}
           <div>
-            <label className={`mb-1 block ${labelCls}`}>Destination cluster</label>
+            <label htmlFor={`${fieldId}-cluster`} className={`mb-1 block ${labelCls}`}>
+              Destination cluster
+            </label>
             <select
+              id={`${fieldId}-cluster`}
               value={effectiveCluster}
               onChange={(e) => {
                 setDestCluster(e.target.value);
@@ -182,8 +186,11 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
 
           {/* Destination topic */}
           <div>
-            <label className={`mb-1 block ${labelCls}`}>Destination topic</label>
+            <label htmlFor={`${fieldId}-topic`} className={`mb-1 block ${labelCls}`}>
+              Destination topic
+            </label>
             <TopicCombobox
+              id={`${fieldId}-topic`}
               value={destTopic}
               onChange={(v) => {
                 setDestTopic(v);
@@ -200,12 +207,17 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
         {/* Time range */}
         <div>
           <div className="mb-1 flex items-center gap-2">
-            <label className={labelCls}>Time range</label>
+            <span id={`${fieldId}-range`} className={labelCls}>
+              Time range
+            </span>
             <span className="text-[10px] text-subtle-text" title={TIME_RANGE_TOOLTIP}>
               (empty From = oldest record; empty To = the moment the copy starts)
             </span>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <fieldset
+            aria-labelledby={`${fieldId}-range`}
+            className="flex min-w-0 flex-wrap items-center gap-2"
+          >
             {Object.keys(PRESET_DURATIONS_MS).map((key) => (
               <button
                 key={key}
@@ -228,11 +240,14 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
             >
               Clear
             </button>
-          </div>
+          </fieldset>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             <div>
-              <label className="mb-0.5 block text-[10px] text-muted">From</label>
+              <label htmlFor={`${fieldId}-from`} className="mb-0.5 block text-[10px] text-muted">
+                From
+              </label>
               <Input
+                id={`${fieldId}-from`}
                 type="datetime-local"
                 value={fromTs}
                 onChange={(e) => setFromTs(e.target.value)}
@@ -241,8 +256,11 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
               />
             </div>
             <div>
-              <label className="mb-0.5 block text-[10px] text-muted">To</label>
+              <label htmlFor={`${fieldId}-to`} className="mb-0.5 block text-[10px] text-muted">
+                To
+              </label>
               <Input
+                id={`${fieldId}-to`}
                 type="datetime-local"
                 value={toTs}
                 onChange={(e) => setToTs(e.target.value)}
@@ -256,8 +274,11 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
         {/* Limit + Partition row */}
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className={`mb-1 block ${labelCls}`}>Max messages</label>
+            <label htmlFor={`${fieldId}-limit`} className={`mb-1 block ${labelCls}`}>
+              Max messages
+            </label>
             <Input
+              id={`${fieldId}-limit`}
               type="number"
               min={1}
               value={limit}
@@ -268,8 +289,11 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
             />
           </div>
           <div>
-            <label className={`mb-1 block ${labelCls}`}>Source partition</label>
+            <label htmlFor={`${fieldId}-partition`} className={`mb-1 block ${labelCls}`}>
+              Source partition
+            </label>
             <select
+              id={`${fieldId}-partition`}
               value={partition}
               onChange={(e) => setPartition(e.target.value)}
               disabled={running}

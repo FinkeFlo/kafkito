@@ -212,7 +212,11 @@ function DataTableColumnView<Row>({
                   </th>
                 );
               })}
-              {onRowClick ? <th aria-hidden="true" className="w-10" /> : null}
+              {onRowClick ? (
+                <th className="w-10">
+                  <span className="sr-only">Open</span>
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">

@@ -257,6 +257,7 @@ function EditConfigsModal({
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Edit configuration — {topic}</h2>
           <button
+            type="button"
             onClick={onClose}
             className="text-[var(--color-text-subtle)] hover:text-[var(--color-text)]"
           >
@@ -368,12 +369,14 @@ function EditConfigsModal({
 
         <div className="mt-5 flex items-center justify-end gap-2">
           <button
+            type="button"
             onClick={onClose}
             className="rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] px-3 py-1.5 text-sm hover:border-[var(--color-border-strong)]"
           >
             Close
           </button>
           <button
+            type="button"
             onClick={() => mut.mutate()}
             disabled={!hasChanges || mut.isPending}
             className="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-sm text-[var(--color-text-on-accent)] disabled:opacity-50"

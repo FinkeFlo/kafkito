@@ -90,6 +90,7 @@ export function ClusterPill({ className }: { className?: string }) {
   if (isLoading && !clusters) {
     return (
       <span
+        role="status"
         aria-label="Loading clusters"
         className={clsx(
           "inline-flex h-8 items-center gap-2 rounded-full border border-border bg-panel px-3 text-xs text-muted",

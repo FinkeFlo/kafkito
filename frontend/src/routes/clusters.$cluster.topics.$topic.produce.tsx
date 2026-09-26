@@ -258,8 +258,11 @@ function ProduceSection({
 
       <div className="grid gap-4">
         <div className="flex flex-wrap items-center gap-3">
-          <label className={labelCls}>Partition</label>
+          <label htmlFor="produce-partition" className={labelCls}>
+            Partition
+          </label>
           <select
+            id="produce-partition"
             value={partition}
             onChange={(e) => setPartition(e.target.value)}
             className="rounded-md border border-border bg-panel px-2 py-1 text-sm"
@@ -274,8 +277,11 @@ function ProduceSection({
         </div>
 
         <div>
-          <label className={`mb-1 block ${labelCls}`}>Key</label>
+          <label htmlFor="produce-key" className={`mb-1 block ${labelCls}`}>
+            Key
+          </label>
           <Input
+            id="produce-key"
             value={key}
             onChange={(e) => setKey(e.target.value)}
             placeholder="(empty key)"
@@ -285,7 +291,9 @@ function ProduceSection({
 
         <div>
           <div className="mb-1 flex items-center justify-between">
-            <label className={labelCls}>Value</label>
+            <label htmlFor="produce-value" className={labelCls}>
+              Value
+            </label>
             <div className="flex items-center gap-2 text-xs text-muted">
               <span
                 className={
@@ -307,6 +315,7 @@ function ProduceSection({
             </div>
           </div>
           <textarea
+            id="produce-value"
             value={value}
             onChange={(e) => {
               setValue(e.target.value);
@@ -320,7 +329,7 @@ function ProduceSection({
 
         <div>
           <div className="mb-1 flex items-center justify-between">
-            <label className={labelCls}>Headers</label>
+            <span className={labelCls}>Headers</span>
             <Button
               variant="ghost"
               size="sm"
@@ -338,12 +347,14 @@ function ProduceSection({
               {headers.map((h, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <Input
+                    aria-label={`Header ${i + 1} key`}
                     placeholder="key"
                     value={h.k}
                     onChange={(e) => updateHeader(i, "k", e.target.value)}
                     className="w-1/3 font-mono"
                   />
                   <Input
+                    aria-label={`Header ${i + 1} value`}
                     placeholder="value"
                     value={h.v}
                     onChange={(e) => updateHeader(i, "v", e.target.value)}

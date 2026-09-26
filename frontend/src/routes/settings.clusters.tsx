@@ -660,6 +660,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
+    // biome-ignore lint/a11y/noLabelWithoutControl: every Field wraps exactly one form control passed as children, which the wrapping label names implicitly.
     <label className="block">
       <span className="mb-1 block text-xs font-medium uppercase tracking-wider text-muted">
         {label}
