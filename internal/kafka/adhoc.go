@@ -39,7 +39,7 @@ func IsAdhoc(name string) bool {
 // process (not persisted, not logged, not part of any API response); its
 // only purpose is to prevent Fingerprint's HMAC output from being reduced
 // to an unkeyed hash of caller-supplied credentials.
-func (r *Registry) adhocFPKey() []byte {
+func (r *Connections) adhocFPKey() []byte {
 	r.adhocFPKeyOnce.Do(func() {
 		key := make([]byte, 32)
 		if _, err := rand.Read(key); err != nil {
@@ -95,7 +95,7 @@ func Fingerprint(cfg config.ClusterConfig, key []byte) string {
 // used instead so unrelated users with identical connection parameters share
 // the underlying kgo.Client (acceptable because they carry the same
 // credentials anyway).
-func (r *Registry) UseAdhoc(cfg config.ClusterConfig) (string, error) {
+func (r *Connections) UseAdhoc(cfg config.ClusterConfig) (string, error) {
 	if len(cfg.Brokers) == 0 {
 		return "", errors.New("adhoc cluster: at least one broker required")
 	}
@@ -131,7 +131,7 @@ func (r *Registry) UseAdhoc(cfg config.ClusterConfig) (string, error) {
 
 // touchAdhocLocked records the last-use timestamp for an adhoc cluster.
 // Must be called while holding r.mu.
-func (r *Registry) touchAdhocLocked(name string) {
+func (r *Connections) touchAdhocLocked(name string) {
 	if r.adhocLastUsed == nil {
 		r.adhocLastUsed = make(map[string]time.Time, 4)
 	}
@@ -140,7 +140,7 @@ func (r *Registry) touchAdhocLocked(name string) {
 
 // sweepAdhocLocked evicts adhoc entries whose last use is older than
 // adhocIdleTTL. Must be called while holding r.mu.
-func (r *Registry) sweepAdhocLocked() {
+func (r *Connections) sweepAdhocLocked() {
 	if len(r.adhocLastUsed) == 0 {
 		return
 	}

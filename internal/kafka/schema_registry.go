@@ -118,7 +118,7 @@ func newSchemaRegistryClient(cfg config.SchemaRegistryConfig, guarded bool) *Sch
 // uses a guarded dialer that blocks SSRF at dial time to defend against DNS
 // rebinding. Operator-configured clusters are not guarded (they may
 // legitimately point SR at localhost, and the existing tests rely on this).
-func (r *Registry) SchemaRegistry(cluster string) (*SchemaRegistryClient, error) {
+func (r *Connections) SchemaRegistry(cluster string) (*SchemaRegistryClient, error) {
 	// r.clusters is written only at construction time (NewRegistry) or under
 	// r.mu (UseAdhoc). Reading it here without r.mu is safe for the same reason
 	// the rest of this method always has: there is no write path that races with
