@@ -9,14 +9,14 @@ import {
   subscribePrivateClusters,
   type PrivateCluster,
 } from "@/lib/private-clusters";
-import { StatusDot } from "@/components/StatusDot";
-import { Tag } from "@/components/Tag";
-import { KpiCard } from "@/components/KpiCard";
-import { DataTable, DataTableHead, DataTableRow, DataTableTh } from "@/components/DataTable";
-import { EmptyState } from "@/components/EmptyState";
-import { ErrorState } from "@/components/ErrorState";
-import { PageHeader } from "@/components/page-header";
-import { Button } from "@/components/button";
+import { StatusDot } from "@/components/ui/StatusDot";
+import { Tag } from "@/components/ui/Tag";
+import { KpiCard } from "@/components/ui/KpiCard";
+import { DataTable, DataTableHead, DataTableRow, DataTableTh } from "@/components/ui/DataTable";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { PageHeader } from "@/components/ui/page-header";
+import { Button } from "@/components/ui/button";
 import { formatRelative } from "@/lib/format";
 import { useFormatters } from "@/lib/use-formatters";
 import { clusterQueries } from "@/lib/queries/clusters";

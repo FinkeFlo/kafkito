@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Sparkles } from "lucide-react";
-import { anyModalOpen } from "@/components/Modal";
+import { anyModalOpen } from "@/components/ui/Modal";
 import { WhatsNewModal } from "@/components/whats-new-modal";
 import { CHANGELOG } from "@/content/changelog";
 import {

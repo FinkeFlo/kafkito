@@ -6,10 +6,10 @@ import {
   type CreateGroupStrategy,
   type ResetOffsetResult,
 } from "@/lib/api";
-import { Button } from "@/components/button";
-import { Input } from "@/components/Input";
-import { Modal } from "@/components/Modal";
-import { Notice } from "@/components/Notice";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
+import { Notice } from "@/components/ui/Notice";
 import { localInputToMs, msToLocalInput } from "@/lib/datetime";
 import { aclQueries } from "@/lib/queries/acls";
 import { topicQueries } from "@/lib/queries/topics";

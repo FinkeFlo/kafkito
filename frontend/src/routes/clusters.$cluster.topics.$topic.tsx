@@ -3,9 +3,9 @@ import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import type { TopicDetail } from "@/lib/api";
-import { Tag } from "@/components/Tag";
-import { KpiCard } from "@/components/KpiCard";
-import { Notice } from "@/components/Notice";
+import { Tag } from "@/components/ui/Tag";
+import { KpiCard } from "@/components/ui/KpiCard";
+import { Notice } from "@/components/ui/Notice";
 import { useFormatters, type Formatters } from "@/lib/use-formatters";
 import { topicQueries } from "@/lib/queries/topics";
 

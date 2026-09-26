@@ -2,8 +2,8 @@ import { createRootRouteWithContext } from "@tanstack/react-router";
 import type { QueryClient } from "@tanstack/react-query";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Shell } from "@/components/Shell";
-import { Toaster } from "@/components/toaster";
-import { TooltipProvider } from "@/components/tooltip";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 interface RouterContext {
   queryClient: QueryClient;

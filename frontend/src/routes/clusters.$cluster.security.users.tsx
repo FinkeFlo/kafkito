@@ -3,14 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useMemo, useState } from "react";
 import { KeyRound, Trash2 } from "lucide-react";
 import { deleteSCRAMUser, upsertSCRAMUser, type SCRAMMechanism, type SCRAMUser } from "@/lib/api";
-import { DataTable, type DataTableColumn } from "@/components/DataTable";
-import { Badge } from "@/components/badge";
-import { EmptyState } from "@/components/EmptyState";
-import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Button } from "@/components/button";
-import { Input } from "@/components/Input";
-import { Modal } from "@/components/Modal";
-import { Notice } from "@/components/Notice";
+import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
+import { Notice } from "@/components/ui/Notice";
 import { scramUserQueries } from "@/lib/queries/users";
 
 export const Route = createFileRoute("/clusters/$cluster/security/users")({

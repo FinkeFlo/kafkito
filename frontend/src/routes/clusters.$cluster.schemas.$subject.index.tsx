@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const Route = createFileRoute("/clusters/$cluster/schemas/$subject/")({
   component: SubjectOverview,

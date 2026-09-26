@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PathTree } from "@/lib/path-tree";
 import { useFuzzy } from "@/lib/fuzzy";
-import { Highlight } from "@/components/highlight";
+import { Highlight } from "@/components/ui/highlight";
 
 export interface PathSenseProps {
   tree: PathTree;

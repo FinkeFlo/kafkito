@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Boxes, FileJson, Moon, Search, Server, Shield, Sun, Users } from "lucide-react";
 import { ClusterPill } from "./ClusterPill";
 import { openCommandPalette } from "./CommandPalette";
-import { Tooltip } from "./tooltip";
+import { Tooltip } from "@/components/ui/tooltip";
 import { UserMenu } from "./UserMenu";
 import { WhatsNewButton } from "./whats-new-button";
 import { useTheme } from "@/lib/theme";

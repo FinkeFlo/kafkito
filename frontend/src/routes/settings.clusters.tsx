@@ -2,17 +2,17 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { PageHeader } from "@/components/page-header";
-import { EmptyState } from "@/components/EmptyState";
-import { Badge } from "@/components/badge";
-import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Card } from "@/components/card";
-import { Button } from "@/components/button";
-import { Input } from "@/components/Input";
-import { Modal } from "@/components/Modal";
-import { Notice } from "@/components/Notice";
-import { SearchInput } from "@/components/search-input";
-import { Toolbar } from "@/components/Toolbar";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
+import { Notice } from "@/components/ui/Notice";
+import { SearchInput } from "@/components/ui/search-input";
+import { Toolbar } from "@/components/ui/Toolbar";
 import { useFuzzy } from "@/lib/fuzzy";
 import {
   deletePrivateCluster,

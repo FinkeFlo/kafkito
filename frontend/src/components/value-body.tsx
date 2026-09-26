@@ -29,8 +29,8 @@ import type { Token } from "@/lib/path-builder";
 import { useFormatters } from "@/lib/use-formatters";
 import { useMessageRawValue } from "@/lib/use-message-raw-value";
 import { JsonInteractive, SIZE_LIMIT_BYTES } from "@/components/json-interactive";
-import { Button } from "@/components/button";
-import { Notice } from "@/components/Notice";
+import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/Notice";
 
 function ClickToFilterHint() {
   return (
