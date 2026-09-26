@@ -209,51 +209,41 @@ function SubjectRow({
   const latest = subject.versions[subject.versions.length - 1];
   const type = subject.latest_schema_type || inferType(subject.name);
   return (
-    <li>
+    <li
+      className={clsx(
+        "group flex items-start border-b border-border transition-colors",
+        active ? "bg-accent-subtle" : "hover:bg-hover",
+      )}
+    >
       <button
         type="button"
         onClick={() => onSelect("latest")}
-        className={clsx(
-          "group flex w-full items-start justify-between gap-3 border-b border-border px-3 py-2.5 text-left transition-colors",
-          active ? "bg-accent-subtle" : "hover:bg-hover",
-        )}
+        aria-current={active ? "true" : undefined}
+        className="min-w-0 flex-1 px-3 py-2.5 text-left"
       >
-        <div className="min-w-0 flex-1">
-          <div
-            className={clsx(
-              "truncate font-mono text-[13px] tabular-nums",
-              active ? "font-semibold text-text" : "text-text",
-            )}
-            title={subject.name}
-          >
-            <Highlight text={subject.name} ranges={nameHighlight ?? []} />
-          </div>
-          <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted">
-            <Tag>{type}</Tag>
-            <span>v{latest}</span>
-            <span>·</span>
-            <span>{subject.versions.length} versions</span>
-          </div>
-        </div>
-        <span
-          role="button"
-          tabIndex={0}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              e.stopPropagation();
-              onDelete();
-            }
-          }}
-          aria-label={`Delete subject ${subject.name}`}
-          className="mt-0.5 text-subtle-text opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 focus-visible:opacity-100"
+        <div
+          className={clsx(
+            "truncate font-mono text-[13px] tabular-nums",
+            active ? "font-semibold text-text" : "text-text",
+          )}
+          title={subject.name}
         >
-          <Trash2 className="h-4 w-4" />
-        </span>
+          <Highlight text={subject.name} ranges={nameHighlight ?? []} />
+        </div>
+        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted">
+          <Tag>{type}</Tag>
+          <span>v{latest}</span>
+          <span>·</span>
+          <span>{subject.versions.length} versions</span>
+        </div>
+      </button>
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label={`Delete subject ${subject.name}`}
+        className="mr-3 mt-3 text-subtle-text opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 focus-visible:opacity-100"
+      >
+        <Trash2 className="h-4 w-4" />
       </button>
     </li>
   );

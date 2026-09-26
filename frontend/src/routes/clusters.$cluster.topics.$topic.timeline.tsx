@@ -90,8 +90,11 @@ function TopicTimelinePage() {
       <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4">
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
-            <label>Range</label>
-            <div className="inline-flex overflow-hidden rounded border border-[var(--color-border)]">
+            <span id="timeline-range">Range</span>
+            <fieldset
+              aria-labelledby="timeline-range"
+              className="inline-flex min-w-0 overflow-hidden rounded border border-[var(--color-border)]"
+            >
               {PRESET_OPTIONS.map((p, i) => (
                 <button
                   key={p.key}
@@ -111,11 +114,12 @@ function TopicTimelinePage() {
                   {p.label}
                 </button>
               ))}
-            </div>
+            </fieldset>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
-            <label>Partition</label>
+            <label htmlFor="timeline-partition">Partition</label>
             <select
+              id="timeline-partition"
               value={partition}
               onChange={(e) => {
                 setPartition(Number(e.target.value));
@@ -248,6 +252,7 @@ function TimelineBarChart({
           const isSelected = selected === i;
           const isHovered = hovered === i;
           return (
+            // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only shortcut that highlights the slot in the Time grid table, which carries the same data for keyboard and screen-reader users.
             <g
               key={b.from_ts_ms}
               onClick={() => onSelect(isSelected ? null : i)}

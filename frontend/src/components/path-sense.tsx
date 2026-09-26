@@ -115,6 +115,7 @@ export function PathSense({
   };
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: focusout delegation only — closes the suggestion list once focus leaves the input and its options; the div itself takes no pointer or keyboard input.
     <div
       ref={rootRef}
       className="relative"

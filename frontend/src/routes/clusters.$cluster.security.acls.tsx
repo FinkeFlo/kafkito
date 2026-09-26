@@ -445,10 +445,13 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted">
-        {label}
+      {/* biome-ignore lint/a11y/noLabelWithoutControl: every Field wraps exactly one form control passed as children, which the wrapping label names implicitly. */}
+      <label className="block">
+        <span className="block text-[11px] font-semibold uppercase tracking-wider text-muted">
+          {label}
+        </span>
+        <span className="mt-1 block">{children}</span>
       </label>
-      <div className="mt-1">{children}</div>
       {hint && <div className="mt-0.5 text-xs text-subtle-text">{hint}</div>}
     </div>
   );

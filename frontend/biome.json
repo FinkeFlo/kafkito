@@ -35,7 +35,13 @@
         "noArrayIndexKey": "warn"
       },
       "a11y": {
-        "recommended": false
+        "recommended": true,
+        "noLabelWithoutControl": {
+          "level": "error",
+          "options": {
+            "inputComponents": ["Input"]
+          }
+        }
       }
     }
   }
