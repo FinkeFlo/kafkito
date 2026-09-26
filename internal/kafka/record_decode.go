@@ -25,31 +25,71 @@ type recordDecoder struct {
 	topic string
 	sr    *SRDecoder // nil when the cluster has no Schema Registry
 	mask  *masking.Policy
+	// masks is true when a masking rule is active for topic.
+	masks bool
 }
 
 func (r *Registry) recordDecoder(cluster, topic string) recordDecoder {
-	return recordDecoder{topic: topic, sr: r.srDecoderFor(cluster), mask: r.MaskingPolicy(cluster)}
+	mask := r.MaskingPolicy(cluster)
+	return recordDecoder{topic: topic, sr: r.srDecoderFor(cluster), mask: mask, masks: mask.AppliesTo(topic)}
 }
 
 // message renders rec for a response: the value is truncated to
-// maxMessageValueBytes, decoded via the Schema Registry and masked.
+// maxMessageValueBytes, decoded via the Schema Registry and masked. Masking
+// runs on the full decoded value (see maskedValue), so a record is masked
+// the same way no matter how large it is.
 func (d recordDecoder) message(ctx context.Context, rec *kgo.Record) Message {
 	m := recordToMessage(rec)
 	m.applySRDecoder(ctx, d.sr, rec.Key, rec.Value, true)
-	if !d.mask.IsEmpty() && m.Value != "" {
-		if mv, did := d.mask.Apply(d.topic, m.Value); did {
-			m.Value = mv
-			m.Masked = true
+	if !d.masks {
+		return m
+	}
+	if mv, did := d.maskedValue(ctx, rec); did {
+		if int64(len(mv)) > maxMessageValueBytes {
+			mv = mv[:maxMessageValueBytes]
+			m.ValueTruncated = true
 		}
+		m.Value = mv
+		m.Masked = true
+		// The base64 of a binary value carries the raw, unmasked bytes.
+		m.ValueB64 = ""
 	}
 	return m
 }
 
-// matchMessage renders rec for the search matchers: full, decoded, unmasked.
-// It must never end up in a response; see recordToMatchMessage.
+// maskedValue applies the masking policy to the full decoded value of rec,
+// the rendering the search matchers see, and reports whether the policy
+// changed it. Masking the 64 KB preview instead would miss JSONPath fields
+// of any larger JSON value, because the cut-off preview does not parse.
+func (d recordDecoder) maskedValue(ctx context.Context, rec *kgo.Record) (string, bool) {
+	value := renderForMatch(rec.Value)
+	if d.sr != nil {
+		if rendered, _, ok, _ := d.sr.Decode(ctx, rec.Value); ok {
+			value = rendered
+		}
+	}
+	return d.mask.Apply(d.topic, value)
+}
+
+// valueMasked reports whether the masking policy changes the value of rec.
+func (d recordDecoder) valueMasked(ctx context.Context, rec *kgo.Record) bool {
+	if !d.masks {
+		return false
+	}
+	_, did := d.maskedValue(ctx, rec)
+	return did
+}
+
+// matchMessage renders rec for the search matchers: full and decoded, with
+// the value masked where the policy applies, so a search only matches what
+// a response would show. It must never end up in a response; see
+// recordToMatchMessage.
 func (d recordDecoder) matchMessage(ctx context.Context, rec *kgo.Record) Message {
 	m := recordToMatchMessage(rec)
 	m.applySRDecoder(ctx, d.sr, rec.Key, rec.Value, false)
+	if d.masks {
+		m.Value, _ = d.mask.Apply(d.topic, m.Value)
+	}
 	return m
 }
 

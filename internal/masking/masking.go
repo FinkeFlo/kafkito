@@ -81,6 +81,12 @@ func Compile(rules []config.MaskingRule) (*Policy, error) {
 // IsEmpty reports whether the policy has zero rules.
 func (p *Policy) IsEmpty() bool { return p == nil || len(p.rules) == 0 }
 
+// AppliesTo reports whether at least one rule is active for topic, i.e.
+// whether Apply may change values of that topic.
+func (p *Policy) AppliesTo(topic string) bool {
+	return !p.IsEmpty() && len(p.activeRules(topic)) > 0
+}
+
 // Apply masks value according to rules that match topic. Returns the new
 // value and whether anything was masked.
 func (p *Policy) Apply(topic, value string) (string, bool) {

@@ -347,11 +347,13 @@ func (sc *searchScan) visit(ctx context.Context, rec *kgo.Record) {
 		sc.lowest[p] = rec.Offset
 	}
 	sc.scanned++
-	// Match against the full, untruncated and unmasked record: truncating
-	// first would hide contains-matches past maxMessageValueBytes and corrupt
-	// JSONPath/XPath/JS parsing of any larger record. A hit is rebuilt
-	// through the truncating, masking path so the response carries the same
-	// bounded preview as every other consume path.
+	// Match against the full, untruncated record: truncating first would
+	// hide contains-matches past maxMessageValueBytes and corrupt
+	// JSONPath/XPath/JS parsing of any larger record. Where a masking rule
+	// applies, the value is matched in its masked form, so masked content
+	// cannot be found by searching for it. A hit is rebuilt through the
+	// truncating, masking path so the response carries the same bounded
+	// preview as every other consume path.
 	full := sc.dec.matchMessage(ctx, rec)
 	hit, err := sc.match.match(&full)
 	if err != nil {
@@ -363,17 +365,25 @@ func (sc *searchScan) visit(ctx context.Context, rec *kgo.Record) {
 	}
 }
 
+// parseErrorWithheld replaces the parse error text on topics with an active
+// masking rule: parser and JS errors can quote parts of the value.
+const parseErrorWithheld = "value could not be evaluated (details withheld: data masking applies to this topic)"
+
 func (sc *searchScan) parseError(ctx context.Context, rec *kgo.Record, err error) {
 	sc.parseErrors++
+	msg := err.Error()
+	if sc.dec.masks {
+		msg = parseErrorWithheld
+	}
 	slog.WarnContext(ctx, "search: skipping message – parse error",
 		"partition", rec.Partition,
 		"offset", rec.Offset,
-		"error", err)
+		"error", msg)
 	if len(sc.parseErrorOffsets) < parseErrorOffsetsCap {
 		sc.parseErrorOffsets = append(sc.parseErrorOffsets, ParseErrorOffset{
 			Partition: rec.Partition,
 			Offset:    rec.Offset,
-			Error:     err.Error(),
+			Error:     msg,
 		})
 	}
 }

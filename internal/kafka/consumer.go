@@ -551,7 +551,9 @@ type RawMessageValue struct {
 // call for records larger than maxMessageValueBytes as long as the payload
 // stays within maxRawDownloadBytes.
 //
-// Returns ErrValueTooLarge when the record's value exceeds maxRawDownloadBytes.
+// Returns ErrValueTooLarge when the record's value exceeds maxRawDownloadBytes
+// and ErrValueMasked when the cluster's masking policy changes the record's
+// value: the raw bytes would bypass the masking.
 func (r *Registry) FetchRawMessageValue(ctx context.Context, cluster, topic string, partition int32, offset int64) (*RawMessageValue, error) {
 	cfg, ok := r.ConfigFor(cluster)
 	if !ok {
@@ -578,6 +580,9 @@ func (r *Registry) FetchRawMessageValue(ctx context.Context, cluster, topic stri
 	if int64(len(rec.Value)) > maxRawDownloadBytes {
 		return nil, ErrValueTooLarge
 	}
+	if r.recordDecoder(cluster, topic).valueMasked(ctx, rec) {
+		return nil, ErrValueMasked
+	}
 
 	ct, ext := detectContentType(rec.Value)
 	return &RawMessageValue{
@@ -589,6 +594,10 @@ func (r *Registry) FetchRawMessageValue(ctx context.Context, cluster, topic stri
 
 // ErrValueTooLarge is returned when a raw value exceeds maxRawDownloadBytes.
 var ErrValueTooLarge = errors.New("value exceeds download size limit")
+
+// ErrValueMasked is returned when the raw value of a masked record is
+// requested.
+var ErrValueMasked = errors.New("value is masked and cannot be downloaded")
 
 // detectContentType returns a MIME type and file extension for raw Kafka value
 // bytes. JSON and UTF-8 text are distinguished from binary payloads.

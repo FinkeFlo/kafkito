@@ -98,3 +98,20 @@ func TestPolicyCompile_RejectsInvalidTopicRegex(t *testing.T) {
 
 	assert.Error(t, err, "Compile must reject malformed topic regex")
 }
+
+func TestPolicy_AppliesTo(t *testing.T) {
+	t.Parallel()
+
+	scoped, err := Compile([]config.MaskingRule{{Topics: []string{"^orders$"}, Fields: []string{"$.email"}}})
+	require.NoError(t, err)
+	assert.True(t, scoped.AppliesTo("orders"))
+	assert.False(t, scoped.AppliesTo("payments"), "no rule targets the topic")
+
+	assert.True(t, newApplyPolicy(t).AppliesTo("anything"), "a rule without topics applies everywhere")
+
+	empty, err := Compile(nil)
+	require.NoError(t, err)
+	assert.False(t, empty.AppliesTo("orders"))
+	var nilPolicy *Policy
+	assert.False(t, nilPolicy.AppliesTo("orders"))
+}
