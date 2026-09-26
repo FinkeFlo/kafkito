@@ -211,7 +211,8 @@ const maxProduceCompressedBodyBytes = maxProduceBodyBytes + (1 << 20) // +1 MiB
 // produceBody reads the produce request body before the request validator
 // does: it caps the bytes read off the wire, decompresses a
 // Content-Encoding: gzip body, and caps the decompressed size. The validator
-// and handler then see the plain JSON body without Content-Encoding.
+// and handler then see the plain JSON body without Content-Encoding; other
+// encodings are read as plain JSON, as before the strict server.
 func produceBody(errs errorWriter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

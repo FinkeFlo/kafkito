@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -418,8 +419,10 @@ func assertResponseMatchesSpec(t *testing.T, router routers.Router, req *http.Re
 	opts := &openapi3filter.Options{
 		AuthenticationFunc:    openapi3filter.NoopAuthenticationFunc,
 		IncludeResponseStatus: true,
-		// The raw YAML document does not decode to the documented string.
-		ExcludeResponseBody: route.Operation.OperationID == "getOpenApiSpec",
+		// The raw YAML document does not decode to the documented string,
+		// and kin-openapi has no decoder for event streams or raw values;
+		// those bodies are checked by dedicated tests.
+		ExcludeResponseBody: slices.Contains([]string{"getOpenApiSpec", "copyMessages", "downloadMessageRaw"}, route.Operation.OperationID),
 	}
 	in := &openapi3filter.ResponseValidationInput{
 		RequestValidationInput: &openapi3filter.RequestValidationInput{
@@ -435,6 +438,12 @@ func assertResponseMatchesSpec(t *testing.T, router routers.Router, req *http.Re
 	return route.Operation.OperationID
 }
 
+// handlerCase is a requestCase sent to a specific handler.
+type handlerCase struct {
+	handler http.Handler
+	requestCase
+}
+
 // requestCase is a real request against server.New whose response is
 // checked for its status, body and conformance to the spec.
 type requestCase struct {
@@ -447,6 +456,7 @@ type requestCase struct {
 	timeout     time.Duration
 	wantStatus  int
 	wantBody    string // substring
+	wantHeader  map[string]string
 	// notAnOperation marks responses of chi's fallback handlers, which the
 	// spec does not describe per operation.
 	notAnOperation bool
@@ -481,10 +491,7 @@ func TestMigratedOps_Requests(t *testing.T) {
 	blankBrokerHeader := encodeHeader(t, config.ClusterConfig{Brokers: []string{unreachableBroker, " "}})
 	jsonCT := "application/json"
 
-	cases := []struct {
-		handler http.Handler
-		requestCase
-	}{
+	cases := []handlerCase{
 		// getHealth
 		{h, requestCase{name: "health", method: http.MethodGet, path: "/healthz", wantStatus: 200, wantBody: `{"status":"ok"}`}},
 		{h, requestCase{name: "health ignores a body", method: http.MethodGet, path: "/healthz", body: "junk", wantStatus: 200}},
@@ -545,6 +552,8 @@ func TestMigratedOps_Requests(t *testing.T) {
 		{h, requestCase{name: "brokers private without header", method: http.MethodGet, path: "/api/v1/clusters/__private__/brokers", wantStatus: 400}},
 	}
 
+	cases = append(cases, topicMessageCases(t)...)
+
 	router := contractRouter(t)
 	seen := map[string]map[string]bool{} // operationId -> "2xx"/"4xx"
 	for _, tc := range cases {
@@ -552,6 +561,9 @@ func TestMigratedOps_Requests(t *testing.T) {
 		assert.Equal(t, tc.wantStatus, rec.Code, "%s: %s", tc.name, rec.Body.String())
 		if tc.wantBody != "" {
 			assert.Contains(t, rec.Body.String(), tc.wantBody, tc.name)
+		}
+		for k, v := range tc.wantHeader {
+			assert.Equal(t, v, rec.Header().Get(k), "%s: header %s", tc.name, k)
 		}
 		if tc.notAnOperation {
 			continue

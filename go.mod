@@ -23,6 +23,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/kafka v0.44.0
 	github.com/twmb/franz-go v1.21.6
 	github.com/twmb/franz-go/pkg/kadm v1.18.0
+	github.com/twmb/franz-go/pkg/kfake v0.0.0-20260812145205-b8814509d953
 	github.com/twmb/franz-go/pkg/kmsg v1.13.1
 	golang.org/x/sync v0.23.0
 )
