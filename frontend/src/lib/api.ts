@@ -705,7 +705,8 @@ export async function testCluster(cfg: PrivateCluster): Promise<ClusterInfo> {
 /**
  * Downloads the full raw value of a single Kafka record identified by
  * partition and offset. Triggers a browser file-save dialog.
- * Throws on HTTP error (including 413 when the value exceeds the server cap).
+ * Throws on HTTP error: RawValueTooLargeError on 413 (value exceeds the
+ * server cap), RawValueMaskedError on 403 `value_masked`.
  */
 export async function downloadMessageRaw(
   cluster: string,
@@ -718,16 +719,7 @@ export async function downloadMessageRaw(
     `topics/${encodeURIComponent(topic)}/messages/${partition}/${offset}/raw`,
   );
   const res = await fetchAPI(cluster, path);
-  if (!res.ok) {
-    let detail = "";
-    try {
-      const b = (await res.json()) as Partial<ApiError>;
-      detail = b.error ? `: ${b.error}` : "";
-    } catch {
-      /* ignore */
-    }
-    throw new Error(`HTTP ${res.status}${detail}`);
-  }
+  if (!res.ok) throw await rawValueError(res);
   const disposition = res.headers.get("content-disposition") ?? "";
   const match = disposition.match(/filename="([^"]+)"/);
   const filename = match ? match[1] : `${topic}-p${partition}-o${offset}.bin`;
@@ -742,8 +734,30 @@ export async function downloadMessageRaw(
   URL.revokeObjectURL(url);
 }
 
-/** Thrown by fetchMessageRawBase64 when the value exceeds the server's raw-download cap (HTTP 413). */
+/** Thrown by the raw-value fetchers when the value exceeds the server's raw-download cap (HTTP 413). */
 export class RawValueTooLargeError extends Error {}
+
+/**
+ * Thrown by the raw-value fetchers when the server refuses the value because
+ * the cluster's data masking rules change it (HTTP 403 `value_masked`). The
+ * message is the server's own text.
+ */
+export class RawValueMaskedError extends Error {}
+
+async function rawValueError(res: Response): Promise<Error> {
+  let body: Partial<ApiError> = {};
+  try {
+    body = (await res.json()) as Partial<ApiError>;
+  } catch {
+    /* ignore */
+  }
+  if (res.status === 403 && body.code === "value_masked") {
+    return new RawValueMaskedError(body.error ?? "value is masked and cannot be downloaded");
+  }
+  const detail = body.error ? `: ${body.error}` : "";
+  if (res.status === 413) return new RawValueTooLargeError(`HTTP 413${detail}`);
+  return new Error(`HTTP ${res.status}${detail}`);
+}
 
 function arrayBufferToBase64(buf: ArrayBuffer): string {
   // Chunked to avoid blowing the call stack on String.fromCharCode(...bytes)
@@ -775,7 +789,8 @@ export function base64ToUtf8(b64: string): string {
  * triggering a file download like downloadMessageRaw). Used by the Replay
  * dialog to recover the untruncated bytes of a value that was cut to 64 KB
  * for the message list preview. Throws RawValueTooLargeError on HTTP 413,
- * a plain Error on any other HTTP error.
+ * RawValueMaskedError on HTTP 403 `value_masked`, a plain Error on any other
+ * HTTP error.
  */
 export async function fetchMessageRawBase64(
   cluster: string,
@@ -789,16 +804,6 @@ export async function fetchMessageRawBase64(
     `topics/${encodeURIComponent(topic)}/messages/${partition}/${offset}/raw`,
   );
   const res = await fetchAPI(cluster, path, { signal });
-  if (!res.ok) {
-    let detail = "";
-    try {
-      const b = (await res.json()) as Partial<ApiError>;
-      detail = b.error ? `: ${b.error}` : "";
-    } catch {
-      /* ignore */
-    }
-    if (res.status === 413) throw new RawValueTooLargeError(`HTTP 413${detail}`);
-    throw new Error(`HTTP ${res.status}${detail}`);
-  }
+  if (!res.ok) throw await rawValueError(res);
   return arrayBufferToBase64(await res.arrayBuffer());
 }

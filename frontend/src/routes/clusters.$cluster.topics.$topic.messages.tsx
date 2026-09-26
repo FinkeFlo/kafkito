@@ -1,12 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   fetchTopicDetail,
   fetchMessages,
   fetchSample,
   searchMessages,
   downloadMessageRaw,
+  RawValueMaskedError,
   type Message,
   type PartitionInfo,
   type SampleResponse,
@@ -1204,7 +1206,9 @@ function MessageRow({
     try {
       await downloadMessageRaw(cluster, topic, m.partition, m.offset);
     } catch (err) {
-      setDownloadError((err as Error).message);
+      // The list may predate a masking rule that now covers this record.
+      if (err instanceof RawValueMaskedError) toast.error(err.message);
+      else setDownloadError((err as Error).message);
     } finally {
       setDownloading(false);
     }
@@ -1306,7 +1310,24 @@ function MessageRow({
                 >
                   {copied ? "Copied!" : "Copy value"}
                 </button>
-                {m.value_truncated && (
+                {m.value_truncated && m.masked && (
+                  <>
+                    <button
+                      disabled
+                      aria-describedby={`download-masked-${m.partition}-${m.offset}`}
+                      className="rounded border border-[var(--color-border)] px-2 py-1 text-[11px] disabled:opacity-50"
+                    >
+                      Download full value
+                    </button>
+                    <span
+                      id={`download-masked-${m.partition}-${m.offset}`}
+                      className="text-[11px] text-[var(--color-text-muted)]"
+                    >
+                      Masked values can&apos;t be downloaded.
+                    </span>
+                  </>
+                )}
+                {m.value_truncated && !m.masked && (
                   <button
                     onClick={downloadFull}
                     disabled={downloading}

@@ -157,6 +157,17 @@ describe("hydrateTruncatedSampleMessages", () => {
     expect(fetchMessageRawBase64).not.toHaveBeenCalled();
   });
 
+  it("skips masked values, whose raw download is refused", async () => {
+    const msgs = [
+      message({ value: '{"email":"***","pad":"y', value_truncated: true, masked: true }),
+    ];
+
+    const result = await hydrateTruncatedSampleMessages("c", "t", msgs);
+
+    expect(result).toEqual(msgs);
+    expect(fetchMessageRawBase64).not.toHaveBeenCalled();
+  });
+
   it("skips values above the hydrate size limit instead of downloading them", async () => {
     const msgs = [
       message({

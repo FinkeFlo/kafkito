@@ -40,6 +40,9 @@ export function isTooLargeToScan(m: Message): boolean {
  * rendering, while the raw-download endpoint returns the encoded wire bytes,
  * which would not parse as JSON.
  *
+ * Masked values are skipped too: the server refuses their raw download, and
+ * the suggestions must not be built from anything but the masked rendering.
+ *
  * `encoding` must match what the caller's tree can actually consume. Only
  * values of that encoding are fetched: hydrating an XML sample for the JSON
  * tree (or vice versa) is never useful — the other builder discards it — and
@@ -58,6 +61,7 @@ export async function hydrateTruncatedSampleMessages(
         m.value_truncated === true &&
         m.value_encoding === encoding &&
         !m.value_sr &&
+        !m.masked &&
         (m.value_size_bytes ?? 0) <= MAX_HYDRATE_VALUE_BYTES;
       if (!needsHydration) return m;
       try {
