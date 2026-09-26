@@ -31,7 +31,7 @@ func (s *apiServer) ConsumeMessages(ctx context.Context, req gen.ConsumeMessages
 	ctx, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
 
-	res, err := s.reg.ConsumeMessages(ctx, req.Cluster, req.Topic, opts)
+	res, err := s.messages.ConsumeMessages(ctx, req.Cluster, req.Topic, opts)
 	if err != nil {
 		return nil, clusterError(req.Cluster, "consume messages", err)
 	}
@@ -78,7 +78,7 @@ func (s *apiServer) DownloadMessageRaw(ctx context.Context, req gen.DownloadMess
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
-	raw, err := s.reg.FetchRawMessageValue(ctx, req.Cluster, req.Topic, req.Partition, req.Offset)
+	raw, err := s.messages.FetchRawMessageValue(ctx, req.Cluster, req.Topic, req.Partition, req.Offset)
 	if err != nil {
 		if errors.Is(err, kafkapkg.ErrValueTooLarge) || errors.Is(err, kafkapkg.ErrValueMasked) {
 			return nil, err
@@ -103,7 +103,7 @@ func (s *apiServer) CountMessages(ctx context.Context, req gen.CountMessagesRequ
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	res, err := s.reg.CountMessages(ctx, req.Cluster, req.Topic, opts)
+	res, err := s.messages.CountMessages(ctx, req.Cluster, req.Topic, opts)
 	if err != nil {
 		return nil, clusterError(req.Cluster, "count messages", err)
 	}
@@ -128,7 +128,7 @@ func (s *apiServer) GetMessageTimeline(ctx context.Context, req gen.GetMessageTi
 	ctx, cancel := context.WithTimeout(ctx, 25*time.Second)
 	defer cancel()
 
-	res, err := s.reg.MessageTimeline(ctx, req.Cluster, req.Topic, opts)
+	res, err := s.messages.MessageTimeline(ctx, req.Cluster, req.Topic, opts)
 	if err != nil {
 		return nil, clusterError(req.Cluster, "message timeline", err)
 	}
@@ -150,7 +150,7 @@ func (s *apiServer) SampleMessages(ctx context.Context, req gen.SampleMessagesRe
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	res, err := s.reg.ConsumeMessages(ctx, req.Cluster, req.Topic, opts)
+	res, err := s.messages.ConsumeMessages(ctx, req.Cluster, req.Topic, opts)
 	if err != nil {
 		return nil, clusterError(req.Cluster, "sample messages", err)
 	}
@@ -171,7 +171,7 @@ func (s *apiServer) SearchMessages(ctx context.Context, req gen.SearchMessagesRe
 
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	res, err := s.reg.SearchMessages(ctx, req.Cluster, req.Topic, opts)
+	res, err := s.messages.SearchMessages(ctx, req.Cluster, req.Topic, opts)
 	if err != nil {
 		if msg := err.Error(); !errors.Is(err, kafkapkg.ErrUnknownCluster) && isSearchClientErr(msg) {
 			// The 400 body uses the raw message without the "kafka: " prefix
@@ -277,7 +277,7 @@ func readProduceBody(w http.ResponseWriter, r *http.Request) ([]byte, error) {
 // produceBody).
 func (s *apiServer) ProduceMessage(ctx context.Context, req gen.ProduceMessageRequestObject) (gen.ProduceMessageResponseObject, error) {
 	r := httpRequestFromContext(ctx)
-	if err := prodConfirmationError(s.reg, req.Cluster, r); err != nil {
+	if err := prodConfirmationError(s.configs, req.Cluster, r); err != nil {
 		return nil, err
 	}
 
@@ -286,7 +286,7 @@ func (s *apiServer) ProduceMessage(ctx context.Context, req gen.ProduceMessageRe
 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	res, err := s.reg.Produce(ctx, req.Cluster, req.Topic, body)
+	res, err := s.messages.Produce(ctx, req.Cluster, req.Topic, body)
 	if err != nil {
 		return nil, produceError(req.Cluster, req.Topic, body.Partition, err)
 	}

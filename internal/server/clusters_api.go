@@ -17,7 +17,7 @@ import (
 func (s *apiServer) ListClusters(ctx context.Context, _ gen.ListClustersRequestObject) (gen.ListClustersResponseObject, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	return gen.ListClusters200JSONResponse{Clusters: s.reg.Describe(ctx, 1*time.Second)}, nil
+	return gen.ListClusters200JSONResponse{Clusters: s.clusters.Describe(ctx, 1*time.Second)}, nil
 }
 
 // TestCluster probes a user-supplied ClusterConfig (sent either as the
@@ -37,7 +37,7 @@ func (s *apiServer) TestCluster(ctx context.Context, req gen.TestClusterRequestO
 	} else {
 		return nil, badRequest("cluster config required in body or " + PrivateClusterHeader + " header")
 	}
-	name, err := s.reg.UseAdhoc(cfg)
+	name, err := s.clusters.UseAdhoc(cfg)
 	if err != nil {
 		return nil, badRequest(err.Error())
 	}
@@ -46,7 +46,7 @@ func (s *apiServer) TestCluster(ctx context.Context, req gen.TestClusterRequestO
 	// rather than burning the full Ping budget. Client construction is
 	// synchronous and does not dial; the resulting client is cached on
 	// the registry, so the subsequent Ping reuses it.
-	if _, cerr := s.reg.Client(name); cerr != nil {
+	if _, cerr := s.clusters.Client(name); cerr != nil {
 		return nil, badRequest(cerr.Error())
 	}
 	pingCtx, pingCancel := context.WithTimeout(ctx, s.testConnectionTimeout())
@@ -61,7 +61,7 @@ func (s *apiServer) TestCluster(ctx context.Context, req gen.TestClusterRequestO
 	if info.AuthType == "" {
 		info.AuthType = "none"
 	}
-	if err := s.reg.Ping(pingCtx, name); err != nil {
+	if err := s.clusters.Ping(pingCtx, name); err != nil {
 		// Intentional: testCluster is a user-invoked diagnostic for a cluster
 		// the caller supplied and owns. Returning the raw connection error is
 		// the point of this endpoint — it tells the user exactly why their
@@ -76,7 +76,7 @@ func (s *apiServer) TestCluster(ctx context.Context, req gen.TestClusterRequestO
 	} else {
 		info.Reachable = true
 		capCtx, capCancel := context.WithTimeout(ctx, 4*time.Second)
-		if caps, cerr := s.reg.Capabilities(capCtx, name); cerr == nil {
+		if caps, cerr := s.clusters.Capabilities(capCtx, name); cerr == nil {
 			info.Capabilities = caps
 		}
 		capCancel()
@@ -95,7 +95,7 @@ func (s *apiServer) GetCapabilities(ctx context.Context, req gen.GetCapabilities
 
 // RefreshCapabilities invalidates the probe cache and re-runs it.
 func (s *apiServer) RefreshCapabilities(ctx context.Context, req gen.RefreshCapabilitiesRequestObject) (gen.RefreshCapabilitiesResponseObject, error) {
-	s.reg.RefreshCapabilities(req.Cluster)
+	s.clusters.RefreshCapabilities(req.Cluster)
 	caps, err := s.capabilities(ctx, req.Cluster)
 	if err != nil {
 		return nil, err
@@ -106,7 +106,7 @@ func (s *apiServer) RefreshCapabilities(ctx context.Context, req gen.RefreshCapa
 func (s *apiServer) capabilities(ctx context.Context, cluster string) (kafkapkg.Capabilities, error) {
 	ctx, cancel := context.WithTimeout(ctx, 6*time.Second)
 	defer cancel()
-	caps, err := s.reg.Capabilities(ctx, cluster)
+	caps, err := s.clusters.Capabilities(ctx, cluster)
 	if err != nil {
 		return kafkapkg.Capabilities{}, clusterError(cluster, "get capabilities", err)
 	}
@@ -120,7 +120,7 @@ func (s *apiServer) capabilities(ctx context.Context, cluster string) (kafkapkg.
 func (s *apiServer) ListBrokers(ctx context.Context, req gen.ListBrokersRequestObject) (gen.ListBrokersResponseObject, error) {
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
-	brokers, err := s.reg.ListBrokers(ctx, req.Cluster)
+	brokers, err := s.clusters.ListBrokers(ctx, req.Cluster)
 	if err != nil {
 		return nil, clusterError(req.Cluster, "list brokers", err)
 	}

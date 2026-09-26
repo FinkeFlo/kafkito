@@ -20,7 +20,7 @@ const maxACLBodyBytes = 16 << 10
 func (s *apiServer) ListAcls(ctx context.Context, req gen.ListAclsRequestObject) (gen.ListAclsResponseObject, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	acls, err := s.reg.ListACLs(ctx, req.Cluster)
+	acls, err := s.acls.ListACLs(ctx, req.Cluster)
 	if err != nil {
 		return nil, clusterError(req.Cluster, "list ACLs", err)
 	}
@@ -31,7 +31,7 @@ func (s *apiServer) ListAcls(ctx context.Context, req gen.ListAclsRequestObject)
 func (s *apiServer) CreateAcl(ctx context.Context, req gen.CreateAclRequestObject) (gen.CreateAclResponseObject, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	if err := s.reg.CreateACL(ctx, req.Cluster, kafkapkg.ACLSpec(*req.Body)); err != nil {
+	if err := s.acls.CreateACL(ctx, req.Cluster, kafkapkg.ACLSpec(*req.Body)); err != nil {
 		return nil, aclError(req.Cluster, "create ACL", err)
 	}
 	return gen.CreateAcl201JSONResponse{Ok: true, Acl: *req.Body}, nil
@@ -41,7 +41,7 @@ func (s *apiServer) CreateAcl(ctx context.Context, req gen.CreateAclRequestObjec
 func (s *apiServer) DeleteAcl(ctx context.Context, req gen.DeleteAclRequestObject) (gen.DeleteAclResponseObject, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	deleted, err := s.reg.DeleteACL(ctx, req.Cluster, kafkapkg.ACLSpec(*req.Body))
+	deleted, err := s.acls.DeleteACL(ctx, req.Cluster, kafkapkg.ACLSpec(*req.Body))
 	if err != nil {
 		return nil, aclError(req.Cluster, "delete ACL", err)
 	}

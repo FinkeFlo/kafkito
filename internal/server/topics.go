@@ -30,7 +30,7 @@ func (s *apiServer) ListTopics(ctx context.Context, req gen.ListTopicsRequestObj
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
-	topics, err := s.reg.ListTopics(ctx, req.Cluster)
+	topics, err := s.topics.ListTopics(ctx, req.Cluster)
 	if err != nil {
 		return nil, clusterError(req.Cluster, "list topics", err)
 	}
@@ -46,7 +46,7 @@ func (s *apiServer) ListTopics(ctx context.Context, req gen.ListTopicsRequestObj
 func (s *apiServer) CreateTopic(ctx context.Context, req gen.CreateTopicRequestObject) (gen.CreateTopicResponseObject, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	if err := s.reg.CreateTopic(ctx, req.Cluster, *req.Body); err != nil {
+	if err := s.topics.CreateTopic(ctx, req.Cluster, *req.Body); err != nil {
 		if msg := err.Error(); !errors.Is(err, kafkapkg.ErrUnknownCluster) && strings.Contains(msg, "topic name required") {
 			return nil, badRequest("kafka: " + msg)
 		}
@@ -60,7 +60,7 @@ func (s *apiServer) DescribeTopic(ctx context.Context, req gen.DescribeTopicRequ
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 
-	detail, err := s.reg.DescribeTopic(ctx, req.Cluster, req.Topic)
+	detail, err := s.topics.DescribeTopic(ctx, req.Cluster, req.Topic)
 	if err != nil {
 		return nil, clusterError(req.Cluster, "describe topic", err)
 	}
@@ -75,12 +75,12 @@ func (s *apiServer) DescribeTopic(ctx context.Context, req gen.DescribeTopicRequ
 
 // DeleteTopic removes a topic.
 func (s *apiServer) DeleteTopic(ctx context.Context, req gen.DeleteTopicRequestObject) (gen.DeleteTopicResponseObject, error) {
-	if err := prodConfirmationError(s.reg, req.Cluster, httpRequestFromContext(ctx)); err != nil {
+	if err := prodConfirmationError(s.configs, req.Cluster, httpRequestFromContext(ctx)); err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	if err := s.reg.DeleteTopic(ctx, req.Cluster, req.Topic); err != nil {
+	if err := s.topics.DeleteTopic(ctx, req.Cluster, req.Topic); err != nil {
 		return nil, clusterError(req.Cluster, "delete topic", err)
 	}
 	return gen.DeleteTopic200JSONResponse{Deleted: req.Topic}, nil
@@ -102,7 +102,7 @@ func (s *apiServer) ListTopicConsumers(ctx context.Context, req gen.ListTopicCon
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	consumers, err := s.reg.ListTopicConsumers(ctx, req.Cluster, req.Topic)
+	consumers, err := s.topics.ListTopicConsumers(ctx, req.Cluster, req.Topic)
 	if err != nil {
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
@@ -128,7 +128,7 @@ func (s *apiServer) ListTopicConsumers(ctx context.Context, req gen.ListTopicCon
 func (s *apiServer) AlterTopicConfigs(ctx context.Context, req gen.AlterTopicConfigsRequestObject) (gen.AlterTopicConfigsResponseObject, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	res, err := s.reg.AlterTopicConfigs(ctx, req.Cluster, req.Topic, *req.Body)
+	res, err := s.topics.AlterTopicConfigs(ctx, req.Cluster, req.Topic, *req.Body)
 	if err != nil {
 		if msg := err.Error(); !errors.Is(err, kafkapkg.ErrUnknownCluster) && (strings.Contains(msg, "required") || strings.Contains(msg, "no changes")) {
 			return nil, badRequest("kafka: " + msg)
@@ -140,12 +140,12 @@ func (s *apiServer) AlterTopicConfigs(ctx context.Context, req gen.AlterTopicCon
 
 // DeleteRecords truncates the topic log per partition.
 func (s *apiServer) DeleteRecords(ctx context.Context, req gen.DeleteRecordsRequestObject) (gen.DeleteRecordsResponseObject, error) {
-	if err := prodConfirmationError(s.reg, req.Cluster, httpRequestFromContext(ctx)); err != nil {
+	if err := prodConfirmationError(s.configs, req.Cluster, httpRequestFromContext(ctx)); err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	res, err := s.reg.DeleteRecords(ctx, req.Cluster, req.Topic, *req.Body)
+	res, err := s.topics.DeleteRecords(ctx, req.Cluster, req.Topic, *req.Body)
 	if err != nil {
 		if msg := err.Error(); !errors.Is(err, kafkapkg.ErrUnknownCluster) && (strings.Contains(msg, "required") || strings.Contains(msg, "no resolvable")) {
 			return nil, badRequest("kafka: " + msg)

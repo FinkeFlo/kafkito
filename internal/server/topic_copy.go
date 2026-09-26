@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
 )
@@ -92,8 +91,8 @@ func releaseCopySlot() {
 // copyRegistry is the part of *kafkapkg.Registry the copy job uses. Tests
 // substitute a fake to drive the SSE stream without a broker.
 type copyRegistry interface {
-	ConfigFor(name string) (config.ClusterConfig, bool)
-	UseAdhoc(cfg config.ClusterConfig) (string, error)
+	clusterConfigs
+	adhocClusters
 	DescribeTopic(ctx context.Context, cluster, topic string) (*kafkapkg.TopicDetail, error)
 	ConsumeMessages(ctx context.Context, cluster, topic string, opts kafkapkg.ConsumeOptions) (*kafkapkg.ConsumeResult, error)
 	ProduceBatch(ctx context.Context, cluster, topic string, reqs []kafkapkg.ProduceRequest) (int, error)
