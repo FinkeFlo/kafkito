@@ -1,4 +1,5 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
+import { hostAddress } from "./fixtures/host-address";
 import {
   UNREACHABLE_CLUSTER as DOWN,
   withUnreachableCluster,
@@ -183,14 +184,8 @@ test.describe("Status indicators never rely on colour alone", () => {
     await expect(errorIcon).toBeVisible();
     const errorMask = await inkMask(page, errorIcon);
 
-    // For the same reason a real success is impossible in e2e, so the probe
-    // answer is stubbed.
-    await page.route("**/api/v1/clusters/_test", (route) =>
-      route.fulfill({
-        json: { name: "draft", reachable: true, auth_type: "none", tls: false, is_prod: false },
-      }),
-    );
-    await brokers.fill("broker.example.com:9092");
+    // The fixture broker through a private host address is a real success.
+    await brokers.fill(`${hostAddress()}:39092`);
     await testButton.click();
     const ok = dialog.getByRole("status").filter({ hasText: /^OK — reachable/ });
     await expect(ok).toBeVisible({ timeout: 20_000 });

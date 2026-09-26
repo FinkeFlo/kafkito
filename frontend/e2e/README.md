@@ -52,6 +52,11 @@ frontend/e2e/fixtures/seed.sh       seeds the broker via `docker exec kafkito-ka
 frontend/e2e/fixtures/kafkito-e2e.yaml  kafkito config: cluster `local` + data_masking for e2e-masked
 frontend/e2e/*.spec.ts              the actual walks
 frontend/e2e/csp.spec.ts            fails on any Content-Security-Policy violation (needs the Go-served build)
+frontend/e2e/a11y.spec.ts           axe scan of the main routes and dialogs in light and dark theme
+                                    (fixtures/axe.ts); fails on serious/critical violations
+frontend/e2e/status-indicators.spec.ts  every status indicator keeps a non-colour cue (WCAG 1.4.1)
+frontend/e2e/vision-deficiency.spec.ts  opt-in: set KAFKITO_E2E_VISION_DIR to capture the status pages
+                                    under deuteranopia / protanopia emulation (Chromium CDP)
 Makefile :: e2e, e2e-up, e2e-test, e2e-down
 .github/workflows/e2e.yml           CI workflow with browser caching + artifact upload
 ```
@@ -75,10 +80,11 @@ Makefile :: e2e, e2e-up, e2e-test, e2e-down
     rotates its password and deletes the credential.
 - Cluster name in URLs is `KAFKITO_E2E_CLUSTER` (defaults to `local` —
   the cluster defined in `fixtures/kafkito-e2e.yaml`).
-- `clusters.spec.ts` tests private-cluster connections against the fixture
-  broker through the host's private IPv4 address, because the backend
-  refuses loopback brokers for private clusters. It picks the first
-  RFC 1918 interface address; set `KAFKITO_E2E_HOST_IP` to override.
+- `clusters.spec.ts` and `status-indicators.spec.ts` test private-cluster
+  connections against the fixture broker through the host's private IPv4
+  address (`fixtures/host-address.ts`), because the backend refuses
+  loopback brokers for private clusters. It picks the first RFC 1918
+  interface address; set `KAFKITO_E2E_HOST_IP` to override.
 
 ## What is NOT here yet
 
