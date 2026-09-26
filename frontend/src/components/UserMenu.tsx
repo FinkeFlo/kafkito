@@ -101,7 +101,7 @@ export function UserMenu() {
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-haspopup="menu"
+        aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={popoverId}
         aria-label={`Account menu for ${display}`}
@@ -123,7 +123,9 @@ export function UserMenu() {
         <div
           ref={popoverRef}
           id={popoverId}
-          role="menu"
+          // A settings panel (radio groups, inputs), not a list of menu
+          // items, so it is a non-modal dialog rather than role="menu".
+          role="dialog"
           aria-label="Account and settings"
           tabIndex={-1}
           className="absolute right-0 z-30 mt-2 w-72 rounded-xl border border-border bg-panel p-1.5 shadow-xl"
@@ -147,7 +149,6 @@ export function UserMenu() {
 
           <a
             href="/logout"
-            role="menuitem"
             className="flex items-center gap-2 rounded-md px-2.5 py-2 text-xs text-muted transition-colors hover:bg-hover hover:text-text"
           >
             <LogOut className="h-3.5 w-3.5" aria-hidden />
