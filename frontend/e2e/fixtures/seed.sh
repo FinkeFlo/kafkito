@@ -11,6 +11,9 @@
 #   topic e2e-copy-source      1 partition, 1500 messages (bulk-copy walk: three copy pages)
 #   topic e2e-copy-dest        1 partition, empty (bulk-copy walk destination)
 #   topic e2e-produce-target   1 partition, empty (produce / search walk)
+#   topic e2e-masked           1 partition, 2 JSON messages whose customer.email is
+#                              masked by kafkito-e2e.yaml (masking walk); the
+#                              second is ~100 KB
 #   consumer group e2e-idle-group  in Empty state (consumed once, then exited)
 #
 # Idempotent: safe to re-run; topics are recreated, the consumer is run
@@ -220,6 +223,21 @@ produce_large_xml() {
   printf '%s\t%s\n' "${now_ms}" "${value}" | produce_spread_lines "${topic}"
 }
 
+# produce_masked_json puts two records whose `customer.email` the
+# data_masking rule in kafkito-e2e.yaml masks: a small one, and a ~100 KB one
+# whose email sits past the 64 KB preview boundary (masking.spec.ts).
+produce_masked_json() {
+  local topic="$1"
+  local now_ms
+  now_ms=$(( $(date +%s) * 1000 ))
+  local padding
+  padding=$(printf '%*s' 100000 '' | tr ' ' 'y')
+  {
+    printf '%s\t%s\n' "$((now_ms - 1000))" '{"order":"E2E-MASK-1","customer":{"email":"hidden-e2e@example.com"}}'
+    printf '%s\t%s\n' "${now_ms}" "{\"_padding\":\"${padding}\",\"customer\":{\"email\":\"hidden-large@example.com\"},\"order\":\"E2E-MASK-2\"}"
+  } | produce_spread_lines "${topic}"
+}
+
 main() {
   echo "seed: waiting for broker on ${BROKER_INTERNAL} (via ${CONTAINER})"
   wait_for_broker
@@ -238,6 +256,7 @@ main() {
   recreate_topic "e2e-copy-source" 1
   recreate_topic "e2e-copy-dest" 1
   recreate_topic "e2e-produce-target" 1
+  recreate_topic "e2e-masked" 1
 
   echo "seed: producing fixture messages"
   now_ms=$(( $(date +%s) * 1000 ))
@@ -253,6 +272,7 @@ main() {
   produce_large_json "e2e-large-message"
   produce_large_xml "e2e-large-message-xml"
   produce_root_array_json "e2e-root-array"
+  produce_masked_json "e2e-masked"
 
   echo "seed: bringing group e2e-idle-group to Empty"
   leave_group_empty "e2e-walk-target" "e2e-idle-group"

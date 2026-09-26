@@ -1,0 +1,9 @@
+# kafkito config for `make e2e`: the same "local" cluster the
+# KAFKITO_KAFKA_BROKERS shortcut would create, plus a data_masking rule that
+# masking.spec.ts walks against the e2e-masked fixture topic (seed.sh).
+clusters:
+  - name: local
+    brokers: ["localhost:39092"]
+    data_masking:
+      - topics: ["^e2e-masked$"]
+        fields: ["$.customer.email"]
