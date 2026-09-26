@@ -46,6 +46,12 @@ const ProducerBatchMaxBytes = 10 << 20 // 10 MiB
 // keyed by cluster name. It also owns what every domain operation needs per
 // cluster: ad-hoc (private) cluster registration, the Schema Registry
 // decoder and the masking policy.
+//
+// Locking: mu guards clusters, masking, clients and adhocLastUsed, which
+// UseAdhoc and its idle sweep modify at runtime; srMu guards srDecoders.
+// ordered is written only by the constructor. The lock order is mu -> srMu
+// (the sweep holds mu while it drops cached decoders), so code holding srMu
+// must never take mu or call a method that does.
 type Connections struct {
 	log      *slog.Logger
 	ordered  []config.ClusterConfig
@@ -56,7 +62,7 @@ type Connections struct {
 	clients map[string]*kgo.Client
 	// adhocLastUsed tracks last-access time for ad-hoc (private) cluster
 	// entries so they can be idle-evicted. Nil for registries without any
-	// ad-hoc activity. Protected by r.mu.
+	// ad-hoc activity.
 	adhocLastUsed map[string]time.Time
 	// adhocFPKeyOnce/adhocFPKeyVal hold the process-local secret used to key
 	// the ad-hoc cluster fingerprint HMAC (see adhoc.go Fingerprint). Lazily
@@ -178,27 +184,51 @@ func newConnections(cfg []config.ClusterConfig, log *slog.Logger) *Connections {
 
 // srDecoderFor returns a cached *SRDecoder for the cluster, or nil when the
 // cluster has no Schema Registry configured. Decoders are cached for the
-// lifetime of the registry.
+// lifetime of the cluster entry.
+//
+// The decoder is built without holding srMu, because SchemaRegistry takes mu
+// and the lock order is mu -> srMu. If another goroutine cached a decoder in
+// the meantime, that one wins.
 func (r *Connections) srDecoderFor(cluster string) *SRDecoder {
 	r.srMu.Lock()
-	defer r.srMu.Unlock()
-	if d, ok := r.srDecoders[cluster]; ok {
+	d, ok := r.srDecoders[cluster]
+	r.srMu.Unlock()
+	if ok {
 		return d
 	}
-	sr, err := r.SchemaRegistry(cluster)
-	if err != nil {
-		r.srDecoders[cluster] = nil
-		return nil
+
+	if sr, err := r.SchemaRegistry(cluster); err == nil {
+		d = NewSRDecoder(sr)
 	}
-	d := NewSRDecoder(sr)
-	r.srDecoders[cluster] = d
+
+	r.srMu.Lock()
+	if cached, ok := r.srDecoders[cluster]; ok {
+		d = cached
+	} else {
+		r.srDecoders[cluster] = d
+	}
+	r.srMu.Unlock()
+
+	// An idle sweep may have evicted the cluster while the decoder was
+	// built. Its cleanup then ran before the entry above was stored, so drop
+	// the entry here instead of leaving it behind for a cluster that is gone.
+	if _, ok := r.ConfigFor(cluster); !ok {
+		r.srMu.Lock()
+		if r.srDecoders[cluster] == d {
+			delete(r.srDecoders, cluster)
+		}
+		r.srMu.Unlock()
+	}
 	return d
 }
 
 // MaskingPolicy returns the compiled masking policy for the named cluster.
 // Returns an empty policy if the cluster is unknown or no rules configured.
 func (r *Connections) MaskingPolicy(cluster string) *masking.Policy {
-	if p, ok := r.masking[cluster]; ok && p != nil {
+	r.mu.Lock()
+	p, ok := r.masking[cluster]
+	r.mu.Unlock()
+	if ok && p != nil {
 		return p
 	}
 	empty, _ := masking.Compile(nil)
