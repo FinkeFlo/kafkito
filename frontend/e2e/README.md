@@ -11,6 +11,8 @@ PR builds (`.github/workflows/e2e.yml`).
 
 ```
 Kafka broker      docker compose ↑ kafkito-kafka  : 39092 (host)  ← seed.sh writes here
+                  runs the StandardAuthorizer with User:ANONYMOUS as super
+                  user, so the ACL walk can create and delete rules
 Schema Registry   not started for e2e (not needed by current walks)
 kafkito (Go)      subprocess on PORT=47421       : 47421 (host)  ← Playwright targets here
                   built with -tags devauth so KAFKITO_AUTH_MODE=off is allowed
@@ -57,10 +59,16 @@ Makefile :: e2e, e2e-up, e2e-test, e2e-down
   the local fixture broker — type the confirm phrase, hit Escape, assert
   focus restoration. The point is to walk the gating UI, not to exercise
   mutation code (we have Go integration tests for that).
-  The exception is `topic-data.spec.ts`: produce and bulk copy only add
-  records, so it really runs them, against its own fixture topics
-  (`e2e-copy-source`, `e2e-copy-dest`, `e2e-produce-target`) that
-  `seed.sh` recreates on every run.
+  The exceptions really run their mutations, each on data it owns:
+  - `topic-data.spec.ts`: produce and bulk copy only add records, against
+    its own fixture topics (`e2e-copy-source`, `e2e-copy-dest`,
+    `e2e-produce-target`) that `seed.sh` recreates on every run.
+  - `groups.spec.ts`: creates a consumer group with a unique name, resets
+    its offsets and deletes it.
+  - `acls.spec.ts`: creates an ACL rule for a unique principal, finds it
+    in the list and deletes it.
+  - `scram-users.spec.ts`: creates a SCRAM user with a unique name,
+    rotates its password and deletes the credential.
 - Cluster name in URLs is `KAFKITO_E2E_CLUSTER` (defaults to `local` —
   the auto-cluster name from the `KAFKITO_KAFKA_BROKERS` shortcut).
 - `clusters.spec.ts` tests private-cluster connections against the fixture
@@ -72,6 +80,7 @@ Makefile :: e2e, e2e-up, e2e-test, e2e-down
 
 Out of scope for the current iteration:
 
-- ACL grant/revoke walks — needs Keycloak (compose `auth` profile)
-- SCRAM rotate walks — same
+- Schema Registry walks beyond the capability checks in `schemas.spec.ts`
+  — the e2e stack starts no Schema Registry, so listing subjects and
+  opening a version is covered by the Go tests against a fake registry
 - Cross-cluster switch walks — needs ≥2 fixture clusters
