@@ -26,6 +26,13 @@ import (
 // topics and returns its bootstrap address.
 func startKfake(t *testing.T, topics ...string) string {
 	t.Helper()
+	return newKfake(t, topics...).ListenAddrs()[0]
+}
+
+// newKfake starts an in-memory Kafka cluster with one broker and the
+// given single-partition topics.
+func newKfake(t *testing.T, topics ...string) *kfake.Cluster {
+	t.Helper()
 	opts := []kfake.Opt{kfake.NumBrokers(1)}
 	if len(topics) > 0 {
 		opts = append(opts, kfake.SeedTopics(1, topics...))
@@ -33,7 +40,7 @@ func startKfake(t *testing.T, topics ...string) string {
 	c, err := kfake.NewCluster(opts...)
 	require.NoError(t, err)
 	t.Cleanup(c.Close)
-	return c.ListenAddrs()[0]
+	return c
 }
 
 // kfakeServer serves server.New against an in-memory Kafka cluster that is

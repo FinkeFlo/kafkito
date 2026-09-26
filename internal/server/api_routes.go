@@ -12,14 +12,14 @@ import (
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
 )
 
-// generatedRoutes registers the operations of the generated strict server
-// (api/oapi-codegen.yaml include-operation-ids) on the existing chi groups.
+// generatedRoutes registers every operation of the generated strict server
+// (api/openapi.yaml) on the chi groups of server.New.
 //
 // The generated HandlerWithOptions would put every operation on a single
 // router. Instead, each operation's generated wrapper method is mounted
-// individually on the group whose middleware chain it had before (none,
-// auth, or auth + private cluster + RBAC), with a relative path so chi
-// reports the same route pattern that RBAC resolves permissions from.
+// individually on the group whose middleware chain it needs (none, auth, or
+// auth + private cluster + RBAC), with a relative path so chi reports the
+// route pattern that RBAC resolves permissions from.
 //
 // Every route runs, after the group middleware:
 //
@@ -100,4 +100,29 @@ func (g *generatedRoutes) mountClusters(r chi.Router) {
 		Post("/clusters/{cluster}/topics/{topic}/messages/search", g.w.SearchMessages)
 	r.With(limitRequestBody(maxCopyBodyBytes, http.StatusBadRequest), g.validate).
 		Post("/clusters/{cluster}/topics/{topic}/copy", g.w.CopyMessages)
+
+	groupBody := r.With(limitRequestBody(maxGroupBodyBytes, http.StatusBadRequest), g.validate)
+	noBody.Get("/clusters/{cluster}/groups", g.w.ListGroups)
+	groupBody.Post("/clusters/{cluster}/groups", g.w.CreateGroup)
+	noBody.Get("/clusters/{cluster}/groups/{group}", g.w.DescribeGroup)
+	noBody.Delete("/clusters/{cluster}/groups/{group}", g.w.DeleteGroup)
+	groupBody.Post("/clusters/{cluster}/groups/{group}/reset-offsets", g.w.ResetGroupOffsets)
+
+	noBody.Get("/clusters/{cluster}/schemas/subjects", g.w.ListSubjects)
+	noBody.Delete("/clusters/{cluster}/schemas/subjects/{subject}", g.w.DeleteSubject)
+	noBody.Get("/clusters/{cluster}/schemas/subjects/{subject}/versions", g.w.ListSchemaVersions)
+	r.With(limitRequestBody(maxRegisterSchemaBodyBytes, http.StatusBadRequest), g.validate).
+		Post("/clusters/{cluster}/schemas/subjects/{subject}/versions", g.w.RegisterSchema)
+	noBody.Get("/clusters/{cluster}/schemas/subjects/{subject}/versions/{version}", g.w.GetSchemaVersion)
+
+	// The ACL and SCRAM limits predate the shared message prefix.
+	aclBody := r.With(limitRequestBodyMsg(maxACLBodyBytes, http.StatusBadRequest, "invalid json: "), g.validate)
+	noBody.Get("/clusters/{cluster}/acls", g.w.ListAcls)
+	aclBody.Post("/clusters/{cluster}/acls", g.w.CreateAcl)
+	aclBody.Delete("/clusters/{cluster}/acls", g.w.DeleteAcl)
+
+	noBody.Get("/clusters/{cluster}/users", g.w.ListScramUsers)
+	r.With(limitRequestBodyMsg(maxSCRAMBodyBytes, http.StatusBadRequest, "invalid json: "), g.validate).
+		Post("/clusters/{cluster}/users", g.w.UpsertScramUser)
+	noBody.Delete("/clusters/{cluster}/users/{user}", g.w.DeleteScramUser)
 }

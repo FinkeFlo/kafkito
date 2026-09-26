@@ -230,7 +230,7 @@ func (e panicLogEntry) Panic(v any, stack []byte) {
 
 // requestIDHandler adds request_id to every record logged with a request
 // context (the *Context logging methods), so handler error logs such as
-// gatewayError correlate with the request-log line without every call site
+// errorWriter's correlate with the request-log line without every call site
 // passing the id explicitly.
 type requestIDHandler struct {
 	slog.Handler

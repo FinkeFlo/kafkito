@@ -4,14 +4,12 @@
 package server
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"reflect"
 	"slices"
 	"strconv"
@@ -33,9 +31,9 @@ import (
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
 )
 
-// migratedOp describes an operation served by the generated strict server,
-// together with the route it had as a hand-written handler.
-type migratedOp struct {
+// apiOp describes an operation served by the generated strict server,
+// together with its route and the middleware chain it runs behind.
+type apiOp struct {
 	id      string
 	method  string
 	pattern string // chi route pattern == spec path
@@ -53,9 +51,9 @@ const (
 	groupCluster = "cluster" // auth + private cluster + RBAC + private param
 )
 
-// migratedOps must list exactly the include-operation-ids of
-// api/oapi-codegen.yaml (TestMigratedOps_MatchCodegenConfig).
-var migratedOps = []migratedOp{
+// apiOps must list exactly the operations of api/openapi.yaml
+// (TestAPIOps_MatchSpec).
+var apiOps = []apiOp{
 	{id: "getHealth", method: http.MethodGet, pattern: "/healthz", group: groupRoot},
 	{id: "getReadiness", method: http.MethodGet, pattern: "/readyz", group: groupRoot},
 	{id: "getInfo", method: http.MethodGet, pattern: "/api/v1/info", group: groupMeta},
@@ -84,75 +82,79 @@ var migratedOps = []migratedOp{
 	{id: "sampleMessages", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/sample", group: groupCluster, resource: "topic:{topic}", action: "consume"},
 	{id: "searchMessages", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/messages/search", group: groupCluster, resource: "topic:{topic}", action: "consume"},
 	{id: "copyMessages", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/copy", group: groupCluster, resource: "topic:{topic}", action: "consume"},
+	{id: "listGroups", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/groups", group: groupCluster, resource: "group:", action: "view"},
+	{id: "createGroup", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/groups", group: groupCluster, resource: "group:" + opGroup, action: "edit"},
+	{id: "describeGroup", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/groups/{group}", group: groupCluster, resource: "group:{group}", action: "view"},
+	{id: "deleteGroup", method: http.MethodDelete, pattern: "/api/v1/clusters/{cluster}/groups/{group}", group: groupCluster, resource: "group:{group}", action: "delete"},
+	{id: "resetGroupOffsets", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/groups/{group}/reset-offsets", group: groupCluster, resource: "group:{group}", action: "edit"},
+	{id: "listSubjects", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/schemas/subjects", group: groupCluster, resource: "schema:", action: "view"},
+	{id: "deleteSubject", method: http.MethodDelete, pattern: "/api/v1/clusters/{cluster}/schemas/subjects/{subject}", group: groupCluster, resource: "schema:{subject}", action: "delete"},
+	{id: "listSchemaVersions", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions", group: groupCluster, resource: "schema:{subject}", action: "view"},
+	{id: "registerSchema", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions", group: groupCluster, resource: "schema:{subject}", action: "edit"},
+	{id: "getSchemaVersion", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions/{version}", group: groupCluster, resource: "schema:{subject}", action: "view"},
+	{id: "listAcls", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/acls", group: groupCluster, resource: "acl:*", action: "view"},
+	{id: "createAcl", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/acls", group: groupCluster, resource: "acl:*", action: "edit"},
+	{id: "deleteAcl", method: http.MethodDelete, pattern: "/api/v1/clusters/{cluster}/acls", group: groupCluster, resource: "acl:*", action: "delete"},
+	{id: "listScramUsers", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/users", group: groupCluster, resource: "user:", action: "view"},
+	{id: "upsertScramUser", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/users", group: groupCluster, resource: "user:", action: "edit"},
+	{id: "deleteScramUser", method: http.MethodDelete, pattern: "/api/v1/clusters/{cluster}/users/{user}", group: groupCluster, resource: "user:{user}", action: "delete"},
 }
 
-// opTopic, opPartition and opOffset fill the {topic}, {partition} and
-// {offset} path parameters of migratedOps.
+// The op* constants fill the path parameters of apiOps.
 const (
 	opTopic     = "orders"
 	opPartition = "0"
 	opOffset    = "0"
+	opGroup     = "orders-group"
+	opSubject   = "orders-value"
+	opVersion   = "latest"
+	opUser      = "alice"
 )
 
-func (op migratedOp) path(cluster string) string {
-	return strings.NewReplacer("{cluster}", cluster, "{topic}", opTopic, "{partition}", opPartition, "{offset}", opOffset).Replace(op.pattern)
+var opParams = strings.NewReplacer("{topic}", opTopic, "{partition}", opPartition, "{offset}", opOffset,
+	"{group}", opGroup, "{subject}", opSubject, "{version}", opVersion, "{user}", opUser)
+
+func (op apiOp) path(cluster string) string {
+	return opParams.Replace(strings.ReplaceAll(op.pattern, "{cluster}", cluster))
 }
 
 // rbacBody is a body that gets a request of op past the RBAC middleware's
 // own body read.
-func (op migratedOp) rbacBody() string {
+func (op apiOp) rbacBody() string {
 	switch op.id {
 	case "testCluster":
 		return `{"brokers":["127.0.0.1:9092"]}`
 	case "createTopic":
 		return `{"name":"` + opTopic + `"}`
+	case "createGroup":
+		return `{"group_id":"` + opGroup + `"}`
 	}
 	return ""
 }
 
-func TestMigratedOps_MatchCodegenConfig(t *testing.T) {
+// apiOps lists every operation of the spec with its method and path, so the
+// table-driven tests below cover each operation.
+func TestAPIOps_MatchSpec(t *testing.T) {
 	t.Parallel()
-
-	f, err := os.Open("../../api/oapi-codegen.yaml")
-	require.NoError(t, err)
-	defer func() { _ = f.Close() }()
-	var configured []string
-	in := false
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		line := sc.Text()
-		trimmed := strings.TrimSpace(line)
-		switch {
-		case trimmed == "include-operation-ids:":
-			in = true
-		case in && strings.HasPrefix(trimmed, "- "):
-			configured = append(configured, strings.TrimPrefix(trimmed, "- "))
-		case in && trimmed != "" && !strings.HasPrefix(trimmed, "#"):
-			in = false
-		}
-	}
-	require.NoError(t, sc.Err())
-
-	var listed []string
-	for _, op := range migratedOps {
-		listed = append(listed, op.id)
-	}
-	assert.ElementsMatch(t, configured, listed)
 
 	doc, err := loadSpec()
 	require.NoError(t, err)
-	for _, op := range migratedOps {
-		item := doc.Paths.Find(op.pattern)
-		require.NotNil(t, item, op.pattern)
-		o := item.GetOperation(op.method)
-		require.NotNil(t, o, "%s %s", op.method, op.pattern)
-		assert.Equal(t, op.id, o.OperationID)
+	spec := map[string]string{} // operationId -> "METHOD path"
+	for path, item := range doc.Paths.Map() {
+		for method, o := range item.Operations() {
+			spec[o.OperationID] = method + " " + path
+		}
 	}
+	listed := map[string]string{}
+	for _, op := range apiOps {
+		listed[op.id] = op.method + " " + op.pattern
+	}
+	assert.Equal(t, spec, listed)
 }
 
 // Generated operations must keep their chi route patterns: RBAC derives the
 // permission from them, and the request log reports them.
-func TestMigratedOps_KeepRoutePatterns(t *testing.T) {
+func TestAPIOps_KeepRoutePatterns(t *testing.T) {
 	t.Parallel()
 
 	h := New(Options{Version: "test", Logger: slog.Default(), Registry: kafkapkg.NewRegistry(nil, slog.Default())})
@@ -161,7 +163,7 @@ func TestMigratedOps_KeepRoutePatterns(t *testing.T) {
 		routes[method+" "+normalizeChiRoute(route)] = true
 		return nil
 	}))
-	for _, op := range migratedOps {
+	for _, op := range apiOps {
 		assert.True(t, routes[op.method+" "+op.pattern], "%s %s not registered", op.method, op.pattern)
 	}
 }
@@ -182,7 +184,7 @@ func (acceptingValidator) Validate(context.Context, string) (*auth.Principal, er
 
 // Each migrated operation runs behind the same middleware chain as before:
 // the probes without auth, everything under /api/v1 behind it.
-func TestMigratedOps_AuthMiddleware(t *testing.T) {
+func TestAPIOps_AuthMiddleware(t *testing.T) {
 	t.Parallel()
 
 	for _, v := range []struct {
@@ -198,7 +200,7 @@ func TestMigratedOps_AuthMiddleware(t *testing.T) {
 			reg := kafkapkg.NewRegistry(nil, slog.Default())
 			t.Cleanup(reg.Close)
 			h := New(Options{Version: "test", Logger: slog.Default(), Registry: reg, Auth: v.auth})
-			for _, op := range migratedOps {
+			for _, op := range apiOps {
 				req := httptest.NewRequest(op.method, op.path("local"), nil)
 				if v.token != "" {
 					req.Header.Set("Authorization", v.token)
@@ -234,14 +236,14 @@ func denyAllRBAC() config.Config {
 
 // RBAC resolves the same resource and action from the generated routes as
 // from the former hand-written ones, and runs after auth.
-func TestMigratedOps_RBAC(t *testing.T) {
+func TestAPIOps_RBAC(t *testing.T) {
 	t.Parallel()
 
 	reg := kafkapkg.NewRegistry([]config.ClusterConfig{{Name: "rbac-c", Brokers: []string{"127.0.0.1:1"}}}, slog.Default())
 	t.Cleanup(reg.Close)
 	h := New(Options{Version: "test", Logger: slog.Default(), Registry: reg, Config: denyAllRBAC()})
 
-	for _, op := range migratedOps {
+	for _, op := range apiOps {
 		if op.group != groupCluster {
 			continue
 		}
@@ -263,7 +265,7 @@ func TestMigratedOps_RBAC(t *testing.T) {
 				assert.NotEqual(t, http.StatusForbidden, rec.Code, rec.Body.String())
 			default:
 				require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
-				resource := strings.NewReplacer("{cluster}", "rbac-c", "{topic}", opTopic).Replace(op.resource)
+				resource := opParams.Replace(strings.ReplaceAll(op.resource, "{cluster}", "rbac-c"))
 				assert.JSONEq(t, `{"error":"forbidden","resource":"`+resource+`","action":"`+op.action+`"}`, rec.Body.String())
 			}
 		})
@@ -312,7 +314,7 @@ func recordCluster(got *[]string) gen.StrictMiddlewareFunc {
 
 // resolvePrivateClusterParam rewrites {cluster} before the generated wrapper
 // binds it, so handlers see the ad-hoc registry name, not the sentinel.
-func TestMigratedOps_PrivateClusterParam(t *testing.T) {
+func TestAPIOps_PrivateClusterParam(t *testing.T) {
 	t.Parallel()
 
 	reg := kafkapkg.NewRegistry([]config.ClusterConfig{{Name: "static", Brokers: []string{"127.0.0.1:1"}}}, slog.Default())
@@ -338,7 +340,7 @@ func TestMigratedOps_PrivateClusterParam(t *testing.T) {
 	require.True(t, strings.HasPrefix(adhoc, kafkapkg.AdhocPrefix))
 	header := encodeHeader(t, cfg)
 
-	for _, op := range migratedOps {
+	for _, op := range apiOps {
 		if !strings.Contains(op.pattern, "{cluster}") {
 			continue
 		}
@@ -392,9 +394,21 @@ func validBody(id string) string {
 		return `{}`
 	case "copyMessages":
 		return `{"dest_cluster":"static","dest_topic":"other"}`
+	case "createGroup":
+		return `{"group_id":"` + opGroup + `","topic":"` + opTopic + `","strategy":"earliest"}`
+	case "resetGroupOffsets":
+		return `{"topic":"` + opTopic + `","strategy":"earliest"}`
+	case "registerSchema":
+		return `{"schema":"\"string\""}`
+	case "createAcl", "deleteAcl":
+		return validACL
+	case "upsertScramUser":
+		return `{"user":"` + opUser + `","mechanism":"SCRAM-SHA-256","password":"pw"}`
 	}
 	return ""
 }
+
+const validACL = `{"principal":"User:alice","host":"*","resource_type":"TOPIC","resource_name":"orders","pattern_type":"LITERAL","operation":"READ","permission_type":"ALLOW"}`
 
 // contractRouter matches requests to operations of the embedded spec.
 func contractRouter(t *testing.T) routers.Router {
@@ -462,10 +476,10 @@ type requestCase struct {
 	notAnOperation bool
 }
 
-// TestMigratedOps_Requests sends one or more valid and invalid requests per
+// TestAPIOps_Requests sends one or more valid and invalid requests per
 // migrated operation, including the boundaries of the former hand-written
 // validation, and validates every response against the spec.
-func TestMigratedOps_Requests(t *testing.T) {
+func TestAPIOps_Requests(t *testing.T) {
 	t.Parallel()
 
 	broker := startFakeBroker(t)
@@ -553,6 +567,7 @@ func TestMigratedOps_Requests(t *testing.T) {
 	}
 
 	cases = append(cases, topicMessageCases(t)...)
+	cases = append(cases, adminCases(t)...)
 
 	router := contractRouter(t)
 	seen := map[string]map[string]bool{} // operationId -> "2xx"/"4xx"
@@ -574,7 +589,7 @@ func TestMigratedOps_Requests(t *testing.T) {
 		}
 		seen[id][statusClass(rec.Code)] = true
 	}
-	for _, op := range migratedOps {
+	for _, op := range apiOps {
 		assert.True(t, seen[op.id]["2xx"], "%s: no successful response validated", op.id)
 	}
 }
@@ -671,7 +686,7 @@ func (c *countingReader) Read(p []byte) (int, error) {
 // Validation errors name the field and the rule, never the submitted value,
 // and neither the password of a private cluster nor the raw
 // X-Kafkito-Cluster header reaches the response or any log line.
-func TestMigratedOps_ValidationErrorsNeverLeakCredentials(t *testing.T) {
+func TestAPIOps_ValidationErrorsNeverLeakCredentials(t *testing.T) {
 	t.Parallel()
 
 	header := encodeHeader(t, config.ClusterConfig{

@@ -157,6 +157,24 @@ func (e SearchRequestZones) Valid() bool {
 	}
 }
 
+// Defines values for UpsertSCRAMUserRequestMechanism.
+const (
+	UpsertSCRAMUserRequestMechanismSCRAMSHA256 UpsertSCRAMUserRequestMechanism = "SCRAM-SHA-256"
+	UpsertSCRAMUserRequestMechanismSCRAMSHA512 UpsertSCRAMUserRequestMechanism = "SCRAM-SHA-512"
+)
+
+// Valid indicates whether the value is a known member of the UpsertSCRAMUserRequestMechanism enum.
+func (e UpsertSCRAMUserRequestMechanism) Valid() bool {
+	switch e {
+	case UpsertSCRAMUserRequestMechanismSCRAMSHA256:
+		return true
+	case UpsertSCRAMUserRequestMechanismSCRAMSHA512:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ProdConfirmHeader.
 const (
 	ProdConfirmHeaderTrue ProdConfirmHeader = "true"
@@ -166,6 +184,21 @@ const (
 func (e ProdConfirmHeader) Valid() bool {
 	switch e {
 	case ProdConfirmHeaderTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResetGroupOffsetsParamsXKafkitoConfirmProd.
+const (
+	ResetGroupOffsetsParamsXKafkitoConfirmProdTrue ResetGroupOffsetsParamsXKafkitoConfirmProd = "true"
+)
+
+// Valid indicates whether the value is a known member of the ResetGroupOffsetsParamsXKafkitoConfirmProd enum.
+func (e ResetGroupOffsetsParamsXKafkitoConfirmProd) Valid() bool {
+	switch e {
+	case ResetGroupOffsetsParamsXKafkitoConfirmProdTrue:
 		return true
 	default:
 		return false
@@ -271,6 +304,27 @@ func (e DeleteRecordsParamsXKafkitoConfirmProd) Valid() bool {
 	}
 }
 
+// Defines values for DeleteScramUserParamsMechanism.
+const (
+	DeleteScramUserParamsMechanismSCRAMSHA256 DeleteScramUserParamsMechanism = "SCRAM-SHA-256"
+	DeleteScramUserParamsMechanismSCRAMSHA512 DeleteScramUserParamsMechanism = "SCRAM-SHA-512"
+)
+
+// Valid indicates whether the value is a known member of the DeleteScramUserParamsMechanism enum.
+func (e DeleteScramUserParamsMechanism) Valid() bool {
+	switch e {
+	case DeleteScramUserParamsMechanismSCRAMSHA256:
+		return true
+	case DeleteScramUserParamsMechanismSCRAMSHA512:
+		return true
+	default:
+		return false
+	}
+}
+
+// ACLEntry ACL binding. As a request body it is a create spec or a delete filter. Enum-like fields are parsed case-insensitively by franz-go (`kmsg`).
+type ACLEntry = kafka.ACLEntry
+
 // AlterTopicConfigsRequest defines model for AlterTopicConfigsRequest.
 type AlterTopicConfigsRequest = kafka.AlterTopicConfigsRequest
 
@@ -342,12 +396,29 @@ type CopyRequest struct {
 	ToTsMs *int64 `json:"to_ts_ms,omitempty"`
 }
 
+// CreateACLResponse defines model for CreateACLResponse.
+type CreateACLResponse struct {
+	// Acl ACL binding. As a request body it is a create spec or a delete filter. Enum-like fields are parsed case-insensitively by franz-go (`kmsg`).
+	Acl ACLEntry `json:"acl"`
+	Ok  bool     `json:"ok"`
+}
+
+// CreateGroupRequest defines model for CreateGroupRequest.
+type CreateGroupRequest = kafka.CreateGroupRequest
+
 // CreateTopicRequest defines model for CreateTopicRequest.
 type CreateTopicRequest = kafka.CreateTopicRequest
 
 // CreatedResponse defines model for CreatedResponse.
 type CreatedResponse struct {
 	Created string `json:"created"`
+}
+
+// DeleteACLResponse defines model for DeleteACLResponse.
+type DeleteACLResponse struct {
+	// Deleted Number of deleted ACL bindings.
+	Deleted int  `json:"deleted"`
+	Ok      bool `json:"ok"`
 }
 
 // DeleteRecordsRequest defines model for DeleteRecordsRequest.
@@ -360,6 +431,21 @@ type DeleteRecordsResponse struct {
 
 // DeleteRecordsResult defines model for DeleteRecordsResult.
 type DeleteRecordsResult = kafka.DeleteRecordsResult
+
+// DeleteSCRAMUserResponse defines model for DeleteSCRAMUserResponse.
+type DeleteSCRAMUserResponse struct {
+	// Deleted Number of mechanisms deleted.
+	Deleted int    `json:"deleted"`
+	Ok      bool   `json:"ok"`
+	User    string `json:"user"`
+}
+
+// DeleteSubjectResponse defines model for DeleteSubjectResponse.
+type DeleteSubjectResponse struct {
+	Deleted   string `json:"deleted"`
+	Permanent bool   `json:"permanent"`
+	Versions  []int  `json:"versions"`
+}
 
 // DeletedNameResponse defines model for DeletedNameResponse.
 type DeletedNameResponse struct {
@@ -390,6 +476,35 @@ type Error struct {
 	Resource *string `json:"resource,omitempty"`
 }
 
+// GroupDetail GroupInfo fields plus membership and offsets. `members` is the member list here, not the count from GroupInfo.
+type GroupDetail = kafka.GroupDetail
+
+// GroupInfo defines model for GroupInfo.
+type GroupInfo = kafka.GroupInfo
+
+// GroupMember defines model for GroupMember.
+type GroupMember struct {
+	Assignments []MemberAssignment `json:"assignments"`
+	ClientHost  string             `json:"client_host"`
+	ClientId    string             `json:"client_id"`
+
+	// InstanceId Static-membership group.instance.id, if configured.
+	InstanceId *string `json:"instance_id,omitempty"`
+	MemberId   string  `json:"member_id"`
+}
+
+// GroupOffset defines model for GroupOffset.
+type GroupOffset struct {
+	// AssignedTo Current owner as `<client_id>@<host>`, absent during rebalance.
+	AssignedTo *string `json:"assigned_to,omitempty"`
+	Lag        int64   `json:"lag"`
+	LogEnd     int64   `json:"log_end"`
+	Metadata   *string `json:"metadata,omitempty"`
+	Offset     int64   `json:"offset"`
+	Partition  int32   `json:"partition"`
+	Topic      string  `json:"topic"`
+}
+
 // HealthResponse defines model for HealthResponse.
 type HealthResponse struct {
 	Status HealthResponseStatus `json:"status"`
@@ -404,6 +519,12 @@ type InfoResponse struct {
 	Version string `json:"version"`
 }
 
+// ListACLsResponse defines model for ListACLsResponse.
+type ListACLsResponse struct {
+	Acls    []ACLEntry `json:"acls"`
+	Cluster string     `json:"cluster"`
+}
+
 // ListBrokersResponse defines model for ListBrokersResponse.
 type ListBrokersResponse struct {
 	Brokers []BrokerInfo `json:"brokers"`
@@ -413,6 +534,30 @@ type ListBrokersResponse struct {
 // ListClustersResponse defines model for ListClustersResponse.
 type ListClustersResponse struct {
 	Clusters []ClusterInfo `json:"clusters"`
+}
+
+// ListGroupsResponse defines model for ListGroupsResponse.
+type ListGroupsResponse struct {
+	Cluster string      `json:"cluster"`
+	Groups  []GroupInfo `json:"groups"`
+}
+
+// ListSCRAMUsersResponse defines model for ListSCRAMUsersResponse.
+type ListSCRAMUsersResponse struct {
+	Cluster string      `json:"cluster"`
+	Users   []SCRAMUser `json:"users"`
+}
+
+// ListSchemaVersionsResponse defines model for ListSchemaVersionsResponse.
+type ListSchemaVersionsResponse struct {
+	Subject  string `json:"subject"`
+	Versions []int  `json:"versions"`
+}
+
+// ListSubjectsResponse defines model for ListSubjectsResponse.
+type ListSubjectsResponse struct {
+	Cluster  string          `json:"cluster"`
+	Subjects []SchemaSubject `json:"subjects"`
 }
 
 // ListTopicConsumersResponse defines model for ListTopicConsumersResponse.
@@ -459,6 +604,12 @@ type MeResponse struct {
 
 	// User Resolved RBAC subject; empty when anonymous.
 	User string `json:"user"`
+}
+
+// MemberAssignment defines model for MemberAssignment.
+type MemberAssignment struct {
+	Partitions []int32 `json:"partitions"`
+	Topic      string  `json:"topic"`
 }
 
 // Message defines model for Message.
@@ -546,6 +697,39 @@ type ReadinessResponse struct {
 // ReadinessResponseStatus defines model for ReadinessResponse.Status.
 type ReadinessResponseStatus string
 
+// RegisterSchemaRequest defines model for RegisterSchemaRequest.
+type RegisterSchemaRequest = kafka.RegisterSchemaRequest
+
+// RegisterSchemaResponse defines model for RegisterSchemaResponse.
+type RegisterSchemaResponse = kafka.RegisterSchemaResponse
+
+// ResetOffsetResult defines model for ResetOffsetResult.
+type ResetOffsetResult struct {
+	// EndOffset Log-end offset, -1 if unknown.
+	EndOffset int64   `json:"end_offset"`
+	Error     *string `json:"error,omitempty"`
+	NewOffset int64   `json:"new_offset"`
+
+	// OldOffset -1 if no prior commit.
+	OldOffset int64 `json:"old_offset"`
+	Partition int32 `json:"partition"`
+}
+
+// ResetOffsetsRequest defines model for ResetOffsetsRequest.
+type ResetOffsetsRequest = kafka.ResetOffsetsRequest
+
+// ResetOffsetsResponse defines model for ResetOffsetsResponse.
+type ResetOffsetsResponse = kafka.ResetOffsetsResult
+
+// SCRAMCredential defines model for SCRAMCredential.
+type SCRAMCredential struct {
+	Iterations int32  `json:"iterations"`
+	Mechanism  string `json:"mechanism"`
+}
+
+// SCRAMUser defines model for SCRAMUser.
+type SCRAMUser = kafka.SCRAMUser
+
 // SRDecodedMeta defines model for SRDecodedMeta.
 type SRDecodedMeta struct {
 	// Format `avro`, `protobuf` or `json_schema`.
@@ -562,6 +746,16 @@ type SampleResponse struct {
 	SampledAt int64     `json:"sampled_at"`
 	Topic     string    `json:"topic"`
 }
+
+// SchemaReference defines model for SchemaReference.
+type SchemaReference struct {
+	Name    string `json:"name"`
+	Subject string `json:"subject"`
+	Version int    `json:"version"`
+}
+
+// SchemaVersion defines model for SchemaVersion.
+type SchemaVersion = kafka.SchemaVersion
 
 // SearchRequest All fields are optional; server-side defaults apply.
 type SearchRequest struct {
@@ -612,6 +806,9 @@ type SearchResponse struct {
 // SearchStats defines model for SearchStats.
 type SearchStats = kafka.SearchStats
 
+// SchemaSubject defines model for Subject.
+type SchemaSubject = kafka.Subject
+
 // TopicConfigEntry defines model for TopicConfigEntry.
 type TopicConfigEntry struct {
 	IsDefault bool    `json:"is_default"`
@@ -629,6 +826,25 @@ type TopicDetail = kafka.TopicDetail
 
 // TopicInfo defines model for TopicInfo.
 type TopicInfo = kafka.TopicInfo
+
+// UpsertSCRAMUserRequest defines model for UpsertSCRAMUserRequest.
+type UpsertSCRAMUserRequest struct {
+	// Iterations 0 = server default.
+	Iterations *int32                          `json:"iterations,omitempty"`
+	Mechanism  UpsertSCRAMUserRequestMechanism `json:"mechanism"`
+	Password   string                          `json:"password"`
+	User       string                          `json:"user"`
+}
+
+// UpsertSCRAMUserRequestMechanism defines model for UpsertSCRAMUserRequest.Mechanism.
+type UpsertSCRAMUserRequestMechanism string
+
+// UpsertSCRAMUserResponse defines model for UpsertSCRAMUserResponse.
+type UpsertSCRAMUserResponse struct {
+	Mechanism string `json:"mechanism"`
+	Ok        bool   `json:"ok"`
+	User      string `json:"user"`
+}
 
 // Cluster defines model for Cluster.
 type Cluster = string
@@ -684,6 +900,24 @@ type TestClusterParams struct {
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
+// DeleteAclParams defines parameters for DeleteAcl.
+type DeleteAclParams struct {
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
+}
+
+// ListAclsParams defines parameters for ListAcls.
+type ListAclsParams struct {
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
+}
+
+// CreateAclParams defines parameters for CreateAcl.
+type CreateAclParams struct {
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
+}
+
 // ListBrokersParams defines parameters for ListBrokers.
 type ListBrokersParams struct {
 	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
@@ -698,6 +932,75 @@ type GetCapabilitiesParams struct {
 
 // RefreshCapabilitiesParams defines parameters for RefreshCapabilities.
 type RefreshCapabilitiesParams struct {
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
+}
+
+// ListGroupsParams defines parameters for ListGroups.
+type ListGroupsParams struct {
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
+}
+
+// CreateGroupParams defines parameters for CreateGroup.
+type CreateGroupParams struct {
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
+}
+
+// DeleteGroupParams defines parameters for DeleteGroup.
+type DeleteGroupParams struct {
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
+}
+
+// DescribeGroupParams defines parameters for DescribeGroup.
+type DescribeGroupParams struct {
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
+}
+
+// ResetGroupOffsetsParams defines parameters for ResetGroupOffsets.
+type ResetGroupOffsetsParams struct {
+	// XKafkitoConfirmProd Must be `true` when the target cluster is marked `is_prod`; the request is rejected with 428 otherwise. Send only after explicit user confirmation.
+	XKafkitoConfirmProd *ResetGroupOffsetsParamsXKafkitoConfirmProd `json:"X-Kafkito-Confirm-Prod,omitempty"`
+
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
+}
+
+// ResetGroupOffsetsParamsXKafkitoConfirmProd defines parameters for ResetGroupOffsets.
+type ResetGroupOffsetsParamsXKafkitoConfirmProd string
+
+// ListSubjectsParams defines parameters for ListSubjects.
+type ListSubjectsParams struct {
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
+}
+
+// DeleteSubjectParams defines parameters for DeleteSubject.
+type DeleteSubjectParams struct {
+	// Permanent `true` performs a hard delete.
+	Permanent *bool `form:"permanent,omitempty" json:"permanent,omitempty"`
+
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
+}
+
+// ListSchemaVersionsParams defines parameters for ListSchemaVersions.
+type ListSchemaVersionsParams struct {
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
+}
+
+// RegisterSchemaParams defines parameters for RegisterSchema.
+type RegisterSchemaParams struct {
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
+}
+
+// GetSchemaVersionParams defines parameters for GetSchemaVersion.
+type GetSchemaVersionParams struct {
 	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
@@ -876,8 +1179,47 @@ type SampleMessagesParams struct {
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
+// ListScramUsersParams defines parameters for ListScramUsers.
+type ListScramUsersParams struct {
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
+}
+
+// UpsertScramUserParams defines parameters for UpsertScramUser.
+type UpsertScramUserParams struct {
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
+}
+
+// DeleteScramUserParams defines parameters for DeleteScramUser.
+type DeleteScramUserParams struct {
+	// Mechanism Mechanism to delete. Omitted = both mechanisms are tried.
+	Mechanism *DeleteScramUserParamsMechanism `form:"mechanism,omitempty" json:"mechanism,omitempty"`
+
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
+}
+
+// DeleteScramUserParamsMechanism defines parameters for DeleteScramUser.
+type DeleteScramUserParamsMechanism string
+
 // TestClusterJSONRequestBody defines body for TestCluster for application/json ContentType.
 type TestClusterJSONRequestBody = ClusterConfig
+
+// DeleteAclJSONRequestBody defines body for DeleteAcl for application/json ContentType.
+type DeleteAclJSONRequestBody = ACLEntry
+
+// CreateAclJSONRequestBody defines body for CreateAcl for application/json ContentType.
+type CreateAclJSONRequestBody = ACLEntry
+
+// CreateGroupJSONRequestBody defines body for CreateGroup for application/json ContentType.
+type CreateGroupJSONRequestBody = CreateGroupRequest
+
+// ResetGroupOffsetsJSONRequestBody defines body for ResetGroupOffsets for application/json ContentType.
+type ResetGroupOffsetsJSONRequestBody = ResetOffsetsRequest
+
+// RegisterSchemaJSONRequestBody defines body for RegisterSchema for application/json ContentType.
+type RegisterSchemaJSONRequestBody = RegisterSchemaRequest
 
 // CreateTopicJSONRequestBody defines body for CreateTopic for application/json ContentType.
 type CreateTopicJSONRequestBody = CreateTopicRequest
@@ -897,6 +1239,9 @@ type SearchMessagesJSONRequestBody = SearchRequest
 // DeleteRecordsJSONRequestBody defines body for DeleteRecords for application/json ContentType.
 type DeleteRecordsJSONRequestBody = DeleteRecordsRequest
 
+// UpsertScramUserJSONRequestBody defines body for UpsertScramUser for application/json ContentType.
+type UpsertScramUserJSONRequestBody = UpsertSCRAMUserRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// ListClusters List configured clusters with reachability, capabilities and metrics.
@@ -905,6 +1250,15 @@ type ServerInterface interface {
 	// TestCluster Probe an ad-hoc cluster definition without storing it.
 	// (POST /api/v1/clusters/_test)
 	TestCluster(w http.ResponseWriter, r *http.Request, params TestClusterParams)
+	// DeleteAcl Delete ACL(s) matching a filter.
+	// (DELETE /api/v1/clusters/{cluster}/acls)
+	DeleteAcl(w http.ResponseWriter, r *http.Request, cluster Cluster, params DeleteAclParams)
+	// ListAcls List ACLs.
+	// (GET /api/v1/clusters/{cluster}/acls)
+	ListAcls(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListAclsParams)
+	// CreateAcl Create an ACL.
+	// (POST /api/v1/clusters/{cluster}/acls)
+	CreateAcl(w http.ResponseWriter, r *http.Request, cluster Cluster, params CreateAclParams)
 	// ListBrokers List the brokers of a cluster.
 	// (GET /api/v1/clusters/{cluster}/brokers)
 	ListBrokers(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListBrokersParams)
@@ -914,6 +1268,36 @@ type ServerInterface interface {
 	// RefreshCapabilities Re-probe capabilities (clears the cache).
 	// (POST /api/v1/clusters/{cluster}/capabilities/refresh)
 	RefreshCapabilities(w http.ResponseWriter, r *http.Request, cluster Cluster, params RefreshCapabilitiesParams)
+	// ListGroups List consumer groups (filtered by RBAC view permission).
+	// (GET /api/v1/clusters/{cluster}/groups)
+	ListGroups(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListGroupsParams)
+	// CreateGroup Create a consumer group bound to a topic.
+	// (POST /api/v1/clusters/{cluster}/groups)
+	CreateGroup(w http.ResponseWriter, r *http.Request, cluster Cluster, params CreateGroupParams)
+	// DeleteGroup Delete a consumer group. Must be empty.
+	// (DELETE /api/v1/clusters/{cluster}/groups/{group})
+	DeleteGroup(w http.ResponseWriter, r *http.Request, cluster Cluster, group Group, params DeleteGroupParams)
+	// DescribeGroup Describe a consumer group (members, offsets, lag).
+	// (GET /api/v1/clusters/{cluster}/groups/{group})
+	DescribeGroup(w http.ResponseWriter, r *http.Request, cluster Cluster, group Group, params DescribeGroupParams)
+	// ResetGroupOffsets Reset committed offsets of a group.
+	// (POST /api/v1/clusters/{cluster}/groups/{group}/reset-offsets)
+	ResetGroupOffsets(w http.ResponseWriter, r *http.Request, cluster Cluster, group Group, params ResetGroupOffsetsParams)
+	// ListSubjects List Schema Registry subjects with their versions.
+	// (GET /api/v1/clusters/{cluster}/schemas/subjects)
+	ListSubjects(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListSubjectsParams)
+	// DeleteSubject Delete a subject (soft by default).
+	// (DELETE /api/v1/clusters/{cluster}/schemas/subjects/{subject})
+	DeleteSubject(w http.ResponseWriter, r *http.Request, cluster Cluster, subject Subject, params DeleteSubjectParams)
+	// ListSchemaVersions List versions of a subject.
+	// (GET /api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions)
+	ListSchemaVersions(w http.ResponseWriter, r *http.Request, cluster Cluster, subject Subject, params ListSchemaVersionsParams)
+	// RegisterSchema Register a new version for a subject.
+	// (POST /api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions)
+	RegisterSchema(w http.ResponseWriter, r *http.Request, cluster Cluster, subject Subject, params RegisterSchemaParams)
+	// GetSchemaVersion Get a specific subject version (or `latest`).
+	// (GET /api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions/{version})
+	GetSchemaVersion(w http.ResponseWriter, r *http.Request, cluster Cluster, subject Subject, version string, params GetSchemaVersionParams)
 	// ListTopics List topics (filtered by RBAC view permission).
 	// (GET /api/v1/clusters/{cluster}/topics)
 	ListTopics(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListTopicsParams)
@@ -959,6 +1343,15 @@ type ServerInterface interface {
 	// SampleMessages Sample the last n decoded messages from a topic.
 	// (GET /api/v1/clusters/{cluster}/topics/{topic}/sample)
 	SampleMessages(w http.ResponseWriter, r *http.Request, cluster Cluster, topic Topic, params SampleMessagesParams)
+	// ListScramUsers List SCRAM users.
+	// (GET /api/v1/clusters/{cluster}/users)
+	ListScramUsers(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListScramUsersParams)
+	// UpsertScramUser Create or update a SCRAM user.
+	// (POST /api/v1/clusters/{cluster}/users)
+	UpsertScramUser(w http.ResponseWriter, r *http.Request, cluster Cluster, params UpsertScramUserParams)
+	// DeleteScramUser Delete a SCRAM user's credentials.
+	// (DELETE /api/v1/clusters/{cluster}/users/{user})
+	DeleteScramUser(w http.ResponseWriter, r *http.Request, cluster Cluster, user string, params DeleteScramUserParams)
 	// GetInfo Build info.
 	// (GET /api/v1/info)
 	GetInfo(w http.ResponseWriter, r *http.Request)
@@ -992,6 +1385,24 @@ func (_ Unimplemented) TestCluster(w http.ResponseWriter, r *http.Request, param
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// DeleteAcl Delete ACL(s) matching a filter.
+// (DELETE /api/v1/clusters/{cluster}/acls)
+func (_ Unimplemented) DeleteAcl(w http.ResponseWriter, r *http.Request, cluster Cluster, params DeleteAclParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListAcls List ACLs.
+// (GET /api/v1/clusters/{cluster}/acls)
+func (_ Unimplemented) ListAcls(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListAclsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateAcl Create an ACL.
+// (POST /api/v1/clusters/{cluster}/acls)
+func (_ Unimplemented) CreateAcl(w http.ResponseWriter, r *http.Request, cluster Cluster, params CreateAclParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // ListBrokers List the brokers of a cluster.
 // (GET /api/v1/clusters/{cluster}/brokers)
 func (_ Unimplemented) ListBrokers(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListBrokersParams) {
@@ -1007,6 +1418,66 @@ func (_ Unimplemented) GetCapabilities(w http.ResponseWriter, r *http.Request, c
 // RefreshCapabilities Re-probe capabilities (clears the cache).
 // (POST /api/v1/clusters/{cluster}/capabilities/refresh)
 func (_ Unimplemented) RefreshCapabilities(w http.ResponseWriter, r *http.Request, cluster Cluster, params RefreshCapabilitiesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListGroups List consumer groups (filtered by RBAC view permission).
+// (GET /api/v1/clusters/{cluster}/groups)
+func (_ Unimplemented) ListGroups(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListGroupsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateGroup Create a consumer group bound to a topic.
+// (POST /api/v1/clusters/{cluster}/groups)
+func (_ Unimplemented) CreateGroup(w http.ResponseWriter, r *http.Request, cluster Cluster, params CreateGroupParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteGroup Delete a consumer group. Must be empty.
+// (DELETE /api/v1/clusters/{cluster}/groups/{group})
+func (_ Unimplemented) DeleteGroup(w http.ResponseWriter, r *http.Request, cluster Cluster, group Group, params DeleteGroupParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DescribeGroup Describe a consumer group (members, offsets, lag).
+// (GET /api/v1/clusters/{cluster}/groups/{group})
+func (_ Unimplemented) DescribeGroup(w http.ResponseWriter, r *http.Request, cluster Cluster, group Group, params DescribeGroupParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ResetGroupOffsets Reset committed offsets of a group.
+// (POST /api/v1/clusters/{cluster}/groups/{group}/reset-offsets)
+func (_ Unimplemented) ResetGroupOffsets(w http.ResponseWriter, r *http.Request, cluster Cluster, group Group, params ResetGroupOffsetsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListSubjects List Schema Registry subjects with their versions.
+// (GET /api/v1/clusters/{cluster}/schemas/subjects)
+func (_ Unimplemented) ListSubjects(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListSubjectsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteSubject Delete a subject (soft by default).
+// (DELETE /api/v1/clusters/{cluster}/schemas/subjects/{subject})
+func (_ Unimplemented) DeleteSubject(w http.ResponseWriter, r *http.Request, cluster Cluster, subject Subject, params DeleteSubjectParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListSchemaVersions List versions of a subject.
+// (GET /api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions)
+func (_ Unimplemented) ListSchemaVersions(w http.ResponseWriter, r *http.Request, cluster Cluster, subject Subject, params ListSchemaVersionsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// RegisterSchema Register a new version for a subject.
+// (POST /api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions)
+func (_ Unimplemented) RegisterSchema(w http.ResponseWriter, r *http.Request, cluster Cluster, subject Subject, params RegisterSchemaParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetSchemaVersion Get a specific subject version (or `latest`).
+// (GET /api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions/{version})
+func (_ Unimplemented) GetSchemaVersion(w http.ResponseWriter, r *http.Request, cluster Cluster, subject Subject, version string, params GetSchemaVersionParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1100,6 +1571,24 @@ func (_ Unimplemented) SampleMessages(w http.ResponseWriter, r *http.Request, cl
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ListScramUsers List SCRAM users.
+// (GET /api/v1/clusters/{cluster}/users)
+func (_ Unimplemented) ListScramUsers(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListScramUsersParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpsertScramUser Create or update a SCRAM user.
+// (POST /api/v1/clusters/{cluster}/users)
+func (_ Unimplemented) UpsertScramUser(w http.ResponseWriter, r *http.Request, cluster Cluster, params UpsertScramUserParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteScramUser Delete a SCRAM user's credentials.
+// (DELETE /api/v1/clusters/{cluster}/users/{user})
+func (_ Unimplemented) DeleteScramUser(w http.ResponseWriter, r *http.Request, cluster Cluster, user string, params DeleteScramUserParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // GetInfo Build info.
 // (GET /api/v1/info)
 func (_ Unimplemented) GetInfo(w http.ResponseWriter, r *http.Request) {
@@ -1185,6 +1674,156 @@ func (siw *ServerInterfaceWrapper) TestCluster(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.TestCluster(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAcl operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAcl(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "cluster" -------------
+	var cluster Cluster
+
+	err = runtime.BindStyledParameterWithOptions("simple", "cluster", chi.URLParam(r, "cluster"), &cluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteAclParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Kafkito-Cluster" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Kafkito-Cluster")]; found {
+		var XKafkitoCluster PrivateClusterHeader
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Kafkito-Cluster", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Kafkito-Cluster", valueList[0], &XKafkitoCluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Kafkito-Cluster", Err: err})
+			return
+		}
+
+		params.XKafkitoCluster = &XKafkitoCluster
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAcl(w, r, cluster, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAcls operation middleware
+func (siw *ServerInterfaceWrapper) ListAcls(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "cluster" -------------
+	var cluster Cluster
+
+	err = runtime.BindStyledParameterWithOptions("simple", "cluster", chi.URLParam(r, "cluster"), &cluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAclsParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Kafkito-Cluster" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Kafkito-Cluster")]; found {
+		var XKafkitoCluster PrivateClusterHeader
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Kafkito-Cluster", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Kafkito-Cluster", valueList[0], &XKafkitoCluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Kafkito-Cluster", Err: err})
+			return
+		}
+
+		params.XKafkitoCluster = &XKafkitoCluster
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAcls(w, r, cluster, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAcl operation middleware
+func (siw *ServerInterfaceWrapper) CreateAcl(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "cluster" -------------
+	var cluster Cluster
+
+	err = runtime.BindStyledParameterWithOptions("simple", "cluster", chi.URLParam(r, "cluster"), &cluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateAclParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Kafkito-Cluster" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Kafkito-Cluster")]; found {
+		var XKafkitoCluster PrivateClusterHeader
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Kafkito-Cluster", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Kafkito-Cluster", valueList[0], &XKafkitoCluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Kafkito-Cluster", Err: err})
+			return
+		}
+
+		params.XKafkitoCluster = &XKafkitoCluster
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAcl(w, r, cluster, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1335,6 +1974,610 @@ func (siw *ServerInterfaceWrapper) RefreshCapabilities(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RefreshCapabilities(w, r, cluster, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListGroups operation middleware
+func (siw *ServerInterfaceWrapper) ListGroups(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "cluster" -------------
+	var cluster Cluster
+
+	err = runtime.BindStyledParameterWithOptions("simple", "cluster", chi.URLParam(r, "cluster"), &cluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListGroupsParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Kafkito-Cluster" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Kafkito-Cluster")]; found {
+		var XKafkitoCluster PrivateClusterHeader
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Kafkito-Cluster", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Kafkito-Cluster", valueList[0], &XKafkitoCluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Kafkito-Cluster", Err: err})
+			return
+		}
+
+		params.XKafkitoCluster = &XKafkitoCluster
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListGroups(w, r, cluster, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateGroup operation middleware
+func (siw *ServerInterfaceWrapper) CreateGroup(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "cluster" -------------
+	var cluster Cluster
+
+	err = runtime.BindStyledParameterWithOptions("simple", "cluster", chi.URLParam(r, "cluster"), &cluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateGroupParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Kafkito-Cluster" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Kafkito-Cluster")]; found {
+		var XKafkitoCluster PrivateClusterHeader
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Kafkito-Cluster", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Kafkito-Cluster", valueList[0], &XKafkitoCluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Kafkito-Cluster", Err: err})
+			return
+		}
+
+		params.XKafkitoCluster = &XKafkitoCluster
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateGroup(w, r, cluster, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteGroup operation middleware
+func (siw *ServerInterfaceWrapper) DeleteGroup(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "cluster" -------------
+	var cluster Cluster
+
+	err = runtime.BindStyledParameterWithOptions("simple", "cluster", chi.URLParam(r, "cluster"), &cluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "group" -------------
+	var group Group
+
+	err = runtime.BindStyledParameterWithOptions("simple", "group", chi.URLParam(r, "group"), &group, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "group", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteGroupParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Kafkito-Cluster" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Kafkito-Cluster")]; found {
+		var XKafkitoCluster PrivateClusterHeader
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Kafkito-Cluster", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Kafkito-Cluster", valueList[0], &XKafkitoCluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Kafkito-Cluster", Err: err})
+			return
+		}
+
+		params.XKafkitoCluster = &XKafkitoCluster
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteGroup(w, r, cluster, group, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DescribeGroup operation middleware
+func (siw *ServerInterfaceWrapper) DescribeGroup(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "cluster" -------------
+	var cluster Cluster
+
+	err = runtime.BindStyledParameterWithOptions("simple", "cluster", chi.URLParam(r, "cluster"), &cluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "group" -------------
+	var group Group
+
+	err = runtime.BindStyledParameterWithOptions("simple", "group", chi.URLParam(r, "group"), &group, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "group", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DescribeGroupParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Kafkito-Cluster" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Kafkito-Cluster")]; found {
+		var XKafkitoCluster PrivateClusterHeader
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Kafkito-Cluster", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Kafkito-Cluster", valueList[0], &XKafkitoCluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Kafkito-Cluster", Err: err})
+			return
+		}
+
+		params.XKafkitoCluster = &XKafkitoCluster
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DescribeGroup(w, r, cluster, group, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResetGroupOffsets operation middleware
+func (siw *ServerInterfaceWrapper) ResetGroupOffsets(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "cluster" -------------
+	var cluster Cluster
+
+	err = runtime.BindStyledParameterWithOptions("simple", "cluster", chi.URLParam(r, "cluster"), &cluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "group" -------------
+	var group Group
+
+	err = runtime.BindStyledParameterWithOptions("simple", "group", chi.URLParam(r, "group"), &group, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "group", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ResetGroupOffsetsParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Kafkito-Confirm-Prod" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Kafkito-Confirm-Prod")]; found {
+		var XKafkitoConfirmProd ResetGroupOffsetsParamsXKafkitoConfirmProd
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Kafkito-Confirm-Prod", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Kafkito-Confirm-Prod", valueList[0], &XKafkitoConfirmProd, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Kafkito-Confirm-Prod", Err: err})
+			return
+		}
+
+		params.XKafkitoConfirmProd = &XKafkitoConfirmProd
+
+	}
+
+	// ------------- Optional header parameter "X-Kafkito-Cluster" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Kafkito-Cluster")]; found {
+		var XKafkitoCluster PrivateClusterHeader
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Kafkito-Cluster", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Kafkito-Cluster", valueList[0], &XKafkitoCluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Kafkito-Cluster", Err: err})
+			return
+		}
+
+		params.XKafkitoCluster = &XKafkitoCluster
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResetGroupOffsets(w, r, cluster, group, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSubjects operation middleware
+func (siw *ServerInterfaceWrapper) ListSubjects(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "cluster" -------------
+	var cluster Cluster
+
+	err = runtime.BindStyledParameterWithOptions("simple", "cluster", chi.URLParam(r, "cluster"), &cluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListSubjectsParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Kafkito-Cluster" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Kafkito-Cluster")]; found {
+		var XKafkitoCluster PrivateClusterHeader
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Kafkito-Cluster", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Kafkito-Cluster", valueList[0], &XKafkitoCluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Kafkito-Cluster", Err: err})
+			return
+		}
+
+		params.XKafkitoCluster = &XKafkitoCluster
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSubjects(w, r, cluster, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteSubject operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSubject(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "cluster" -------------
+	var cluster Cluster
+
+	err = runtime.BindStyledParameterWithOptions("simple", "cluster", chi.URLParam(r, "cluster"), &cluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "subject" -------------
+	var subject Subject
+
+	err = runtime.BindStyledParameterWithOptions("simple", "subject", chi.URLParam(r, "subject"), &subject, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "subject", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteSubjectParams
+
+	// ------------- Optional query parameter "permanent" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "permanent", r.URL.Query(), &params.Permanent, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "permanent"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "permanent", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Kafkito-Cluster" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Kafkito-Cluster")]; found {
+		var XKafkitoCluster PrivateClusterHeader
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Kafkito-Cluster", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Kafkito-Cluster", valueList[0], &XKafkitoCluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Kafkito-Cluster", Err: err})
+			return
+		}
+
+		params.XKafkitoCluster = &XKafkitoCluster
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteSubject(w, r, cluster, subject, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSchemaVersions operation middleware
+func (siw *ServerInterfaceWrapper) ListSchemaVersions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "cluster" -------------
+	var cluster Cluster
+
+	err = runtime.BindStyledParameterWithOptions("simple", "cluster", chi.URLParam(r, "cluster"), &cluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "subject" -------------
+	var subject Subject
+
+	err = runtime.BindStyledParameterWithOptions("simple", "subject", chi.URLParam(r, "subject"), &subject, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "subject", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListSchemaVersionsParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Kafkito-Cluster" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Kafkito-Cluster")]; found {
+		var XKafkitoCluster PrivateClusterHeader
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Kafkito-Cluster", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Kafkito-Cluster", valueList[0], &XKafkitoCluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Kafkito-Cluster", Err: err})
+			return
+		}
+
+		params.XKafkitoCluster = &XKafkitoCluster
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSchemaVersions(w, r, cluster, subject, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RegisterSchema operation middleware
+func (siw *ServerInterfaceWrapper) RegisterSchema(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "cluster" -------------
+	var cluster Cluster
+
+	err = runtime.BindStyledParameterWithOptions("simple", "cluster", chi.URLParam(r, "cluster"), &cluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "subject" -------------
+	var subject Subject
+
+	err = runtime.BindStyledParameterWithOptions("simple", "subject", chi.URLParam(r, "subject"), &subject, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "subject", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RegisterSchemaParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Kafkito-Cluster" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Kafkito-Cluster")]; found {
+		var XKafkitoCluster PrivateClusterHeader
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Kafkito-Cluster", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Kafkito-Cluster", valueList[0], &XKafkitoCluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Kafkito-Cluster", Err: err})
+			return
+		}
+
+		params.XKafkitoCluster = &XKafkitoCluster
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RegisterSchema(w, r, cluster, subject, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSchemaVersion operation middleware
+func (siw *ServerInterfaceWrapper) GetSchemaVersion(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "cluster" -------------
+	var cluster Cluster
+
+	err = runtime.BindStyledParameterWithOptions("simple", "cluster", chi.URLParam(r, "cluster"), &cluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "subject" -------------
+	var subject Subject
+
+	err = runtime.BindStyledParameterWithOptions("simple", "subject", chi.URLParam(r, "subject"), &subject, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "subject", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "version" -------------
+	var version string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "version", chi.URLParam(r, "version"), &version, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "version", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetSchemaVersionParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Kafkito-Cluster" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Kafkito-Cluster")]; found {
+		var XKafkitoCluster PrivateClusterHeader
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Kafkito-Cluster", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Kafkito-Cluster", valueList[0], &XKafkitoCluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Kafkito-Cluster", Err: err})
+			return
+		}
+
+		params.XKafkitoCluster = &XKafkitoCluster
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSchemaVersion(w, r, cluster, subject, version, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2545,6 +3788,178 @@ func (siw *ServerInterfaceWrapper) SampleMessages(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// ListScramUsers operation middleware
+func (siw *ServerInterfaceWrapper) ListScramUsers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "cluster" -------------
+	var cluster Cluster
+
+	err = runtime.BindStyledParameterWithOptions("simple", "cluster", chi.URLParam(r, "cluster"), &cluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListScramUsersParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Kafkito-Cluster" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Kafkito-Cluster")]; found {
+		var XKafkitoCluster PrivateClusterHeader
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Kafkito-Cluster", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Kafkito-Cluster", valueList[0], &XKafkitoCluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Kafkito-Cluster", Err: err})
+			return
+		}
+
+		params.XKafkitoCluster = &XKafkitoCluster
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListScramUsers(w, r, cluster, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpsertScramUser operation middleware
+func (siw *ServerInterfaceWrapper) UpsertScramUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "cluster" -------------
+	var cluster Cluster
+
+	err = runtime.BindStyledParameterWithOptions("simple", "cluster", chi.URLParam(r, "cluster"), &cluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpsertScramUserParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Kafkito-Cluster" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Kafkito-Cluster")]; found {
+		var XKafkitoCluster PrivateClusterHeader
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Kafkito-Cluster", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Kafkito-Cluster", valueList[0], &XKafkitoCluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Kafkito-Cluster", Err: err})
+			return
+		}
+
+		params.XKafkitoCluster = &XKafkitoCluster
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpsertScramUser(w, r, cluster, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteScramUser operation middleware
+func (siw *ServerInterfaceWrapper) DeleteScramUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "cluster" -------------
+	var cluster Cluster
+
+	err = runtime.BindStyledParameterWithOptions("simple", "cluster", chi.URLParam(r, "cluster"), &cluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "user" -------------
+	var user string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user", chi.URLParam(r, "user"), &user, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteScramUserParams
+
+	// ------------- Optional query parameter "mechanism" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "mechanism", r.URL.Query(), &params.Mechanism, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "mechanism"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "mechanism", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Kafkito-Cluster" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Kafkito-Cluster")]; found {
+		var XKafkitoCluster PrivateClusterHeader
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Kafkito-Cluster", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Kafkito-Cluster", valueList[0], &XKafkitoCluster, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Kafkito-Cluster", Err: err})
+			return
+		}
+
+		params.XKafkitoCluster = &XKafkitoCluster
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteScramUser(w, r, cluster, user, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetInfo operation middleware
 func (siw *ServerInterfaceWrapper) GetInfo(w http.ResponseWriter, r *http.Request) {
 
@@ -2735,6 +4150,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/v1/clusters/_test", wrapper.TestCluster)
 	})
 	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/clusters/{cluster}/acls", wrapper.DeleteAcl)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/clusters/{cluster}/acls", wrapper.ListAcls)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/clusters/{cluster}/acls", wrapper.CreateAcl)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/clusters/{cluster}/brokers", wrapper.ListBrokers)
 	})
 	r.Group(func(r chi.Router) {
@@ -2742,6 +4166,36 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/v1/clusters/{cluster}/capabilities/refresh", wrapper.RefreshCapabilities)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/clusters/{cluster}/groups", wrapper.ListGroups)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/clusters/{cluster}/groups", wrapper.CreateGroup)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/clusters/{cluster}/groups/{group}", wrapper.DeleteGroup)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/clusters/{cluster}/groups/{group}", wrapper.DescribeGroup)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/clusters/{cluster}/groups/{group}/reset-offsets", wrapper.ResetGroupOffsets)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/clusters/{cluster}/schemas/subjects", wrapper.ListSubjects)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/clusters/{cluster}/schemas/subjects/{subject}", wrapper.DeleteSubject)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions", wrapper.ListSchemaVersions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions", wrapper.RegisterSchema)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions/{version}", wrapper.GetSchemaVersion)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/clusters/{cluster}/topics", wrapper.ListTopics)
@@ -2787,6 +4241,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/clusters/{cluster}/topics/{topic}/sample", wrapper.SampleMessages)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/clusters/{cluster}/users", wrapper.ListScramUsers)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/clusters/{cluster}/users", wrapper.UpsertScramUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/clusters/{cluster}/users/{user}", wrapper.DeleteScramUser)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/info", wrapper.GetInfo)
@@ -2916,6 +4379,296 @@ func (response TestCluster401JSONResponse) VisitTestClusterResponse(w http.Respo
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAclRequestObject struct {
+	Cluster Cluster `json:"cluster"`
+	Params  DeleteAclParams
+	Body    *DeleteAclJSONRequestBody
+}
+
+type DeleteAclResponseObject interface {
+	VisitDeleteAclResponse(w http.ResponseWriter) error
+}
+
+type DeleteAcl200JSONResponse DeleteACLResponse
+
+func (response DeleteAcl200JSONResponse) VisitDeleteAclResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAcl400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response DeleteAcl400JSONResponse) VisitDeleteAclResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAcl401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response DeleteAcl401JSONResponse) VisitDeleteAclResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAcl403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response DeleteAcl403JSONResponse) VisitDeleteAclResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAcl404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteAcl404JSONResponse) VisitDeleteAclResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAcl502JSONResponse struct{ BadGatewayJSONResponse }
+
+func (response DeleteAcl502JSONResponse) VisitDeleteAclResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAclsRequestObject struct {
+	Cluster Cluster `json:"cluster"`
+	Params  ListAclsParams
+}
+
+type ListAclsResponseObject interface {
+	VisitListAclsResponse(w http.ResponseWriter) error
+}
+
+type ListAcls200JSONResponse ListACLsResponse
+
+func (response ListAcls200JSONResponse) VisitListAclsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAcls400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListAcls400JSONResponse) VisitListAclsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAcls401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListAcls401JSONResponse) VisitListAclsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAcls403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListAcls403JSONResponse) VisitListAclsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAcls404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListAcls404JSONResponse) VisitListAclsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAcls502JSONResponse struct{ BadGatewayJSONResponse }
+
+func (response ListAcls502JSONResponse) VisitListAclsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAclRequestObject struct {
+	Cluster Cluster `json:"cluster"`
+	Params  CreateAclParams
+	Body    *CreateAclJSONRequestBody
+}
+
+type CreateAclResponseObject interface {
+	VisitCreateAclResponse(w http.ResponseWriter) error
+}
+
+type CreateAcl201JSONResponse CreateACLResponse
+
+func (response CreateAcl201JSONResponse) VisitCreateAclResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAcl400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateAcl400JSONResponse) VisitCreateAclResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAcl401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateAcl401JSONResponse) VisitCreateAclResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAcl403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateAcl403JSONResponse) VisitCreateAclResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAcl404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CreateAcl404JSONResponse) VisitCreateAclResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAcl502JSONResponse struct{ BadGatewayJSONResponse }
+
+func (response CreateAcl502JSONResponse) VisitCreateAclResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(502)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -3169,6 +4922,1007 @@ func (response RefreshCapabilities404JSONResponse) VisitRefreshCapabilitiesRespo
 type RefreshCapabilities502JSONResponse struct{ BadGatewayJSONResponse }
 
 func (response RefreshCapabilities502JSONResponse) VisitRefreshCapabilitiesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGroupsRequestObject struct {
+	Cluster Cluster `json:"cluster"`
+	Params  ListGroupsParams
+}
+
+type ListGroupsResponseObject interface {
+	VisitListGroupsResponse(w http.ResponseWriter) error
+}
+
+type ListGroups200JSONResponse ListGroupsResponse
+
+func (response ListGroups200JSONResponse) VisitListGroupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGroups400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListGroups400JSONResponse) VisitListGroupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGroups401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListGroups401JSONResponse) VisitListGroupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGroups403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListGroups403JSONResponse) VisitListGroupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGroups404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListGroups404JSONResponse) VisitListGroupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGroups502JSONResponse struct{ BadGatewayJSONResponse }
+
+func (response ListGroups502JSONResponse) VisitListGroupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGroupRequestObject struct {
+	Cluster Cluster `json:"cluster"`
+	Params  CreateGroupParams
+	Body    *CreateGroupJSONRequestBody
+}
+
+type CreateGroupResponseObject interface {
+	VisitCreateGroupResponse(w http.ResponseWriter) error
+}
+
+type CreateGroup200JSONResponse ResetOffsetsResponse
+
+func (response CreateGroup200JSONResponse) VisitCreateGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGroup400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateGroup400JSONResponse) VisitCreateGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGroup401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateGroup401JSONResponse) VisitCreateGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGroup403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateGroup403JSONResponse) VisitCreateGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGroup404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CreateGroup404JSONResponse) VisitCreateGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGroup409JSONResponse Error
+
+func (response CreateGroup409JSONResponse) VisitCreateGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGroup502JSONResponse struct{ BadGatewayJSONResponse }
+
+func (response CreateGroup502JSONResponse) VisitCreateGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteGroupRequestObject struct {
+	Cluster Cluster `json:"cluster"`
+	Group   Group   `json:"group"`
+	Params  DeleteGroupParams
+}
+
+type DeleteGroupResponseObject interface {
+	VisitDeleteGroupResponse(w http.ResponseWriter) error
+}
+
+type DeleteGroup200JSONResponse DeletedNameResponse
+
+func (response DeleteGroup200JSONResponse) VisitDeleteGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteGroup400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response DeleteGroup400JSONResponse) VisitDeleteGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteGroup401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response DeleteGroup401JSONResponse) VisitDeleteGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteGroup403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response DeleteGroup403JSONResponse) VisitDeleteGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteGroup404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteGroup404JSONResponse) VisitDeleteGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteGroup502JSONResponse struct{ BadGatewayJSONResponse }
+
+func (response DeleteGroup502JSONResponse) VisitDeleteGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DescribeGroupRequestObject struct {
+	Cluster Cluster `json:"cluster"`
+	Group   Group   `json:"group"`
+	Params  DescribeGroupParams
+}
+
+type DescribeGroupResponseObject interface {
+	VisitDescribeGroupResponse(w http.ResponseWriter) error
+}
+
+type DescribeGroup200JSONResponse GroupDetail
+
+func (response DescribeGroup200JSONResponse) VisitDescribeGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DescribeGroup400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response DescribeGroup400JSONResponse) VisitDescribeGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DescribeGroup401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response DescribeGroup401JSONResponse) VisitDescribeGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DescribeGroup403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response DescribeGroup403JSONResponse) VisitDescribeGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DescribeGroup404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DescribeGroup404JSONResponse) VisitDescribeGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DescribeGroup502JSONResponse struct{ BadGatewayJSONResponse }
+
+func (response DescribeGroup502JSONResponse) VisitDescribeGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetGroupOffsetsRequestObject struct {
+	Cluster Cluster `json:"cluster"`
+	Group   Group   `json:"group"`
+	Params  ResetGroupOffsetsParams
+	Body    *ResetGroupOffsetsJSONRequestBody
+}
+
+type ResetGroupOffsetsResponseObject interface {
+	VisitResetGroupOffsetsResponse(w http.ResponseWriter) error
+}
+
+type ResetGroupOffsets200JSONResponse ResetOffsetsResponse
+
+func (response ResetGroupOffsets200JSONResponse) VisitResetGroupOffsetsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetGroupOffsets400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ResetGroupOffsets400JSONResponse) VisitResetGroupOffsetsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetGroupOffsets401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ResetGroupOffsets401JSONResponse) VisitResetGroupOffsetsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetGroupOffsets403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ResetGroupOffsets403JSONResponse) VisitResetGroupOffsetsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetGroupOffsets404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ResetGroupOffsets404JSONResponse) VisitResetGroupOffsetsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetGroupOffsets428JSONResponse struct {
+	ProdConfirmationRequiredJSONResponse
+}
+
+func (response ResetGroupOffsets428JSONResponse) VisitResetGroupOffsetsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetGroupOffsets502JSONResponse struct{ BadGatewayJSONResponse }
+
+func (response ResetGroupOffsets502JSONResponse) VisitResetGroupOffsetsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubjectsRequestObject struct {
+	Cluster Cluster `json:"cluster"`
+	Params  ListSubjectsParams
+}
+
+type ListSubjectsResponseObject interface {
+	VisitListSubjectsResponse(w http.ResponseWriter) error
+}
+
+type ListSubjects200JSONResponse ListSubjectsResponse
+
+func (response ListSubjects200JSONResponse) VisitListSubjectsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubjects400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListSubjects400JSONResponse) VisitListSubjectsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubjects401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListSubjects401JSONResponse) VisitListSubjectsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubjects403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListSubjects403JSONResponse) VisitListSubjectsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubjects404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListSubjects404JSONResponse) VisitListSubjectsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubjects502JSONResponse struct{ BadGatewayJSONResponse }
+
+func (response ListSubjects502JSONResponse) VisitListSubjectsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSubjectRequestObject struct {
+	Cluster Cluster `json:"cluster"`
+	Subject Subject `json:"subject"`
+	Params  DeleteSubjectParams
+}
+
+type DeleteSubjectResponseObject interface {
+	VisitDeleteSubjectResponse(w http.ResponseWriter) error
+}
+
+type DeleteSubject200JSONResponse DeleteSubjectResponse
+
+func (response DeleteSubject200JSONResponse) VisitDeleteSubjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSubject400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response DeleteSubject400JSONResponse) VisitDeleteSubjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSubject401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response DeleteSubject401JSONResponse) VisitDeleteSubjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSubject403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response DeleteSubject403JSONResponse) VisitDeleteSubjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSubject404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteSubject404JSONResponse) VisitDeleteSubjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSubject502JSONResponse struct{ BadGatewayJSONResponse }
+
+func (response DeleteSubject502JSONResponse) VisitDeleteSubjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSchemaVersionsRequestObject struct {
+	Cluster Cluster `json:"cluster"`
+	Subject Subject `json:"subject"`
+	Params  ListSchemaVersionsParams
+}
+
+type ListSchemaVersionsResponseObject interface {
+	VisitListSchemaVersionsResponse(w http.ResponseWriter) error
+}
+
+type ListSchemaVersions200JSONResponse ListSchemaVersionsResponse
+
+func (response ListSchemaVersions200JSONResponse) VisitListSchemaVersionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSchemaVersions400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListSchemaVersions400JSONResponse) VisitListSchemaVersionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSchemaVersions401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListSchemaVersions401JSONResponse) VisitListSchemaVersionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSchemaVersions403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListSchemaVersions403JSONResponse) VisitListSchemaVersionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSchemaVersions404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListSchemaVersions404JSONResponse) VisitListSchemaVersionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSchemaVersions502JSONResponse struct{ BadGatewayJSONResponse }
+
+func (response ListSchemaVersions502JSONResponse) VisitListSchemaVersionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterSchemaRequestObject struct {
+	Cluster Cluster `json:"cluster"`
+	Subject Subject `json:"subject"`
+	Params  RegisterSchemaParams
+	Body    *RegisterSchemaJSONRequestBody
+}
+
+type RegisterSchemaResponseObject interface {
+	VisitRegisterSchemaResponse(w http.ResponseWriter) error
+}
+
+type RegisterSchema200JSONResponse RegisterSchemaResponse
+
+func (response RegisterSchema200JSONResponse) VisitRegisterSchemaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterSchema400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response RegisterSchema400JSONResponse) VisitRegisterSchemaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterSchema401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response RegisterSchema401JSONResponse) VisitRegisterSchemaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterSchema403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response RegisterSchema403JSONResponse) VisitRegisterSchemaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterSchema404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response RegisterSchema404JSONResponse) VisitRegisterSchemaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterSchema502JSONResponse struct{ BadGatewayJSONResponse }
+
+func (response RegisterSchema502JSONResponse) VisitRegisterSchemaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSchemaVersionRequestObject struct {
+	Cluster Cluster `json:"cluster"`
+	Subject Subject `json:"subject"`
+	Version string  `json:"version"`
+	Params  GetSchemaVersionParams
+}
+
+type GetSchemaVersionResponseObject interface {
+	VisitGetSchemaVersionResponse(w http.ResponseWriter) error
+}
+
+type GetSchemaVersion200JSONResponse SchemaVersion
+
+func (response GetSchemaVersion200JSONResponse) VisitGetSchemaVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSchemaVersion400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GetSchemaVersion400JSONResponse) VisitGetSchemaVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSchemaVersion401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetSchemaVersion401JSONResponse) VisitGetSchemaVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSchemaVersion403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetSchemaVersion403JSONResponse) VisitGetSchemaVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSchemaVersion404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetSchemaVersion404JSONResponse) VisitGetSchemaVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSchemaVersion502JSONResponse struct{ BadGatewayJSONResponse }
+
+func (response GetSchemaVersion502JSONResponse) VisitGetSchemaVersionResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -4837,6 +7591,296 @@ func (response SampleMessages502JSONResponse) VisitSampleMessagesResponse(w http
 	return err
 }
 
+type ListScramUsersRequestObject struct {
+	Cluster Cluster `json:"cluster"`
+	Params  ListScramUsersParams
+}
+
+type ListScramUsersResponseObject interface {
+	VisitListScramUsersResponse(w http.ResponseWriter) error
+}
+
+type ListScramUsers200JSONResponse ListSCRAMUsersResponse
+
+func (response ListScramUsers200JSONResponse) VisitListScramUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListScramUsers400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListScramUsers400JSONResponse) VisitListScramUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListScramUsers401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListScramUsers401JSONResponse) VisitListScramUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListScramUsers403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListScramUsers403JSONResponse) VisitListScramUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListScramUsers404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListScramUsers404JSONResponse) VisitListScramUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListScramUsers502JSONResponse struct{ BadGatewayJSONResponse }
+
+func (response ListScramUsers502JSONResponse) VisitListScramUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpsertScramUserRequestObject struct {
+	Cluster Cluster `json:"cluster"`
+	Params  UpsertScramUserParams
+	Body    *UpsertScramUserJSONRequestBody
+}
+
+type UpsertScramUserResponseObject interface {
+	VisitUpsertScramUserResponse(w http.ResponseWriter) error
+}
+
+type UpsertScramUser200JSONResponse UpsertSCRAMUserResponse
+
+func (response UpsertScramUser200JSONResponse) VisitUpsertScramUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpsertScramUser400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpsertScramUser400JSONResponse) VisitUpsertScramUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpsertScramUser401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpsertScramUser401JSONResponse) VisitUpsertScramUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpsertScramUser403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response UpsertScramUser403JSONResponse) VisitUpsertScramUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpsertScramUser404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpsertScramUser404JSONResponse) VisitUpsertScramUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpsertScramUser502JSONResponse struct{ BadGatewayJSONResponse }
+
+func (response UpsertScramUser502JSONResponse) VisitUpsertScramUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteScramUserRequestObject struct {
+	Cluster Cluster `json:"cluster"`
+	User    string  `json:"user"`
+	Params  DeleteScramUserParams
+}
+
+type DeleteScramUserResponseObject interface {
+	VisitDeleteScramUserResponse(w http.ResponseWriter) error
+}
+
+type DeleteScramUser200JSONResponse DeleteSCRAMUserResponse
+
+func (response DeleteScramUser200JSONResponse) VisitDeleteScramUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteScramUser400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response DeleteScramUser400JSONResponse) VisitDeleteScramUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteScramUser401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response DeleteScramUser401JSONResponse) VisitDeleteScramUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteScramUser403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response DeleteScramUser403JSONResponse) VisitDeleteScramUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteScramUser404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteScramUser404JSONResponse) VisitDeleteScramUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteScramUser502JSONResponse struct{ BadGatewayJSONResponse }
+
+func (response DeleteScramUser502JSONResponse) VisitDeleteScramUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetInfoRequestObject struct {
 }
 
@@ -5021,6 +8065,15 @@ type StrictServerInterface interface {
 	// TestCluster Probe an ad-hoc cluster definition without storing it.
 	// (POST /api/v1/clusters/_test)
 	TestCluster(ctx context.Context, request TestClusterRequestObject) (TestClusterResponseObject, error)
+	// DeleteAcl Delete ACL(s) matching a filter.
+	// (DELETE /api/v1/clusters/{cluster}/acls)
+	DeleteAcl(ctx context.Context, request DeleteAclRequestObject) (DeleteAclResponseObject, error)
+	// ListAcls List ACLs.
+	// (GET /api/v1/clusters/{cluster}/acls)
+	ListAcls(ctx context.Context, request ListAclsRequestObject) (ListAclsResponseObject, error)
+	// CreateAcl Create an ACL.
+	// (POST /api/v1/clusters/{cluster}/acls)
+	CreateAcl(ctx context.Context, request CreateAclRequestObject) (CreateAclResponseObject, error)
 	// ListBrokers List the brokers of a cluster.
 	// (GET /api/v1/clusters/{cluster}/brokers)
 	ListBrokers(ctx context.Context, request ListBrokersRequestObject) (ListBrokersResponseObject, error)
@@ -5030,6 +8083,36 @@ type StrictServerInterface interface {
 	// RefreshCapabilities Re-probe capabilities (clears the cache).
 	// (POST /api/v1/clusters/{cluster}/capabilities/refresh)
 	RefreshCapabilities(ctx context.Context, request RefreshCapabilitiesRequestObject) (RefreshCapabilitiesResponseObject, error)
+	// ListGroups List consumer groups (filtered by RBAC view permission).
+	// (GET /api/v1/clusters/{cluster}/groups)
+	ListGroups(ctx context.Context, request ListGroupsRequestObject) (ListGroupsResponseObject, error)
+	// CreateGroup Create a consumer group bound to a topic.
+	// (POST /api/v1/clusters/{cluster}/groups)
+	CreateGroup(ctx context.Context, request CreateGroupRequestObject) (CreateGroupResponseObject, error)
+	// DeleteGroup Delete a consumer group. Must be empty.
+	// (DELETE /api/v1/clusters/{cluster}/groups/{group})
+	DeleteGroup(ctx context.Context, request DeleteGroupRequestObject) (DeleteGroupResponseObject, error)
+	// DescribeGroup Describe a consumer group (members, offsets, lag).
+	// (GET /api/v1/clusters/{cluster}/groups/{group})
+	DescribeGroup(ctx context.Context, request DescribeGroupRequestObject) (DescribeGroupResponseObject, error)
+	// ResetGroupOffsets Reset committed offsets of a group.
+	// (POST /api/v1/clusters/{cluster}/groups/{group}/reset-offsets)
+	ResetGroupOffsets(ctx context.Context, request ResetGroupOffsetsRequestObject) (ResetGroupOffsetsResponseObject, error)
+	// ListSubjects List Schema Registry subjects with their versions.
+	// (GET /api/v1/clusters/{cluster}/schemas/subjects)
+	ListSubjects(ctx context.Context, request ListSubjectsRequestObject) (ListSubjectsResponseObject, error)
+	// DeleteSubject Delete a subject (soft by default).
+	// (DELETE /api/v1/clusters/{cluster}/schemas/subjects/{subject})
+	DeleteSubject(ctx context.Context, request DeleteSubjectRequestObject) (DeleteSubjectResponseObject, error)
+	// ListSchemaVersions List versions of a subject.
+	// (GET /api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions)
+	ListSchemaVersions(ctx context.Context, request ListSchemaVersionsRequestObject) (ListSchemaVersionsResponseObject, error)
+	// RegisterSchema Register a new version for a subject.
+	// (POST /api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions)
+	RegisterSchema(ctx context.Context, request RegisterSchemaRequestObject) (RegisterSchemaResponseObject, error)
+	// GetSchemaVersion Get a specific subject version (or `latest`).
+	// (GET /api/v1/clusters/{cluster}/schemas/subjects/{subject}/versions/{version})
+	GetSchemaVersion(ctx context.Context, request GetSchemaVersionRequestObject) (GetSchemaVersionResponseObject, error)
 	// ListTopics List topics (filtered by RBAC view permission).
 	// (GET /api/v1/clusters/{cluster}/topics)
 	ListTopics(ctx context.Context, request ListTopicsRequestObject) (ListTopicsResponseObject, error)
@@ -5075,6 +8158,15 @@ type StrictServerInterface interface {
 	// SampleMessages Sample the last n decoded messages from a topic.
 	// (GET /api/v1/clusters/{cluster}/topics/{topic}/sample)
 	SampleMessages(ctx context.Context, request SampleMessagesRequestObject) (SampleMessagesResponseObject, error)
+	// ListScramUsers List SCRAM users.
+	// (GET /api/v1/clusters/{cluster}/users)
+	ListScramUsers(ctx context.Context, request ListScramUsersRequestObject) (ListScramUsersResponseObject, error)
+	// UpsertScramUser Create or update a SCRAM user.
+	// (POST /api/v1/clusters/{cluster}/users)
+	UpsertScramUser(ctx context.Context, request UpsertScramUserRequestObject) (UpsertScramUserResponseObject, error)
+	// DeleteScramUser Delete a SCRAM user's credentials.
+	// (DELETE /api/v1/clusters/{cluster}/users/{user})
+	DeleteScramUser(ctx context.Context, request DeleteScramUserRequestObject) (DeleteScramUserResponseObject, error)
 	// GetInfo Build info.
 	// (GET /api/v1/info)
 	GetInfo(ctx context.Context, request GetInfoRequestObject) (GetInfoResponseObject, error)
@@ -5191,6 +8283,101 @@ func (sh *strictHandler) TestCluster(w http.ResponseWriter, r *http.Request, par
 	}
 }
 
+// DeleteAcl operation middleware
+func (sh *strictHandler) DeleteAcl(w http.ResponseWriter, r *http.Request, cluster Cluster, params DeleteAclParams) {
+	var request DeleteAclRequestObject
+
+	request.Cluster = cluster
+	request.Params = params
+
+	var body DeleteAclJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteAcl(ctx, request.(DeleteAclRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteAcl")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteAclResponseObject); ok {
+		if err := validResponse.VisitDeleteAclResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAcls operation middleware
+func (sh *strictHandler) ListAcls(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListAclsParams) {
+	var request ListAclsRequestObject
+
+	request.Cluster = cluster
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAcls(ctx, request.(ListAclsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAcls")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAclsResponseObject); ok {
+		if err := validResponse.VisitListAclsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateAcl operation middleware
+func (sh *strictHandler) CreateAcl(w http.ResponseWriter, r *http.Request, cluster Cluster, params CreateAclParams) {
+	var request CreateAclRequestObject
+
+	request.Cluster = cluster
+	request.Params = params
+
+	var body CreateAclJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateAcl(ctx, request.(CreateAclRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateAcl")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateAclResponseObject); ok {
+		if err := validResponse.VisitCreateAclResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListBrokers operation middleware
 func (sh *strictHandler) ListBrokers(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListBrokersParams) {
 	var request ListBrokersRequestObject
@@ -5265,6 +8452,305 @@ func (sh *strictHandler) RefreshCapabilities(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RefreshCapabilitiesResponseObject); ok {
 		if err := validResponse.VisitRefreshCapabilitiesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListGroups operation middleware
+func (sh *strictHandler) ListGroups(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListGroupsParams) {
+	var request ListGroupsRequestObject
+
+	request.Cluster = cluster
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListGroups(ctx, request.(ListGroupsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListGroups")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListGroupsResponseObject); ok {
+		if err := validResponse.VisitListGroupsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateGroup operation middleware
+func (sh *strictHandler) CreateGroup(w http.ResponseWriter, r *http.Request, cluster Cluster, params CreateGroupParams) {
+	var request CreateGroupRequestObject
+
+	request.Cluster = cluster
+	request.Params = params
+
+	var body CreateGroupJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateGroup(ctx, request.(CreateGroupRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateGroup")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateGroupResponseObject); ok {
+		if err := validResponse.VisitCreateGroupResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteGroup operation middleware
+func (sh *strictHandler) DeleteGroup(w http.ResponseWriter, r *http.Request, cluster Cluster, group Group, params DeleteGroupParams) {
+	var request DeleteGroupRequestObject
+
+	request.Cluster = cluster
+	request.Group = group
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteGroup(ctx, request.(DeleteGroupRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteGroup")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteGroupResponseObject); ok {
+		if err := validResponse.VisitDeleteGroupResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DescribeGroup operation middleware
+func (sh *strictHandler) DescribeGroup(w http.ResponseWriter, r *http.Request, cluster Cluster, group Group, params DescribeGroupParams) {
+	var request DescribeGroupRequestObject
+
+	request.Cluster = cluster
+	request.Group = group
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DescribeGroup(ctx, request.(DescribeGroupRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DescribeGroup")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DescribeGroupResponseObject); ok {
+		if err := validResponse.VisitDescribeGroupResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ResetGroupOffsets operation middleware
+func (sh *strictHandler) ResetGroupOffsets(w http.ResponseWriter, r *http.Request, cluster Cluster, group Group, params ResetGroupOffsetsParams) {
+	var request ResetGroupOffsetsRequestObject
+
+	request.Cluster = cluster
+	request.Group = group
+	request.Params = params
+
+	var body ResetGroupOffsetsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ResetGroupOffsets(ctx, request.(ResetGroupOffsetsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ResetGroupOffsets")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ResetGroupOffsetsResponseObject); ok {
+		if err := validResponse.VisitResetGroupOffsetsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSubjects operation middleware
+func (sh *strictHandler) ListSubjects(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListSubjectsParams) {
+	var request ListSubjectsRequestObject
+
+	request.Cluster = cluster
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSubjects(ctx, request.(ListSubjectsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSubjects")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSubjectsResponseObject); ok {
+		if err := validResponse.VisitListSubjectsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteSubject operation middleware
+func (sh *strictHandler) DeleteSubject(w http.ResponseWriter, r *http.Request, cluster Cluster, subject Subject, params DeleteSubjectParams) {
+	var request DeleteSubjectRequestObject
+
+	request.Cluster = cluster
+	request.Subject = subject
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteSubject(ctx, request.(DeleteSubjectRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteSubject")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteSubjectResponseObject); ok {
+		if err := validResponse.VisitDeleteSubjectResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSchemaVersions operation middleware
+func (sh *strictHandler) ListSchemaVersions(w http.ResponseWriter, r *http.Request, cluster Cluster, subject Subject, params ListSchemaVersionsParams) {
+	var request ListSchemaVersionsRequestObject
+
+	request.Cluster = cluster
+	request.Subject = subject
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSchemaVersions(ctx, request.(ListSchemaVersionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSchemaVersions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSchemaVersionsResponseObject); ok {
+		if err := validResponse.VisitListSchemaVersionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RegisterSchema operation middleware
+func (sh *strictHandler) RegisterSchema(w http.ResponseWriter, r *http.Request, cluster Cluster, subject Subject, params RegisterSchemaParams) {
+	var request RegisterSchemaRequestObject
+
+	request.Cluster = cluster
+	request.Subject = subject
+	request.Params = params
+
+	var body RegisterSchemaJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RegisterSchema(ctx, request.(RegisterSchemaRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RegisterSchema")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RegisterSchemaResponseObject); ok {
+		if err := validResponse.VisitRegisterSchemaResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSchemaVersion operation middleware
+func (sh *strictHandler) GetSchemaVersion(w http.ResponseWriter, r *http.Request, cluster Cluster, subject Subject, version string, params GetSchemaVersionParams) {
+	var request GetSchemaVersionRequestObject
+
+	request.Cluster = cluster
+	request.Subject = subject
+	request.Version = version
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSchemaVersion(ctx, request.(GetSchemaVersionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSchemaVersion")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSchemaVersionResponseObject); ok {
+		if err := validResponse.VisitGetSchemaVersionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -5730,6 +9216,95 @@ func (sh *strictHandler) SampleMessages(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SampleMessagesResponseObject); ok {
 		if err := validResponse.VisitSampleMessagesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListScramUsers operation middleware
+func (sh *strictHandler) ListScramUsers(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListScramUsersParams) {
+	var request ListScramUsersRequestObject
+
+	request.Cluster = cluster
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListScramUsers(ctx, request.(ListScramUsersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListScramUsers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListScramUsersResponseObject); ok {
+		if err := validResponse.VisitListScramUsersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpsertScramUser operation middleware
+func (sh *strictHandler) UpsertScramUser(w http.ResponseWriter, r *http.Request, cluster Cluster, params UpsertScramUserParams) {
+	var request UpsertScramUserRequestObject
+
+	request.Cluster = cluster
+	request.Params = params
+
+	var body UpsertScramUserJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpsertScramUser(ctx, request.(UpsertScramUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpsertScramUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpsertScramUserResponseObject); ok {
+		if err := validResponse.VisitUpsertScramUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteScramUser operation middleware
+func (sh *strictHandler) DeleteScramUser(w http.ResponseWriter, r *http.Request, cluster Cluster, user string, params DeleteScramUserParams) {
+	var request DeleteScramUserRequestObject
+
+	request.Cluster = cluster
+	request.User = user
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteScramUser(ctx, request.(DeleteScramUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteScramUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteScramUserResponseObject); ok {
+		if err := validResponse.VisitDeleteScramUserResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

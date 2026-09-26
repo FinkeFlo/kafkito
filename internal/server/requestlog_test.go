@@ -246,13 +246,13 @@ func TestRequestLog_FlushPassesThrough(t *testing.T) {
 	assert.Equal(t, "data: 1\n\n", rec.Body.String())
 }
 
-func TestGatewayError_CarriesRequestID(t *testing.T) {
+func TestUpstreamError_CarriesRequestID(t *testing.T) {
 	t.Parallel()
 	sink, log := newLogSink(slog.LevelInfo)
 	handlerLog := withRequestIDLogging(log)
 	r := testRouter(log)
 	r.Get("/api/fail", func(w http.ResponseWriter, r *http.Request) {
-		gatewayError(r.Context(), w, handlerLog, "list topics", errors.New("dial failed"))
+		errorWriter{log: handlerLog}.writeError(w, r, upstreamError("list topics", errors.New("dial failed")))
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/fail", nil)
