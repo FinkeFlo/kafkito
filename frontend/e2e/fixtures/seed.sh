@@ -168,7 +168,7 @@ leave_group_empty() {
 
 # produce_large_json puts one JSON record whose value is ~100 KB — well past
 # consumer.go's 64 KB truncation boundary (maxMessageValueBytes) but safely
-# under both json-interactive.tsx's 1 MB interactive-tree size cap and the
+# under both JsonInteractive.tsx's 1 MB interactive-tree size cap and the
 # broker's default message.max.bytes, so large-messages.spec.ts exercises the
 # real success path (search past 64 KB, click-to-filter, PathSense hydrated
 # suggestions), not either size guard's fallback. `_padding` is placed

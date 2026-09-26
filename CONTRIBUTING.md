@@ -62,6 +62,7 @@ stage the changes, then commit again. `make check` and CI remain the gate.
 
 - Backend: idiomatic Go 1.26, golangci-lint clean.
 - Frontend: Tailwind tokens from `@theme`; the default palette is disabled there. See `docs/DESIGN_GUIDELINES.md`.
+- Frontend layout: primitives in `frontend/src/components/ui/`, domain components in `frontend/src/features/<domain>/`, PascalCase component files (enforced by Biome). See `docs/DESIGN_GUIDELINES.md` § 10.
 - UI strings and code comments are English only. No emojis in UI chrome, logs, or commit messages.
 
 ## Releasing

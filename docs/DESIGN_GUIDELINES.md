@@ -47,7 +47,7 @@ styled-components, emotion, a state library (Redux/Zustand/Jotai), or a
 charting library. If you think you need one, stop and open a discussion
 first.
 
-**Radix UI headless primitives** (`@radix-ui/react-*` only, no shadcn) are allowed for behavioural complexity that is hard to get right by hand: focus trap, ARIA, collision-aware positioning. Each addition must be wrapped under `frontend/src/components/` with a canonical name and documented in § 6.1. We paint 100% of the visual layer ourselves; Radix provides no styling, only behaviour.
+**Radix UI headless primitives** (`@radix-ui/react-*` only, no shadcn) are allowed for behavioural complexity that is hard to get right by hand: focus trap, ARIA, collision-aware positioning. Each addition must be wrapped under `frontend/src/components/ui/` with a canonical name and documented in § 6.1. We paint 100% of the visual layer ourselves; Radix provides no styling, only behaviour.
 
 ---
 
@@ -156,7 +156,7 @@ Do not ship one-off hex values. Every color must be a token.
 
 ### 4.1 Page scaffold
 
-Every route renders as children of `<Shell>` (in `src/components/Shell.tsx`).
+Every route renders as children of `<Shell>` (in `src/features/shell/Shell.tsx`).
 The page body itself follows this pattern:
 
 ```tsx
@@ -231,7 +231,7 @@ Kafkito is a data console. Err toward density, not whitespace.
 
 ## 5 · Shell / navigation
 
-Every route is wrapped by `<Shell>` in `src/components/Shell.tsx`. Do not
+Every route is wrapped by `<Shell>` in `src/features/shell/Shell.tsx`. Do not
 bypass it.
 
 ### 5.1 What Shell provides
@@ -279,11 +279,18 @@ the only way to change the active cluster.
 
 ## 6 · Components
 
-Every reusable component lives under `frontend/src/components/` and is
-imported from there. Shared primitives must not be duplicated across
-routes.
+Generic, domain-free primitives live in `frontend/src/components/ui/` and
+are imported from there (`@/components/ui/Button`). Components that belong
+to one domain live in `frontend/src/features/<domain>/`; the app chrome
+(`<Shell>`, command palette, cluster pill, user menu, "What's new") lives
+in `frontend/src/features/shell/`. Shared primitives must not be
+duplicated across routes. See § 10.1 for the full layout.
 
 ### 6.1 Core primitives (already exist — use them)
+
+Every entry lives in `src/components/ui/<Name>.tsx`, except `<Shell>`
+(`src/features/shell/Shell.tsx`) and `<StateBadge>`
+(`src/features/groups/StateBadge.tsx`).
 
 | Component | Purpose |
 |---|---|
@@ -513,7 +520,12 @@ src/
 │   ├── index.tsx
 │   ├── topics.tsx
 │   └── topics_.$topic.tsx
-├── components/              ← shared, reusable UI only
+├── components/
+│   └── ui/                  ← generic, domain-free primitives (Button, Modal, DataTable, …)
+├── features/                ← components that belong to one domain
+│   ├── groups/              ← consumer groups: LagBadge, StateBadge, reset/create modals
+│   ├── messages/            ← message browser: MessageRow, RangePicker, ValueBody, replay, bulk copy
+│   └── shell/               ← app chrome rendered by __root: Shell, CommandPalette, ClusterPill, UserMenu, What's new
 ├── lib/
 │   ├── api.ts               ← don't touch without a backend reason
 │   ├── format.ts            ← formatters + thresholds
@@ -522,13 +534,36 @@ src/
 └── index.css                ← tokens only; no component CSS
 ```
 
+Where a component goes:
+
+- `components/ui/` when it knows nothing about Kafka or kafkito data
+  (no `@/lib/api` types, no queries). It may be used by one route only.
+- `features/<domain>/` when it is tied to one domain (topics, messages,
+  groups, schemas, security, clusters, …). Create the folder when the
+  first component for that domain is extracted; do not create empty
+  folders.
+- `features/shell/` for the chrome that `__root` renders once and that
+  spans every domain.
+- Otherwise keep it in the route file. Extract into `features/` when a
+  route grows large, a component is reused, or it needs its own test.
+
+Tests sit next to the component they cover (`Button.tsx` +
+`Button.test.tsx`).
+
 **Never** create `styles/`, `hooks/` (put hooks in `lib/`), `types/`
 (types live next to the code that owns them or in `lib/api.ts`),
 `assets/` (put images in `public/`).
 
 ### 10.2 Naming
 
-- Components: `PascalCase` files and exports.
+- Components: `PascalCase` files and exports. Every `.tsx` file under
+  `components/`, `features/` and `auth/` is named in PascalCase, tests
+  included (`ConfirmDialog.test.tsx`). All other modules (`lib/`,
+  `content/`, `__checks__/`, `e2e/`) use kebab-case (`use-cluster.ts`).
+  Biome's `useFilenamingConvention` enforces both. Route files under
+  `routes/` are exempt: TanStack Router derives URLs from their names.
+  The generated `routeTree.gen.ts` and `lib/api.gen.ts` are outside the
+  Biome file set.
 - Hooks: `useCamelCase`.
 - Query keys: always arrays, lowercase strings.
 - UI copy is English, written inline in the component (no i18n layer or
@@ -647,6 +682,7 @@ a review, treat it as drift and bring it in line.
 | 2026-04-26 | Direction-A delivery: WCAG-AA token sweep (focus-on-accent, accent-foreground, border-hover, dark overlay); new primitives (Toolbar, Modal, Input, Notice); kebab/PascalCase consolidation; Button variant rename destructive→danger; PageHeader eyebrow; Incidents-(24h) → Unreachable now semantic fix; outline-based focus indicator | (this PR — link added by author) |
 | 2026-05-02 | Hardening: German strings stripped (English-only), `confirmPhrase` parity on Reset-Offsets and Delete-Records, ErrorState retry migrated to canonical `<Button>`, focus-indicator escapes removed (TimezoneToggle/SearchInput/CommandPalette), Radix headless-primitive carve-out in § 1 | (this PR — link added by author) |
 | 2026-09-26 | Accessibility: Biome a11y rules on; axe scans in light and dark replace the contrast scanner; token-pair contrast test; "never colour alone" rule with StatusIcon / StatusBox and shape-coded StatusDot | (this PR — link added by author) |
+| 2026-09-26 | Frontend layout: primitives move to `components/ui/`, domain components to `features/<domain>/` (groups, messages, shell); PascalCase component files enforced by Biome `useFilenamingConvention`; MessageRow and RangePicker extracted from the messages route | (this PR — link added by author) |
 
 Add a row on every change. Small tweaks to tokens or primitives are
 fine; major shifts (new visual language, new nav model) require a design
