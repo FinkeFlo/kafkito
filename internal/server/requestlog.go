@@ -106,7 +106,8 @@ func requestLogMiddleware(log *slog.Logger) func(http.Handler) http.Handler {
 				if p := rctx.RoutePattern(); p != "" {
 					route = p
 				}
-				cluster = rctx.URLParam("cluster")
+				// As the handler saw it; "" if it does not decode.
+				cluster, _ = pathParam(r, "cluster")
 			}
 
 			attrs := []slog.Attr{
