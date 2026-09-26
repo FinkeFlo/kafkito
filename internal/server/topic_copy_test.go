@@ -4,7 +4,6 @@
 package server
 
 import (
-	"bytes"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -194,6 +193,14 @@ func newCopyTestHandler(t *testing.T, clusters []config.ClusterConfig, rbacCfg c
 	})
 }
 
+// newCopyRequest builds a copy request with the JSON content type the
+// request validator requires.
+func newCopyRequest(path, body string) *http.Request {
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	return req
+}
+
 func TestCopyMessages_ValidationErrors(t *testing.T) {
 	t.Parallel()
 
@@ -209,6 +216,11 @@ func TestCopyMessages_ValidationErrors(t *testing.T) {
 		{
 			name:          "missing_dest_topic",
 			body:          `{"dest_cluster":"test"}`,
+			wantErrSubstr: `request body "/dest_topic": is required`,
+		},
+		{
+			name:          "blank_dest_topic",
+			body:          `{"dest_cluster":"test","dest_topic":"  "}`,
 			wantErrSubstr: "dest_topic is required",
 		},
 		{
@@ -232,7 +244,7 @@ func TestCopyMessages_ValidationErrors(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters/test/topics/orders/copy", bytes.NewReader([]byte(tc.body)))
+			req := newCopyRequest("/api/v1/clusters/test/topics/orders/copy", tc.body)
 			rec := httptest.NewRecorder()
 
 			h.ServeHTTP(rec, req)
@@ -257,7 +269,7 @@ func TestCopyMessages_RequiresProdConfirmation_ForDestination(t *testing.T) {
 
 	t.Run("without_confirmation_header_returns_428", func(t *testing.T) {
 		t.Parallel()
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters/src/topics/orders/copy", bytes.NewReader([]byte(body)))
+		req := newCopyRequest("/api/v1/clusters/src/topics/orders/copy", body)
 		rec := httptest.NewRecorder()
 
 		h.ServeHTTP(rec, req)
@@ -267,7 +279,7 @@ func TestCopyMessages_RequiresProdConfirmation_ForDestination(t *testing.T) {
 
 	t.Run("with_confirmation_header_passes_the_gate", func(t *testing.T) {
 		t.Parallel()
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters/src/topics/orders/copy", bytes.NewReader([]byte(body)))
+		req := newCopyRequest("/api/v1/clusters/src/topics/orders/copy", body)
 		req.Header.Set(ProdConfirmHeader, "true")
 		rec := httptest.NewRecorder()
 
@@ -306,7 +318,7 @@ func TestCopyMessages_DestinationRequiresProducePermission(t *testing.T) {
 	}, rbacCfg)
 
 	body := `{"dest_cluster":"dst","dest_topic":"orders2"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters/src/topics/orders/copy", bytes.NewReader([]byte(body)))
+	req := newCopyRequest("/api/v1/clusters/src/topics/orders/copy", body)
 	req.Header.Set(rbacTestHeader, userMallory)
 	rec := httptest.NewRecorder()
 
@@ -339,7 +351,7 @@ func TestCopyMessages_SourceConsumePermissionEnforcedByMiddleware(t *testing.T) 
 	}, rbacCfg)
 
 	body := `{"dest_cluster":"dst","dest_topic":"orders2"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters/src/topics/orders/copy", bytes.NewReader([]byte(body)))
+	req := newCopyRequest("/api/v1/clusters/src/topics/orders/copy", body)
 	req.Header.Set(rbacTestHeader, userMallory)
 	rec := httptest.NewRecorder()
 
@@ -364,7 +376,7 @@ func TestCopyMessages_UnknownDestClusterIsRejectedBeforeStreaming(t *testing.T) 
 	}, config.RBACConfig{})
 
 	body := `{"dest_cluster":"nope","dest_topic":"orders2"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters/src/topics/orders/copy", bytes.NewReader([]byte(body)))
+	req := newCopyRequest("/api/v1/clusters/src/topics/orders/copy", body)
 	rec := httptest.NewRecorder()
 
 	h.ServeHTTP(rec, req)
@@ -389,7 +401,7 @@ func TestCopyMessages_EmitsInitialEventBeforeCopying(t *testing.T) {
 	}, config.RBACConfig{})
 
 	body := `{"dest_cluster":"dst","dest_topic":"orders2"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters/src/topics/orders/copy", bytes.NewReader([]byte(body)))
+	req := newCopyRequest("/api/v1/clusters/src/topics/orders/copy", body)
 	rec := httptest.NewRecorder()
 
 	h.ServeHTTP(rec, req)
@@ -421,7 +433,7 @@ func TestCopyMessages_ConcurrencyLimit(t *testing.T) {
 	}, config.RBACConfig{})
 
 	body := `{"dest_cluster":"dst","dest_topic":"orders2"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters/src/topics/orders/copy", bytes.NewReader([]byte(body)))
+	req := newCopyRequest("/api/v1/clusters/src/topics/orders/copy", body)
 	rec := httptest.NewRecorder()
 
 	h.ServeHTTP(rec, req)

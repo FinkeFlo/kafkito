@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -40,6 +41,9 @@ type migratedOp struct {
 	group   string // groupRoot, groupMeta or groupCluster
 	// RBAC permission resolved from the route pattern ("" = no check).
 	resource, action string
+	// handlerRBAC is the 403 body of an operation whose handler checks
+	// RBAC itself instead of the middleware.
+	handlerRBAC string
 }
 
 const (
@@ -61,10 +65,48 @@ var migratedOps = []migratedOp{
 	{id: "getCapabilities", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/capabilities", group: groupCluster, resource: "cluster:{cluster}", action: "view"},
 	{id: "refreshCapabilities", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/capabilities/refresh", group: groupCluster, resource: "cluster:{cluster}", action: "view"},
 	{id: "listBrokers", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/brokers", group: groupCluster},
+	{id: "listTopics", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics", group: groupCluster, resource: "topic:", action: "view"},
+	{id: "createTopic", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/topics", group: groupCluster, resource: "topic:" + opTopic, action: "edit"},
+	{id: "describeTopic", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics/{topic}", group: groupCluster, resource: "topic:{topic}", action: "view"},
+	{id: "deleteTopic", method: http.MethodDelete, pattern: "/api/v1/clusters/{cluster}/topics/{topic}", group: groupCluster, resource: "topic:{topic}", action: "delete"},
+	// The consumers route has no middleware permission; the handler checks
+	// topic:view itself.
+	{id: "listTopicConsumers", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/consumers", group: groupCluster, handlerRBAC: `{"error":"forbidden","code":"rbac_denied"}`},
+	{id: "alterTopicConfigs", method: http.MethodPatch, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/configs", group: groupCluster, resource: "topic:{topic}", action: "edit"},
+	{id: "deleteRecords", method: http.MethodDelete, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/records", group: groupCluster, resource: "topic:{topic}", action: "delete"},
+	{id: "consumeMessages", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/messages", group: groupCluster, resource: "topic:{topic}", action: "consume"},
+	{id: "produceMessage", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/messages", group: groupCluster, resource: "topic:{topic}", action: "produce"},
+	{id: "countMessages", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/messages/count", group: groupCluster, resource: "topic:{topic}", action: "consume"},
+	{id: "getMessageTimeline", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/messages/timeline", group: groupCluster, resource: "topic:{topic}", action: "consume"},
+	// The raw download route has no permission case in resolvePermission.
+	{id: "downloadMessageRaw", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/messages/{partition}/{offset}/raw", group: groupCluster},
+	{id: "sampleMessages", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/sample", group: groupCluster, resource: "topic:{topic}", action: "consume"},
+	{id: "searchMessages", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/messages/search", group: groupCluster, resource: "topic:{topic}", action: "consume"},
+	{id: "copyMessages", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/copy", group: groupCluster, resource: "topic:{topic}", action: "consume"},
 }
 
+// opTopic, opPartition and opOffset fill the {topic}, {partition} and
+// {offset} path parameters of migratedOps.
+const (
+	opTopic     = "orders"
+	opPartition = "0"
+	opOffset    = "0"
+)
+
 func (op migratedOp) path(cluster string) string {
-	return strings.ReplaceAll(op.pattern, "{cluster}", cluster)
+	return strings.NewReplacer("{cluster}", cluster, "{topic}", opTopic, "{partition}", opPartition, "{offset}", opOffset).Replace(op.pattern)
+}
+
+// rbacBody is a body that gets a request of op past the RBAC middleware's
+// own body read.
+func (op migratedOp) rbacBody() string {
+	switch op.id {
+	case "testCluster":
+		return `{"brokers":["127.0.0.1:9092"]}`
+	case "createTopic":
+		return `{"name":"` + opTopic + `"}`
+	}
+	return ""
 }
 
 func TestMigratedOps_MatchCodegenConfig(t *testing.T) {
@@ -204,13 +246,7 @@ func TestMigratedOps_RBAC(t *testing.T) {
 		}
 		t.Run(op.id, func(t *testing.T) {
 			t.Parallel()
-			var body *strings.Reader
-			if op.id == "testCluster" {
-				body = strings.NewReader(`{"brokers":["127.0.0.1:9092"]}`)
-			} else {
-				body = strings.NewReader("")
-			}
-			req := httptest.NewRequest(op.method, op.path("rbac-c"), body)
+			req := httptest.NewRequest(op.method, op.path("rbac-c"), strings.NewReader(op.rbacBody()))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set(rbacTestHeader, "mallory")
 			ctx, cancel := context.WithTimeout(req.Context(), 2*time.Second)
@@ -218,12 +254,17 @@ func TestMigratedOps_RBAC(t *testing.T) {
 			rec := httptest.NewRecorder()
 			h.ServeHTTP(rec, req.WithContext(ctx))
 
-			if op.resource == "" {
+			switch {
+			case op.handlerRBAC != "":
+				require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+				assert.JSONEq(t, op.handlerRBAC, rec.Body.String())
+			case op.resource == "":
 				assert.NotEqual(t, http.StatusForbidden, rec.Code, rec.Body.String())
-				return
+			default:
+				require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+				resource := strings.NewReplacer("{cluster}", "rbac-c", "{topic}", opTopic).Replace(op.resource)
+				assert.JSONEq(t, `{"error":"forbidden","resource":"`+resource+`","action":"`+op.action+`"}`, rec.Body.String())
 			}
-			require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
-			assert.JSONEq(t, `{"error":"forbidden","resource":"`+strings.ReplaceAll(op.resource, "{cluster}", "rbac-c")+`","action":"`+op.action+`"}`, rec.Body.String())
 		})
 	}
 
@@ -257,25 +298,15 @@ func TestMigratedOps_RBAC(t *testing.T) {
 	})
 }
 
-// recordingServer records the {cluster} value the generated wrapper bound.
-type recordingServer struct {
-	*apiServer
-	got []string
-}
-
-func (s *recordingServer) GetCapabilities(_ context.Context, req gen.GetCapabilitiesRequestObject) (gen.GetCapabilitiesResponseObject, error) {
-	s.got = append(s.got, req.Cluster)
-	return gen.GetCapabilities200JSONResponse{Cluster: req.Cluster}, nil
-}
-
-func (s *recordingServer) RefreshCapabilities(_ context.Context, req gen.RefreshCapabilitiesRequestObject) (gen.RefreshCapabilitiesResponseObject, error) {
-	s.got = append(s.got, req.Cluster)
-	return gen.RefreshCapabilities200JSONResponse{Cluster: req.Cluster}, nil
-}
-
-func (s *recordingServer) ListBrokers(_ context.Context, req gen.ListBrokersRequestObject) (gen.ListBrokersResponseObject, error) {
-	s.got = append(s.got, req.Cluster)
-	return gen.ListBrokers200JSONResponse{Cluster: req.Cluster}, nil
+// recordCluster is a strict middleware that records the {cluster} value
+// the generated wrapper bound and answers 418 without running the handler.
+func recordCluster(got *[]string) gen.StrictMiddlewareFunc {
+	return func(_ gen.StrictHandlerFunc, _ string) gen.StrictHandlerFunc {
+		return func(_ context.Context, _ http.ResponseWriter, _ *http.Request, req any) (any, error) {
+			*got = append(*got, reflect.ValueOf(req).FieldByName("Cluster").String())
+			return nil, &apiError{Status: http.StatusTeapot, Message: "recorded"}
+		}
+	}
 }
 
 // resolvePrivateClusterParam rewrites {cluster} before the generated wrapper
@@ -285,15 +316,16 @@ func TestMigratedOps_PrivateClusterParam(t *testing.T) {
 
 	reg := kafkapkg.NewRegistry([]config.ClusterConfig{{Name: "static", Brokers: []string{"127.0.0.1:1"}}}, slog.Default())
 	t.Cleanup(reg.Close)
-	rec := &recordingServer{apiServer: &apiServer{reg: reg, policy: rbac.Compile(config.RBACConfig{})}}
-	routes, err := newGeneratedRoutes(rec, errorWriter{log: slog.Default()})
+	var got []string
+	impl := &apiServer{reg: reg, copyReg: reg, policy: rbac.Compile(config.RBACConfig{})}
+	routes, err := newGeneratedRoutes(impl, errorWriter{log: slog.Default()}, recordCluster(&got))
 	require.NoError(t, err)
 	// Same group middleware as server.New.
 	r := chi.NewRouter()
 	r.Route("/api/v1", func(v1 chi.Router) {
 		v1.Group(func(g chi.Router) {
 			g.Use(privateClusterMiddleware)
-			g.Use(rbacMiddleware(rec.policy))
+			g.Use(rbacMiddleware(impl.policy))
 			g.Use(resolvePrivateClusterParam(reg))
 			routes.mountClusters(g)
 		})
@@ -305,29 +337,62 @@ func TestMigratedOps_PrivateClusterParam(t *testing.T) {
 	require.True(t, strings.HasPrefix(adhoc, kafkapkg.AdhocPrefix))
 	header := encodeHeader(t, cfg)
 
-	for _, tc := range []struct{ method, path, header, want string }{
-		{http.MethodGet, "/api/v1/clusters/__private__/capabilities", header, adhoc},
-		{http.MethodPost, "/api/v1/clusters/__private__/capabilities/refresh", header, adhoc},
-		{http.MethodGet, "/api/v1/clusters/__private__/brokers", header, adhoc},
-		{http.MethodGet, "/api/v1/clusters/static/brokers", "", "static"},
-		{http.MethodGet, "/api/v1/clusters/static/brokers", header, "static"},
-	} {
-		rec.got = nil
-		req := httptest.NewRequest(tc.method, tc.path, nil)
-		if tc.header != "" {
-			req.Header.Set(PrivateClusterHeader, tc.header)
+	for _, op := range migratedOps {
+		if !strings.Contains(op.pattern, "{cluster}") {
+			continue
 		}
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		require.Equal(t, http.StatusOK, w.Code, "%s %s: %s", tc.method, tc.path, w.Body.String())
-		assert.Equal(t, []string{tc.want}, rec.got, "%s %s", tc.method, tc.path)
-		assert.Contains(t, w.Body.String(), `"cluster":"`+tc.want+`"`)
+		for _, tc := range []struct{ cluster, header, want string }{
+			{config.PrivateClusterSentinel, header, adhoc},
+			{"static", "", "static"},
+			{"static", header, "static"},
+		} {
+			t.Run(op.id+"/"+tc.cluster, func(t *testing.T) {
+				got = nil
+				req := httptest.NewRequest(op.method, op.path(tc.cluster)+validQuery(op.id), strings.NewReader(validBody(op.id)))
+				req.Header.Set("Content-Type", "application/json")
+				if tc.header != "" {
+					req.Header.Set(PrivateClusterHeader, tc.header)
+				}
+				w := httptest.NewRecorder()
+				r.ServeHTTP(w, req)
+				require.Equal(t, http.StatusTeapot, w.Code, "%s %s: %s", op.method, req.URL.Path, w.Body.String())
+				assert.Equal(t, []string{tc.want}, got)
+			})
+		}
 	}
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/clusters/__private__/brokers", nil))
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.JSONEq(t, `{"error":"private cluster requires X-Kafkito-Cluster header"}`, w.Body.String())
+}
+
+// validQuery is the query string of required parameters of the operation.
+func validQuery(id string) string {
+	if id == "getMessageTimeline" {
+		return "?from_ts_ms=1&to_ts_ms=2&slot_ms=1"
+	}
+	return ""
+}
+
+// validBody is a request body that passes the request validator for the
+// operation, or "" for operations without one.
+func validBody(id string) string {
+	switch id {
+	case "createTopic":
+		return `{"name":"` + opTopic + `"}`
+	case "alterTopicConfigs":
+		return `{"set":{"retention.ms":"1000"}}`
+	case "deleteRecords":
+		return `{"partitions":{"0":-1}}`
+	case "produceMessage":
+		return `{"value":"v"}`
+	case "searchMessages":
+		return `{}`
+	case "copyMessages":
+		return `{"dest_cluster":"static","dest_topic":"other"}`
+	}
+	return ""
 }
 
 // contractRouter matches requests to operations of the embedded spec.

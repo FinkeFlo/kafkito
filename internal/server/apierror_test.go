@@ -34,7 +34,6 @@ func TestToAPIError(t *testing.T) {
 	}{
 		{"apiError", &apiError{Status: 418, Code: "c", Message: "m"}, 418, "c", "m"},
 		{"wrapped apiError", fmt.Errorf("x: %w", badRequest("bad")), 400, "", "bad"},
-		{"paramError", badParam("invalid limit"), 400, "", "invalid limit"},
 		{"unknown cluster", fmt.Errorf("lookup: %w", kafkapkg.ErrUnknownCluster), 404, "", "unknown cluster"},
 		{"no schema registry", kafkapkg.ErrNoSchemaRegistry, 404, "", kafkapkg.ErrNoSchemaRegistry.Error()},
 		{"topic not found", kafkapkg.ErrTopicNotFound, 404, "", "topic not found"},
