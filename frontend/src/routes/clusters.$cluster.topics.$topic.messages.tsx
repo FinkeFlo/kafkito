@@ -37,6 +37,7 @@ import { MessageRangeCountPreview } from "@/components/message-range-count-previ
 import { useFormatters } from "@/lib/use-formatters";
 import { ReplayModal } from "@/components/replay-modal";
 import { BulkCopyPanel } from "@/components/bulk-copy-panel";
+import { StatusBox, StatusIcon } from "@/components/status-icon";
 
 interface MessagesSearch {
   partition: number;
@@ -1054,11 +1055,7 @@ function MessagesPanel({
             )}
           </div>
 
-          {searchError && (
-            <div className="rounded border border-[var(--color-danger)]/30 bg-[var(--color-danger-subtle)] p-2 text-xs text-[var(--color-danger)]">
-              {searchError}
-            </div>
-          )}
+          {searchError && <StatusBox intent="danger">{searchError}</StatusBox>}
           {searchResult && (
             <div className="flex flex-wrap items-center gap-3 rounded border border-accent/30 bg-accent-subtle p-2 text-xs">
               <span className="font-semibold text-accent">
@@ -1124,16 +1121,16 @@ function MessagesPanel({
       )}
 
       {msgsQuery.error && !searchResult && (
-        <div className="m-3 rounded-md border border-[var(--color-danger)]/30 bg-[var(--color-danger-subtle)] p-3 text-sm text-[var(--color-danger)]">
+        <StatusBox intent="danger" className="m-3 p-3 text-sm">
           {(msgsQuery.error as Error).message}
-        </div>
+        </StatusBox>
       )}
 
       {!msgsQuery.error && !searchResult && msgsQuery.data?.partial && (
-        <div className="m-3 rounded-md border border-[var(--color-warning)]/30 bg-[var(--color-warning-subtle)] p-3 text-sm text-[var(--color-warning)]">
+        <StatusBox intent="warning" className="m-3 p-3 text-sm">
           This page may be incomplete — a very large record delayed loading past the server's
           timeout, so the newest message(s) might be missing. Try Refresh.
-        </div>
+        </StatusBox>
       )}
 
       {displayMessages.length === 0 && searching && (
@@ -1187,7 +1184,10 @@ function MessagesPanel({
             {loadingMore ? "Loading…" : "Load more"}
           </button>
           {loadMoreError && (
-            <div className="text-xs text-[var(--color-danger)]">{loadMoreError}</div>
+            <div className="flex items-center gap-1 text-xs text-[var(--color-danger)]">
+              <StatusIcon intent="danger" />
+              {loadMoreError}
+            </div>
           )}
         </div>
       )}
@@ -1365,7 +1365,10 @@ function MessageRow({
                   </button>
                 )}
                 {downloadError && (
-                  <span className="text-[11px] text-[var(--color-danger)]">{downloadError}</span>
+                  <span className="inline-flex items-center gap-1 text-[11px] text-[var(--color-danger)]">
+                    <StatusIcon intent="danger" className="h-3 w-3" />
+                    {downloadError}
+                  </span>
                 )}
               </div>
             }

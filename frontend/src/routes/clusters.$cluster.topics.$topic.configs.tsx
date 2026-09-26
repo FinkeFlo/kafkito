@@ -11,6 +11,7 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/auth/hooks";
 import { Notice } from "@/components/Notice";
+import { StatusBox, StatusIcon } from "@/components/status-icon";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic/configs")({
   component: ConfigsTab,
@@ -341,9 +342,9 @@ function EditConfigsModal({
         </div>
 
         {mut.error && (
-          <div className="mt-3 rounded-md border border-[var(--color-danger)]/30 bg-[var(--color-danger-subtle)] px-3 py-2 text-xs text-[var(--color-danger)]">
+          <StatusBox intent="danger" className="mt-3 px-3 py-2">
             {(mut.error as Error).message}
-          </div>
+          </StatusBox>
         )}
         {results && (
           <div className="mt-3">
@@ -357,9 +358,15 @@ function EditConfigsModal({
                     {r.op} {r.name}
                   </span>
                   {r.error ? (
-                    <span className="text-xs text-[var(--color-danger)]">{r.error}</span>
+                    <span className="inline-flex items-center gap-1 text-xs text-[var(--color-danger)]">
+                      <StatusIcon intent="danger" className="h-3 w-3" />
+                      {r.error}
+                    </span>
                   ) : (
-                    <span className="text-xs text-[var(--color-success)]">ok</span>
+                    <span className="inline-flex items-center gap-1 text-xs text-[var(--color-success)]">
+                      <StatusIcon intent="success" className="h-3 w-3" />
+                      ok
+                    </span>
                   )}
                 </li>
               ))}
