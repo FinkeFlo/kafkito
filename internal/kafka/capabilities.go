@@ -47,7 +47,7 @@ var capCaches sync.Map // key: cluster name
 // Capabilities returns the capability probe result for the named cluster,
 // using a 60-second cache.
 func (r *Registry) Capabilities(ctx context.Context, cluster string) (*Capabilities, error) {
-	if _, ok := r.clusters[cluster]; !ok {
+	if _, ok := r.ConfigFor(cluster); !ok {
 		return nil, ErrUnknownCluster
 	}
 	if v, ok := capCaches.Load(cluster); ok {

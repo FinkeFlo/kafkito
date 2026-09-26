@@ -224,7 +224,7 @@ func resolveSearchRange(opts SearchOptions, partitions []int32, starts, ends map
 // and returns those matching the compiled predicate. It is a read-only op; it
 // never commits offsets.
 func (r *Registry) SearchMessages(ctx context.Context, cluster, topic string, opts SearchOptions) (*SearchResult, error) {
-	cfg, ok := r.clusters[cluster]
+	cfg, ok := r.ConfigFor(cluster)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, cluster)
 	}
