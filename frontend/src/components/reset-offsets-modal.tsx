@@ -15,6 +15,7 @@ import { Notice } from "@/components/Notice";
 import { Timestamp } from "@/components/timestamp";
 import { LagBadge } from "@/components/lag-badge";
 import { localInputToMs, msToLocalInput } from "@/lib/datetime";
+import { groupQueries } from "@/lib/queries/groups";
 
 function partitionsForTopic(detail: GroupDetail, topic: string): number[] {
   return detail.offsets.filter((o) => o.topic === topic).map((o) => o.partition);
@@ -104,17 +105,7 @@ export function ResetOffsetsModal({
   }, [previewBody]);
 
   const previewQuery = useQuery({
-    queryKey: ["reset-offsets-preview", cluster, detail.group_id, debouncedBody],
-    queryFn: () =>
-      resetGroupOffsets(
-        cluster,
-        detail.group_id,
-        {
-          ...debouncedBody,
-          dry_run: true,
-        },
-        isProd,
-      ),
+    ...groupQueries.resetPreview(cluster, detail.group_id, debouncedBody, isProd),
     enabled: !!topic && strategyReady,
     placeholderData: keepPreviousData,
     staleTime: 10_000,
@@ -136,8 +127,8 @@ export function ResetOffsetsModal({
     mutationFn: () => resetGroupOffsets(cluster, detail.group_id, buildBody(false), isProd),
     onSuccess: (r) => {
       setResult(r.results);
-      qc.invalidateQueries({ queryKey: ["group", cluster, detail.group_id] });
-      qc.invalidateQueries({ queryKey: ["groups", cluster] });
+      qc.invalidateQueries({ queryKey: groupQueries.detail(cluster, detail.group_id).queryKey });
+      qc.invalidateQueries({ queryKey: groupQueries.list(cluster).queryKey });
     },
     onError: (e: Error) => setErr(e.message),
   });

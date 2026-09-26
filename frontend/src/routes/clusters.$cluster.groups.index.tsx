@@ -1,13 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import {
-  fetchGroups,
-  fetchGroupDetail,
-  deleteGroup,
-  type ClusterInfo,
-  type GroupInfo,
-  type GroupDetail,
-} from "@/lib/api";
+import { deleteGroup, type ClusterInfo, type GroupInfo, type GroupDetail } from "@/lib/api";
 import { useCluster } from "@/lib/use-cluster";
 import { useMemo, useState } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -26,6 +19,7 @@ import { Highlight } from "@/components/highlight";
 import { useFuzzy } from "@/lib/fuzzy";
 import { useFormatters } from "@/lib/use-formatters";
 import { Users } from "lucide-react";
+import { groupQueries } from "@/lib/queries/groups";
 
 export const Route = createFileRoute("/clusters/$cluster/groups/")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -47,8 +41,7 @@ function GroupsPage() {
   );
 
   const groupsQuery = useQuery({
-    queryKey: ["groups", selected],
-    queryFn: () => fetchGroups(selected!),
+    ...groupQueries.list(selected!),
     enabled: !!selected,
     refetchInterval: 10_000,
   });
@@ -291,8 +284,7 @@ function GroupDetailPanel({
   onDeleted?: () => void;
 }) {
   const q = useQuery({
-    queryKey: ["group", cluster, group],
-    queryFn: () => fetchGroupDetail(cluster, group),
+    ...groupQueries.detail(cluster, group),
     refetchInterval: 5_000,
   });
   if (q.isLoading) {
@@ -548,7 +540,7 @@ function GroupActions({
   const delMut = useMutation({
     mutationFn: () => deleteGroup(cluster, detail.group_id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["groups", cluster] });
+      qc.invalidateQueries({ queryKey: groupQueries.list(cluster).queryKey });
       // Clear the selection so GroupDetailPanel unmounts and stops polling the
       // now-deleted group.
       onDeleted?.();

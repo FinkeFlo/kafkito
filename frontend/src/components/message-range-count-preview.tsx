@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { fetchMessageCount } from "@/lib/api";
 import { useFormatters } from "@/lib/use-formatters";
+import { messageQueries } from "@/lib/queries/messages";
 
 export const MESSAGE_RANGE_COUNT_DEBOUNCE_MS = 400;
 
@@ -50,8 +50,7 @@ export function MessageRangeCountPreview({
   }, [expanded]);
 
   const query = useQuery({
-    queryKey: ["message-count", cluster, topic, debouncedRequest],
-    queryFn: () => fetchMessageCount(cluster, topic, debouncedRequest),
+    ...messageQueries.count(cluster, topic, debouncedRequest),
     enabled: !live,
     placeholderData: keepPreviousData,
     staleTime: 10_000,

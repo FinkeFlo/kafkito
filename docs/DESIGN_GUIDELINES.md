@@ -370,14 +370,18 @@ alone".
 
 ```tsx
 const q = useQuery({
-  queryKey: ["topics", cluster],
-  queryFn: () => fetchTopics(cluster!),
+  ...topicQueries.list(cluster!),
   enabled: !!cluster,
   refetchInterval: 10_000, // only if the data is "live"
 });
 ```
 
-- Keys are arrays of `[<resource>, ...scopes]`.
+- Keys and query functions live in `queryOptions()` factories under
+  `src/lib/queries/` (one module per resource). Components spread a factory
+  and add view-specific options (`enabled`, `refetchInterval`, …). Inline
+  `queryKey` literals elsewhere fail `src/__checks__/query-keys.test.ts`.
+- Keys are arrays of `[<resource>, ...scopes]`; cluster-scoped keys include
+  the cluster name.
 - Never fetch in `useEffect`.
 - Never store fetched data in component state.
 - `refetchInterval` is opt-in — only for data the user watches in real
@@ -390,7 +394,7 @@ const q = useQuery({
 const qc = useQueryClient();
 const m = useMutation({
   mutationFn: () => createTopic(cluster, req),
-  onSuccess: () => qc.invalidateQueries({ queryKey: ["topics", cluster] }),
+  onSuccess: () => qc.invalidateQueries({ queryKey: topicQueries.list(cluster).queryKey }),
   onError: (e: Error) => setErr(e.message),
 });
 ```

@@ -1,22 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import {
-  fetchBrokers,
-  fetchGroups,
-  fetchTopics,
-  listSCRAMUsers,
-  listSubjects,
-  type BrokerInfo,
-  type GroupInfo,
-  type SCRAMUser,
-  type Subject,
-  type TopicInfo,
-} from "../lib/api";
+import type { BrokerInfo, GroupInfo, SCRAMUser, Subject, TopicInfo } from "../lib/api";
 import { useCluster } from "../lib/use-cluster";
 import { useFuzzy } from "../lib/fuzzy";
 import { latestVersion } from "../lib/schema-version";
 import { Boxes, FileJson, Home, Search, Server, Shield, UserCog, Users } from "lucide-react";
+import { brokerQueries } from "@/lib/queries/brokers";
+import { groupQueries } from "@/lib/queries/groups";
+import { schemaQueries } from "@/lib/queries/schemas";
+import { topicQueries } from "@/lib/queries/topics";
+import { scramUserQueries } from "@/lib/queries/users";
 
 type ItemKind = "nav" | "cluster" | "topic" | "group" | "broker" | "subject" | "user";
 
@@ -135,30 +129,25 @@ export function CommandPalette() {
   const hasSR = activeInfo ? activeInfo.schema_registry : undefined;
 
   const topicsQ = useQuery({
-    queryKey: ["topics", activeCluster],
-    queryFn: () => fetchTopics(activeCluster!),
+    ...topicQueries.list(activeCluster!),
     enabled: open && !!activeCluster,
   });
   const groupsQ = useQuery({
-    queryKey: ["groups", activeCluster],
-    queryFn: () => fetchGroups(activeCluster!),
+    ...groupQueries.list(activeCluster!),
     enabled: open && !!activeCluster,
   });
   const brokersQ = useQuery({
-    queryKey: ["brokers", activeCluster],
-    queryFn: () => fetchBrokers(activeCluster!),
+    ...brokerQueries.list(activeCluster!),
     enabled: open && !!activeCluster,
   });
   const subjectsQ = useQuery({
-    queryKey: ["schemas", activeCluster],
-    queryFn: () => listSubjects(activeCluster!),
+    ...schemaQueries.subjects(activeCluster!),
     // Only probe the registry when we know the cluster has one; avoids a
     // guaranteed-404 flood for clusters without a Schema Registry.
     enabled: open && !!activeCluster && hasSR === true,
   });
   const usersQ = useQuery({
-    queryKey: ["scram-users", activeCluster],
-    queryFn: () => listSCRAMUsers(activeCluster!),
+    ...scramUserQueries.list(activeCluster!),
     enabled: open && !!activeCluster,
     // Best-effort: clusters without SCRAM (or with insufficient ACLs) return
     // an error; keep the palette quiet instead of retrying.

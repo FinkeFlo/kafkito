@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { fetchTopicDetail, type PartitionInfo } from "@/lib/api";
+import type { PartitionInfo } from "@/lib/api";
 import { useFormatters, type Formatters } from "@/lib/use-formatters";
+import { topicQueries } from "@/lib/queries/topics";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic/")({
   component: OverviewTab,
@@ -12,8 +13,7 @@ function OverviewTab() {
   const fmt = useFormatters();
 
   const detailQuery = useQuery({
-    queryKey: ["topic", cluster, topic],
-    queryFn: () => fetchTopicDetail(cluster, topic),
+    ...topicQueries.detail(cluster, topic),
     enabled: !!cluster,
     refetchInterval: 5_000,
   });

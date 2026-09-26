@@ -1,10 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchMessageTimeline, fetchTopicDetail, type MessageTimelineSlot } from "@/lib/api";
+import type { MessageTimelineSlot } from "@/lib/api";
 import { useFormatters } from "@/lib/use-formatters";
 import { Timestamp } from "@/components/timestamp";
 import { useTimeZone } from "@/lib/use-timezone";
+import { messageQueries } from "@/lib/queries/messages";
+import { topicQueries } from "@/lib/queries/topics";
 
 type Preset = "24h" | "7d" | "30d";
 
@@ -62,21 +64,13 @@ function TopicTimelinePage() {
   }, [preset]);
 
   const topicQuery = useQuery({
-    queryKey: ["topic", cluster, topic],
-    queryFn: () => fetchTopicDetail(cluster, topic),
+    ...topicQueries.detail(cluster, topic),
     enabled: !!cluster,
     staleTime: 10_000,
   });
 
   const timelineQuery = useQuery({
-    queryKey: ["message-timeline", cluster, topic, partition, range],
-    queryFn: () =>
-      fetchMessageTimeline(cluster, topic, {
-        partition,
-        from_ts_ms: range.from_ts_ms,
-        to_ts_ms: range.to_ts_ms,
-        slot_ms: range.slot_ms,
-      }),
+    ...messageQueries.timeline(cluster, topic, partition, range),
     enabled: !!cluster,
     staleTime: 10_000,
   });

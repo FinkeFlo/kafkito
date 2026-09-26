@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { FileJson } from "lucide-react";
-import { getSchemaVersion, listSubjects } from "@/lib/api";
 import { EmptyState } from "@/components/EmptyState";
 import { Tag } from "@/components/Tag";
 import { Button } from "@/components/button";
+import { schemaQueries } from "@/lib/queries/schemas";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic/schema")({
   component: SchemaTab,
@@ -15,8 +15,7 @@ function SchemaTab() {
   const subject = `${topic}-value`;
 
   const subjectsQuery = useQuery({
-    queryKey: ["subjects", cluster],
-    queryFn: () => listSubjects(cluster),
+    ...schemaQueries.topicSubjects(cluster),
     enabled: !!cluster,
     staleTime: 60_000,
   });
@@ -24,8 +23,7 @@ function SchemaTab() {
   const hasSubject = subjectsQuery.data?.some((s) => s.name === subject) ?? false;
 
   const versionQuery = useQuery({
-    queryKey: ["schema-version", cluster, subject, "latest"],
-    queryFn: () => getSchemaVersion(cluster, subject, "latest"),
+    ...schemaQueries.latestVersion(cluster, subject),
     enabled: !!cluster && hasSubject,
     staleTime: 60_000,
   });

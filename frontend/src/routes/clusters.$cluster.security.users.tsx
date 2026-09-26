@@ -2,13 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useMemo, useState } from "react";
 import { KeyRound, Trash2 } from "lucide-react";
-import {
-  deleteSCRAMUser,
-  listSCRAMUsers,
-  upsertSCRAMUser,
-  type SCRAMMechanism,
-  type SCRAMUser,
-} from "@/lib/api";
+import { deleteSCRAMUser, upsertSCRAMUser, type SCRAMMechanism, type SCRAMUser } from "@/lib/api";
 import { DataTable, type DataTableColumn } from "@/components/DataTable";
 import { Badge } from "@/components/badge";
 import { EmptyState } from "@/components/EmptyState";
@@ -17,6 +11,7 @@ import { Button } from "@/components/button";
 import { Input } from "@/components/Input";
 import { Modal } from "@/components/Modal";
 import { Notice } from "@/components/Notice";
+import { scramUserQueries } from "@/lib/queries/users";
 
 export const Route = createFileRoute("/clusters/$cluster/security/users")({
   component: UsersPage,
@@ -48,8 +43,7 @@ function UsersBody({ cluster }: { cluster: string }) {
   const [banner, setBanner] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
 
   const q = useQuery({
-    queryKey: ["scram-users", cluster],
-    queryFn: () => listSCRAMUsers(cluster),
+    ...scramUserQueries.list(cluster),
   });
 
   const delMut = useMutation({
@@ -58,7 +52,7 @@ function UsersBody({ cluster }: { cluster: string }) {
     onSuccess: (_, p) => {
       setBanner({ kind: "ok", msg: `Credential deleted: ${p.user} / ${p.mechanism}` });
       setPendingDelete(null);
-      qc.invalidateQueries({ queryKey: ["scram-users", cluster] });
+      qc.invalidateQueries({ queryKey: scramUserQueries.list(cluster).queryKey });
     },
     onError: (e: Error) => setBanner({ kind: "err", msg: e.message }),
   });
@@ -190,7 +184,7 @@ function UsersBody({ cluster }: { cluster: string }) {
           onDone={(msg) => {
             setBanner({ kind: "ok", msg });
             setShowUpsert(false);
-            qc.invalidateQueries({ queryKey: ["scram-users", cluster] });
+            qc.invalidateQueries({ queryKey: scramUserQueries.list(cluster).queryKey });
           }}
           onError={(msg) => setBanner({ kind: "err", msg })}
         />

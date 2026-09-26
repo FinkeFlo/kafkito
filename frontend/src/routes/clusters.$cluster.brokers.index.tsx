@@ -2,13 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Server } from "lucide-react";
 import { useCluster } from "@/lib/use-cluster";
-import { fetchBrokers, type BrokerInfo } from "@/lib/api";
+import type { BrokerInfo } from "@/lib/api";
 import { KpiCard } from "@/components/KpiCard";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { DataTable, DataTableHead, DataTableRow, DataTableTh } from "@/components/DataTable";
 import { Tag } from "@/components/Tag";
 import { StatusDot } from "@/components/StatusDot";
+import { brokerQueries } from "@/lib/queries/brokers";
 
 export const Route = createFileRoute("/clusters/$cluster/brokers/")({
   component: BrokersPage,
@@ -20,8 +21,7 @@ function BrokersPage() {
   const canDescribe = active?.capabilities?.describe_cluster ?? false;
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["brokers", cluster],
-    queryFn: () => fetchBrokers(cluster as string),
+    ...brokerQueries.list(cluster as string),
     enabled: Boolean(cluster && canDescribe),
   });
 

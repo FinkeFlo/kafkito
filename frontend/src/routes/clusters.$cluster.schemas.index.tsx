@@ -3,7 +3,7 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { FileJson, Trash2 } from "lucide-react";
 import { clsx } from "clsx";
-import { listSubjects, getSchemaVersion, deleteSubject, type Subject } from "@/lib/api";
+import { deleteSubject, type Subject } from "@/lib/api";
 import { useCluster } from "@/lib/use-cluster";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Tag } from "@/components/Tag";
@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/button";
 import { Notice } from "@/components/Notice";
 import { useFuzzy, type HighlightRange } from "@/lib/fuzzy";
+import { schemaQueries } from "@/lib/queries/schemas";
 
 export const Route = createFileRoute("/clusters/$cluster/schemas/")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -109,8 +110,7 @@ function SchemasBody({
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const qc = useQueryClient();
   const subjectsQuery = useQuery({
-    queryKey: ["schemas", cluster],
-    queryFn: () => listSubjects(cluster),
+    ...schemaQueries.subjects(cluster),
   });
   const subjects = subjectsQuery.data ?? [];
   const sortedSubjects = useMemo(
@@ -123,7 +123,7 @@ function SchemasBody({
   const deleteMut = useMutation({
     mutationFn: (name: string) => deleteSubject(cluster, name, false),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["schemas", cluster] });
+      qc.invalidateQueries({ queryKey: schemaQueries.subjects(cluster).queryKey });
       onSelect(undefined, undefined);
     },
   });
@@ -264,8 +264,7 @@ function SchemaDetail({
   version: string;
 }) {
   const versionQuery = useQuery({
-    queryKey: ["schema", cluster, subject, version],
-    queryFn: () => getSchemaVersion(cluster, subject, version),
+    ...schemaQueries.version(cluster, subject, version),
   });
   const s = versionQuery.data;
   const prettySchema = useMemo(() => {

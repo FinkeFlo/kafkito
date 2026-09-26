@@ -7,8 +7,8 @@ import { Tooltip } from "./tooltip";
 import { UserMenu } from "./UserMenu";
 import { WhatsNewButton } from "./whats-new-button";
 import { useTheme } from "@/lib/theme";
-import { fetchInfo } from "@/lib/api";
 import { useCluster } from "@/lib/use-cluster";
+import { infoQueries } from "@/lib/queries/info";
 
 function Logo() {
   return (
@@ -95,11 +95,7 @@ function ThemeButton() {
 }
 
 function VersionBadge() {
-  const infoQuery = useQuery({
-    queryKey: ["info"],
-    queryFn: fetchInfo,
-    staleTime: 5 * 60_000,
-  });
+  const infoQuery = useQuery(infoQueries.info());
   const version = infoQuery.data?.version ?? "—";
   return (
     <div className="leading-tight">

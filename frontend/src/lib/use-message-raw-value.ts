@@ -9,7 +9,7 @@
 // row no longer refetches megabytes), automatic abort on unmount, and the
 // shared loading/error state shape the rest of the app uses.
 import { useQuery } from "@tanstack/react-query";
-import { fetchMessageRawBase64 } from "@/lib/api";
+import { messageQueries } from "@/lib/queries/messages";
 
 export function useMessageRawValue(params: {
   cluster: string;
@@ -20,13 +20,7 @@ export function useMessageRawValue(params: {
 }) {
   const { cluster, topic, partition, offset, enabled } = params;
   return useQuery({
-    queryKey: ["message-raw", cluster, topic, partition, offset],
-    queryFn: ({ signal }) => fetchMessageRawBase64(cluster, topic, partition, offset, signal),
+    ...messageQueries.raw(cluster, topic, partition, offset),
     enabled: enabled && !!cluster && !!topic,
-    staleTime: 5 * 60_000,
-    // Deliberately short: these entries are megabyte-sized base64 strings,
-    // so they must not linger in the cache once nothing renders them.
-    gcTime: 60_000,
-    retry: false,
   });
 }

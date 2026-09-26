@@ -1,17 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import {
-  fetchClusters,
-  fetchTopicDetail,
-  alterTopicConfigs,
-  can,
-  type Capabilities,
-  type TopicConfigEntry,
-} from "@/lib/api";
+import { alterTopicConfigs, can, type Capabilities, type TopicConfigEntry } from "@/lib/api";
 import { useAuth } from "@/auth/hooks";
 import { Notice } from "@/components/Notice";
 import { StatusBox, StatusIcon } from "@/components/status-icon";
+import { clusterQueries } from "@/lib/queries/clusters";
+import { topicQueries } from "@/lib/queries/topics";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic/configs")({
   component: ConfigsTab,
@@ -20,18 +15,14 @@ export const Route = createFileRoute("/clusters/$cluster/topics/$topic/configs")
 function ConfigsTab() {
   const { cluster, topic } = Route.useParams();
 
-  const clustersQuery = useQuery({
-    queryKey: ["clusters"],
-    queryFn: fetchClusters,
-  });
+  const clustersQuery = useQuery(clusterQueries.list());
   const caps = useMemo(
     () => clustersQuery.data?.find((c) => c.name === cluster)?.capabilities ?? undefined,
     [clustersQuery.data, cluster],
   );
 
   const detailQuery = useQuery({
-    queryKey: ["topic", cluster, topic],
-    queryFn: () => fetchTopicDetail(cluster, topic),
+    ...topicQueries.detail(cluster, topic),
     enabled: !!cluster,
     refetchInterval: (query) =>
       query.state.data?.configs_error === "unauthorized" ? false : 5_000,
@@ -246,7 +237,7 @@ function EditConfigsModal({
     },
     onSuccess: (data) => {
       setResults(data.results);
-      qc.invalidateQueries({ queryKey: ["topic", cluster, topic] });
+      qc.invalidateQueries({ queryKey: topicQueries.detail(cluster, topic).queryKey });
     },
   });
 

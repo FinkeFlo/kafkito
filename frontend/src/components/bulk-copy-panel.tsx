@@ -5,7 +5,7 @@
 import { useId, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Square, Play } from "lucide-react";
-import { copyMessages, fetchTopics, type CopyProgressEvent, type CopyRequest } from "@/lib/api";
+import { copyMessages, type CopyProgressEvent, type CopyRequest } from "@/lib/api";
 import { useCluster, type ClusterListItem } from "@/lib/use-cluster";
 import { Button } from "./button";
 import { Input } from "./Input";
@@ -13,6 +13,7 @@ import { ConfirmDialog } from "./confirm-dialog";
 import { TopicCombobox } from "./topic-combobox";
 import { StatusBox } from "./status-icon";
 import { getPrivateClusterByName, toBackendClusterConfig } from "@/lib/private-clusters";
+import { topicQueries } from "@/lib/queries/topics";
 
 interface BulkCopyPanelProps {
   srcCluster: string;
@@ -70,8 +71,7 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
   const isProdDest = !!clusterList.find((c) => c.name === effectiveCluster)?.is_prod;
 
   const topicsQuery = useQuery({
-    queryKey: ["topics", effectiveCluster],
-    queryFn: () => fetchTopics(effectiveCluster),
+    ...topicQueries.list(effectiveCluster),
     enabled: !!effectiveCluster,
     staleTime: 30_000,
   });
