@@ -416,11 +416,11 @@ func TestResolvePermission_RepresentativeEntries(t *testing.T) {
 			want:    want{resType: "schema", resName: "orders-value", action: "edit", bodyField: ""},
 		},
 		{
-			name:    "acls_post_uses_wildcard_resName",
+			name:    "acls_post_uses_any_name",
 			method:  http.MethodPost,
 			pattern: "/api/v1/clusters/{cluster}/acls",
 			urlPath: "/api/v1/clusters/" + clusterShared + "/acls",
-			want:    want{resType: "acl", resName: "*", action: "edit", bodyField: ""},
+			want:    want{resType: "acl", resName: "", action: "edit", bodyField: ""},
 		},
 	}
 

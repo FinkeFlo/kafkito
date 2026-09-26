@@ -225,26 +225,32 @@ func matchResType(pattern, target string) bool {
 	return pattern == "*" || pattern == target
 }
 
-// matchResName matches a resource name against a pattern. Pattern may be "*"
-// (any), "prefix*" (prefix glob), or an exact string. An empty target matches
-// any pattern (used for list operations).
+// matchResName matches the target of an Allow check against a pattern. An
+// empty target is "any name of this type" and matches every pattern; the
+// server uses it for list operations only, never for a name from a request.
+// Every other target is a concrete name, matched by matchName.
 func matchResName(pattern, target string) bool {
+	return target == "" || matchName(pattern, target)
+}
+
+// matchName matches a concrete resource name against a pattern: "*" (any),
+// "prefix*" (prefix glob) or an exact string. The name is literal; a name
+// "*" or "" has no special meaning.
+func matchName(pattern, name string) bool {
 	if pattern == "*" {
 		return true
 	}
-	if target == "" || target == "*" {
-		return true
+	if prefix, ok := strings.CutSuffix(pattern, "*"); ok {
+		return strings.HasPrefix(name, prefix)
 	}
-	if strings.HasSuffix(pattern, "*") {
-		prefix := strings.TrimSuffix(pattern, "*")
-		return strings.HasPrefix(target, prefix)
-	}
-	return pattern == target
+	return pattern == name
 }
 
-// MatchName reports whether a resource name matches a glob pattern from the
-// policy. It is exported so HTTP handlers can filter list results using the
-// globs returned by AllowedResourceNames.
+// MatchName reports whether a concrete resource name matches a glob pattern
+// from the policy. It is exported so HTTP handlers can filter list results
+// (real names from Kafka or the Schema Registry) using the globs returned by
+// AllowedResourceNames. The name is literal: "*" and "" are names, not
+// wildcards.
 func MatchName(pattern, name string) bool {
-	return matchResName(pattern, name)
+	return matchName(pattern, name)
 }

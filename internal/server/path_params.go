@@ -46,9 +46,12 @@ func setPathParam(r *http.Request, key, value string) {
 	}
 }
 
-// undecodablePathParam returns the name of the first route parameter that
-// is not valid percent-encoding, or "" if all decode.
-func undecodablePathParam(r *http.Request) string {
+// invalidPathParam returns the name of the first route parameter that is
+// not valid percent-encoding or is empty, or "" if all are valid. An empty
+// name must never reach RBAC, where it would mean "any name". server.New
+// cleans the path, so chi does not deliver empty parameters ("//"
+// collapses); this is the check that holds without it.
+func invalidPathParam(r *http.Request) string {
 	rctx := chi.RouteContext(r.Context())
 	if rctx == nil {
 		return ""
@@ -57,7 +60,7 @@ func undecodablePathParam(r *http.Request) string {
 		if k == "" || k == "*" {
 			continue
 		}
-		if _, err := pathParam(r, k); err != nil {
+		if v, err := pathParam(r, k); err != nil || v == "" {
 			return k
 		}
 	}

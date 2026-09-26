@@ -145,7 +145,10 @@ type RoleConfig struct {
 	Permissions []PermissionConfig `koanf:"permissions"`
 }
 
-// PermissionConfig binds a resource glob to a set of actions.
+// PermissionConfig binds a resource to a set of actions. Resource is "*",
+// a resource type ("topic", covering every topic) or "type:pattern", where
+// pattern is "*", a prefix ending in "*" or an exact name. Names are matched
+// literally, so a resource named "*" is only covered by the pattern "*".
 type PermissionConfig struct {
 	Resource string   `koanf:"resource"`
 	Actions  []string `koanf:"actions"`
