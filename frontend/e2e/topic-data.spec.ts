@@ -42,6 +42,42 @@ test.describe("Topic data (produce, search, raw download, bulk copy)", () => {
     await expect(page.getByTestId("message-row")).toContainText(needle);
   });
 
+  test("X-Kafkito-* headers typed in the form are flagged and replaced by kafkito", async ({
+    page,
+  }) => {
+    const needle = `e2e-provenance-${Date.now()}`;
+
+    await page.goto(topicPath(PRODUCE_TOPIC, "produce"));
+    await page.getByPlaceholder('{"hello":"world"}').fill(`{"needle":"${needle}"}`);
+    const reservedNote = page.getByText(/are reserved: kafkito drops them/);
+
+    await page.getByRole("button", { name: "Add header" }).click();
+    await page.getByLabel("Header 1 key").fill("e2e-trace");
+    await page.getByLabel("Header 1 value").fill(needle);
+    await expect(reservedNote).toBeHidden();
+
+    await page.getByRole("button", { name: "Add header" }).click();
+    await page.getByLabel("Header 2 key").fill("x-kafkito-user");
+    await page.getByLabel("Header 2 value").fill("e2e-spoofed-user");
+    await expect(reservedNote).toBeVisible();
+
+    await page.getByRole("button", { name: "Produce", exact: true }).click();
+    await expect(page.getByText(/Produced · partition 0 · offset \d+/)).toBeVisible();
+
+    // kafkito stamps its own X-Kafkito-Source and X-Kafkito-User (the e2e
+    // stack's dev identity); the spoofed lower-case key must not reach the
+    // record next to them.
+    await page.goto(topicPath(PRODUCE_TOPIC, "messages"));
+    const row = page.getByTestId("message-row").filter({ hasText: needle });
+    await row.getByRole("button").first().click();
+    await expect(row.getByText("headers · 3")).toBeVisible();
+    await expect(row).toContainText("X-Kafkito-Source: true");
+    await expect(row).toContainText(`e2e-trace: ${needle}`);
+    await expect(row).toContainText("X-Kafkito-User: ");
+    await expect(row).not.toContainText("x-kafkito-user");
+    await expect(row).not.toContainText("e2e-spoofed-user");
+  });
+
   test("the full value of a truncated record downloads as a file", async ({ page }) => {
     await page.goto(topicPath(LARGE_TOPIC, "messages"));
     await page.getByTestId("message-row").click();

@@ -75,6 +75,11 @@ function ProduceSection({
   const removeHeader = (i: number) => setHeaders((h) => h.filter((_, idx) => idx !== i));
   const updateHeader = (i: number, field: "k" | "v", val: string) =>
     setHeaders((h) => h.map((row, idx) => (idx === i ? { ...row, [field]: val } : row)));
+  // The server drops every X-Kafkito-* header and sets its own provenance
+  // headers; say so where the user can see (e.g. after "Load latest").
+  const hasReservedHeader = headers.some(({ k }) =>
+    k.trim().toLowerCase().startsWith("x-kafkito-"),
+  );
   const { me } = useAuth();
   const rbacAllowsProduce = can(me, cluster, "topic", "produce", topic);
   const rbacAllowsConsume = can(me, cluster, "topic", "consume", topic);
@@ -387,6 +392,12 @@ function ProduceSection({
                 </div>
               ))}
             </div>
+          )}
+          {hasReservedHeader && (
+            <p className="mt-1.5 text-xs text-muted">
+              Headers starting with <code className="font-mono">X-Kafkito-</code> are reserved:
+              kafkito drops them and sets its own provenance headers.
+            </p>
           )}
         </div>
 
