@@ -290,9 +290,12 @@ them as base64 raw bytes in `headers_b64` instead. A key present in both maps
 wins in `headers_b64` and is emitted exactly once; an undecodable value fails the
 request with 400.
 
-kafkito always injects `X-Kafkito-Source: true` and, when an identity is
-available, `X-Kafkito-User: <subject>`, overwriting those keys if you supplied
-them.
+Header keys starting with `X-Kafkito-` are reserved for kafkito's provenance
+headers. kafkito drops every such key from `headers` and `headers_b64`, matched
+case-insensitively (`x-kafkito-user` and `X-KAFKITO-USER` are dropped too), then
+sets `X-Kafkito-Source: true` and, only when an identity is available,
+`X-Kafkito-User: <subject>` (the same subject RBAC resolves). Without an
+identity the record carries no `X-Kafkito-User` at all.
 
 The body may be gzip-compressed with `Content-Encoding: gzip`. The body is
 capped at 15 MiB of JSON either way (after decompression); a larger body
@@ -381,8 +384,10 @@ therefore left out rather than copied approximately:
   value with a redacted rendering, so copying would write the redaction.
 
 Copied records carry the same provenance headers the produce endpoint injects —
-`X-Kafkito-Source: true` and `X-Kafkito-User: <subject>` — overwriting those
-keys if the source record already had them.
+`X-Kafkito-Source: true` and, when an identity is available,
+`X-Kafkito-User: <subject>` of the caller. Every source header whose key starts
+with `X-Kafkito-` (case-insensitive) is dropped, so the original producer's
+provenance is never carried over.
 
 Status codes returned **before** the stream starts:
 
