@@ -237,7 +237,7 @@ function ProduceSection({
   return (
     <Card>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-text">Produce message</h3>
+        <h2 className="text-sm font-semibold text-text">Produce message</h2>
         <Button
           variant="secondary"
           size="sm"
