@@ -1,15 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { PartitionInfo, SearchMode, SearchOp, SearchDirection } from "@/lib/api";
-import {
-  isTooLargeToScan,
-  MAX_HYDRATE_VALUE_BYTES,
-  type HydratableEncoding,
-} from "@/lib/hydrate-sample";
-import { buildPathTree } from "@/lib/path-tree";
-import { buildXmlPathTree, looksLikeXml } from "@/lib/xml-path-tree";
-import { buildJsonPath, wildcardArrayIndices, type Token } from "@/lib/path-builder";
+import { MAX_HYDRATE_VALUE_BYTES } from "@/lib/hydrate-sample";
 import { PathSense } from "@/features/messages/PathSense";
 import { MessageRangeCountPreview } from "@/features/messages/MessageRangeCountPreview";
 import { useFormatters } from "@/lib/use-formatters";
@@ -17,7 +10,6 @@ import { BulkCopyPanel } from "@/features/messages/BulkCopyPanel";
 import { MessageRow } from "@/features/messages/MessageRow";
 import { RangePicker } from "@/features/messages/RangePicker";
 import { StatusBox, StatusIcon } from "@/components/ui/StatusIcon";
-import { messageQueries } from "@/lib/queries/messages";
 import { topicQueries } from "@/lib/queries/topics";
 import { computeTimeRange } from "@/features/messages/time-range";
 import { orderForDisplay, type SortOrder } from "@/features/messages/display-order";
@@ -34,6 +26,9 @@ import { useBrowseMessages } from "@/features/messages/use-browse-messages";
 import { useLoadMore } from "@/features/messages/use-load-more";
 import { useSearchForm } from "@/features/messages/use-search-form";
 import { useMessageSearch } from "@/features/messages/use-message-search";
+import { usePathSuggestions } from "@/features/messages/use-path-suggestions";
+import { useClickToFilter } from "@/features/messages/use-click-to-filter";
+import { useJsonCoachmark } from "@/features/messages/use-json-coachmark";
 
 interface MessagesSearch {
   partition: number;
@@ -184,116 +179,14 @@ function MessagesPanel({
     clearSearch,
   } = useMessageSearch(cluster, topic, partition, limit, form);
 
-  // Sample query (lazy, only when a structured — JSONPath or XPath — search
-  // is open). Field-path suggestions need each sample message's full
-  // structure, but the sample endpoint returns the same 64 KB-truncated
-  // preview as the message list — silently starving PathSense of any field
-  // that only appears past the truncation boundary (or dropping the message
-  // outright, since truncated JSON/XML usually fails to parse).
-  // hydrateTruncatedSampleMessages fetches the full raw value for any
-  // truncated sample, falling back to the truncated preview on failure.
-  //
-  // Keyed by encoding, not by mode, so the two structured modes share a
-  // cache entry whenever they hydrate the same thing. Hydration only fetches
-  // values the active tree can parse: pulling up to MAX_HYDRATE_VALUE_BYTES
-  // per sample for the builder that will discard them is pure waste.
-  const sampleEncoding: HydratableEncoding = mode === "xpath" ? "xml" : "json";
-  const sampleQuery = useQuery({
-    ...messageQueries.sample(cluster, topic, sampleEncoding),
-    enabled: searchOpen && (mode === "jsonpath" || mode === "xpath"),
-  });
-
-  const pathTree = useMemo(() => {
-    const msgs = sampleQuery.data?.messages ?? [];
-    const parsed: unknown[] = msgs
-      .map((m) => {
-        try {
-          return JSON.parse(m.value ?? "");
-        } catch {
-          return null;
-        }
-      })
-      // Arrays are kept: a record whose whole value is an array of rows is a
-      // normal payload shape, and buildPathTree indexes it under `$[*]`.
-      // Scalars carry no field paths and are dropped by the builder itself.
-      .filter((v): v is object => v !== null && typeof v === "object");
-    return buildPathTree(parsed);
-  }, [sampleQuery.data]);
-
-  // A sample above the hydration cap never gets its full value, so the tree
-  // is built from a 64 KB fragment that is cut mid-structure and therefore
-  // doesn't parse. Reporting that as "isn't JSON" is simply untrue — the
-  // value is valid, it is just too large to scan for field names.
-  const sampleTooLargeToScan = useMemo(
-    () => (sampleQuery.data?.messages ?? []).some(isTooLargeToScan),
-    [sampleQuery.data],
+  const { pathTree, xmlPathTree, sampleTooLargeToScan } = usePathSuggestions(
+    cluster,
+    topic,
+    mode,
+    searchOpen,
   );
 
-  // XPath's suggestion tree is built from the same (already hydrated)
-  // samples, parsed with the browser's DOMParser rather than JSON.parse.
-  const xmlPathTree = useMemo(() => {
-    const values = (sampleQuery.data?.messages ?? [])
-      .map((m) => m.value ?? "")
-      .filter(looksLikeXml);
-    return buildXmlPathTree(values);
-  }, [sampleQuery.data]);
-
-  const [undoToast, setUndoToast] = useState<{
-    previous: { path: string; op: SearchOp; needle: string };
-    until: number;
-  } | null>(null);
-
-  const finalizePick = (trail: Token[], leafValue: unknown) => {
-    const previous = { path, op, needle };
-    const hadAnyInput = path.trim() !== "" || needle.trim() !== "";
-
-    setMode("jsonpath");
-    setPath(buildJsonPath(trail));
-    if (leafValue !== undefined) {
-      setOp("eq");
-      setNeedle(String(leafValue));
-    } else {
-      setOp("exists");
-      setNeedle("");
-    }
-
-    if (hadAnyInput) {
-      setUndoToast({ previous, until: Date.now() + 4000 });
-    }
-  };
-
-  useEffect(() => {
-    if (!undoToast) return;
-    const remaining = undoToast.until - Date.now();
-    if (remaining <= 0) {
-      setUndoToast(null);
-      return;
-    }
-    const timer = setTimeout(() => setUndoToast(null), remaining);
-    return () => clearTimeout(timer);
-  }, [undoToast]);
-
-  const handlePick = (trail: Token[], leafValue: unknown) => {
-    setSearchOpen(true);
-    finalizePick(wildcardArrayIndices(trail), leafValue);
-  };
-
-  const [showCoachmark, setShowCoachmark] = useState(() => {
-    try {
-      return localStorage.getItem("kafkito.coachmark.livejson.seen") !== "1";
-    } catch {
-      return false;
-    }
-  });
-
-  const dismissCoachmark = useCallback(() => {
-    setShowCoachmark(false);
-    try {
-      localStorage.setItem("kafkito.coachmark.livejson.seen", "1");
-    } catch {
-      // ignore quota / privacy-mode failures
-    }
-  }, []);
+  const { showUndo, handlePick, undo } = useClickToFilter(form, () => setSearchOpen(true));
 
   const browseRange = useMemo(
     () => computeTimeRange(browseRangeMode, browsePreset, browseCustomFrom, browseCustomTo),
@@ -328,25 +221,7 @@ function MessagesPanel({
     [rawMessages, sortOrder],
   );
 
-  // Points the coachmark at a row that actually renders the click-to-filter
-  // tree. Since the search fix the backend keeps reporting "json" for values
-  // it truncated mid-structure, and those rows show a "Load full value"
-  // button instead of a clickable tree — teaching on one would be misleading.
-  const firstJsonIdx = displayMessages.findIndex(
-    (m) => m.value_encoding === "json" && !m.value_truncated,
-  );
-
-  useEffect(() => {
-    if (!showCoachmark) return;
-    if (firstJsonIdx < 0) return; // don't burn the timer if there's no JSON to teach about
-    const timer = setTimeout(dismissCoachmark, 8000);
-    const onScroll = () => dismissCoachmark();
-    window.addEventListener("scroll", onScroll, { once: true });
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("scroll", onScroll);
-    };
-  }, [showCoachmark, firstJsonIdx, dismissCoachmark]);
+  const coachmark = useJsonCoachmark(displayMessages);
 
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm">
@@ -513,17 +388,12 @@ function MessagesPanel({
 
       {searchOpen && (
         <div className="space-y-3 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3">
-          {undoToast && (
+          {showUndo && (
             <div className="flex items-center gap-3 rounded border border-border bg-panel p-2 text-xs">
               <span>Path replaced by click.</span>
               <button
                 type="button"
-                onClick={() => {
-                  setPath(undoToast.previous.path);
-                  setOp(undoToast.previous.op);
-                  setNeedle(undoToast.previous.needle);
-                  setUndoToast(null);
-                }}
+                onClick={undo}
                 className="rounded border border-border px-2 py-0.5 hover:border-border-strong"
               >
                 Undo
@@ -890,12 +760,12 @@ function MessagesPanel({
         </div>
       )}
 
-      {showCoachmark && firstJsonIdx >= 0 && (
+      {coachmark.visible && (
         <div className="m-3 flex items-center gap-2 rounded border border-accent/40 bg-accent-subtle p-2 text-xs text-accent">
           <span>Tip: click any value in a JSON message to filter by it.</span>
           <button
             type="button"
-            onClick={dismissCoachmark}
+            onClick={coachmark.dismiss}
             className="ml-auto rounded border border-border px-2 py-0.5 hover:border-border-strong"
           >
             Got it
