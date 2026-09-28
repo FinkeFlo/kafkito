@@ -47,8 +47,8 @@ const ProducerBatchMaxBytes = 10 << 20 // 10 MiB
 // cluster: ad-hoc (private) cluster registration, the Schema Registry
 // decoder and the masking policy.
 //
-// Locking: mu guards clusters, masking, clients and adhocLastUsed, which
-// UseAdhoc and its idle sweep modify at runtime; srMu guards srDecoders.
+// Locking: mu guards clusters, masking, clients, adhocLastUsed and caps,
+// which UseAdhoc and its idle sweep modify at runtime; srMu guards srDecoders.
 // ordered is written only by the constructor. The lock order is mu -> srMu
 // (the sweep holds mu while it drops cached decoders), so code holding srMu
 // must never take mu or call a method that does.
@@ -64,6 +64,9 @@ type Connections struct {
 	// entries so they can be idle-evicted. Nil for registries without any
 	// ad-hoc activity.
 	adhocLastUsed map[string]time.Time
+	// caps caches capability probe results per cluster name for
+	// capCacheTTL (see Clusters.Capabilities).
+	caps map[string]capCache
 	// adhocFPKeyOnce/adhocFPKeyVal hold the process-local secret used to key
 	// the ad-hoc cluster fingerprint HMAC (see adhoc.go Fingerprint). Lazily
 	// generated on first use so registries that never see a private-cluster
@@ -178,6 +181,7 @@ func newConnections(cfg []config.ClusterConfig, log *slog.Logger) *Connections {
 		clusters:   m,
 		masking:    policies,
 		clients:    make(map[string]*kgo.Client),
+		caps:       make(map[string]capCache),
 		srDecoders: make(map[string]*SRDecoder),
 	}
 }
