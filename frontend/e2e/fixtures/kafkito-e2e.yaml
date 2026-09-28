@@ -1,10 +1,13 @@
 # kafkito config for `make e2e`: the same "local" cluster the
-# KAFKITO_KAFKA_BROKERS shortcut would create, plus the data_masking rules
-# masking.spec.ts walks against the e2e-masked and e2e-masked-kh fixture
-# topics (seed.sh).
+# KAFKITO_KAFKA_BROKERS shortcut would create, plus the Schema Registry that
+# `make e2e-up` starts (docker compose service schema-registry, subjects
+# seeded by seed.sh) and the data_masking rules masking.spec.ts walks
+# against the e2e-masked and e2e-masked-kh fixture topics (seed.sh).
 clusters:
   - name: local
     brokers: ["localhost:39092"]
+    schema_registry:
+      url: http://localhost:38081
     data_masking:
       - topics: ["^e2e-masked$"]
         fields: ["$.customer.email"]

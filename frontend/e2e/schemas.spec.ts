@@ -1,12 +1,17 @@
-import { test, expect, SR_CLUSTER_NAME } from "./fixtures/private-cluster";
+import { test, expect, SECOND_CLUSTER_NAME, SR_CLUSTER_NAME } from "./fixtures/private-cluster";
 
+// `local` (fixtures/kafkito-e2e.yaml) points at the e2e Schema Registry that
+// seed.sh fills; the capability checks for a cluster without a registry use
+// the private cluster the `page` fixture stores (SECOND_CLUSTER_NAME, no
+// schema_registry).
 const PRIMARY = process.env.KAFKITO_E2E_CLUSTER ?? "local";
+const c = encodeURIComponent(PRIMARY);
 
 test.describe("Schemas tab (capability-driven)", () => {
   test("schemas link shows '(—)' suffix and aria-disabled when active cluster has no SR", async ({
     page,
   }) => {
-    await page.goto(`/clusters/${encodeURIComponent(PRIMARY)}/topics`);
+    await page.goto(`/clusters/${encodeURIComponent(SECOND_CLUSTER_NAME)}/topics`);
 
     const schemasLink = page.getByRole("link", { name: /^Schemas/ });
     await expect(schemasLink).toBeVisible();
@@ -17,7 +22,7 @@ test.describe("Schemas tab (capability-driven)", () => {
   test("schemas landing page shows 'Schemas not configured' notice for cluster without SR", async ({
     page,
   }) => {
-    await page.goto(`/clusters/${encodeURIComponent(PRIMARY)}/schemas`);
+    await page.goto(`/clusters/${encodeURIComponent(SECOND_CLUSTER_NAME)}/schemas`);
 
     await expect(page.getByRole("heading", { level: 1, name: "Schemas" })).toBeVisible();
     await expect(page.getByText(/Schemas not configured/i)).toBeVisible();
@@ -49,5 +54,13 @@ test.describe("Schemas tab (capability-driven)", () => {
     await expect(
       pageWithSRCluster.getByRole("textbox", { name: /filter subjects/i }),
     ).toBeVisible();
+  });
+
+  test("the e2e cluster's schemas link is enabled", async ({ page }) => {
+    await page.goto(`/clusters/${c}/topics`);
+
+    const schemasLink = page.getByRole("link", { name: "Schemas", exact: true });
+    await expect(schemasLink).toBeVisible();
+    await expect(schemasLink).not.toHaveAttribute("aria-disabled", "true");
   });
 });

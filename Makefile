@@ -177,7 +177,8 @@ clean:
 
 # --- e2e harness ---------------------------------------------------------
 # `make e2e` runs Playwright walks against a hermetic local stack:
-# Kafka via docker compose (existing kafkito-kafka container) +
+# Kafka + Schema Registry via docker compose (kafkito-kafka and
+# kafkito-schema-registry containers) +
 # kafkito as a Go subprocess on a non-default port (E2E_PORT, default
 # 47421) so it does NOT conflict with a running `make dev` stack.
 # Frontend is served from the kafkito-embedded assets — no Vite needed.
@@ -191,6 +192,10 @@ clean:
 E2E_PORT ?= 47421
 E2E_PID := /tmp/kafkito-e2e.pid
 E2E_LOG := /tmp/kafkito-e2e.log
+# Marker that e2e-up started the Schema Registry container. e2e-down and
+# e2e-clean stop the container only when it is present, so an already
+# running `make dev` stack (same compose project) keeps its registry.
+E2E_SR_MARKER := bin/.e2e-schema-registry-started
 
 e2e: e2e-up e2e-test e2e-down
 
@@ -199,7 +204,11 @@ e2e-up:
 		echo "e2e: port $(E2E_PORT) is in use — kill the listener and retry"; \
 		exit 1; \
 	fi
-	docker compose up -d --wait kafka
+	@mkdir -p bin
+	@if [ -z "$$(docker compose ps -q --status running schema-registry 2>/dev/null)" ]; then \
+		touch $(E2E_SR_MARKER); \
+	fi
+	docker compose up -d --wait kafka schema-registry
 	cd frontend && bun run build
 	go build -tags devauth -ldflags "-X main.version=e2e-dev" -o bin/kafkito-e2e ./cmd/kafkito
 	@echo "e2e: starting kafkito-e2e on port $(E2E_PORT)"
@@ -235,12 +244,21 @@ e2e-down:
 		rm -f $(E2E_PID); \
 		echo "e2e: kafkito-e2e stopped"; \
 	fi
+	@if [ -f $(E2E_SR_MARKER) ]; then \
+		docker compose stop schema-registry; \
+		rm -f $(E2E_SR_MARKER); \
+		echo "e2e: schema-registry stopped"; \
+	fi
 
 e2e-clean:
 	@pids=$$(lsof -nP -iTCP:$(E2E_PORT) -sTCP:LISTEN -t 2>/dev/null); \
 	if [ -n "$$pids" ]; then kill -9 $$pids 2>/dev/null || true; fi
 	@rm -rf frontend/test-results/.playwright-artifacts-*
 	@rm -f $(E2E_PID) $(E2E_LOG)
+	@if [ -f $(E2E_SR_MARKER) ]; then \
+		docker compose stop schema-registry; \
+		rm -f $(E2E_SR_MARKER); \
+	fi
 	@echo "e2e: cleaned port $(E2E_PORT) and stale state"
 
 
