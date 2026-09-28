@@ -6,7 +6,6 @@ package kafka
 import (
 	"context"
 	"errors"
-	"sync"
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kadm"
@@ -42,31 +41,40 @@ type capCache struct {
 
 const capCacheTTL = 60 * time.Second
 
-var capCaches sync.Map // key: cluster name
-
 // Capabilities returns the capability probe result for the named cluster,
 // using a 60-second cache.
+//
+// The probe runs without holding mu. If an idle sweep evicted the cluster in
+// the meantime, the result is returned but not cached, so no entry is left
+// behind for a cluster that is gone.
 func (r *Clusters) Capabilities(ctx context.Context, cluster string) (*Capabilities, error) {
-	if _, ok := r.ConfigFor(cluster); !ok {
+	r.mu.Lock()
+	_, known := r.clusters[cluster]
+	c, cached := r.caps[cluster]
+	r.mu.Unlock()
+	if !known {
 		return nil, ErrUnknownCluster
 	}
-	if v, ok := capCaches.Load(cluster); ok {
-		c := v.(*capCache)
-		if time.Since(c.at) < capCacheTTL {
-			return c.caps, nil
-		}
+	if cached && time.Since(c.at) < capCacheTTL {
+		return c.caps, nil
 	}
 	caps, err := r.probeCapabilities(ctx, cluster)
 	if err != nil {
 		return nil, err
 	}
-	capCaches.Store(cluster, &capCache{caps: caps, at: time.Now()})
+	r.mu.Lock()
+	if _, ok := r.clusters[cluster]; ok {
+		r.caps[cluster] = capCache{caps: caps, at: time.Now()}
+	}
+	r.mu.Unlock()
 	return caps, nil
 }
 
 // RefreshCapabilities invalidates the cache entry for one cluster.
 func (r *Clusters) RefreshCapabilities(cluster string) {
-	capCaches.Delete(cluster)
+	r.mu.Lock()
+	delete(r.caps, cluster)
+	r.mu.Unlock()
 }
 
 func (r *Clusters) probeCapabilities(ctx context.Context, cluster string) (*Capabilities, error) {

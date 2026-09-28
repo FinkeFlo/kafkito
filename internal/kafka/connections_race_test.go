@@ -39,10 +39,13 @@ func TestConnections_AdhocChurnRacesWithReaders(t *testing.T) {
 
 	// Backdating the last-use stamps makes the next UseAdhoc sweep evict
 	// every entry, so the writers keep deleting and re-adding map entries.
+	// A capability entry is seeded for each cluster so the sweep drops it
+	// too.
 	expireAll := func() {
 		r.mu.Lock()
 		for name := range r.adhocLastUsed {
 			r.adhocLastUsed[name] = time.Time{}
+			r.caps[name] = capCache{caps: &Capabilities{}, at: time.Now()}
 		}
 		r.mu.Unlock()
 	}
@@ -70,6 +73,7 @@ func TestConnections_AdhocChurnRacesWithReaders(t *testing.T) {
 				_ = r.srDecoderFor(name)
 				assert.NotNil(t, r.MaskingPolicy(name))
 				_, _ = r.ConfigFor(name)
+				r.RefreshCapabilities(name)
 			}
 		})
 	}
@@ -95,6 +99,9 @@ func TestConnections_AdhocChurnRacesWithReaders(t *testing.T) {
 	registered := make(map[string]bool, len(r.clusters))
 	for name := range r.clusters {
 		registered[name] = true
+	}
+	for name := range r.caps {
+		assert.Truef(t, registered[name], "capabilities cached for evicted cluster %s", name)
 	}
 	r.mu.Unlock()
 	r.srMu.Lock()

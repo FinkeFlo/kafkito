@@ -156,7 +156,7 @@ func (r *Connections) sweepAdhocLocked() {
 		delete(r.clusters, name)
 		delete(r.masking, name)
 		delete(r.adhocLastUsed, name)
-		capCaches.Delete(name)
+		delete(r.caps, name)
 
 		r.srMu.Lock()
 		delete(r.srDecoders, name)
