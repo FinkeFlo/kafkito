@@ -22,6 +22,19 @@ describe("useFieldError + Input", () => {
     expect(input).toHaveAccessibleDescription(/Name is required\.$/);
     expect(screen.getByText("Name is required.")).toBeVisible();
     expect(screen.getByRole("img", { name: "Error" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+    const message = document.getElementById(input.getAttribute("aria-describedby") ?? "");
+    expect(message?.parentElement).toHaveAttribute("aria-live", "polite");
+  });
+
+  it("keeps the polite live region mounted while the field is valid", () => {
+    const { rerender, container } = render(<Field error={null} />);
+    const region = container.querySelector('[aria-live="polite"]');
+    expect(region).toBeEmptyDOMElement();
+    rerender(<Field error="Name is required." />);
+    expect(container.querySelector('[aria-live="polite"]')).toBe(region);
+    expect(region).toHaveTextContent("Name is required.");
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("keeps an existing description next to the error", () => {

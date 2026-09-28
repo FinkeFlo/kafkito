@@ -5,6 +5,8 @@ const TOPIC = "e2e-walk-target";
 const GROUP = "e2e-idle-group";
 const c = encodeURIComponent(CLUSTER);
 
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 // Presses Tab until `target` has focus. A table row must never take focus on
 // the way: the row's action lives in the control inside its primary cell.
 async function tabTo(page: Page, target: Locator, maxPresses = 60): Promise<void> {
@@ -22,7 +24,9 @@ async function expectNoRowRoleOverride(page: Page): Promise<void> {
 }
 
 // The field is marked invalid and its description is the visible error text,
-// which carries a named icon so the state does not rely on colour.
+// which carries a named icon so the state does not rely on colour. The error
+// sits in a polite live region (never role=alert), so typing into a live
+// validated field is not interrupted.
 async function expectFieldError(page: Page, control: Locator, message: string): Promise<void> {
   await expect(control).toHaveAttribute("aria-invalid", "true");
   const describedBy = await control.getAttribute("aria-describedby");
@@ -31,7 +35,9 @@ async function expectFieldError(page: Page, control: Locator, message: string): 
   await expect(error).toBeVisible();
   await expect(error).toContainText(message);
   await expect(error.getByRole("img", { name: "Error" })).toBeVisible();
-  await expect(control).toHaveAccessibleDescription(new RegExp(message.replace(/[.]/g, "\\.")));
+  await expect(error).not.toHaveAttribute("role");
+  await expect(page.locator(`[aria-live="polite"]:has(> [id="${describedBy}"])`)).toHaveCount(1);
+  await expect(control).toHaveAccessibleDescription(new RegExp(escapeRegExp(message)));
 }
 
 async function expectFieldValid(control: Locator): Promise<void> {
