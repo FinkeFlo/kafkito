@@ -70,15 +70,15 @@ func rbacMiddleware(policy *rbac.Policy) func(http.Handler) http.Handler {
 
 			if bodyField != "" {
 				// Runs before the route's own body limit, so it caps the read
-				// itself, at the limit of the routes that name a body field
-				// (create topic, create group).
-				bodyBytes, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxJSONBodyBytes))
+				// itself, at that limit and with that message.
+				limit, prefix := rbacBodyLimit(resType)
+				bodyBytes, err := io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
 				_ = r.Body.Close()
 				if err != nil {
 					msg := "failed to read request body"
 					var mbe *http.MaxBytesError
 					if errors.As(err, &mbe) {
-						msg = "invalid body: " + mbe.Error()
+						msg = prefix + mbe.Error()
 					}
 					writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg})
 					return
@@ -120,11 +120,21 @@ func rbacMiddleware(policy *rbac.Policy) func(http.Handler) http.Handler {
 	}
 }
 
+// rbacBodyLimit returns the body limit and too-large message prefix of the
+// route whose body rbacMiddleware reads to find the resource name: those of
+// create topic and create group, or of the SCRAM user upsert.
+func rbacBodyLimit(resType string) (int64, string) {
+	if resType == "user" {
+		return maxSCRAMBodyBytes, "invalid json: "
+	}
+	return maxJSONBodyBytes, "invalid body: "
+}
+
 // resolvePermission maps the current request to (resourceType, resourceName,
 // action, bodyField). A non-empty bodyField names the JSON request-body field
 // that holds the resource name; the middleware reads it to derive resName
-// (e.g. POST /topics uses "name", POST /groups uses "group_id"). An empty
-// bodyField means resName is already final. A return of ("", "", "", "")
+// (e.g. POST /topics uses "name", POST /groups uses "group_id", POST /users
+// uses "user"). An empty bodyField means resName is already final. A return of ("", "", "", "")
 // means no permission check is required.
 func resolvePermission(r *http.Request) (resType, resName, action, bodyField string) {
 	rctx := chi.RouteContext(r.Context())
@@ -214,7 +224,8 @@ func resolvePermission(r *http.Request) (resType, resName, action, bodyField str
 	case strings.HasSuffix(pattern, "/schemas/subjects/{subject}") && method == http.MethodDelete:
 		return "schema", subject, "delete", ""
 
-	// ACLs
+	// ACLs are cluster-scoped and have no resource name: any acl grant with
+	// the action covers every ACL of the cluster.
 	case strings.HasSuffix(pattern, "/acls") && method == http.MethodGet:
 		return "acl", "", "view", ""
 	case strings.HasSuffix(pattern, "/acls") && method == http.MethodPost:
@@ -226,7 +237,7 @@ func resolvePermission(r *http.Request) (resType, resName, action, bodyField str
 	case strings.HasSuffix(pattern, "/users") && method == http.MethodGet:
 		return "user", "", "view", ""
 	case strings.HasSuffix(pattern, "/users") && method == http.MethodPost:
-		return "user", "", "edit", ""
+		return "user", "", "edit", "user"
 	case strings.HasSuffix(pattern, "/users/{user}") && method == http.MethodDelete:
 		return "user", user, "delete", ""
 	}

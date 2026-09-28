@@ -6,6 +6,7 @@ package server
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strings"
 	"time"
 
@@ -42,6 +43,14 @@ func (s *apiServer) ListScramUsers(ctx context.Context, req gen.ListScramUsersRe
 // passed to the broker only; it is not part of any response or log line.
 func (s *apiServer) UpsertScramUser(ctx context.Context, req gen.UpsertScramUserRequestObject) (gen.UpsertScramUserResponseObject, error) {
 	b := req.Body
+	// rbacMiddleware authorized the trimmed user name; the broker stores
+	// the name as sent, so a padded name must be allowed as sent too.
+	if b.User != strings.TrimSpace(b.User) && s.policy != nil && s.policy.Enabled() && !kafkapkg.IsAdhoc(req.Cluster) {
+		user := rbacSubject(httpRequestFromContext(ctx), s.policy)
+		if !s.policy.Allow(user, req.Cluster, "user", b.User, "edit") {
+			return nil, &apiError{Status: http.StatusForbidden, Code: "rbac_denied", Message: "forbidden"}
+		}
+	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	if err := s.scram.UpsertSCRAMUser(ctx, req.Cluster, b.User, string(b.Mechanism), b.Password, deref(b.Iterations)); err != nil {

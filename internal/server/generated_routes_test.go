@@ -96,7 +96,7 @@ var apiOps = []apiOp{
 	{id: "createAcl", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/acls", group: groupCluster, resource: "acl:", action: "edit"},
 	{id: "deleteAcl", method: http.MethodDelete, pattern: "/api/v1/clusters/{cluster}/acls", group: groupCluster, resource: "acl:", action: "delete"},
 	{id: "listScramUsers", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/users", group: groupCluster, resource: "user:", action: "view"},
-	{id: "upsertScramUser", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/users", group: groupCluster, resource: "user:", action: "edit"},
+	{id: "upsertScramUser", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/users", group: groupCluster, resource: "user:" + opUser, action: "edit"},
 	{id: "deleteScramUser", method: http.MethodDelete, pattern: "/api/v1/clusters/{cluster}/users/{user}", group: groupCluster, resource: "user:{user}", action: "delete"},
 }
 
@@ -128,6 +128,8 @@ func (op apiOp) rbacBody() string {
 		return `{"name":"` + opTopic + `"}`
 	case "createGroup":
 		return `{"group_id":"` + opGroup + `"}`
+	case "upsertScramUser":
+		return `{"user":"` + opUser + `"}`
 	}
 	return ""
 }
