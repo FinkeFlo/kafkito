@@ -109,6 +109,31 @@ describe("replayBlocker", () => {
     expect(blocker?.reason).toContain("redacted");
   });
 
+  it("blocks a message whose key is masked", () => {
+    const blocker = replayBlocker(message({ key: "cust-***", key_masked: true }));
+    expect(blocker?.reason).toContain("the key shown is redacted");
+  });
+
+  it("blocks a masked binary key before reporting its missing bytes", () => {
+    const blocker = replayBlocker(
+      message({ key: "***", key_encoding: "binary", key_masked: true }),
+    );
+    expect(blocker?.reason).toContain("the key shown is redacted");
+  });
+
+  it("blocks a message with masked headers and names them", () => {
+    expect(replayBlocker(message({ masked_headers: ["authorization"] }))?.reason).toContain(
+      "the value of header authorization is redacted",
+    );
+    expect(
+      replayBlocker(message({ masked_headers: ["authorization", "x-token"] }))?.reason,
+    ).toContain("the values of headers authorization, x-token are redacted");
+  });
+
+  it("does not block on an empty masked_headers list", () => {
+    expect(replayBlocker(message({ masked_headers: [] }))).toBeNull();
+  });
+
   it("blocks an avro value instead of silently sending the decoded JSON", () => {
     const blocker = replayBlocker(
       message({

@@ -9,6 +9,7 @@ import { Timestamp } from "@/components/ui/Timestamp";
 import { StatusIcon } from "@/components/ui/StatusIcon";
 import { ReplayModal } from "@/features/messages/ReplayModal";
 import { ValueBody } from "@/features/messages/ValueBody";
+import { MaskedBadge } from "@/features/messages/MaskedBadge";
 
 const routeApi = getRouteApi("/clusters/$cluster/topics/$topic/messages");
 
@@ -26,6 +27,7 @@ export function MessageRow({
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [replayOpen, setReplayOpen] = useState(false);
+  const maskedHeaders = new Set(m.masked_headers ?? []);
   const preview =
     m.value_encoding === "null"
       ? "(null)"
@@ -81,13 +83,15 @@ export function MessageRow({
         </span>
         <EncodingBadge enc={m.value_encoding} />
         {m.value_sr && <SRBadge meta={m.value_sr} />}
-        {m.masked && (
-          <span
-            title="Value modified by a data_masking rule"
-            className="rounded bg-[var(--color-warning-subtle)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-warning)]"
-          >
-            masked
-          </span>
+        {m.masked && <MaskedBadge title="Value modified by a data_masking rule" />}
+        {m.key_masked && (
+          <MaskedBadge label="key masked" title="Key modified by a data_masking rule" />
+        )}
+        {maskedHeaders.size > 0 && (
+          <MaskedBadge
+            label="headers masked"
+            title={`Header values modified by a data_masking rule: ${[...maskedHeaders].join(", ")}`}
+          />
         )}
         {m.value_truncated && (
           <span
@@ -115,15 +119,26 @@ export function MessageRow({
               label={`key · ${m.key === undefined ? "none" : m.key_encoding}`}
               body={m.key === undefined ? "(no key)" : prettyValue(m.key, m.key_encoding)}
               empty={m.key === undefined}
+              action={
+                m.key_masked && (
+                  <MaskedBadge title="Key modified by a data_masking rule" label="masked" />
+                )
+              }
             />
             <DetailSection
               label={`headers${m.headers ? ` · ${fmt.number(Object.keys(m.headers).length)}` : ""}`}
               body={
-                m.headers && Object.keys(m.headers).length > 0
-                  ? Object.entries(m.headers)
+                m.headers && Object.keys(m.headers).length > 0 ? (
+                  maskedHeaders.size > 0 ? (
+                    <HeaderLines headers={m.headers} masked={maskedHeaders} />
+                  ) : (
+                    Object.entries(m.headers)
                       .map(([k, v]) => `${k}: ${v}`)
                       .join("\n")
-                  : "(no headers)"
+                  )
+                ) : (
+                  "(no headers)"
+                )
               }
               empty={!m.headers || Object.keys(m.headers).length === 0}
             />
@@ -241,6 +256,31 @@ function DetailSection({
         </div>
       )}
     </div>
+  );
+}
+
+/** Header lines with a masked marker on the values masking redacted. */
+function HeaderLines({
+  headers,
+  masked,
+}: {
+  headers: Record<string, string>;
+  masked: Set<string>;
+}) {
+  return (
+    <ul className="max-h-96 space-y-0.5 overflow-auto rounded-md bg-[var(--color-surface-subtle)] p-3 font-mono text-[11px] leading-relaxed">
+      {Object.entries(headers).map(([k, v]) => (
+        <li key={k} data-testid="header-line" className="break-all whitespace-pre-wrap">
+          {`${k}: ${v}`}
+          {masked.has(k) && (
+            <>
+              {" "}
+              <MaskedBadge title="Header value modified by a data_masking rule" />
+            </>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 
