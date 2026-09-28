@@ -475,8 +475,10 @@ export interface paths {
          *     `application/json` for valid JSON, `text/plain` for other UTF-8 and
          *     `application/octet-stream` otherwise. Values above 15 MB are rejected
          *     with 413. A value the cluster's `data_masking` rules change is refused
-         *     with 403 `value_masked`: the raw bytes would bypass the masking. With
-         *     RBAC enabled, requires `consume` on `topic:<topic>`.
+         *     with 403 `value_masked`: the raw bytes would bypass the masking. The
+         *     body never contains the key or headers, so masking rules that target
+         *     only those do not block the download. With RBAC enabled, requires
+         *     `consume` on `topic:<topic>`.
          */
         get: operations["downloadMessageRaw"];
         put?: never;
@@ -581,8 +583,8 @@ export interface paths {
          *     Schema-Registry-decoded payloads (`avro` / `json_schema` /
          *     `protobuf`), for which only the decoded JSON rendering is available and
          *     the original wire-format bytes are gone, and masked records, whose
-         *     value the source cluster's `data_masking` rules replaced with a
-         *     redacted rendering.
+         *     value, key or header values the source cluster's `data_masking` rules
+         *     replaced with a redacted rendering.
          *
          *     Copied records carry the same provenance headers the produce endpoint
          *     injects — `X-Kafkito-Source: true` and, when an identity is available,
@@ -1143,6 +1145,10 @@ export interface components {
             };
             /** @description The cluster's `data_masking` rules changed the value. Masking runs on the full decoded value; `value_b64` is omitted and the raw download is refused with 403 `value_masked`. */
             masked?: boolean;
+            /** @description The cluster's `data_masking` rules changed the key (rules with target `key`); `key_b64` is omitted. */
+            key_masked?: boolean;
+            /** @description Sorted keys of the headers whose values the cluster's `data_masking` rules changed (rules with target `headers`); their `headers_b64` entries are omitted. Header keys are never masked. */
+            masked_headers?: string[];
             /**
              * Format: int64
              * @description Untruncated byte length of the raw value; absent for nil/empty values.
@@ -1358,7 +1364,7 @@ export interface components {
             copied: number;
             /**
              * Format: int64
-             * @description Source records deliberately left out because they cannot be reproduced byte-for-byte (Schema-Registry-decoded or masked values). Omitted while 0.
+             * @description Source records deliberately left out because they cannot be reproduced byte-for-byte (Schema-Registry-decoded, or masked values, keys or header values). Omitted while 0.
              */
             skipped?: number;
             /** @description True on the final event only; omitted otherwise. */
@@ -1404,6 +1410,10 @@ export interface components {
             }[];
             /** @description Replacement for `fields`; empty = "***". */
             replacement?: string;
+            /** @description Record parts the rule masks. Absent or empty = `[value]`. */
+            targets?: ("value" | "key" | "headers")[];
+            /** @description Go regex patterns on header keys that restrict the `headers` target to matching headers. Absent or empty = every header. */
+            headers?: string[];
         };
         GroupInfo: {
             group_id: string;
