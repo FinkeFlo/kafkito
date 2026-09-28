@@ -31,19 +31,26 @@ import { messageQueries } from "@/lib/queries/messages";
 import { topicQueries } from "@/lib/queries/topics";
 import { computeTimeRange } from "@/features/messages/time-range";
 import { orderForDisplay, type SortOrder } from "@/features/messages/display-order";
+import {
+  clampLimit,
+  clampOffset,
+  offsetBoundsFor,
+  type BrowseFrom,
+} from "@/features/messages/browse-params";
+import { useNumberDraft } from "@/features/messages/use-number-draft";
+import { useMessagesSearchParams } from "@/features/messages/use-messages-search-params";
 
 interface MessagesSearch {
   partition: number;
   limit: number;
-  from: "end" | "start" | "offset";
+  from: BrowseFrom;
   msgOffset: number;
 }
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic/messages")({
   validateSearch: (s: Record<string, unknown>): MessagesSearch => {
     const fromRaw = s.from;
-    const from: "end" | "start" | "offset" =
-      fromRaw === "start" || fromRaw === "offset" ? fromRaw : "end";
+    const from: BrowseFrom = fromRaw === "start" || fromRaw === "offset" ? fromRaw : "end";
     return {
       partition: typeof s.partition === "number" ? s.partition : -1,
       limit: typeof s.limit === "number" ? s.limit : 50,
@@ -104,57 +111,27 @@ function MessagesPanel({
   partitions: PartitionInfo[];
 }) {
   const fmt = useFormatters();
-  const search = Route.useSearch();
-  const navigate = Route.useNavigate();
-  const { partition, limit, from, msgOffset } = search;
+  const { partition, limit, from, msgOffset, setPartition, setLimit, setFrom, setMsgOffset } =
+    useMessagesSearchParams();
 
-  const setPartition = (v: number) => navigate({ search: (prev) => ({ ...prev, partition: v }) });
-  const setLimit = (v: number) => navigate({ search: (prev) => ({ ...prev, limit: v }) });
-  const setFrom = (v: "end" | "start" | "offset") =>
-    navigate({ search: (prev) => ({ ...prev, from: v }) });
-  const setMsgOffset = (v: number) => navigate({ search: (prev) => ({ ...prev, msgOffset: v }) });
+  const offsetBounds = useMemo(
+    () => offsetBoundsFor(partitions, partition),
+    [partition, partitions],
+  );
 
-  // Valid offset range for the current partition selection (single partition
-  // or all). Used to hint the input and clamp committed values.
-  const offsetBounds = useMemo(() => {
-    const sel = partition >= 0 ? partitions.filter((p) => p.partition === partition) : partitions;
-    if (sel.length === 0) return null;
-    const min = Math.min(...sel.map((p) => p.start_offset));
-    const maxEnd = Math.max(...sel.map((p) => p.end_offset));
-    return { min, max: Math.max(min, maxEnd - 1) };
-  }, [partition, partitions]);
-
-  // Local draft so typing an offset does not refetch on every keystroke; the
-  // value is committed (and clamped to the valid range) on Enter or blur.
-  const [offsetDraft, setOffsetDraft] = useState<string>(String(msgOffset));
-  useEffect(() => {
-    setOffsetDraft(String(msgOffset));
-  }, [msgOffset]);
-
-  const commitOffset = () => {
-    const parsed = Number(offsetDraft);
-    let next = Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : 0;
-    if (offsetBounds) {
-      next = Math.min(Math.max(next, offsetBounds.min), offsetBounds.max);
-    }
-    setOffsetDraft(String(next));
-    if (next !== msgOffset) setMsgOffset(next);
-  };
+  const {
+    draft: offsetDraft,
+    setDraft: setOffsetDraft,
+    commit: commitOffset,
+  } = useNumberDraft(msgOffset, (raw) => clampOffset(raw, offsetBounds), setMsgOffset);
 
   const [live, setLive] = useState<boolean>(false);
 
-  const [limitDraft, setLimitDraft] = useState<string>(String(limit));
-  useEffect(() => {
-    setLimitDraft(String(limit));
-  }, [limit]);
-
-  const commitLimit = () => {
-    const parsed = Number(limitDraft);
-    let next = Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : 50;
-    if (next > 500) next = 500;
-    setLimitDraft(String(next));
-    if (next !== limit) setLimit(next);
-  };
+  const {
+    draft: limitDraft,
+    setDraft: setLimitDraft,
+    commit: commitLimit,
+  } = useNumberDraft(limit, clampLimit, setLimit);
 
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
 
@@ -538,7 +515,7 @@ function MessagesPanel({
           <select
             id="browse-from"
             value={from}
-            onChange={(e) => setFrom(e.target.value as "end" | "start" | "offset")}
+            onChange={(e) => setFrom(e.target.value as BrowseFrom)}
             className="rounded border border-[var(--color-border)] px-2 py-1 text-xs"
             disabled={!!searchResult}
           >
