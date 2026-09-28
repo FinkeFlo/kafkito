@@ -358,7 +358,7 @@ All tables use `<DataTable>`. Rules:
 ### 6.4 Forms
 
 - Every input has a label above it (`text-xs font-semibold uppercase tracking-wider text-muted`).
-- Validation errors: visible text below the field (the `message` from `useFieldError`, which pairs the red tint with a named ⊗ icon — never colour alone), `aria-invalid="true"` on the control, and `aria-describedby` pointing at the error text's id. Use `useFieldError` so the three stay in sync, and render the message outside any wrapping `<label>` so it does not become part of the field's name.
+- Validation errors: visible text below the field (the `message` from `useFieldError`, which pairs the red tint with a named ⊗ icon — never colour alone), `aria-invalid="true"` on the control, and `aria-describedby` pointing at the error text's id. Use `useFieldError` so the three stay in sync, and render the message outside any wrapping `<label>` so it does not become part of the field's name. The message is a polite live region (`aria-live="polite"`, never `role="alert"`), so errors from live validation do not interrupt typing.
 - Destructive actions require a `<Modal>` / `<ConfirmDialog>` — never a single click, never `window.confirm`.
 - Disabled controls must convey *why* they are disabled via `aria-describedby` plus either a visible `<Notice>` or an `sr-only` `<span>`. Never rely on `title=` alone for load-bearing reason copy — the disabled-with-tooltip pattern is a Confluent anti-pattern (see § 12).
 - After mutation, invalidate the matching TanStack Query keys. Never refetch manually.
