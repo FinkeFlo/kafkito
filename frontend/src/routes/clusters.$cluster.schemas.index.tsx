@@ -243,7 +243,7 @@ function SubjectRow({
         type="button"
         onClick={onDelete}
         aria-label={`Delete subject ${subject.name}`}
-        className="mr-3 mt-3 text-subtle-text opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 focus-visible:opacity-100"
+        className="mr-2 mt-2 p-1 text-subtle-text opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 focus-visible:opacity-100"
       >
         <Trash2 className="h-4 w-4" />
       </button>
@@ -359,7 +359,11 @@ function SchemaDetail({
         </div>
       )}
 
-      <pre className="max-h-[60vh] overflow-auto p-4 font-mono text-[12px] leading-relaxed text-text">
+      <pre
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: the schema scrolls inside a capped height; without a tab stop keyboard users cannot scroll it (axe scrollable-region-focusable).
+        tabIndex={0}
+        className="max-h-[60vh] overflow-auto p-4 font-mono text-[12px] leading-relaxed text-text"
+      >
         {prettySchema}
       </pre>
     </div>
