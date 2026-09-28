@@ -59,6 +59,8 @@ frontend/e2e/keyboard-and-form-errors.spec.ts  keyboard-only row activation (Tab
 frontend/e2e/status-indicators.spec.ts  every status indicator keeps a non-colour cue (WCAG 1.4.1)
 frontend/e2e/private-cluster-storage.spec.ts  seeds kafkito.private-clusters.v1 and walks the stored
                                     connections; secrets must stay out of the console and the page
+frontend/e2e/private-cluster-same-name.spec.ts  adds a private cluster named like the shared one in the
+                                    UI; each must show its own topics, never the other's cached ones
 frontend/e2e/vision-deficiency.spec.ts  opt-in: set KAFKITO_E2E_VISION_DIR to capture the status pages
                                     under deuteranopia / protanopia emulation (Chromium CDP)
 Makefile :: e2e, e2e-up, e2e-test, e2e-down
@@ -88,8 +90,9 @@ Makefile :: e2e, e2e-up, e2e-test, e2e-down
     query invalidation and no full page load.
 - Cluster name in URLs is `KAFKITO_E2E_CLUSTER` (defaults to `local` —
   the cluster defined in `fixtures/kafkito-e2e.yaml`).
-- `clusters.spec.ts`, `status-indicators.spec.ts` and
-  `private-cluster-storage.spec.ts` test private-cluster
+- `clusters.spec.ts`, `status-indicators.spec.ts`,
+  `private-cluster-storage.spec.ts` and `private-cluster-same-name.spec.ts`
+  test private-cluster
   connections against the fixture broker through the host's private IPv4
   address (`fixtures/host-address.ts`), because the backend refuses
   loopback brokers for private clusters. It picks the first RFC 1918
