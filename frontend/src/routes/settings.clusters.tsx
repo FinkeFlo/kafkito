@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useFieldError } from "@/components/ui/FieldError";
 import { Badge } from "@/components/ui/Badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Card } from "@/components/ui/Card";
@@ -12,6 +14,7 @@ import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Notice } from "@/components/ui/Notice";
 import { SearchInput } from "@/components/ui/SearchInput";
+import { StatusIcon } from "@/components/ui/StatusIcon";
 import { Toolbar } from "@/components/ui/Toolbar";
 import { useFuzzy } from "@/lib/fuzzy";
 import {
@@ -25,6 +28,7 @@ import {
   type PrivateClusterAuth,
 } from "@/lib/private-clusters";
 import { testCluster } from "@/lib/api";
+import { removePrivateClusterQueries } from "@/lib/queries/cluster-key";
 import { useCluster } from "@/lib/use-cluster";
 
 export const Route = createFileRoute("/settings/clusters")({
@@ -122,7 +126,14 @@ function fromPrivateCluster(c: PrivateCluster): FormState {
 
 function ClusterSettingsPage() {
   // Subscribe via the hook so list refreshes on any mutation.
-  useCluster();
+  const { clusters } = useCluster();
+  // Names the API client cannot tell apart from a private cluster: it sends
+  // every request for such a name to the private one (exact match).
+  const sharedNames = useMemo(
+    () => new Set(clusters?.filter((c) => c.source === "shared").map((c) => c.name)),
+    [clusters],
+  );
+  const qc = useQueryClient();
   const [items, setItems] = useState(() => listPrivateClusters());
   const forceRefresh = () => setItems(listPrivateClusters());
   useEffect(() => {
@@ -211,7 +222,12 @@ function ClusterSettingsPage() {
   const onImportFile = async (file: File) => {
     try {
       const text = await file.text();
+      const before = listPrivateClusters();
       const res = importBundle(text);
+      const after = new Map(listPrivateClusters().map((c) => [c.id, JSON.stringify(c)]));
+      for (const c of before) {
+        if (after.get(c.id) !== JSON.stringify(c)) removePrivateClusterQueries(qc, c.id);
+      }
       toast.success(`Imported: ${res.added} added, ${res.updated} updated, ${res.skipped} skipped`);
       forceRefresh();
     } catch (e) {
@@ -330,6 +346,12 @@ function ClusterSettingsPage() {
                   </td>
                   <td className="px-4 py-2 font-mono text-[13px] tabular-nums font-medium">
                     {c.name}
+                    {sharedNames.has(c.name) && (
+                      <span className="mt-1 flex items-center gap-1 font-sans text-xs font-normal text-warning">
+                        <StatusIcon intent="warning" />
+                        Same name as a server cluster – rename it to reach both
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-2">
                     {c.is_prod ? (
@@ -386,8 +408,10 @@ function ClusterSettingsPage() {
       {form && (
         <ClusterForm
           initial={form}
+          sharedNames={sharedNames}
           onClose={closeForm}
-          onSaved={() => {
+          onSaved={(saved) => {
+            removePrivateClusterQueries(qc, saved.id);
             closeForm();
             forceRefresh();
           }}
@@ -404,6 +428,7 @@ function ClusterSettingsPage() {
         onConfirm={() => {
           if (confirmDelete) {
             deletePrivateCluster(confirmDelete.id);
+            removePrivateClusterQueries(qc, confirmDelete.id);
             toast.success("Cluster removed");
             forceRefresh();
           }
@@ -416,12 +441,14 @@ function ClusterSettingsPage() {
 
 function ClusterForm({
   initial,
+  sharedNames,
   onClose,
   onSaved,
 }: {
   initial: FormState;
+  sharedNames: ReadonlySet<string>;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (saved: PrivateCluster) => void;
 }) {
   const [f, setF] = useState<FormState>(initial);
   const [testing, setTesting] = useState(false);
@@ -442,10 +469,17 @@ function ClusterForm({
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setF((s) => ({ ...s, [k]: v }));
 
-  const canSave =
+  const complete =
     f.name.trim().length > 0 &&
     f.brokersCSV.trim().length > 0 &&
     (f.authType === "none" || (f.username && f.password));
+  const name = f.name.trim();
+  const nameField = useFieldError(
+    sharedNames.has(name)
+      ? `A server cluster is already named "${name}". Choose another name.`
+      : null,
+  );
+  const canSave = complete && !nameField.invalid;
 
   const onTest = async () => {
     setTesting(true);
@@ -476,7 +510,7 @@ function ClusterForm({
     try {
       const saved = upsertPrivateCluster(toPrivateCluster(f));
       toast.success(`Saved "${saved.name}"`);
-      onSaved();
+      onSaved(saved);
     } catch (e) {
       toast.error(`Save failed: ${(e as Error).message}`);
     }
@@ -490,7 +524,7 @@ function ClusterForm({
       title={f.id ? "Edit private cluster" : "Add private cluster"}
       actions={
         <>
-          <Button variant="secondary" size="sm" onClick={onTest} disabled={testing || !canSave}>
+          <Button variant="secondary" size="sm" onClick={onTest} disabled={testing || !complete}>
             {testing ? "Testing…" : "Test connection"}
           </Button>
           <Button variant="ghost" size="sm" onClick={onClose}>
@@ -508,13 +542,17 @@ function ClusterForm({
       </p>
 
       <div className="mt-4 grid gap-4">
-        <Field label="Name" required>
-          <Input
-            value={f.name}
-            onChange={(e) => set("name", e.target.value)}
-            placeholder="my-dev-cluster"
-          />
-        </Field>
+        <div>
+          <Field label="Name" required>
+            <Input
+              value={f.name}
+              onChange={(e) => set("name", e.target.value)}
+              placeholder="my-dev-cluster"
+              {...nameField.controlProps}
+            />
+          </Field>
+          {nameField.message}
+        </div>
 
         <Field label="Brokers (comma-separated)" required>
           <Input
