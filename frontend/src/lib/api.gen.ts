@@ -371,9 +371,11 @@ export interface paths {
          *     present in both maps wins in `headers_b64` and is emitted exactly once.
          *     An undecodable `headers_b64` value fails the request with 400.
          *
-         *     kafkito always injects the provenance headers `X-Kafkito-Source: true`
-         *     and, when an identity is available, `X-Kafkito-User: <subject>`,
-         *     overwriting those keys if the request supplied them.
+         *     Header keys starting with `X-Kafkito-` (matched case-insensitively) are
+         *     reserved for kafkito's provenance headers: every such key in `headers`
+         *     or `headers_b64` is dropped, then kafkito sets `X-Kafkito-Source: true`
+         *     and, only when an identity is available, `X-Kafkito-User: <subject>`.
+         *     Without an identity the record carries no `X-Kafkito-User` at all.
          *
          *     The body may be sent gzip-compressed with `Content-Encoding: gzip`.
          *     The decompressed body is capped at 15 MiB either way; unknown JSON
@@ -575,8 +577,10 @@ export interface paths {
          *     redacted rendering.
          *
          *     Copied records carry the same provenance headers the produce endpoint
-         *     injects — `X-Kafkito-Source: true` and `X-Kafkito-User: <subject>` —
-         *     overwriting those keys if the source record already had them.
+         *     injects — `X-Kafkito-Source: true` and, when an identity is available,
+         *     `X-Kafkito-User: <subject>` of the caller. Every source header whose key
+         *     starts with `X-Kafkito-` (matched case-insensitively) is dropped, so the
+         *     original producer's provenance is never carried over.
          *
          *     Authorization: the source needs `topic:consume` (checked by the RBAC
          *     middleware from the URL) and the destination needs `topic:produce`
@@ -1164,11 +1168,11 @@ export interface components {
              * @enum {string}
              */
             value_encoding?: "text" | "base64" | "empty";
-            /** @description Header values as UTF-8 text. */
+            /** @description Header values as UTF-8 text. Keys starting with `X-Kafkito-` (case-insensitive) are reserved and dropped; kafkito sets its own provenance headers. */
             headers?: {
                 [key: string]: string;
             };
-            /** @description Header values as standard-base64 raw bytes, for headers whose value is not valid UTF-8. Wins over `headers` for the same key. */
+            /** @description Header values as standard-base64 raw bytes, for headers whose value is not valid UTF-8. Wins over `headers` for the same key. Keys starting with `X-Kafkito-` (case-insensitive) are reserved and dropped, as in `headers`. */
             headers_b64?: {
                 [key: string]: string;
             };
