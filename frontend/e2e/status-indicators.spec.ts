@@ -117,14 +117,14 @@ test.describe("Status indicators never rely on colour alone", () => {
       .getByRole("navigation", { name: "Main" })
       .getByRole("link", { name: "Consumer groups" })
       .click();
-    // Group rows are keyboard-activatable (role="button").
-    const groupRow = page.getByRole("button", { name: new RegExp(GROUP) });
+    // The row keeps role "row"; its action is the group button in the first cell.
+    const groupRow = page.getByRole("row", { name: new RegExp(GROUP) });
     await expect(groupRow.getByText("Empty", { exact: true })).toBeVisible();
     // The lag bucket is named for screen readers and has a visible glyph.
     await expect(groupRow.getByText(/^(normal|elevated|critical) lag/)).toBeAttached();
     await expect(groupRow.getByText(/^(·|▲|▲▲)$/)).toBeVisible();
 
-    await groupRow.click();
+    await groupRow.getByRole("button", { name: GROUP, exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`group=${GROUP}`));
     await expect(page.getByText("Empty", { exact: true }).last()).toBeVisible();
 

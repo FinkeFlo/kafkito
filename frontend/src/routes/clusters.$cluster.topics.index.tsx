@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Boxes, ChevronDown } from "lucide-react";
@@ -166,7 +166,6 @@ function TopicsBody({
   setCreateOpen,
   createDisabledReason,
 }: BodyProps) {
-  const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [showInternal, setShowInternal] = useState(false);
 
@@ -253,12 +252,6 @@ function TopicsBody({
                 showSize={showSize}
                 showRetention={showRetention}
                 nameHighlight={fuzzy.rangesFor(t, "name")}
-                onClick={() =>
-                  navigate({
-                    to: "/clusters/$cluster/topics/$topic",
-                    params: { cluster, topic: t.name },
-                  })
-                }
               />
             ))}
           </tbody>
@@ -271,28 +264,31 @@ function TopicsBody({
 }
 
 function TopicRow({
-  cluster: _cluster,
+  cluster,
   topic,
-  onClick,
   nameHighlight,
   showSize,
   showRetention,
 }: {
   cluster: string;
   topic: TopicInfo;
-  onClick: () => void;
   nameHighlight?: readonly HighlightRange[];
   showSize: boolean;
   showRetention: boolean;
 }) {
   const fmt = useFormatters();
   return (
-    <DataTableRow className="cursor-pointer" onClick={onClick}>
+    <DataTableRow clickable>
       <td className="px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[13px] tabular-nums text-text">
+          <Link
+            to="/clusters/$cluster/topics/$topic"
+            params={{ cluster, topic: topic.name }}
+            data-row-primary=""
+            className="font-mono text-[13px] tabular-nums text-text"
+          >
             <Highlight text={topic.name} ranges={nameHighlight ?? []} />
-          </span>
+          </Link>
           {topic.is_internal && <Tag>INTERNAL</Tag>}
         </div>
       </td>
