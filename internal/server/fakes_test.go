@@ -85,10 +85,15 @@ func (f fakeACLs) DeleteACL(_ context.Context, _ string, spec kafkapkg.ACLSpec) 
 	return f.deleteACL(spec)
 }
 
+// fakeSCRAM implements every scramStore method, so it embeds none.
 type fakeSCRAM struct {
-	scramStore
+	users  []kafkapkg.SCRAMUser
 	upsert func(user, mechanism, password string, iterations int32) error
 	delete func(user, mechanism string) error
+}
+
+func (f fakeSCRAM) ListSCRAMUsers(context.Context, string) ([]kafkapkg.SCRAMUser, error) {
+	return f.users, nil
 }
 
 func (f fakeSCRAM) UpsertSCRAMUser(_ context.Context, _, user, mechanism, password string, iterations int32) error {
