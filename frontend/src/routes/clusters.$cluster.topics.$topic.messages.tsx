@@ -20,7 +20,6 @@ import {
 import { buildPathTree } from "@/lib/path-tree";
 import { buildXmlPathTree, looksLikeXml } from "@/lib/xml-path-tree";
 import { buildJsonPath, wildcardArrayIndices, type Token } from "@/lib/path-builder";
-import { dedupeMessages } from "@/lib/dedupe-messages";
 import { PathSense } from "@/features/messages/PathSense";
 import { MessageRangeCountPreview } from "@/features/messages/MessageRangeCountPreview";
 import { useFormatters } from "@/lib/use-formatters";
@@ -30,55 +29,14 @@ import { RangePicker } from "@/features/messages/RangePicker";
 import { StatusBox, StatusIcon } from "@/components/ui/StatusIcon";
 import { messageQueries } from "@/lib/queries/messages";
 import { topicQueries } from "@/lib/queries/topics";
+import { computeTimeRange } from "@/features/messages/time-range";
+import { orderForDisplay, type SortOrder } from "@/features/messages/display-order";
 
 interface MessagesSearch {
   partition: number;
   limit: number;
   from: "end" | "start" | "offset";
   msgOffset: number;
-}
-
-const PRESET_DURATIONS_MS: Record<string, number> = {
-  "5m": 5 * 60_000,
-  "15m": 15 * 60_000,
-  "1h": 60 * 60_000,
-  "6h": 6 * 60 * 60_000,
-  "24h": 24 * 60 * 60_000,
-  "7d": 7 * 24 * 60 * 60_000,
-  "30d": 30 * 24 * 60 * 60_000,
-};
-
-function computeTimeRange(
-  mode: "off" | "preset" | "custom",
-  preset: string,
-  customFrom: string,
-  customTo: string,
-): { from_ts_ms: number | undefined; to_ts_ms: number | undefined } {
-  if (mode === "off") return { from_ts_ms: undefined, to_ts_ms: undefined };
-  if (mode === "preset") {
-    const now = Date.now();
-    if (preset === "today") {
-      const s = new Date();
-      s.setHours(0, 0, 0, 0);
-      return { from_ts_ms: s.getTime(), to_ts_ms: now };
-    }
-    if (preset === "yesterday") {
-      const s = new Date();
-      s.setHours(0, 0, 0, 0);
-      s.setDate(s.getDate() - 1);
-      const e = new Date(s);
-      e.setHours(23, 59, 59, 999);
-      return { from_ts_ms: s.getTime(), to_ts_ms: e.getTime() };
-    }
-    return {
-      from_ts_ms: now - (PRESET_DURATIONS_MS[preset] ?? 24 * 60 * 60_000),
-      to_ts_ms: now,
-    };
-  }
-  return {
-    from_ts_ms: customFrom ? new Date(customFrom).getTime() : undefined,
-    to_ts_ms: customTo ? new Date(customTo).getTime() : undefined,
-  };
 }
 
 export const Route = createFileRoute("/clusters/$cluster/topics/$topic/messages")({
@@ -198,7 +156,7 @@ function MessagesPanel({
     if (next !== limit) setLimit(next);
   };
 
-  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
 
   // Browse-level time-range filter (separate state from the search panel below)
   const [browseRangeMode, setBrowseRangeMode] = useState<"off" | "preset" | "custom">("off");
@@ -531,19 +489,10 @@ function MessagesPanel({
   const rawMessages = inSearchMode
     ? (searchResult?.messages ?? [])
     : [...(msgsQuery.data?.messages ?? []), ...tailMessages];
-  const displayMessages = useMemo(() => {
-    if (sortOrder === "oldest") return dedupeMessages(rawMessages);
-    // Stable sort: newest timestamp first; ties broken by (partition, offset) desc
-    // so concurrent records keep a deterministic order.
-    // Dedupe after sort: real duplicates are byte-identical (same timestamp), so survivor choice is stable.
-    return dedupeMessages(
-      [...rawMessages].sort((a, b) => {
-        if (b.timestamp_ms !== a.timestamp_ms) return b.timestamp_ms - a.timestamp_ms;
-        if (b.partition !== a.partition) return b.partition - a.partition;
-        return b.offset - a.offset;
-      }),
-    );
-  }, [rawMessages, sortOrder]);
+  const displayMessages = useMemo(
+    () => orderForDisplay(rawMessages, sortOrder),
+    [rawMessages, sortOrder],
+  );
 
   // Points the coachmark at a row that actually renders the click-to-filter
   // tree. Since the search fix the backend keeps reporting "json" for values
@@ -682,7 +631,7 @@ function MessagesPanel({
           <select
             id="browse-sort"
             value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value as "newest" | "oldest")}
+            onChange={(e) => setSortOrder(e.target.value as SortOrder)}
             className="rounded border border-[var(--color-border)] px-2 py-1 text-xs"
             title="Order of displayed messages"
           >
