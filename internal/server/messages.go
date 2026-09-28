@@ -334,14 +334,56 @@ func produceError(cluster, topic string, partition *int32, err error) error {
 	return upstreamError("produce message", err)
 }
 
+// reservedHeaderPrefix marks the record headers kafkito owns. Matched
+// case-insensitively: Kafka header keys are case-sensitive, so a client's
+// "x-kafkito-user" would otherwise sit next to kafkito's "X-Kafkito-User" and
+// fool consumers that look headers up case-insensitively.
+const reservedHeaderPrefix = "X-Kafkito-"
+
+// injectKafkitoProduceHeaders stamps a record kafkito is about to produce
+// with its provenance headers: X-Kafkito-Source always, X-Kafkito-User only
+// when user (the RBAC subject) is known. Every caller-supplied header with the
+// reserved prefix is dropped first, from Headers and HeadersB64 alike, so a
+// record never claims a user kafkito did not verify. It builds fresh maps and
+// never writes into the ones req arrived with.
 func injectKafkitoProduceHeaders(req *kafkapkg.ProduceRequest, user string) {
-	if req.Headers == nil {
-		req.Headers = make(map[string]string)
+	headers := make(map[string]string, len(req.Headers)+2)
+	for k, v := range req.Headers {
+		if !isReservedHeader(k) {
+			headers[k] = v
+		}
 	}
-	req.Headers["X-Kafkito-Source"] = "true"
+	var headersB64 map[string]string
+	for k, v := range req.HeadersB64 {
+		if isReservedHeader(k) {
+			continue
+		}
+		if headersB64 == nil {
+			headersB64 = make(map[string]string, len(req.HeadersB64))
+		}
+		headersB64[k] = v
+	}
+
+	headers["X-Kafkito-Source"] = "true"
 	if user != "" {
-		req.Headers["X-Kafkito-User"] = user
+		headers["X-Kafkito-User"] = user
 	}
+	req.Headers, req.HeadersB64 = headers, headersB64
+}
+
+// isReservedHeader reports whether key starts with reservedHeaderPrefix,
+// ignoring case. The comparison is per rune under Unicode case folding, the
+// same equivalence strings.EqualFold (and Java's equalsIgnoreCase) apply, so
+// e.g. the Kelvin sign standing in for "K" is caught too.
+func isReservedHeader(key string) bool {
+	runes := 0
+	for i := range key {
+		if runes == len(reservedHeaderPrefix) {
+			return strings.EqualFold(key[:i], reservedHeaderPrefix)
+		}
+		runes++
+	}
+	return runes == len(reservedHeaderPrefix) && strings.EqualFold(key, reservedHeaderPrefix)
 }
 
 func isClientProduceErr(msg string) bool {

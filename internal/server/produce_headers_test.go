@@ -60,9 +60,87 @@ func TestInjectKafkitoProduceHeaders(t *testing.T) {
 		}
 		injectKafkitoProduceHeaders(&req, "real-user")
 
-		assert.Equal(t, "true", req.Headers["X-Kafkito-Source"])
-		assert.Equal(t, "real-user", req.Headers["X-Kafkito-User"])
+		assert.Equal(t, map[string]string{
+			"X-Kafkito-Source": "true",
+			"X-Kafkito-User":   "real-user",
+		}, req.Headers)
 	})
+
+	t.Run("drops a spoofed user when there is no identity", func(t *testing.T) {
+		t.Parallel()
+
+		req := kafkapkg.ProduceRequest{
+			Headers: map[string]string{"X-Kafkito-User": "spoofed-user"},
+		}
+		injectKafkitoProduceHeaders(&req, "")
+
+		assert.Equal(t, map[string]string{"X-Kafkito-Source": "true"}, req.Headers)
+	})
+
+	t.Run("drops every reserved key regardless of case or map", func(t *testing.T) {
+		t.Parallel()
+
+		req := kafkapkg.ProduceRequest{
+			Headers: map[string]string{
+				"x-kafkito-user":   "lower",
+				"X-KAFKITO-USER":   "upper",
+				"x-Kafkito-Source": "false",
+				"X-Kafkito-Other":  "anything",
+				"trace-id":         "keep",
+			},
+			HeadersB64: map[string]string{
+				"X-Kafkito-User": "c3Bvb2Zl",
+				"x-kafkito-user": "c3Bvb2Zl",
+				"bin":            "3q2+7w==",
+			},
+		}
+		injectKafkitoProduceHeaders(&req, "alice")
+
+		assert.Equal(t, map[string]string{
+			"trace-id":         "keep",
+			"X-Kafkito-Source": "true",
+			"X-Kafkito-User":   "alice",
+		}, req.Headers)
+		assert.Equal(t, map[string]string{"bin": "3q2+7w=="}, req.HeadersB64)
+	})
+
+	t.Run("leaves the caller's maps untouched", func(t *testing.T) {
+		t.Parallel()
+
+		headers := map[string]string{"X-Kafkito-User": "spoofed", "keep": "v"}
+		headersB64 := map[string]string{"x-kafkito-user": "c3Bvb2Zl"}
+		req := kafkapkg.ProduceRequest{Headers: headers, HeadersB64: headersB64}
+		injectKafkitoProduceHeaders(&req, "alice")
+
+		assert.Equal(t, map[string]string{"X-Kafkito-User": "spoofed", "keep": "v"}, headers)
+		assert.Equal(t, map[string]string{"x-kafkito-user": "c3Bvb2Zl"}, headersB64)
+		assert.Nil(t, req.HeadersB64, "an all-reserved HeadersB64 must not leave an empty map behind")
+	})
+}
+
+func TestIsReservedHeader(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		key  string
+		want bool
+	}{
+		{"X-Kafkito-User", true},
+		{"x-kafkito-user", true},
+		{"X-KAFKITO-SOURCE", true},
+		{"X-Kafkito-", true},
+		{"x-kafkito-anything", true},
+		{"X-\u212Aafkito-User", true}, // Kelvin sign, folds to "k"
+		{"X-Kafkito", false},
+		{"X-Kafkitos-User", false},
+		{"Kafkito-User", false},
+		{" X-Kafkito-User", false},
+		{"trace-id", false},
+		{"", false},
+		{"X-Kafk\xffito-User", false},
+	} {
+		assert.Equal(t, tc.want, isReservedHeader(tc.key), "key %q", tc.key)
+	}
 }
 
 // TestProduceMessage_OversizedBodyReturns413 guards the fix for the Replay

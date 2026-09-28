@@ -138,6 +138,39 @@ func TestCopyProduceRequest(t *testing.T) {
 		assert.Equal(t, map[string]string{"origin": "keep-me"}, msg.Headers)
 	})
 
+	t.Run("source_provenance_headers_are_replaced", func(t *testing.T) {
+		t.Parallel()
+		msg := kafkapkg.Message{
+			Value: "v", ValueEncoding: "text",
+			Headers: map[string]string{
+				"X-Kafkito-Source": "true",
+				"X-Kafkito-User":   "original-producer",
+				"x-kafkito-user":   "lower",
+				"x-kafkito-trace":  "0xdeadbeef",
+				"origin":           "keep-me",
+			},
+			HeadersB64: map[string]string{"x-kafkito-trace": "3q2+7w=="},
+		}
+
+		withoutUser, ok := copyProduceRequest(msg, false, "")
+		require.True(t, ok)
+		assert.Equal(t, map[string]string{"origin": "keep-me", "X-Kafkito-Source": "true"}, withoutUser.Headers,
+			"the original producer's X-Kafkito-User must not survive a copy without identity")
+		assert.Nil(t, withoutUser.HeadersB64)
+
+		withUser, ok := copyProduceRequest(msg, false, "bob")
+		require.True(t, ok)
+		assert.Equal(t, map[string]string{
+			"origin":           "keep-me",
+			"X-Kafkito-Source": "true",
+			"X-Kafkito-User":   "bob",
+		}, withUser.Headers)
+
+		assert.Equal(t, map[string]string{"x-kafkito-trace": "3q2+7w=="}, msg.HeadersB64,
+			"scrubbing must not mutate the consumed record")
+		assert.Len(t, msg.Headers, 5)
+	})
+
 	t.Run("preserve_partition_pins_the_destination_partition", func(t *testing.T) {
 		t.Parallel()
 		msg := kafkapkg.Message{Partition: 3, Value: "v", ValueEncoding: "text"}

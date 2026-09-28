@@ -649,11 +649,12 @@ func isTopicMissingErr(err error) bool {
 //     memory/latency cost the 64 KB cap exists to prevent at this scale — so
 //     it is always skipped, reported like any other skip via `skipped`.
 //
-// Headers go into a fresh map: injectKafkitoProduceHeaders writes into
-// ProduceRequest.Headers, and handing it msg.Headers would mutate the consumed
-// record in place. HeadersB64 carries header values that are not valid UTF-8;
-// without it they would arrive at the destination as the literal display text
-// "0x<hex>" that recordToMessage puts in Headers.
+// injectKafkitoProduceHeaders drops the source record's own X-Kafkito-*
+// headers (the copier is not whoever produced the original) and builds fresh
+// header maps, so msg.Headers and msg.HeadersB64 can be handed over without
+// mutating the consumed record. HeadersB64 carries header values that are not
+// valid UTF-8; without it they would arrive at the destination as the literal
+// display text "0x<hex>" that recordToMessage puts in Headers.
 func copyProduceRequest(msg kafkapkg.Message, preservePartition bool, user string) (kafkapkg.ProduceRequest, bool) {
 	if msg.Masked || msg.ValueTruncated {
 		return kafkapkg.ProduceRequest{}, false
@@ -671,18 +672,13 @@ func copyProduceRequest(msg kafkapkg.Message, preservePartition bool, user strin
 		destPartition = &p
 	}
 
-	headers := make(map[string]string, len(msg.Headers)+2)
-	for k, v := range msg.Headers {
-		headers[k] = v
-	}
-
 	out := kafkapkg.ProduceRequest{
 		Partition:     destPartition,
 		Key:           key,
 		Value:         value,
 		KeyEncoding:   keyEncoding,
 		ValueEncoding: valueEncoding,
-		Headers:       headers,
+		Headers:       msg.Headers,
 		HeadersB64:    msg.HeadersB64,
 	}
 	injectKafkitoProduceHeaders(&out, user)
@@ -693,9 +689,8 @@ func copyProduceRequest(msg kafkapkg.Message, preservePartition bool, user strin
 // triple — as returned by the consumer for Message.Key/Value — to the
 // (value, encoding) pair kafkapkg.ProduceRequest expects, so the record's
 // key and value bytes are reproduced exactly on the destination. The record as
-// a whole is not byte-for-byte identical: copyProduceRequest adds the two
-// X-Kafkito-* provenance headers, overwriting any source header of the same
-// name.
+// a whole is not byte-for-byte identical: copyProduceRequest replaces every
+// X-Kafkito-* source header with kafkito's own provenance headers.
 //
 // "binary" payloads only retain their original bytes in the base64 form, so
 // those use ProduceRequest's "base64" encoding. "empty" needs ProduceRequest's
