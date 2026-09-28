@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
@@ -52,7 +53,7 @@ func (r *Messages) Produce(ctx context.Context, cluster, topic string, req Produ
 		return nil, err
 	}
 
-	res := cl.ProduceSync(ctx, rec)
+	res := produceSync(ctx, cl, topic, []*kgo.Record{rec}, []ProduceRequest{req})
 	if err := res.FirstErr(); err != nil {
 		return nil, fmt.Errorf("produce: %w", err)
 	}
@@ -97,7 +98,7 @@ func (r *Messages) ProduceBatch(ctx context.Context, cluster, topic string, reqs
 	// ProduceSync appends to its result slice from the per-record promise, so
 	// ProduceResults is in completion order, not input order. Only the count of
 	// nil-error entries is meaningful; a "successful prefix" cannot be derived.
-	res := cl.ProduceSync(ctx, recs...)
+	res := produceSync(ctx, cl, topic, recs, reqs)
 	for _, pr := range res {
 		if pr.Err == nil {
 			produced++
@@ -107,6 +108,42 @@ func (r *Messages) ProduceBatch(ctx context.Context, cluster, topic string, reqs
 		return produced, fmt.Errorf("produce: %w", err)
 	}
 	return produced, nil
+}
+
+// produceSync produces recs, built from reqs in the same order, and waits for
+// every record's result.
+//
+// The client locks onto the ID a topic had when it first saw the topic. Once
+// the topic is deleted and recreated under the same name, by kafkito or any
+// other tool, the client fails every record for it with UNKNOWN_TOPIC_ID
+// until the topic is purged from the client. produceSync then purges the
+// topic and produces the refused records once more, rebuilt from their
+// requests: the first attempt already set fields such as the partition.
+func produceSync(ctx context.Context, cl *kgo.Client, topic string, recs []*kgo.Record, reqs []ProduceRequest) kgo.ProduceResults {
+	res := cl.ProduceSync(ctx, recs...)
+	index := make(map[*kgo.Record]int, len(recs))
+	for i, rec := range recs {
+		index[rec] = i
+	}
+	kept := make(kgo.ProduceResults, 0, len(res))
+	var retry []*kgo.Record
+	for _, pr := range res {
+		i, ok := index[pr.Record]
+		if !ok || !errors.Is(pr.Err, kerr.UnknownTopicID) {
+			kept = append(kept, pr)
+			continue
+		}
+		rec, err := buildRecord(topic, reqs[i])
+		if err != nil {
+			return res
+		}
+		retry = append(retry, rec)
+	}
+	if len(retry) == 0 {
+		return res
+	}
+	cl.PurgeTopicsFromClient(topic)
+	return append(kept, cl.ProduceSync(ctx, retry...)...)
 }
 
 // buildRecord turns a ProduceRequest into a kgo.Record for topic. It is the
