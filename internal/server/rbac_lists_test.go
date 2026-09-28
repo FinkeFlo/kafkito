@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -144,4 +145,102 @@ func TestListScramUsers_RBACFilter(t *testing.T) {
 			assert.Equal(t, tc.want, listNames(t, h, tc, "/users", "users", "user"))
 		})
 	}
+}
+
+// Creating or rotating a SCRAM user is checked against the user named in
+// the body, exactly as the broker stores it.
+func TestUpsertScramUser_RBACChecksBodyName(t *testing.T) {
+	t.Parallel()
+
+	const (
+		ok          = `{"mechanism":"SCRAM-SHA-256","ok":true,"user":"%s"}`
+		handlerDeny = `{"code":"rbac_denied","error":"forbidden"}`
+	)
+	deny := func(user string) string {
+		return `{"action":"edit","error":"forbidden","resource":"user:` + user + `"}`
+	}
+	exact := rbacGrantConfig(perm("user:alice", "edit"))
+	glob := rbacGrantConfig(perm("user:team-*", "edit"))
+
+	for _, tc := range []struct {
+		name       string
+		cfg        config.Config
+		private    bool
+		body       string
+		wantStatus int
+		wantBody   string
+	}{
+		{name: "exact grant, same name", cfg: exact, body: scramBody("alice"), wantStatus: http.StatusOK, wantBody: strings.Replace(ok, "%s", "alice", 1)},
+		{name: "exact grant, other name", cfg: exact, body: scramBody("bob"), wantStatus: http.StatusForbidden, wantBody: deny("bob")},
+		{name: "exact grant, star name", cfg: exact, body: scramBody("*"), wantStatus: http.StatusForbidden, wantBody: deny("*")},
+		{name: "exact grant, trailing space", cfg: exact, body: scramBody("alice "), wantStatus: http.StatusForbidden, wantBody: handlerDeny},
+		{name: "exact grant, leading space", cfg: exact, body: scramBody(" alice"), wantStatus: http.StatusForbidden, wantBody: handlerDeny},
+		{name: "glob grant, matching name", cfg: glob, body: scramBody("team-x"), wantStatus: http.StatusOK, wantBody: strings.Replace(ok, "%s", "team-x", 1)},
+		{name: "glob grant, other name", cfg: glob, body: scramBody("alice"), wantStatus: http.StatusForbidden, wantBody: deny("alice")},
+		{name: "view only", cfg: rbacGrantConfig(perm("user:*", "view")), body: scramBody("alice"), wantStatus: http.StatusForbidden, wantBody: deny("alice")},
+		{name: "wildcard grant, padded name", cfg: rbacGrantConfig(perm("user:*", "edit")), body: scramBody("alice "), wantStatus: http.StatusOK, wantBody: strings.Replace(ok, "%s", "alice ", 1)},
+		{name: "missing user", cfg: exact, body: `{"mechanism":"SCRAM-SHA-256","password":"pw-secret"}`, wantStatus: http.StatusBadRequest, wantBody: `{"error":"missing or invalid 'user' in request body"}`},
+		{name: "rbac disabled", cfg: config.Defaults(), body: scramBody("bob"), wantStatus: http.StatusOK, wantBody: strings.Replace(ok, "%s", "bob", 1)},
+		{name: "private cluster", cfg: exact, private: true, body: scramBody("bob"), wantStatus: http.StatusOK, wantBody: strings.Replace(ok, "%s", "bob", 1)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var called []string
+			h := rbacFakeServer(t, tc.cfg, stores{scram: fakeSCRAM{upsert: func(user, _, _ string, _ int32) error {
+				called = append(called, user)
+				return nil
+			}}})
+			cluster := "kf"
+			header := map[string]string{rbacTestHeader: userMallory}
+			if tc.private {
+				cluster = config.PrivateClusterSentinel
+				header[PrivateClusterHeader] = encodeHeader(t, config.ClusterConfig{Brokers: []string{unreachableBroker}})
+			}
+			req, rec := requestCase{
+				method: http.MethodPost, path: "/api/v1/clusters/" + cluster + "/users",
+				contentType: "application/json", header: header, body: tc.body,
+			}.do(t, h)
+			require.Equal(t, tc.wantStatus, rec.Code, rec.Body.String())
+			assert.JSONEq(t, tc.wantBody, rec.Body.String())
+			assert.NotContains(t, rec.Body.String(), "pw-secret")
+			if tc.wantStatus == http.StatusOK {
+				assertResponseMatchesSpec(t, contractRouter(t), req, rec)
+				assert.Len(t, called, 1)
+			} else {
+				assert.Empty(t, called, "the upsert must not reach the broker")
+			}
+		})
+	}
+}
+
+// With RBAC on, the middleware reads the SCRAM upsert body to find the user
+// before the route's limit applies. That read is capped at the route's own
+// 16 KiB and answers with the route's message.
+func TestUpsertScramUser_RBACBodyRead(t *testing.T) {
+	t.Parallel()
+
+	h := rbacFakeServer(t, rbacGrantConfig(perm("user:limit", "edit")), stores{scram: fakeSCRAM{upsert: func(string, string, string, int32) error { return nil }}})
+	user := map[string]string{rbacTestHeader: userMallory}
+	const path = "/api/v1/clusters/kf/users"
+	body := scramBody("limit")
+
+	rec := sendBody(h, http.MethodPost, path, strings.NewReader(padJSON(t, body, maxSCRAMBodyBytes)), user)
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	rec = sendBody(h, http.MethodPost, path, strings.NewReader(`{"user":"limit","mechanism":"SCRAM-SHA-256","password":"pw-secret","bogus":1}`), user)
+	assert.Equal(t, http.StatusOK, rec.Code, "the handler sees the body the middleware read: %s", rec.Body.String())
+
+	rec = sendBody(h, http.MethodPost, path, strings.NewReader(padJSON(t, body, maxSCRAMBodyBytes+1)), user)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.JSONEq(t, `{"error":"invalid json: http: request body too large"}`, rec.Body.String())
+
+	src := &countingReader{}
+	rec = sendBody(h, http.MethodPost, path, src, user)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.LessOrEqual(t, src.n, int64(maxSCRAMBodyBytes)+64<<10, "read %d bytes", src.n)
+}
+
+func scramBody(user string) string {
+	b, _ := json.Marshal(map[string]string{"user": user, "mechanism": "SCRAM-SHA-256", "password": "pw-secret"})
+	return string(b)
 }
