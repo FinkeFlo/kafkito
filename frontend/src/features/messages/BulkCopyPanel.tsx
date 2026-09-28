@@ -28,8 +28,8 @@ interface BulkCopyPanelProps {
  */
 const SKIPPED_TOOLTIP =
   "Records that cannot be reproduced byte-for-byte are left out: payloads decoded " +
-  "through the Schema Registry (the original wire-format bytes are gone) and values " +
-  "redacted by this cluster's data masking rules.";
+  "through the Schema Registry (the original wire-format bytes are gone) and records " +
+  "whose value, key or header values this cluster's data masking rules redacted.";
 
 /**
  * The "To" bound is exclusive, and an empty "To" is pinned to the moment the

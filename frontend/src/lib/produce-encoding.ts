@@ -104,19 +104,37 @@ type ReplayCandidate = Pick<
   Message,
   "key_encoding" | "value_encoding" | "masked" | "key_sr" | "value_sr"
 > &
-  Partial<Pick<Message, "key" | "key_b64" | "value" | "value_b64">>;
+  Partial<
+    Pick<Message, "key" | "key_b64" | "value" | "value_b64" | "key_masked" | "masked_headers">
+  >;
 
 /**
  * Returns null when the message can be replayed byte-for-byte, otherwise the
- * reason it cannot. Blocks on masked records (the rendering the UI holds is
- * redacted, not the real payload) and on a key or value whose original bytes
- * are unrecoverable.
+ * reason it cannot. Blocks on masked records — value, key or any header value
+ * (the rendering the UI holds is redacted, not the real payload) — and on a
+ * key or value whose original bytes are unrecoverable.
  */
 export function replayBlocker(m: ReplayCandidate): ReplayBlocker | null {
   if (m.masked) {
     return {
       reason:
         "Masked message: the value shown is redacted, replaying it would write the redacted text.",
+    };
+  }
+  if (m.key_masked) {
+    return {
+      reason:
+        "Masked message: the key shown is redacted, replaying it would write the redacted key.",
+    };
+  }
+  if (m.masked_headers && m.masked_headers.length > 0) {
+    const names = m.masked_headers.join(", ");
+    const what =
+      m.masked_headers.length === 1
+        ? `the value of header ${names} is`
+        : `the values of headers ${names} are`;
+    return {
+      reason: `Masked message: ${what} redacted, replaying it would write the redacted text.`,
     };
   }
 
