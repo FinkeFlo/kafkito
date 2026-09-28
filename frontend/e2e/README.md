@@ -13,18 +13,29 @@ PR builds (`.github/workflows/e2e.yml`).
 Kafka broker      docker compose ↑ kafkito-kafka  : 39092 (host)  ← seed.sh writes here
                   runs the StandardAuthorizer with User:ANONYMOUS as super
                   user, so the ACL walk can create and delete rules
-Schema Registry   not started for e2e (not needed by current walks)
+Schema Registry   docker compose ↑ kafkito-schema-registry : 38081 (host)  ← seed.sh registers subjects here
+                  confluentinc/cp-schema-registry:7.6.2, stores its schemas in
+                  the fixture broker's _schemas topic
 kafkito (Go)      subprocess on PORT=47421       : 47421 (host)  ← Playwright targets here
                   built with -tags devauth so KAFKITO_AUTH_MODE=off is allowed
                   serves the embedded frontend; Vite is NOT involved
                   configured by fixtures/kafkito-e2e.yaml (KAFKITO_CONFIG)
 ```
 
+`make e2e-up` starts both containers with `docker compose up -d --wait kafka
+schema-registry`, so it returns once both healthchecks pass. `make
+e2e-down` (and `make e2e-clean`) stop the kafkito binary and the Schema
+Registry container, but only the container if `make e2e-up` started it:
+a registry that a running `make dev` stack already owns keeps running.
+Kafka is left running, as before.
+
 `make dev` keeps using `:37421` (kafkito) and `:37422` (Vite). Both can
 coexist with `make e2e` because the e2e kafkito binds a different port
 and uses the fresh local Kafka cluster (named `local` in
-`fixtures/kafkito-e2e.yaml`, which also holds the `data_masking` rules the
-masking walk needs).
+`fixtures/kafkito-e2e.yaml`, which also holds the Schema Registry URL and
+the `data_masking` rules the masking walk needs). Both stacks share the
+same Kafka and Schema Registry containers; `seed.sh` only touches the
+`e2e-*` topics and subjects.
 
 ## Quickstart (local)
 
@@ -46,10 +57,18 @@ To override the port: `make e2e E2E_PORT=47431`.
 ## File map
 
 ```
-docker-compose.yml                  apache/kafka:3.8.1 + cp-schema-registry (existing)
+docker-compose.yml                  apache/kafka:3.8.1 + cp-schema-registry:7.6.2
 frontend/playwright.config.ts       Playwright bootstrap (testDir = ./e2e)
-frontend/e2e/fixtures/seed.sh       seeds the broker via `docker exec kafkito-kafka`
-frontend/e2e/fixtures/kafkito-e2e.yaml  kafkito config: cluster `local` + data_masking for e2e-masked(-kh)
+frontend/e2e/fixtures/seed.sh       seeds the broker via `docker exec kafkito-kafka` and the Schema
+                                    Registry via its REST API (Avro subject with two versions, JSON
+                                    Schema and Protobuf subjects, and the e2e-avro-orders topic with
+                                    Avro records in the Confluent wire format)
+frontend/e2e/fixtures/kafkito-e2e.yaml  kafkito config: cluster `local` + its Schema Registry URL +
+                                    data_masking for e2e-masked(-kh)
+frontend/e2e/schemas.spec.ts        Schemas page (list, filter, subject detail, versions, delete) and
+                                    the topic Schema tab, incl. their shared query cache
+frontend/e2e/schema-messages.spec.ts  decoded Avro records in the messages view and the raw download
+                                    of a truncated one (still the wire format, see #87)
 frontend/e2e/*.spec.ts              the actual walks
 frontend/e2e/csp.spec.ts            fails on any Content-Security-Policy violation (needs the Go-served build)
 frontend/e2e/a11y.spec.ts           axe scan of the main routes, dialogs and form error states in light
@@ -90,6 +109,8 @@ Makefile :: e2e, e2e-up, e2e-test, e2e-down
     in the list and deletes it.
   - `scram-users.spec.ts`: creates a SCRAM user with a unique name,
     rotates its password and deletes the credential.
+  - `schemas.spec.ts`: registers its own subject (`e2e-delete-me-value`)
+    through the API and deletes it in the UI.
   - The mutation walks require the list refetch caused by the mutation's
     query invalidation and no full page load.
 - Cluster name in URLs is `KAFKITO_E2E_CLUSTER` (defaults to `local` —
@@ -111,7 +132,6 @@ Makefile :: e2e, e2e-up, e2e-test, e2e-down
 
 Out of scope for the current iteration:
 
-- Schema Registry walks beyond the capability checks in `schemas.spec.ts`
-  — the e2e stack starts no Schema Registry, so listing subjects and
-  opening a version is covered by the Go tests against a fake registry
+- Decoded Protobuf and JSON Schema records in the messages view — the
+  fixture topic only carries Avro records
 - Cross-cluster switch walks — needs ≥2 fixture clusters
