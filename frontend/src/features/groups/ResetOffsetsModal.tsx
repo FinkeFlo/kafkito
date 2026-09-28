@@ -9,6 +9,7 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useFieldError } from "@/components/ui/FieldError";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Notice } from "@/components/ui/Notice";
@@ -79,6 +80,9 @@ export function ResetOffsetsModal({
     strategy !== "shift-by" || (shift.trim() !== "" && Number.isFinite(Number(shift)));
   const strategyReady =
     (strategy === "timestamp" ? timestampValid : true) && offsetValid && shiftValid;
+  const offsetField = useFieldError(offsetValid ? null : "Enter a numeric offset.");
+  const shiftField = useFieldError(shiftValid ? null : "Enter a numeric shift.");
+  const timestampField = useFieldError(timestampValid ? null : "Pick a valid date and time.");
 
   const setRelativeHours = (hours: number) => {
     setTimestampMs(String(Date.now() - hours * 3600_000));
@@ -207,19 +211,23 @@ export function ResetOffsetsModal({
           </label>
         </div>
         {strategy === "offset" && (
-          <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Offset
-            </span>
-            <Input
-              value={offset}
-              onChange={(e) => setOffset(e.target.value)}
-              className="mt-1 font-mono"
-            />
-            <span className="mt-1 block text-xs text-muted">
-              Applied to every selected partition. Clamped to [start, end].
-            </span>
-          </label>
+          <div>
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                Offset
+              </span>
+              <Input
+                value={offset}
+                onChange={(e) => setOffset(e.target.value)}
+                className="mt-1 font-mono"
+                {...offsetField.controlProps}
+              />
+              <span className="mt-1 block text-xs text-muted">
+                Applied to every selected partition. Clamped to [start, end].
+              </span>
+            </label>
+            {offsetField.message}
+          </div>
         )}
         {strategy === "timestamp" && (
           <div className="space-y-2">
@@ -241,6 +249,7 @@ export function ResetOffsetsModal({
                     setTimestampMs(Number.isFinite(ms) ? String(ms) : "");
                   }}
                   className="max-w-[16rem] font-mono"
+                  {...timestampField.controlProps}
                 />
                 <div className="flex gap-1.5">
                   {[
@@ -265,21 +274,25 @@ export function ResetOffsetsModal({
                 Resolves to <Timestamp value={timestampNum} zone="utc" /> (UTC)
               </p>
             ) : (
-              <Notice intent="warning">Pick a valid date and time.</Notice>
+              timestampField.message
             )}
           </div>
         )}
         {strategy === "shift-by" && (
-          <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Shift (records, negative allowed)
-            </span>
-            <Input
-              value={shift}
-              onChange={(e) => setShift(e.target.value)}
-              className="mt-1 font-mono"
-            />
-          </label>
+          <div>
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                Shift (records, negative allowed)
+              </span>
+              <Input
+                value={shift}
+                onChange={(e) => setShift(e.target.value)}
+                className="mt-1 font-mono"
+                {...shiftField.controlProps}
+              />
+            </label>
+            {shiftField.message}
+          </div>
         )}
         <div>
           <div className="mb-1 flex items-center justify-between text-xs">

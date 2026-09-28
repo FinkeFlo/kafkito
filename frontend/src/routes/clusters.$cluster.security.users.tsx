@@ -4,6 +4,7 @@ import { useId, useMemo, useState } from "react";
 import { KeyRound, Trash2 } from "lucide-react";
 import { deleteSCRAMUser, upsertSCRAMUser, type SCRAMMechanism, type SCRAMUser } from "@/lib/api";
 import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
+import { useFieldError } from "@/components/ui/FieldError";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -237,6 +238,10 @@ function UpsertModal({
   const [password, setPassword] = useState("");
   const [iterations, setIterations] = useState(8192);
   const fieldId = useId();
+  const iterationsValid = iterations >= 4096 && iterations <= 16384;
+  const iterationsField = useFieldError(
+    iterationsValid ? null : "Iterations must be between 4096 and 16384.",
+  );
 
   const mut = useMutation({
     mutationFn: () => upsertSCRAMUser(cluster, { user, mechanism, password, iterations }),
@@ -261,9 +266,7 @@ function UpsertModal({
             variant="primary"
             size="sm"
             onClick={() => mut.mutate()}
-            disabled={
-              mut.isPending || !user.trim() || !password || iterations < 4096 || iterations > 16384
-            }
+            disabled={mut.isPending || !user.trim() || !password || !iterationsValid}
           >
             {mut.isPending ? "Saving…" : rotating ? "Rotate" : "Create"}
           </Button>
@@ -328,7 +331,9 @@ function UpsertModal({
             value={iterations}
             onChange={(e) => setIterations(Number(e.target.value) || 0)}
             className="mt-1 w-32"
+            {...iterationsField.controlProps}
           />
+          {iterationsField.message}
         </div>
       </div>
     </Modal>

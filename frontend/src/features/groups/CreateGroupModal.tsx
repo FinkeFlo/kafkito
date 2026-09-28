@@ -7,6 +7,7 @@ import {
   type ResetOffsetResult,
 } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
+import { useFieldError } from "@/components/ui/FieldError";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Notice } from "@/components/ui/Notice";
@@ -78,6 +79,8 @@ export function CreateGroupModal({
   const timestampValid =
     strategy !== "timestamp" || (timestampMs.trim() !== "" && Number.isFinite(Number(timestampMs)));
   const ready = groupIdValid && offsetValid && timestampValid;
+  const offsetField = useFieldError(offsetValid ? null : "Enter a whole-number offset.");
+  const timestampField = useFieldError(timestampValid ? null : "Pick a valid date and time.");
 
   async function onPreview() {
     setErr(null);
@@ -181,44 +184,52 @@ export function CreateGroupModal({
           </label>
         </div>
         {strategy === "offset" && (
-          <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Offset
-            </span>
-            <Input
-              value={offset}
-              onChange={(e) => {
-                setOffset(e.target.value);
-                setPreview(null);
-              }}
-              className="mt-1 font-mono"
-            />
-            <span className="mt-1 block text-xs text-muted">
-              Applied to every partition of the topic.
-            </span>
-          </label>
+          <div>
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                Offset
+              </span>
+              <Input
+                value={offset}
+                onChange={(e) => {
+                  setOffset(e.target.value);
+                  setPreview(null);
+                }}
+                className="mt-1 font-mono"
+                {...offsetField.controlProps}
+              />
+              <span className="mt-1 block text-xs text-muted">
+                Applied to every partition of the topic.
+              </span>
+            </label>
+            {offsetField.message}
+          </div>
         )}
         {strategy === "timestamp" && (
-          <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Timestamp (epoch ms)
-            </span>
-            <Input
-              type="datetime-local"
-              step="1"
-              value={
-                timestampMs.trim() !== "" && Number.isFinite(Number(timestampMs))
-                  ? msToLocalInput(Number(timestampMs))
-                  : ""
-              }
-              onChange={(e) => {
-                const ms = localInputToMs(e.target.value);
-                setTimestampMs(Number.isFinite(ms) ? String(ms) : "");
-                setPreview(null);
-              }}
-              className="mt-1 max-w-[16rem] font-mono"
-            />
-          </label>
+          <div>
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                Timestamp (epoch ms)
+              </span>
+              <Input
+                type="datetime-local"
+                step="1"
+                value={
+                  timestampMs.trim() !== "" && Number.isFinite(Number(timestampMs))
+                    ? msToLocalInput(Number(timestampMs))
+                    : ""
+                }
+                onChange={(e) => {
+                  const ms = localInputToMs(e.target.value);
+                  setTimestampMs(Number.isFinite(ms) ? String(ms) : "");
+                  setPreview(null);
+                }}
+                className="mt-1 max-w-[16rem] font-mono"
+                {...timestampField.controlProps}
+              />
+            </label>
+            {timestampField.message}
+          </div>
         )}
 
         <Notice intent="info">

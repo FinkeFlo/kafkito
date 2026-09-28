@@ -2,7 +2,11 @@ import { forwardRef, type InputHTMLAttributes, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  /** Marks the input as having a validation error — switches the border to `border-danger`. */
+  /**
+   * Marks the input as having a validation error — sets `aria-invalid="true"`
+   * and switches the border to `border-danger`. Pair it with a visible
+   * `<FieldError>` referenced via `aria-describedby` (see `useFieldError`).
+   */
   invalid?: boolean;
   /** Optional icon rendered absolute-positioned at the leading edge. */
   leadingIcon?: ReactNode;
@@ -23,11 +27,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   { className, wrapperClassName, invalid, leadingIcon, trailingIcon, type = "text", ...rest },
   ref,
 ) {
+  const ariaInvalid = rest["aria-invalid"];
+  const isInvalid = !!invalid || ariaInvalid === true || ariaInvalid === "true";
   const base = cn(
     "h-9 w-full rounded-md border bg-panel px-3 text-sm text-text",
     "placeholder:text-subtle-text",
     "transition-colors duration-150",
-    invalid ? "border-danger" : "border-border hover:border-border-hover",
+    isInvalid ? "border-danger" : "border-border hover:border-border-hover",
     "disabled:cursor-not-allowed disabled:opacity-60",
     leadingIcon && "pl-9",
     trailingIcon && "pr-9",
@@ -35,7 +41,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   );
 
   if (!leadingIcon && !trailingIcon) {
-    return <input ref={ref} type={type} className={base} {...rest} />;
+    return (
+      <input
+        ref={ref}
+        type={type}
+        className={base}
+        {...rest}
+        aria-invalid={isInvalid || undefined}
+      />
+    );
   }
 
   return (
@@ -48,7 +62,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           {leadingIcon}
         </span>
       ) : null}
-      <input ref={ref} type={type} className={base} {...rest} />
+      <input
+        ref={ref}
+        type={type}
+        className={base}
+        {...rest}
+        aria-invalid={isInvalid || undefined}
+      />
       {trailingIcon ? (
         <span className="absolute right-2 flex h-5 w-5 items-center justify-center text-subtle-text">
           {trailingIcon}

@@ -33,7 +33,7 @@ function luminance(tokens: Map<string, string>, name: string): number {
 }
 
 const TEXT =
-  "text/bg text/panel text/subtle muted/bg muted/panel muted/subtle subtle-text/panel accent/panel accent-foreground/accent accent-foreground/accent-hover success/success-subtle warning/warning-subtle danger/danger-subtle info/info-subtle tint-green-fg/tint-green-bg tint-amber-fg/tint-amber-bg tint-red-fg/tint-red-bg";
+  "text/bg text/panel text/subtle muted/bg muted/panel muted/subtle subtle-text/panel accent/panel accent-foreground/accent accent-foreground/accent-hover success/success-subtle warning/warning-subtle danger/danger-subtle info/info-subtle tint-green-fg/tint-green-bg tint-amber-fg/tint-amber-bg tint-red-fg/tint-red-bg danger/panel";
 const NON_TEXT =
   "focus/bg focus/panel focus/subtle focus/hover focus-on-accent/accent focus-on-accent/danger border-strong/panel success/panel warning/panel danger/panel";
 
