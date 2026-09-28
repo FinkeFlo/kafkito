@@ -5,7 +5,8 @@ const CLUSTER = process.env.KAFKITO_E2E_CLUSTER ?? "local";
 const TOPIC = "e2e-walk-target";
 const GROUP = "e2e-idle-group";
 // Seeded by seed.sh into the e2e Schema Registry.
-const SUBJECT = "e2e-avro-orders-value";
+const SR_TOPIC = "e2e-avro-orders";
+const SUBJECT = `${SR_TOPIC}-value`;
 
 const c = encodeURIComponent(CLUSTER);
 const topicPath = (tab: string) => `/clusters/${c}/topics/${encodeURIComponent(TOPIC)}/${tab}`;
@@ -74,6 +75,15 @@ const ROUTES: Route[] = [
     name: "topic-schema",
     path: topicPath("schema"),
     ready: (page) => h1(page, TOPIC),
+  },
+  {
+    name: "topic-schema-subject",
+    path: `/clusters/${c}/topics/${SR_TOPIC}/schema`,
+    ready: async (page) => {
+      await h1(page, SR_TOPIC);
+      await expect(page.getByText(SUBJECT, { exact: true })).toBeVisible();
+      await expect(page.getByText(/^v2 · id \d+$/)).toBeVisible();
+    },
   },
   {
     name: "groups",
@@ -169,6 +179,14 @@ const STATES: State[] = [
     open: async (page) => {
       await page.getByRole("button", { name: /Copy messages to another cluster/ }).click();
       await expect(page.getByPlaceholder("topic-name")).toBeVisible();
+    },
+  },
+  {
+    ...route("schemas"),
+    name: "schema-subject-detail",
+    open: async (page) => {
+      await page.getByRole("button", { name: new RegExp(`^${SUBJECT}`) }).click();
+      await expect(page.getByText("Compatibility: BACKWARD")).toBeVisible();
     },
   },
   {
