@@ -267,6 +267,7 @@ function GroupsTable({
         emptyState={empty}
         caption={`Showing ${filtered.length} of ${total}`}
         onRowClick={(r) => onSelect(r.group_id === selectedGroup ? undefined : r.group_id)}
+        isRowExpanded={(r) => r.group_id === selectedGroup}
       />
     </>
   );

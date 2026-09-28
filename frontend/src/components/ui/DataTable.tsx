@@ -2,6 +2,7 @@ import {
   useMemo,
   useState,
   type HTMLAttributes,
+  type MouseEvent,
   type ReactNode,
   type TableHTMLAttributes,
   type ThHTMLAttributes,
@@ -20,9 +21,27 @@ import { Skeleton } from "./Skeleton";
  *      control over alignment and monospace.
  *   2. Column-driven (`<DataTable columns={…} rows={…} rowKey={…} />`).
  *      Sortable, with built-in skeleton + empty-state rendering. `aria-sort`
- *      is announced on sortable columns. Rows are keyboard reachable when
- *      `onRowClick` is set.
+ *      is announced on sortable columns.
+ *
+ * Clickable rows keep their table semantics: the `<tr>` stays a row and is
+ * never a tab stop. The row's action lives in a real control in the primary
+ * cell (a `<Link>` or `<button>` marked `data-row-primary`), which is what
+ * keyboard and screen-reader users reach. A pointer click elsewhere on the
+ * row is forwarded to that control as a mouse convenience. Column mode
+ * renders the `<button>` itself when `onRowClick` is set; composition mode
+ * passes `clickable` to `<DataTableRow>` and marks its own control.
  */
+
+// Controls inside a clickable row that handle their own clicks.
+const OWN_CLICK_SELECTOR =
+  "a, button, input, select, textarea, label, summary, [role='button'], [role='link'], [contenteditable='true']";
+
+/** Forwards a pointer click on a row to the row's `data-row-primary` control. */
+function forwardRowClick(e: MouseEvent<HTMLTableRowElement>) {
+  const own = (e.target as Element).closest(OWN_CLICK_SELECTOR);
+  if (own && e.currentTarget.contains(own)) return;
+  e.currentTarget.querySelector<HTMLElement>("[data-row-primary]")?.click();
+}
 
 // ---------------------------------------------------------------------------
 // Column-driven mode
@@ -38,6 +57,8 @@ export interface DataTableColumn<Row> {
   /** Tailwind classes for the <td>/<th> (e.g. "w-32", "text-right"). */
   className?: string;
   align?: "left" | "right";
+  /** Hosts the row's `<button>` when `onRowClick` is set. Defaults to the first column. */
+  primary?: boolean;
 }
 
 export interface ColumnDrivenProps<Row> {
@@ -45,8 +66,14 @@ export interface ColumnDrivenProps<Row> {
   rows: Row[] | undefined;
   /** Stable key per row. */
   rowKey: (row: Row) => string;
-  /** Click handler — when set, rows render as clickable with chevron. */
+  /**
+   * Row action — when set, the primary column's cell renders as a real
+   * `<button>` (Tab to it, Enter / Space activates), the rest of the row
+   * forwards pointer clicks to it, and a chevron column is added.
+   */
   onRowClick?: (row: Row) => void;
+  /** Exposes the row action as a disclosure (`aria-expanded`), e.g. an inline detail panel. */
+  isRowExpanded?: (row: Row) => boolean;
   /** Async loading flag. Renders skeleton rows. */
   isLoading?: boolean;
   /** Number of skeleton rows to render while loading. */
@@ -78,6 +105,7 @@ export interface CompositionProps {
   rows?: undefined;
   rowKey?: undefined;
   onRowClick?: undefined;
+  isRowExpanded?: undefined;
   isLoading?: undefined;
   skeletonRows?: undefined;
   emptyState?: undefined;
@@ -127,6 +155,7 @@ function DataTableColumnView<Row>({
   rows,
   rowKey,
   onRowClick,
+  isRowExpanded,
   isLoading,
   skeletonRows = 5,
   emptyState,
@@ -164,6 +193,7 @@ function DataTableColumnView<Row>({
   };
 
   const renderEmpty = !isLoading && rows && rows.length === 0;
+  const primaryId = onRowClick ? (columns.find((c) => c.primary) ?? columns[0])?.id : undefined;
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -238,25 +268,7 @@ function DataTableColumnView<Row>({
                     return (
                       <tr
                         key={rowKey(row)}
-                        onClick={onActivate}
-                        onKeyDown={
-                          onActivate
-                            ? (e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                  e.preventDefault();
-                                  onActivate();
-                                }
-                              }
-                            : undefined
-                        }
-                        tabIndex={onActivate ? 0 : undefined}
-                        // `role="button"` (not `link`): we accept Enter
-                        // AND Space for activation (button semantics) and
-                        // there is no URL to expose for middle/right
-                        // click. Rows may be wrapped in `<Link>` once
-                        // each route knows the canonical row URL — at
-                        // which point the role drops back to default.
-                        role={onActivate ? "button" : undefined}
+                        onClick={onActivate ? forwardRowClick : undefined}
                         className={cn(
                           "group transition-colors duration-150",
                           onActivate && "cursor-pointer hover:bg-hover",
@@ -271,7 +283,19 @@ function DataTableColumnView<Row>({
                               col.className,
                             )}
                           >
-                            {col.cell(row)}
+                            {onActivate && col.id === primaryId ? (
+                              <button
+                                type="button"
+                                data-row-primary=""
+                                onClick={onActivate}
+                                aria-expanded={isRowExpanded?.(row)}
+                                className="cursor-pointer text-left"
+                              >
+                                {col.cell(row)}
+                              </button>
+                            ) : (
+                              col.cell(row)
+                            )}
                           </td>
                         ))}
                         {onActivate ? (
@@ -338,11 +362,24 @@ export function DataTableTh({
 export function DataTableRow({
   children,
   className,
+  clickable,
   ...rest
-}: HTMLAttributes<HTMLTableRowElement>) {
+}: HTMLAttributes<HTMLTableRowElement> & {
+  /**
+   * Forwards pointer clicks on the row to its `data-row-primary` control
+   * (a `<Link>` or `<button>` in the primary cell). The row itself stays a
+   * plain row: no role override, no tab stop.
+   */
+  clickable?: boolean;
+}) {
   return (
     <tr
-      className={clsx("border-t border-border transition-colors hover:bg-hover", className)}
+      className={clsx(
+        "border-t border-border transition-colors hover:bg-hover",
+        clickable && "cursor-pointer",
+        className,
+      )}
+      onClick={clickable ? forwardRowClick : undefined}
       {...rest}
     >
       {children}
