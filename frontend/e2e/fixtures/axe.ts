@@ -6,9 +6,10 @@ export const THEMES: readonly Theme[] = ["light", "dark"];
 
 const THEME_STORAGE_KEY = "kafkito.theme";
 
-// Only these impacts fail the walk. `minor` and `moderate` findings are
-// still attached to the report so they stay visible.
-const BLOCKING_IMPACTS = new Set(["serious", "critical"]);
+// These impacts fail the walk. The suite is clean at `moderate`, so it is
+// gated too (heading-order, landmark and region rules live there). `minor`
+// findings are still attached to the report so they stay visible.
+const BLOCKING_IMPACTS = new Set(["moderate", "serious", "critical"]);
 
 /**
  * Pins the app theme before the first navigation, the same way the theme
@@ -29,8 +30,8 @@ export async function expectTheme(page: Page, theme: Theme): Promise<void> {
 }
 
 /**
- * Runs axe against the current page state and fails on any `serious` or
- * `critical` violation. The full result is attached to the test so the
+ * Runs axe against the current page state and fails on any `moderate`,
+ * `serious` or `critical` violation. The full result is attached to the test so the
  * HTML report (and the CI artifact) shows every finding, blocking or not.
  */
 export async function expectNoBlockingA11yViolations(
@@ -55,5 +56,5 @@ export async function expectNoBlockingA11yViolations(
       help: v.help,
       targets: v.nodes.map((n) => n.target.join(" ")),
     }));
-  expect(blocking, `axe: serious/critical violations on ${name}`).toEqual([]);
+  expect(blocking, `axe: moderate/serious/critical violations on ${name}`).toEqual([]);
 }

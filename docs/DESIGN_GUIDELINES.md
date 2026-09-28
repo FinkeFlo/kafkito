@@ -306,7 +306,8 @@ Every entry lives in `src/components/ui/<Name>.tsx`, except `<Shell>`
 | `<Modal>` | `open` + `onClose` + `title` + `children` + `actions?` + `size?` (`sm \| md \| lg`) + `ariaDescribedBy?`; centered panel with backdrop, focus-trap, body-scroll lock, Escape-to-close, focus-restore |
 | `<Notice>` | `intent="info" \| "success" \| "warning" \| "danger"` + `title?` + `children` + `icon?` + `actions?`; tinted callout for degraded-capability banners and inline explanations. Always pairs colour with an icon |
 | `<Button>` | `variant="primary" \| "secondary" \| "danger" \| "ghost"` + `size="sm" \| "md"` + `leadingIcon?` / `trailingIcon?` + `loading?` |
-| `<Input>` | `h-9` text input + `invalid?` (switches border to `border-danger`) + `leadingIcon?` / `trailingIcon?`. Does **not** set `outline-none`; the global `:focus-visible` rule is the focus indicator |
+| `<Input>` | `h-9` text input + `invalid?` (sets `aria-invalid="true"` and switches border to `border-danger`) + `leadingIcon?` / `trailingIcon?`. Does **not** set `outline-none`; the global `:focus-visible` rule is the focus indicator |
+| `useFieldError` | `useFieldError(error, describedBy?)` (in `FieldError.tsx`) returns `controlProps` (`aria-invalid` + `aria-describedby` → the error's id) to spread on the control and the `message` — the visible field error, ⊗ icon named "Error" + text — to render below it |
 | `<IconButton>` | Icon-only button, `variant="ghost" \| "secondary" \| "danger"` + `size="sm" \| "md"`; always pass an `aria-label` |
 | `<SearchInput>` | Filter box with optional `count` (visible / total) and `/` shortcut |
 | `<ConfirmDialog>` | Confirmation modal for destructive actions; `confirmPhrase?` makes the user type a phrase first |
@@ -342,7 +343,14 @@ All tables use `<DataTable>`. Rules:
 - Numeric columns: `text-right tabular-nums`, `font-mono` if they are IDs/offsets
 - Name columns: `font-mono text-[13px]`
 - Row hover: `hover:bg-hover`
-- Clickable rows: cursor-pointer, full-row `<Link>` or `onClick`
+- Clickable rows keep table semantics: the `<tr>` stays a row — never
+  `role="button"`, never `tabIndex`. The row's action is a real control in
+  the primary (name) cell: a `<Link>` for navigation, a `<button>` for
+  in-page actions (Enter, and Space for buttons). Mark it
+  `data-row-primary` and pass `clickable` to `<DataTableRow>`; a click
+  elsewhere on the row is forwarded to it as a mouse convenience. Column
+  mode does this for you when `onRowClick` is set (`isRowExpanded` adds
+  `aria-expanded` for inline detail panels).
 - Empty result: show a single row spanning all columns with `text-center text-muted py-8` and a "No results" message
 - Loading: replace `<tbody>` with 5 skeleton rows
 - Error: render `<ErrorState>` instead of the table
@@ -350,7 +358,7 @@ All tables use `<DataTable>`. Rules:
 ### 6.4 Forms
 
 - Every input has a label above it (`text-xs font-semibold uppercase tracking-wider text-muted`).
-- Validation errors: red text below the field, and a semantic border on the input (`border-danger`).
+- Validation errors: visible text below the field (the `message` from `useFieldError`, which pairs the red tint with a named ⊗ icon — never colour alone), `aria-invalid="true"` on the control, and `aria-describedby` pointing at the error text's id. Use `useFieldError` so the three stay in sync, and render the message outside any wrapping `<label>` so it does not become part of the field's name.
 - Destructive actions require a `<Modal>` / `<ConfirmDialog>` — never a single click, never `window.confirm`.
 - Disabled controls must convey *why* they are disabled via `aria-describedby` plus either a visible `<Notice>` or an `sr-only` `<span>`. Never rely on `title=` alone for load-bearing reason copy — the disabled-with-tooltip pattern is a Confluent anti-pattern (see § 12).
 - After mutation, invalidate the matching TanStack Query keys. Never refetch manually.
@@ -513,7 +521,10 @@ unless each has been implemented and visually checked.
   `frontend/src/__checks__/contrast.test.ts`; add a pair there when you
   introduce a new foreground/background combination. Rendered pages are
   scanned with axe in light and dark theme by `frontend/e2e/a11y.spec.ts`,
-  which fails on any `serious` or `critical` violation.
+  which fails on any `moderate`, `serious` or `critical` violation
+  (`minor` findings are reported only).
+- Headings do not skip levels: a page has one `<h1>` (`<PageHeader>`),
+  sections and cards below it start at `<h2>`.
 
 ---
 
@@ -701,6 +712,7 @@ a review, treat it as drift and bring it in line.
 | 2026-09-26 | Accessibility: Biome a11y rules on; axe scans in light and dark replace the contrast scanner; token-pair contrast test; "never colour alone" rule with StatusIcon / StatusBox and shape-coded StatusDot | (this PR — link added by author) |
 | 2026-09-26 | Frontend layout: primitives move to `components/ui/`, domain components to `features/<domain>/` (groups, messages, shell); PascalCase component files enforced by Biome `useFilenamingConvention`; MessageRow and RangePicker extracted from the messages route | (this PR — link added by author) |
 | 2026-09-26 | Docs sync: cluster lives in the URL path, full `components/ui` inventory, route and `lib/` paths updated, `routeTree.gen.ts` is not committed | (this PR — link added by author) |
+| 2026-09-28 | Accessibility follow-ups: clickable table rows keep role row with a real link/button in the primary cell; `useFieldError` wires `aria-invalid` + `aria-describedby`; no skipped heading levels; axe gate raised to `moderate` | (this PR — link added by author) |
 
 Add a row on every change. Small tweaks to tokens or primitives are
 fine; major shifts (new visual language, new nav model) require a design

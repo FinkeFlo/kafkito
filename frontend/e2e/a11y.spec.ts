@@ -209,6 +209,49 @@ const STATES: State[] = [
       await expect(page.getByRole("dialog", { name: "Add private cluster" })).toBeVisible();
     },
   },
+  // Form error states: the field carries aria-invalid and the visible
+  // error text is its description.
+  {
+    ...route("topic-produce"),
+    name: "produce-invalid-json",
+    open: async (page) => {
+      await page.getByRole("textbox", { name: "Value", exact: true }).fill("{not json");
+      await page.getByRole("button", { name: "Format JSON" }).click();
+      await expect(page.getByText(/^Value is not valid JSON/)).toBeVisible();
+    },
+  },
+  {
+    ...route("security-users"),
+    name: "scram-user-invalid-iterations",
+    open: async (page) => {
+      await page.getByRole("button", { name: "+ New User" }).click();
+      const dialog = page.getByRole("dialog", { name: "Create / Update SCRAM User" });
+      await dialog.getByRole("spinbutton").fill("100");
+      await expect(dialog.getByText("Iterations must be between 4096 and 16384.")).toBeVisible();
+    },
+  },
+  {
+    ...route("group-detail"),
+    name: "reset-offsets-invalid-offset",
+    open: async (page) => {
+      await page.getByRole("button", { name: /^reset offsets/i }).click();
+      const dialog = page.getByRole("dialog", { name: /reset offsets/i });
+      await dialog.getByRole("combobox", { name: "Strategy" }).selectOption("offset");
+      await dialog.getByRole("textbox", { name: /^Offset/ }).fill("abc");
+      await expect(dialog.getByText("Enter a numeric offset.")).toBeVisible();
+    },
+  },
+  {
+    ...route("topic-consumers"),
+    name: "create-group-invalid-offset",
+    open: async (page) => {
+      await page.getByRole("button", { name: "Create consumer group" }).click();
+      const dialog = page.getByRole("dialog", { name: /create consumer group/i });
+      await dialog.getByRole("combobox", { name: "Strategy" }).selectOption("offset");
+      await dialog.getByRole("textbox", { name: /^Offset/ }).fill("1.5");
+      await expect(dialog.getByText("Enter a whole-number offset.")).toBeVisible();
+    },
+  },
   {
     ...route("topics"),
     name: "user-menu",
@@ -226,7 +269,9 @@ for (const theme of THEMES) {
     });
 
     for (const route of ROUTES) {
-      test(`${route.name} has no serious or critical violations`, async ({ page }, testInfo) => {
+      test(`${route.name} has no moderate, serious or critical violations`, async ({
+        page,
+      }, testInfo) => {
         await page.goto(route.path);
         await expectTheme(page, theme);
         await route.ready(page);
@@ -235,7 +280,9 @@ for (const theme of THEMES) {
     }
 
     for (const state of STATES) {
-      test(`${state.name} has no serious or critical violations`, async ({ page }, testInfo) => {
+      test(`${state.name} has no moderate, serious or critical violations`, async ({
+        page,
+      }, testInfo) => {
         await page.goto(state.path);
         await expectTheme(page, theme);
         await state.ready(page);
@@ -244,7 +291,9 @@ for (const theme of THEMES) {
       });
     }
 
-    test("command palette has no serious or critical violations", async ({ page }, testInfo) => {
+    test("command palette has no moderate, serious or critical violations", async ({
+      page,
+    }, testInfo) => {
       await page.goto(`/clusters/${c}/topics`);
       await expectTheme(page, theme);
       await h1(page, "Topics");
