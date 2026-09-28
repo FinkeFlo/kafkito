@@ -1,21 +1,22 @@
 import { useMemo, useState } from "react";
 import type { PartitionInfo } from "@/lib/api";
-import { useFormatters } from "@/lib/use-formatters";
-import { StatusBox, StatusIcon } from "@/components/ui/StatusIcon";
-import { SearchPanel } from "./SearchPanel";
-import { MessageRow } from "./MessageRow";
 import { BrowseToolbar } from "./BrowseToolbar";
-import { computeTimeRange } from "./time-range";
+import { JsonCoachmark } from "./JsonCoachmark";
+import { LoadMoreFooter } from "./LoadMoreFooter";
+import { MessageList } from "./MessageList";
+import { MessageListStatus } from "./MessageListStatus";
+import { SearchPanel } from "./SearchPanel";
 import { orderForDisplay, type SortOrder } from "./display-order";
-import { useMessagesSearchParams } from "./use-messages-search-params";
-import { useTimeRangeState } from "./use-time-range-state";
+import { computeTimeRange } from "./time-range";
 import { useBrowseMessages } from "./use-browse-messages";
-import { useLoadMore } from "./use-load-more";
-import { useSearchForm } from "./use-search-form";
-import { useMessageSearch } from "./use-message-search";
-import { usePathSuggestions } from "./use-path-suggestions";
 import { useClickToFilter } from "./use-click-to-filter";
 import { useJsonCoachmark } from "./use-json-coachmark";
+import { useLoadMore } from "./use-load-more";
+import { useMessageSearch } from "./use-message-search";
+import { useMessagesSearchParams } from "./use-messages-search-params";
+import { usePathSuggestions } from "./use-path-suggestions";
+import { useSearchForm } from "./use-search-form";
+import { useTimeRangeState } from "./use-time-range-state";
 
 /** Message browser of a topic: browse filters, search, and the message list. */
 export function MessagesPanel({
@@ -27,7 +28,6 @@ export function MessagesPanel({
   topic: string;
   partitions: PartitionInfo[];
 }) {
-  const fmt = useFormatters();
   const searchParams = useMessagesSearchParams();
   const { partition, limit, from, msgOffset } = searchParams;
   const [live, setLive] = useState<boolean>(false);
@@ -125,76 +125,22 @@ export function MessagesPanel({
         />
       )}
 
-      {msgsQuery.error && !searchResult && (
-        <StatusBox intent="danger" className="m-3 p-3 text-sm">
-          {(msgsQuery.error as Error).message}
-        </StatusBox>
-      )}
+      <MessageListStatus
+        error={msgsQuery.error}
+        partial={!!msgsQuery.data?.partial}
+        hasResult={!!searchResult}
+        empty={displayMessages.length === 0}
+        searching={searching}
+        scanned={searchResult?.stats.scanned ?? 0}
+        loading={msgsQuery.isLoading}
+      />
 
-      {!msgsQuery.error && !searchResult && msgsQuery.data?.partial && (
-        <StatusBox intent="warning" className="m-3 p-3 text-sm">
-          This page may be incomplete — a very large record delayed loading past the server's
-          timeout, so the newest message(s) might be missing. Try Refresh.
-        </StatusBox>
-      )}
+      {coachmark.visible && <JsonCoachmark onDismiss={coachmark.dismiss} />}
 
-      {displayMessages.length === 0 && searching && (
-        <div className="p-8 text-center text-sm text-[var(--color-text-subtle)]">
-          Searching… {fmt.number(searchResult?.stats.scanned ?? 0)} scanned, no match yet.
-        </div>
-      )}
-
-      {displayMessages.length === 0 && !searching && msgsQuery.isLoading && (
-        <div className="p-8 text-center text-sm text-[var(--color-text-subtle)]">
-          Loading messages…
-        </div>
-      )}
-
-      {/* `isLoading` (not `isPending`) is the right guard: the query is
-          disabled while a search result is on screen, and a disabled query
-          stays `pending` forever — which would hide the "No matches." state. */}
-      {displayMessages.length === 0 && !searching && !msgsQuery.isLoading && (
-        <div className="p-8 text-center text-sm text-[var(--color-text-subtle)]">
-          {searchResult ? "No matches." : "No messages."}
-        </div>
-      )}
-
-      {coachmark.visible && (
-        <div className="m-3 flex items-center gap-2 rounded border border-accent/40 bg-accent-subtle p-2 text-xs text-accent">
-          <span>Tip: click any value in a JSON message to filter by it.</span>
-          <button
-            type="button"
-            onClick={coachmark.dismiss}
-            className="ml-auto rounded border border-border px-2 py-0.5 hover:border-border-strong"
-          >
-            Got it
-          </button>
-        </div>
-      )}
-
-      <div className="divide-y divide-[var(--color-border)]">
-        {displayMessages.map((m) => (
-          <MessageRow key={`${m.partition}-${m.offset}`} m={m} onPick={handlePick} />
-        ))}
-      </div>
+      <MessageList messages={displayMessages} onPick={handlePick} />
 
       {!inSearchMode && tailCursor && !live && (
-        <div className="flex flex-col items-center gap-2 p-4">
-          <button
-            type="button"
-            onClick={loadMore}
-            disabled={loadingMore}
-            className="rounded-md border border-[var(--color-border)] bg-[var(--color-panel)] px-4 py-2 text-sm font-medium text-[var(--color-text)] transition-colors hover:border-[var(--color-border-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loadingMore ? "Loading…" : "Load more"}
-          </button>
-          {loadMoreError && (
-            <div className="flex items-center gap-1 text-xs text-[var(--color-danger)]">
-              <StatusIcon intent="danger" />
-              {loadMoreError}
-            </div>
-          )}
-        </div>
+        <LoadMoreFooter loading={loadingMore} error={loadMoreError} onLoadMore={loadMore} />
       )}
     </div>
   );
