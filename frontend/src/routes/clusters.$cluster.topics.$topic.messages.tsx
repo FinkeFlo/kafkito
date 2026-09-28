@@ -1,16 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  searchMessages,
-  type Message,
-  type PartitionInfo,
-  type SearchMode,
-  type SearchOp,
-  type SearchDirection,
-  type SearchStats,
-  type SearchRequest,
-} from "@/lib/api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { PartitionInfo, SearchMode, SearchOp, SearchDirection } from "@/lib/api";
 import {
   isTooLargeToScan,
   MAX_HYDRATE_VALUE_BYTES,
@@ -41,6 +32,8 @@ import { useMessagesSearchParams } from "@/features/messages/use-messages-search
 import { useTimeRangeState } from "@/features/messages/use-time-range-state";
 import { useBrowseMessages } from "@/features/messages/use-browse-messages";
 import { useLoadMore } from "@/features/messages/use-load-more";
+import { useSearchForm } from "@/features/messages/use-search-form";
+import { useMessageSearch } from "@/features/messages/use-message-search";
 
 interface MessagesSearch {
   partition: number;
@@ -151,31 +144,45 @@ function MessagesPanel({
 
   // Search state
   const [searchOpen, setSearchOpen] = useState(false);
-  const [mode, setMode] = useState<SearchMode>("contains");
-  const [path, setPath] = useState("");
-  const [op, setOp] = useState<SearchOp>("contains");
-  const [needle, setNeedle] = useState("");
-  const [rangeMode, setRangeMode] = useState<"off" | "preset" | "custom">("off");
-  const [preset, setPreset] = useState<string>("24h");
-  const [customFrom, setCustomFrom] = useState<string>("");
-  const [customTo, setCustomTo] = useState<string>("");
-  const [direction, setDirection] = useState<SearchDirection>("newest_first");
-  const [stopOnLimit, setStopOnLimit] = useState(true);
-  const [budget, setBudget] = useState(50000);
-  const [budgetUnlimited, setBudgetUnlimited] = useState(false);
-  const [searching, setSearching] = useState(false);
-  const [searchResult, setSearchResult] = useState<{
-    messages: Message[];
-    stats: SearchStats;
-    req: SearchRequest;
-  } | null>(null);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  // Why the most recent (auto-chained) search stopped. Drives the result banner.
-  const [searchStopReason, setSearchStopReason] = useState<
-    "budget" | "complete" | "limit" | "stopped" | null
-  >(null);
-  // Set to true to abort an in-flight auto-chain between continuation calls.
-  const stopSearchRef = useRef(false);
+  const form = useSearchForm();
+  const {
+    mode,
+    setMode,
+    path,
+    setPath,
+    op,
+    setOp,
+    needle,
+    setNeedle,
+    direction,
+    setDirection,
+    stopOnLimit,
+    setStopOnLimit,
+    budget,
+    setBudget,
+    budgetUnlimited,
+    setBudgetUnlimited,
+  } = form;
+  const {
+    mode: rangeMode,
+    setMode: setRangeMode,
+    preset,
+    setPreset,
+    customFrom,
+    setCustomFrom,
+    customTo,
+    setCustomTo,
+  } = form.range;
+  const {
+    searching,
+    searchResult,
+    searchError,
+    searchStopReason,
+    inSearchMode,
+    runSearch,
+    stopSearch,
+    clearSearch,
+  } = useMessageSearch(cluster, topic, partition, limit, form);
 
   // Sample query (lazy, only when a structured — JSONPath or XPath — search
   // is open). Field-path suggestions need each sample message's full
@@ -313,120 +320,6 @@ function MessagesPanel({
     msgsQuery.data,
   );
 
-  const resolvedRange = () => computeTimeRange(rangeMode, preset, customFrom, customTo);
-
-  const runSearch = async (continueChain = false) => {
-    stopSearchRef.current = false;
-    setSearching(true);
-    setSearchError(null);
-    // A fresh search clears any previous result immediately so the list shows
-    // search results (empty until the first match arrives) rather than the
-    // browse messages while scanning is still in progress.
-    if (!continueChain) {
-      setSearchResult(null);
-      setSearchStopReason(null);
-    }
-    const { from_ts_ms, to_ts_ms } = resolvedRange();
-    const baseReq: SearchRequest = {
-      partition,
-      limit,
-      direction,
-      stop_on_limit: stopOnLimit,
-      mode,
-      path: mode === "contains" || mode === "js" ? "" : path,
-      op: mode === "contains" || mode === "js" ? "contains" : op,
-      value: needle,
-      zones: mode === "contains" ? ["value", "key", "headers"] : ["value"],
-      from_ts_ms,
-      to_ts_ms,
-    };
-
-    // Seed the accumulator from the existing result when continuing ("Search
-    // more"), otherwise start fresh. The Budget applies per invocation: a fresh
-    // search scans up to `budget` records; "Search more" grants another budget.
-    const prior = continueChain ? searchResult : null;
-    let accMessages: Message[] = prior ? [...prior.messages] : [];
-    let accScanned = prior ? prior.stats.scanned : 0;
-    let accMatched = prior ? prior.stats.matched : 0;
-    let cursors: Record<string, number> | undefined = prior ? prior.stats.next_cursors : undefined;
-
-    const budgetTarget = budgetUnlimited ? 0 : budget;
-    // Budget 0 / empty means "scan the entire topic": keep chaining until the
-    // range is exhausted (more_available=false), the limit is hit, or Stop.
-    const unlimited = budgetTarget <= 0;
-    // Per-call cap used in unlimited mode; the 12s server timeout is the real
-    // limiter, this just keeps each request bounded.
-    const PER_CALL_BUDGET = 1_000_000;
-    let scannedThisRun = 0;
-    let reason: "budget" | "complete" | "limit" | "stopped" = "complete";
-
-    try {
-      for (;;) {
-        let callBudget: number;
-        if (unlimited) {
-          callBudget = PER_CALL_BUDGET;
-        } else {
-          const remaining = budgetTarget - scannedThisRun;
-          if (remaining <= 0) {
-            reason = "budget";
-            break;
-          }
-          callBudget = remaining;
-        }
-        const req: SearchRequest = { ...baseReq, budget: callBudget, cursors };
-        const r = await searchMessages(cluster, topic, req);
-        const s = r.search;
-        accMessages = [...accMessages, ...(r.messages ?? [])];
-        accScanned += s.scanned;
-        accMatched += s.matched;
-        scannedThisRun += s.scanned;
-        cursors = s.next_cursors;
-
-        // Publish cumulative progress so the banner updates between calls.
-        setSearchResult({
-          messages: accMessages,
-          stats: { ...s, scanned: accScanned, matched: accMatched },
-          req,
-        });
-
-        if (!s.more_available) {
-          reason = "complete";
-          break;
-        }
-        if (stopOnLimit && accMatched >= limit) {
-          reason = "limit";
-          break;
-        }
-        if (stopSearchRef.current) {
-          reason = "stopped";
-          break;
-        }
-        // Safety: a call that scanned nothing but reports more would loop forever.
-        if (s.scanned === 0) {
-          reason = "complete";
-          break;
-        }
-      }
-      setSearchStopReason(reason);
-    } catch (err) {
-      setSearchError((err as Error).message);
-    } finally {
-      setSearching(false);
-      stopSearchRef.current = false;
-    }
-  };
-
-  const stopSearch = () => {
-    stopSearchRef.current = true;
-  };
-
-  const clearSearch = () => {
-    setSearchResult(null);
-    setSearchError(null);
-    setSearchStopReason(null);
-  };
-
-  const inSearchMode = searchResult !== null || searching;
   const rawMessages = inSearchMode
     ? (searchResult?.messages ?? [])
     : [...(msgsQuery.data?.messages ?? []), ...tailMessages];
