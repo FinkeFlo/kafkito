@@ -120,6 +120,10 @@ func (r *Messages) scanClient(s recordScan, cursors map[int32]*scanCursor) (*kgo
 	opts := append(clientOpts(s.cfg, r.log.With("cluster", s.cluster, "role", s.role)),
 		kgo.ConsumePartitions(map[string]map[int32]kgo.Offset{s.topic: offsets}),
 		kgo.FetchMaxWait(500*time.Millisecond),
+		// An offset that is out of range, e.g. below a log start moved by
+		// retention or DeleteRecords, resumes at the log start. This was
+		// franz-go's default before v1.22; its default now rewinds by time.
+		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
 		// Transaction markers take up offsets too. Without them a range whose
 		// last offset is a marker would never be seen to end.
 		kgo.KeepControlRecords(),
