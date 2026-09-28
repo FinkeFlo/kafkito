@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, type QueryKey } from "@tanstack/react-query";
 import type { PrivateCluster } from "../private-clusters";
-import { clusterKey } from "./cluster-key";
+import { clusterKey, removePrivateClusterQueries } from "./cluster-key";
+import { messageQueries } from "./messages";
+import { schemaQueries } from "./schemas";
 import { topicQueries } from "./topics";
 
 // The cache identity must follow the cluster the API client actually sends
@@ -74,5 +76,30 @@ describe("clusterKey", () => {
     const back = await qc.fetchQuery({ ...topicQueries.list(NAME), ...fresh });
     expect(back.map((t) => t.name)).toEqual(["shared-topic"]);
     expect(requests).toHaveLength(2);
+  });
+});
+
+describe("removePrivateClusterQueries", () => {
+  it("drops every entry of that private cluster and nothing else", () => {
+    const qc = new QueryClient();
+    const keysFor = (name: string): QueryKey[] => [
+      topicQueries.list(name).queryKey,
+      topicQueries.detail(name, "t").queryKey,
+      messageQueries.page(name, "t", {}).queryKey,
+      schemaQueries.version(name, "s", "latest").queryKey,
+    ];
+    const shared = keysFor(NAME);
+    const other: PrivateCluster = { ...PRIVATE, id: "pc_other", name: "other" };
+    localStorage.setItem("kafkito.private-clusters.v1", JSON.stringify([PRIVATE, other]));
+    const mine = keysFor(NAME);
+    const theirs = keysFor("other");
+    for (const key of [...shared, ...mine, ...theirs]) qc.setQueryData(key, "data");
+    // Built while the private cluster held the name, so they differ from `shared`.
+    expect(mine[0]).not.toEqual(shared[0]);
+
+    removePrivateClusterQueries(qc, PRIVATE.id);
+
+    for (const key of mine) expect(qc.getQueryData(key), JSON.stringify(key)).toBeUndefined();
+    for (const key of [...shared, ...theirs]) expect(qc.getQueryData(key)).toBe("data");
   });
 });

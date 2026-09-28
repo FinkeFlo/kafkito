@@ -1,3 +1,4 @@
+import type { QueryClient } from "@tanstack/react-query";
 import { getPrivateClusterByName } from "../private-clusters";
 
 /**
@@ -17,4 +18,19 @@ export type ClusterKey = string | { readonly private: string };
 export function clusterKey(cluster: string): ClusterKey {
   const priv = getPrivateClusterByName(cluster);
   return priv ? { private: priv.id } : cluster;
+}
+
+function isPrivateClusterKey(part: unknown, id: string): boolean {
+  return (
+    typeof part === "object" && part !== null && (part as { private?: unknown }).private === id
+  );
+}
+
+/**
+ * Drops every cached query of the private cluster `id`. Its entries keep
+ * their key when the stored config changes (the id stays), so without this
+ * an edit would keep showing data from the old brokers or credentials.
+ */
+export function removePrivateClusterQueries(qc: QueryClient, id: string): void {
+  qc.removeQueries({ predicate: (q) => q.queryKey.some((part) => isPrivateClusterKey(part, id)) });
 }
