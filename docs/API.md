@@ -140,7 +140,12 @@ definitive answer.
 rules run on the full decoded value (Schema-Registry decoded where
 applicable), so a masked field is masked even past the 64 KB preview; a masked
 value carries no `value_b64`, and its raw download is refused (see below).
-Masking applies to values only, not to keys or headers.
+Rules with the `key` or `headers` target (see [Data masking](data-masking.md))
+mask keys and header values the same way: `key_masked: true` marks a masked
+key, which then carries no `key_b64`, and `masked_headers` lists the sorted
+keys of the headers whose values were masked, which then have no
+`headers_b64` entry. Header keys are never masked. Rules without `targets`
+mask the value only.
 
 `headers` holds header values as text. A header value that is not valid UTF-8
 is rendered there as `0x…` hex — display only — and its raw bytes are also
@@ -198,7 +203,8 @@ change the value of the record (checked on the same decoded rendering
 `masked: true`), the endpoint responds `403` with
 `{ "error": "value is masked and cannot be downloaded", "code": "value_masked" }`.
 Records of topics without a masking rule, and records the rules leave
-unchanged, are served as before.
+unchanged, are served as before. The body is the value only, so rules that
+mask just the key or headers do not block the download.
 
 The body is always the **raw wire bytes**. For a Schema-Registry encoded
 record that means the Avro/Protobuf payload including the 5-byte magic +
@@ -263,7 +269,7 @@ Notes:
 - JS mode receives a parsed JSON object as `parsed` and can express arbitrarily complex predicates. The server enforces a short per-message timeout for JS filters.
 - Use `zones` to control where the scanner looks (`value`, `headers`, `key`).
 - Matching runs against each record's full, untruncated content, so `contains`/`jsonpath`/`xpath`/`js` all find hits anywhere in large values (there is no size limit on what is *searched*). Only the message previews in the response stay capped at 64 KB per value, same as `GET .../messages` — use the raw-download endpoint to fetch a full value for a hit.
-- On topics with a `data_masking` rule, the value is matched in its **masked** form — the same rendering `GET .../messages` returns — so masked content is not searchable in clear text. Keys and headers are not masked and are matched as they are. Parse errors on such topics report `value could not be evaluated (details withheld: data masking applies to this topic)` in `parse_error_offsets[].error` instead of the parser's message, which can quote the value.
+- On topics with a `data_masking` rule, the value is matched in its **masked** form — the same rendering `GET .../messages` returns — so masked content is not searchable in clear text. The same holds for keys and header values on topics with a `key` or `headers` rule (the `contains` key/headers zones and `key`/`headers` in `js`); header keys are not masked and are matched as they are. Parse errors on such topics report `value could not be evaluated (details withheld: data masking applies to this topic)` in `parse_error_offsets[].error` instead of the parser's message, which can quote the value.
 
 ### Produce
 
@@ -388,7 +394,8 @@ therefore left out rather than copied approximately:
   only the decoded JSON rendering is available, the original wire-format bytes
   are gone.
 - **Masked records**: the source cluster's `data_masking` rules replaced the
-  value with a redacted rendering, so copying would write the redaction.
+  value, the key or a header value with a redacted rendering, so copying
+  would write the redaction.
 
 Copied records carry the same provenance headers the produce endpoint injects —
 `X-Kafkito-Source: true` and, when an identity is available,

@@ -25,6 +25,7 @@ consumer groups, schemas, ACLs, and RBAC-aware operations in one place.
 | [UI: Features overview](ui/features-overview.md) | What each UI area can do (Fleet, Topics, Groups, Schemas, Security, Brokers, Settings) |
 | [UI: Workflows](ui/workflows.md) | Practical flows like finding messages, checking lag, and understanding offsets |
 | [API](API.md) | REST endpoints and examples |
+| [Data masking](data-masking.md) | `data_masking` rules for values, keys and headers |
 | [Architecture](architecture.md) | Request flow, error mapping, record reading, private clusters |
 | [Design guidelines](DESIGN_GUIDELINES.md) | Frontend tokens, components and layout rules |
 | [Contributing](contributing.md) | DCO, local checks, API changes, releases |

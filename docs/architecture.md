@@ -85,9 +85,10 @@ else. Layout and UI rules are in the [design guidelines](DESIGN_GUIDELINES.md).
 Consume, search and the raw download share one iterator,
 `Messages.scanRecords` (`internal/kafka/record_source.go`), which reads the
 requested offset ranges poll by poll. On topics with a `data_masking` rule the
-full decoded value is masked before it is truncated to the 64 KB preview,
-search matches the masked value, and a raw download of a value the rules
-change is refused with `403 value_masked`.
+full decoded value is masked before it is truncated to the 64 KB preview, keys
+and header values are masked for rules with those targets, search matches the
+masked rendering, and a raw download of a value the rules change is refused
+with `403 value_masked`.
 
 ## Outbound connections (SSRF guard)
 

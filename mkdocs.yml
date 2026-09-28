@@ -59,6 +59,7 @@ nav:
       - Features Overview: ui/features-overview.md
       - Workflows: ui/workflows.md
   - API: API.md
+  - Data Masking: data-masking.md
   - Architecture: architecture.md
   - Design Guidelines: DESIGN_GUIDELINES.md
   - Contributing: contributing.md

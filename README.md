@@ -109,6 +109,9 @@ YAML file → `KAFKITO_*` variables → `$PORT`.
 An invalid listen address (for example `PORT=abc`) fails startup with exit
 code 2.
 
+Per-cluster data masking rules (`clusters[].data_masking`, for record values,
+keys and headers) are described in [docs/data-masking.md](docs/data-masking.md).
+
 ### Logging
 
 kafkito logs to stdout via `log/slog`, one line per event:
