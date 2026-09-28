@@ -102,3 +102,15 @@ func TestConsumeMessages_OffsetBelowLogStartStartsAtLogStart(t *testing.T) {
 	assert.Equal(t, []int64{4, 5, 6}, []int64{res.Messages[0].Offset, res.Messages[1].Offset, res.Messages[2].Offset})
 }
 
+// The reader clients reset an out-of-range offset to the log start, as
+// franz-go did by default before v1.22.
+func TestScanClient_ResetsToLogStart(t *testing.T) {
+	env := newKfakeEnv(t, truncatedTopic, 1, nil)
+	cfg, ok := env.reg.ConfigFor(kfakeCluster)
+	require.True(t, ok)
+	cl, err := env.reg.scanClient(recordScan{cluster: kfakeCluster, topic: truncatedTopic, role: "test", cfg: cfg},
+		map[int32]*scanCursor{0: {lower: 0, upper: 1}})
+	require.NoError(t, err)
+	defer cl.Close()
+	assert.Equal(t, kgo.NewOffset().AtStart(), cl.OptValue(kgo.ConsumeResetOffset))
+}
