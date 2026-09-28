@@ -12,10 +12,25 @@ const SMALL_ORDER = "E2E-MASK-1";
 const HIDDEN_TEXT = "hidden-e2e";
 const MASKED_MESSAGE = "value is masked and cannot be downloaded";
 
-async function openTopic(page: Page) {
+// Fixture coupling: kafkito-e2e.yaml masks the key (cust-e2e-<n> → cust-***)
+// and the authorization header value of e2e-masked-kh, and seed.sh's
+// produce_masked_key_headers puts one record there with key cust-e2e-4711,
+// headers authorization (masked) and trace-id (visible) and an unmasked
+// value (order E2E-MASK-KH-1). e2e-masked-kh-dest is an empty copy target.
+const KH_TOPIC = "e2e-masked-kh";
+const KH_DEST = "e2e-masked-kh-dest";
+const KH_ORDER = "E2E-MASK-KH-1";
+const KH_HIDDEN = ["4711", "e2e-token-secret", "Bearer"];
+
+async function openTopic(page: Page, topic = TOPIC) {
   await page.goto(
-    `/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(TOPIC)}/messages`,
+    `/clusters/${encodeURIComponent(CLUSTER)}/topics/${encodeURIComponent(topic)}/messages`,
   );
+}
+
+async function expectNoClearText(page: Page, hidden: string[]) {
+  const html = await page.content();
+  for (const h of hidden) expect(html, `DOM contains ${h}`).not.toContain(h);
 }
 
 async function search(page: Page, needle: string) {
@@ -90,5 +105,76 @@ test.describe("Data masking", () => {
 
     await expect(page.getByText(MASKED_MESSAGE)).toBeVisible();
     expect(downloads).toEqual([]);
+  });
+
+  test("masked keys and headers are badged and never shown in clear text", async ({
+    page,
+  }, testInfo) => {
+    await openTopic(page, KH_TOPIC);
+
+    const row = page.getByTestId("message-row");
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText(KH_ORDER);
+    const keyBadge = row.getByText("key masked", { exact: true });
+    const headersBadge = row.getByText("headers masked", { exact: true });
+    await expect(keyBadge).toBeVisible();
+    await expect(headersBadge).toBeVisible();
+    // Icon + text, never colour alone.
+    await expect(keyBadge.locator("svg")).toHaveCount(1);
+    await expect(headersBadge.locator("svg")).toHaveCount(1);
+    await expect(row.getByText("masked", { exact: true }), "the value is not masked").toHaveCount(
+      0,
+    );
+    await expect(row).toContainText("cust-***");
+
+    await row.getByRole("button").first().click();
+    const lines = row.getByTestId("header-line");
+    const auth = lines.filter({ hasText: "authorization:" });
+    const trace = lines.filter({ hasText: "trace-id:" });
+    await expect(auth.getByText("masked", { exact: true })).toBeVisible();
+    await expect(auth.locator("svg")).toHaveCount(1);
+    await expect(trace).toContainText("e2e-trace-visible");
+    await expect(trace.getByText("masked", { exact: true })).toHaveCount(0);
+    await expectNoClearText(page, KH_HIDDEN);
+    await page.screenshot({ path: testInfo.outputPath("masked-key-headers.png") });
+
+    await row.getByRole("button", { name: "Replay to…" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByText("Replay not possible")).toBeVisible();
+    await expect(dialog.getByText(/the key shown is redacted/)).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Replay", exact: true })).toBeDisabled();
+    await expectNoClearText(page, KH_HIDDEN);
+    await page.screenshot({ path: testInfo.outputPath("masked-key-replay-blocked.png") });
+  });
+
+  test("search does not find masked key or header text", async ({ page }) => {
+    await openTopic(page, KH_TOPIC);
+
+    for (const needle of ["4711", "e2e-token-secret"]) {
+      await search(page, needle);
+      await expect(page.getByTestId("messages-count")).toHaveText("0");
+      await expect(page.getByTestId("message-row")).toHaveCount(0);
+      await openTopic(page, KH_TOPIC);
+    }
+
+    await search(page, "e2e-trace-visible");
+    await expect(page.getByTestId("messages-count")).toHaveText("1");
+    await expect(page.getByTestId("message-row").getByText("key masked")).toBeVisible();
+    await expectNoClearText(page, KH_HIDDEN);
+  });
+
+  test("bulk copy skips records with a masked key or header", async ({ page }) => {
+    await openTopic(page, KH_TOPIC);
+    await page.getByRole("button", { name: /Copy messages to another cluster/ }).click();
+    await page.getByPlaceholder("topic-name").fill(KH_DEST);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Start copy" }).click();
+
+    await expect(page.getByText("Done — 0 messages copied")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("(1 skipped — not reproducible byte-for-byte)")).toBeVisible();
+
+    await openTopic(page, KH_DEST);
+    await expect(page.getByTestId("messages-count")).toHaveText("0");
+    await expectNoClearText(page, KH_HIDDEN);
   });
 });
