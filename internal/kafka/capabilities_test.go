@@ -238,3 +238,27 @@ func TestSweepAdhoc_DropsCapabilitiesEntry(t *testing.T) {
 	assert.False(t, idleCached, "sweep left the capability entry of an evicted cluster")
 	assert.True(t, busyCached, "sweep dropped the entry of a cluster still in use")
 }
+
+// TestCapabilities_NotCachedWhenRequestEndsDuringProbe cancels the caller's
+// context while the probe runs. The probes that fail with that cancellation
+// say nothing about the cluster, so the result must not be cached: the next
+// caller probes again and sees the real capabilities.
+func TestCapabilities_NotCachedWhenRequestEndsDuringProbe(t *testing.T) {
+	c, probes := newCapsCluster(t, false)
+	reg := newCapsRegistry(t, c)
+
+	ctx, cancel := context.WithCancel(capsCtx(t))
+	c.ControlKey(int16(kmsg.DeleteTopics), func(kmsg.Request) (kmsg.Response, error, bool) {
+		cancel()
+		return nil, nil, false
+	})
+	_, err := reg.Capabilities(ctx, kfakeCluster)
+	require.ErrorIs(t, err, context.Canceled)
+
+	caps, err := reg.Capabilities(capsCtx(t), kfakeCluster)
+	require.NoError(t, err)
+	assert.Equal(t, int32(2), probes.Load(), "the canceled probe must not be served from the cache")
+	assert.True(t, caps.CreateTopic)
+	assert.True(t, caps.AlterConfigs)
+	assert.Empty(t, caps.Errors)
+}

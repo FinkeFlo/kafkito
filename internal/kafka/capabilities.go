@@ -62,6 +62,12 @@ func (r *Clusters) Capabilities(ctx context.Context, cluster string) (*Capabilit
 	if err != nil {
 		return nil, err
 	}
+	// A request that ends mid-probe fails the remaining probes with its own
+	// cancellation, not with anything the cluster said. Caching that would
+	// report missing capabilities to every caller for the whole TTL.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	r.mu.Lock()
 	if _, ok := r.clusters[cluster]; ok {
 		r.caps[cluster] = capCache{caps: caps, at: time.Now()}
