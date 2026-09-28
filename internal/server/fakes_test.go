@@ -59,8 +59,13 @@ func (f fakeConfigs) ConfigFor(name string) (config.ClusterConfig, bool) {
 
 type fakeGroups struct {
 	groupStore
+	groups       []kafkapkg.GroupInfo
 	createGroup  func(req kafkapkg.CreateGroupRequest) (*kafkapkg.ResetOffsetsResult, error)
 	resetOffsets func(group string, req kafkapkg.ResetOffsetsRequest) (*kafkapkg.ResetOffsetsResult, error)
+}
+
+func (f fakeGroups) ListGroups(context.Context, string) ([]kafkapkg.GroupInfo, error) {
+	return f.groups, nil
 }
 
 func (f fakeGroups) CreateGroup(_ context.Context, _ string, req kafkapkg.CreateGroupRequest) (*kafkapkg.ResetOffsetsResult, error) {
@@ -159,9 +164,14 @@ func (f fakeSchemaClient) DeleteSubject(_ context.Context, subject string, perma
 
 type fakeMessages struct {
 	messageStore
+	raw      func(topic string, partition int32, offset int64) (*kafkapkg.RawMessageValue, error)
 	consume  func(opts kafkapkg.ConsumeOptions) (*kafkapkg.ConsumeResult, error)
 	count    func(opts kafkapkg.CountMessagesOptions) (*kafkapkg.MessageCountResult, error)
 	timeline func(opts kafkapkg.MessageTimelineOptions) (*kafkapkg.MessageTimelineResult, error)
+}
+
+func (f fakeMessages) FetchRawMessageValue(_ context.Context, _, topic string, partition int32, offset int64) (*kafkapkg.RawMessageValue, error) {
+	return f.raw(topic, partition, offset)
 }
 
 func (f fakeMessages) ConsumeMessages(_ context.Context, _, _ string, opts kafkapkg.ConsumeOptions) (*kafkapkg.ConsumeResult, error) {
@@ -174,4 +184,19 @@ func (f fakeMessages) CountMessages(_ context.Context, _, _ string, opts kafkapk
 
 func (f fakeMessages) MessageTimeline(_ context.Context, _, _ string, opts kafkapkg.MessageTimelineOptions) (*kafkapkg.MessageTimelineResult, error) {
 	return f.timeline(opts)
+}
+
+// fakeTopics answers the topic list and the consumers of any topic.
+type fakeTopics struct {
+	topicStore
+	topics    []kafkapkg.TopicInfo
+	consumers []kafkapkg.TopicConsumer
+}
+
+func (f fakeTopics) ListTopics(context.Context, string) ([]kafkapkg.TopicInfo, error) {
+	return f.topics, nil
+}
+
+func (f fakeTopics) ListTopicConsumers(context.Context, string, string) ([]kafkapkg.TopicConsumer, error) {
+	return f.consumers, nil
 }

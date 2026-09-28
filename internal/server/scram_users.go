@@ -32,8 +32,7 @@ func (s *apiServer) ListScramUsers(ctx context.Context, req gen.ListScramUsersRe
 	if err != nil {
 		return nil, clusterError(req.Cluster, "list SCRAM users", err)
 	}
-	if s.policy != nil && s.policy.Enabled() && !kafkapkg.IsAdhoc(req.Cluster) {
-		user := rbacSubject(httpRequestFromContext(ctx), s.policy)
+	if user, ok := s.rbacListSubject(ctx, req.Cluster); ok {
 		users = filterSCRAMUsersByRBAC(users, s.policy, user, req.Cluster)
 	}
 	return gen.ListScramUsers200JSONResponse{Cluster: req.Cluster, Users: users}, nil
@@ -45,8 +44,7 @@ func (s *apiServer) UpsertScramUser(ctx context.Context, req gen.UpsertScramUser
 	b := req.Body
 	// rbacMiddleware authorized the trimmed user name; the broker stores
 	// the name as sent, so a padded name must be allowed as sent too.
-	if b.User != strings.TrimSpace(b.User) && s.policy != nil && s.policy.Enabled() && !kafkapkg.IsAdhoc(req.Cluster) {
-		user := rbacSubject(httpRequestFromContext(ctx), s.policy)
+	if user, ok := s.rbacListSubject(ctx, req.Cluster); ok && b.User != strings.TrimSpace(b.User) {
 		if !s.policy.Allow(user, req.Cluster, "user", b.User, "edit") {
 			return nil, &apiError{Status: http.StatusForbidden, Code: "rbac_denied", Message: "forbidden"}
 		}

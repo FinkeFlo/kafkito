@@ -96,7 +96,7 @@ func newRBACRouter(t *testing.T, policy *rbac.Policy, method, pattern string, h 
 	t.Helper()
 	r := chi.NewRouter()
 	r.Group(func(g chi.Router) {
-		g.Use(rbacMiddleware(policy))
+		g.Use(rbacMiddleware(policy, nil))
 		g.Method(method, pattern, h)
 	})
 	return r
@@ -131,8 +131,39 @@ func TestRBACMiddleware_DispatchBranches(t *testing.T) {
 			wantNextCalled: true,
 		},
 		{
-			name:           "unmapped_pattern_passes_through_without_auth",
+			name:           "unmapped_pattern_is_denied",
+			policy:         policyAllowAll(),
+			method:         http.MethodGet,
+			pattern:        "/api/v1/clusters/{cluster}/unmapped",
+			urlPath:        "/api/v1/clusters/" + clusterShared + "/unmapped",
+			headerUser:     userAdmin,
+			wantStatus:     http.StatusForbidden,
+			wantNextCalled: false,
+			wantBody:       map[string]any{"error": "forbidden", "code": "rbac_denied"},
+		},
+		{
+			name:           "unmapped_pattern_on_private_cluster_passes_through",
 			policy:         policyDeny(),
+			method:         http.MethodGet,
+			pattern:        "/api/v1/clusters/{cluster}/unmapped",
+			urlPath:        "/api/v1/clusters/" + config.PrivateClusterSentinel + "/unmapped",
+			headerUser:     userMallory,
+			wantStatus:     http.StatusNoContent,
+			wantNextCalled: true,
+		},
+		{
+			name:           "exempt_route_passes_through_without_permission",
+			policy:         policyDeny(),
+			method:         http.MethodPost,
+			pattern:        "/api/v1/clusters/_test",
+			urlPath:        "/api/v1/clusters/_test",
+			headerUser:     userMallory,
+			wantStatus:     http.StatusNoContent,
+			wantNextCalled: true,
+		},
+		{
+			name:           "unmapped_pattern_with_rbac_disabled_passes_through",
+			policy:         policyDisabled(),
 			method:         http.MethodGet,
 			pattern:        "/api/v1/clusters/{cluster}/unmapped",
 			urlPath:        "/api/v1/clusters/" + clusterShared + "/unmapped",
@@ -542,7 +573,7 @@ func TestRBACMiddleware_DeniesHeaderSpoofWhenPrincipalLacksRole(t *testing.T) {
 				next.ServeHTTP(w, req.WithContext(ctx))
 			})
 		})
-		g.Use(rbacMiddleware(policy))
+		g.Use(rbacMiddleware(policy, nil))
 		g.Delete("/clusters/{cluster}/topics/{topic}", leaf)
 	})
 

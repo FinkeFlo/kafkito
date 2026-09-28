@@ -47,8 +47,7 @@ func (s *apiServer) ListSubjects(ctx context.Context, req gen.ListSubjectsReques
 		return nil, upstreamError("list subjects", err)
 	}
 	sort.Slice(subs, func(i, j int) bool { return subs[i].Name < subs[j].Name })
-	if s.policy != nil && s.policy.Enabled() && !kafkapkg.IsAdhoc(req.Cluster) {
-		user := rbacSubject(httpRequestFromContext(ctx), s.policy)
+	if user, ok := s.rbacListSubject(ctx, req.Cluster); ok {
 		subs = filterSubjectsByRBAC(subs, s.policy, user, req.Cluster)
 	}
 	return gen.ListSubjects200JSONResponse{Cluster: req.Cluster, Subjects: subs}, nil

@@ -94,7 +94,7 @@ func New(opts Options) http.Handler {
 			if opts.Registry != nil || opts.stores != nil {
 				v1.Group(func(g chi.Router) {
 					g.Use(privateClusterMiddleware)
-					g.Use(rbacMiddleware(policy))
+					g.Use(rbacMiddleware(policy, withRequestIDLogging(baseLog)))
 					g.Use(resolvePrivateClusterParam(st.clusters))
 					generated.mountClusters(g)
 				})
