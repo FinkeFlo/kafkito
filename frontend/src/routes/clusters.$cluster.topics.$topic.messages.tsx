@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  fetchMessages,
   searchMessages,
   type Message,
   type PartitionInfo,
@@ -39,6 +38,9 @@ import {
 } from "@/features/messages/browse-params";
 import { useNumberDraft } from "@/features/messages/use-number-draft";
 import { useMessagesSearchParams } from "@/features/messages/use-messages-search-params";
+import { useTimeRangeState } from "@/features/messages/use-time-range-state";
+import { useBrowseMessages } from "@/features/messages/use-browse-messages";
+import { useLoadMore } from "@/features/messages/use-load-more";
 
 interface MessagesSearch {
   partition: number;
@@ -136,10 +138,16 @@ function MessagesPanel({
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
 
   // Browse-level time-range filter (separate state from the search panel below)
-  const [browseRangeMode, setBrowseRangeMode] = useState<"off" | "preset" | "custom">("off");
-  const [browsePreset, setBrowsePreset] = useState<string>("24h");
-  const [browseCustomFrom, setBrowseCustomFrom] = useState<string>("");
-  const [browseCustomTo, setBrowseCustomTo] = useState<string>("");
+  const {
+    mode: browseRangeMode,
+    preset: browsePreset,
+    customFrom: browseCustomFrom,
+    customTo: browseCustomTo,
+    setMode: setBrowseRangeMode,
+    setPreset: setBrowsePreset,
+    setCustomFrom: setBrowseCustomFrom,
+    setCustomTo: setBrowseCustomTo,
+  } = useTimeRangeState();
 
   // Search state
   const [searchOpen, setSearchOpen] = useState(false);
@@ -285,69 +293,25 @@ function MessagesPanel({
     [browseRangeMode, browsePreset, browseCustomFrom, browseCustomTo],
   );
 
-  const params = useMemo(
-    () => ({
-      partition,
-      limit,
-      from,
-      // Single partition selected: seek that partition. Partition = all:
-      // seek every partition to the same offset via partition_offsets so
-      // "from offset" works across the whole topic, not just one partition.
-      offset: from === "offset" && partition >= 0 ? msgOffset : undefined,
-      partitionOffsets:
-        from === "offset" && partition < 0 && partitions.length > 0
-          ? Object.fromEntries(partitions.map((p) => [p.partition, msgOffset]))
-          : undefined,
-      from_ts_ms: browseRange.from_ts_ms,
-      to_ts_ms: browseRange.to_ts_ms,
-    }),
-    [partition, limit, from, msgOffset, partitions, browseRange.from_ts_ms, browseRange.to_ts_ms],
-  );
-
-  const msgsQuery = useQuery({
-    ...messageQueries.page(cluster, topic, params),
-    refetchInterval: live ? 2_000 : false,
-    enabled: !searchResult,
+  const { params, query: msgsQuery } = useBrowseMessages({
+    cluster,
+    topic,
+    partitions,
+    partition,
+    limit,
+    from,
+    msgOffset,
+    range: browseRange,
+    live,
+    paused: !!searchResult,
   });
 
-  // Cursor pagination: the head page is fetched by the useQuery above; each
-  // "Load more" click appends the next backward page using the previous
-  // page's next_cursor. Reset whenever the head-page params change so the
-  // accumulated tail can never out-of-sync with the current filter.
-  const [tailMessages, setTailMessages] = useState<Message[]>([]);
-  const [tailCursor, setTailCursor] = useState<string | undefined>(undefined);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
-  const loadGenRef = useRef(0);
-
-  useEffect(() => {
-    loadGenRef.current += 1;
-    setTailMessages([]);
-    setTailCursor(msgsQuery.data?.next_cursor);
-    setLoadMoreError(null);
-    setLoadingMore(false);
-  }, [msgsQuery.data]);
-
-  const loadMore = async () => {
-    if (!tailCursor) return;
-    const gen = loadGenRef.current;
-    setLoadingMore(true);
-    setLoadMoreError(null);
-    try {
-      const next = await fetchMessages(cluster, topic, {
-        ...params,
-        cursor: tailCursor,
-      });
-      if (loadGenRef.current !== gen) return; // filter changed mid-flight; drop this page
-      setTailMessages((prev) => [...prev, ...(next.messages ?? [])]);
-      setTailCursor(next.has_more ? next.next_cursor : undefined);
-    } catch (err) {
-      if (loadGenRef.current !== gen) return;
-      setLoadMoreError((err as Error).message);
-    } finally {
-      if (loadGenRef.current === gen) setLoadingMore(false);
-    }
-  };
+  const { tailMessages, tailCursor, loadingMore, loadMoreError, loadMore } = useLoadMore(
+    cluster,
+    topic,
+    params,
+    msgsQuery.data,
+  );
 
   const resolvedRange = () => computeTimeRange(rangeMode, preset, customFrom, customTo);
 
