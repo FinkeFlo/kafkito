@@ -30,6 +30,11 @@ endpoints that back the web UI — stable, documented, scriptable.
   covered by the pattern `*`. The topic, consumer group, topic consumer,
   schema subject and SCRAM user lists only return the names the user may
   view.
+- Every cluster route checks a permission; the spec and the sections below
+  name it where it is not obvious (for example the raw download needs
+  `topic:consume`, the broker list `cluster:view`). A route without one is
+  denied with `403` `{"error":"forbidden","code":"rbac_denied"}`; only
+  `POST /api/v1/clusters/_test` runs without a resource permission.
 - Every response carries an `X-Request-Id` header. It reuses the inbound
   `X-Vcap-Request-Id`, `traceparent` trace-id or `X-Request-Id` when present,
   and matches the `request_id` field in the server logs.
@@ -52,7 +57,8 @@ The server keeps nothing between requests.
 - A malformed header, a missing header on a `__private__` path, or a broker
   or Schema Registry host the SSRF guard refuses returns `400`. Neither the
   raw header nor the credentials in it appear in a response or a log line.
-- RBAC does not apply to private clusters; only the broker's own ACLs do.
+- RBAC does not apply to private clusters, and their lists are not
+  filtered; only the broker's own ACLs apply.
 - `POST /api/v1/clusters/_test` probes a cluster definition sent in the body
   (the "Test connection" button).
 
@@ -178,7 +184,7 @@ Status codes:
 | ------ | ----------------------------------------------------------------- |
 | `200`  | Value returned in the body.                                       |
 | `400`  | `partition` is not a non-negative int32, or `offset` is not a non-negative int64 (`code: invalid_request`). |
-| `403`  | RBAC denied the read, or the value is masked (`code: value_masked`). |
+| `403`  | RBAC denied `topic:consume` on the topic, or the value is masked (`code: value_masked`). |
 | `404`  | Unknown cluster.                                                  |
 | `413`  | Value is larger than the 15 MB download cap.                      |
 | `502`  | Broker error, or no record at that partition/offset (`code: kafka_upstream`). |

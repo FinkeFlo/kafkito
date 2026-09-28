@@ -192,7 +192,10 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** List the brokers of a cluster. */
+        /**
+         * List the brokers of a cluster.
+         * @description With RBAC enabled, requires `view` on `cluster:<cluster>`.
+         */
         get: operations["listBrokers"];
         put?: never;
         post?: never;
@@ -265,7 +268,11 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Consumer groups that have committed offsets on, or are assigned to, this topic. */
+        /**
+         * Consumer groups that have committed offsets on, or are assigned to, this topic.
+         * @description With RBAC enabled, requires `view` on `topic:<topic>`, and only the
+         *     groups the caller may view are returned.
+         */
         get: operations["listTopicConsumers"];
         put?: never;
         post?: never;
@@ -468,7 +475,8 @@ export interface paths {
          *     `application/json` for valid JSON, `text/plain` for other UTF-8 and
          *     `application/octet-stream` otherwise. Values above 15 MB are rejected
          *     with 413. A value the cluster's `data_masking` rules change is refused
-         *     with 403 `value_masked`: the raw bytes would bypass the masking.
+         *     with 403 `value_masked`: the raw bytes would bypass the masking. With
+         *     RBAC enabled, requires `consume` on `topic:<topic>`.
          */
         get: operations["downloadMessageRaw"];
         put?: never;

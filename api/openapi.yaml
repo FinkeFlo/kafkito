@@ -27,8 +27,8 @@ info:
 
     Private (browser-stored) clusters: use the cluster path segment
     `__private__` and send the cluster definition base64-encoded in the
-    `X-Kafkito-Cluster` header. Such requests bypass RBAC; only the broker's
-    own ACLs apply.
+    `X-Kafkito-Cluster` header. Such requests bypass RBAC, and their lists are
+    not filtered; only the broker's own ACLs apply.
 
     Conventions:
     - List endpoints return objects (`{ "<resource>": [...] }`), never bare
@@ -230,6 +230,7 @@ paths:
       operationId: listBrokers
       tags: [clusters]
       summary: List the brokers of a cluster.
+      description: With RBAC enabled, requires `view` on `cluster:<cluster>`.
       responses:
         "200":
           description: OK
@@ -337,6 +338,9 @@ paths:
       operationId: listTopicConsumers
       tags: [topics]
       summary: Consumer groups that have committed offsets on, or are assigned to, this topic.
+      description: |
+        With RBAC enabled, requires `view` on `topic:<topic>`, and only the
+        groups the caller may view are returned.
       responses:
         "200":
           description: OK
@@ -629,7 +633,8 @@ paths:
         `application/json` for valid JSON, `text/plain` for other UTF-8 and
         `application/octet-stream` otherwise. Values above 15 MB are rejected
         with 413. A value the cluster's `data_masking` rules change is refused
-        with 403 `value_masked`: the raw bytes would bypass the masking.
+        with 403 `value_masked`: the raw bytes would bypass the masking. With
+        RBAC enabled, requires `consume` on `topic:<topic>`.
       responses:
         "200":
           description: Raw value bytes.

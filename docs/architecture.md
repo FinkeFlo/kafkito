@@ -38,8 +38,11 @@ mounts each generated operation on the middleware chain it needs.
   resource name against prefix-glob rules (`*`, `team-*`, or an exact name).
   Path parameters are percent-decoded exactly once, the same way the
   generated binding decodes them, so RBAC and the handler always see the same
-  name. The topic, group, consumer, schema subject and SCRAM user lists are
-  filtered to what the caller may view.
+  name. A route without a permission is denied unless it is listed in
+  `rbacExemptRoutes`, and a test walks the router so every cluster route has
+  one or the other. The topic, group, consumer, schema subject and SCRAM
+  user lists are filtered to what the caller may view, except on private
+  clusters.
 - **Handlers** implement the generated `StrictServerInterface` and talk to
   the kafka layer through small interfaces (`internal/server/stores.go`).
   `internal/kafka` has one `Connections` core (configs, lazily created
@@ -114,7 +117,7 @@ inline scripts or styles), `X-Content-Type-Options`, `Referrer-Policy`,
   persists nothing; it only keeps the Kafka client in memory until it has
   been idle for 15 minutes. The raw header and its credentials never appear
   in logs, error bodies or validation messages.
-- RBAC does not apply; the broker's own ACLs do.
+- RBAC does not apply, lists included; the broker's own ACLs do.
 - Anyone who can run script in the page can read them, which is why the CSP
   is strict. On a shared machine, other users of the same browser profile
   can read them too.
