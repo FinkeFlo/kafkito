@@ -1,7 +1,8 @@
 // ReplayModal — lets the user replay a single captured message to an arbitrary
 // cluster / topic (potentially different from where it was consumed).
 //
-// Key, value and all headers are reproduced byte-for-byte. The produce
+// Key, value and all headers are reproduced byte-for-byte, except the
+// X-Kafkito-* provenance headers, which the server replaces. The produce
 // encoding is derived per field by `produceEncodingFor` (shared fidelity rules
 // with internal/server/topic_copy.go), because the rendering the consumer
 // returns is not always the payload: "binary" fields carry only a truncated
