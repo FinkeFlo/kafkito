@@ -14,7 +14,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
 import { useFuzzy, type HighlightRange } from "@/lib/fuzzy";
-import { schemaQueries } from "@/lib/queries/schemas";
+import { schemaKeys, schemaQueries } from "@/lib/queries/schemas";
 
 export const Route = createFileRoute("/clusters/$cluster/schemas/")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -122,8 +122,9 @@ function SchemasBody({
 
   const deleteMut = useMutation({
     mutationFn: (name: string) => deleteSubject(cluster, name, false),
-    onSuccess: () => {
+    onSuccess: (_, name) => {
       qc.invalidateQueries({ queryKey: schemaQueries.subjects(cluster).queryKey });
+      qc.invalidateQueries({ queryKey: schemaKeys.subject(cluster, name) });
       onSelect(undefined, undefined);
     },
   });

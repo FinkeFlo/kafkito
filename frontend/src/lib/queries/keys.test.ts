@@ -6,7 +6,7 @@ import { clusterQueries } from "./clusters";
 import { groupQueries } from "./groups";
 import { infoQueries } from "./info";
 import { messageKeys, messageQueries } from "./messages";
-import { schemaQueries } from "./schemas";
+import { schemaKeys, schemaQueries } from "./schemas";
 import { topicQueries } from "./topics";
 import { scramUserQueries } from "./users";
 
@@ -42,9 +42,9 @@ describe("query keys", () => {
       group: groupQueries.detail(C, "g").queryKey,
       resetPreview: groupQueries.resetPreview(C, "g", body, true).queryKey,
       schemas: schemaQueries.subjects(C).queryKey,
-      subjects: schemaQueries.topicSubjects(C).queryKey,
+      schemaSubject: schemaKeys.subject(C, "s"),
       schema: schemaQueries.version(C, "s", 3).queryKey,
-      schemaLatest: schemaQueries.latestVersion(C, "s").queryKey,
+      schemaLatest: schemaQueries.version(C, "s", "latest").queryKey,
       acls: aclQueries.list(C).queryKey,
       scramUsers: scramUserQueries.list(C).queryKey,
     }).toEqual({
@@ -68,9 +68,9 @@ describe("query keys", () => {
       group: ["group", C, "g"],
       resetPreview: ["reset-offsets-preview", C, "g", body],
       schemas: ["schemas", C],
-      subjects: ["subjects", C],
+      schemaSubject: ["schema", C, "s"],
       schema: ["schema", C, "s", 3],
-      schemaLatest: ["schema-version", C, "s", "latest"],
+      schemaLatest: ["schema", C, "s", "latest"],
       acls: ["acls", C],
       scramUsers: ["scram-users", C],
     });
@@ -79,5 +79,10 @@ describe("query keys", () => {
   it("keep the message-page key under the prefix used for invalidation", () => {
     const page = messageQueries.page(C, T, {}).queryKey;
     expect(page.slice(0, 3)).toEqual([...messageKeys.topic(C, T)]);
+  });
+
+  it("keep schema versions under the subject prefix used for invalidation", () => {
+    const latest = schemaQueries.version(C, "s", "latest").queryKey;
+    expect(latest.slice(0, 3)).toEqual([...schemaKeys.subject(C, "s")]);
   });
 });
