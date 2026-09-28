@@ -15,7 +15,7 @@ function SchemaTab() {
   const subject = `${topic}-value`;
 
   const subjectsQuery = useQuery({
-    ...schemaQueries.topicSubjects(cluster),
+    ...schemaQueries.subjects(cluster),
     enabled: !!cluster,
     staleTime: 60_000,
   });
@@ -23,7 +23,7 @@ function SchemaTab() {
   const hasSubject = subjectsQuery.data?.some((s) => s.name === subject) ?? false;
 
   const versionQuery = useQuery({
-    ...schemaQueries.latestVersion(cluster, subject),
+    ...schemaQueries.version(cluster, subject, "latest"),
     enabled: !!cluster && hasSubject,
     staleTime: 60_000,
   });
