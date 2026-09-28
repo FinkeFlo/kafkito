@@ -404,7 +404,11 @@ const q = useQuery({
   and add view-specific options (`enabled`, `refetchInterval`, …). Inline
   `queryKey` literals elsewhere fail `src/__checks__/query-keys.test.ts`.
 - Keys are arrays of `[<resource>, ...scopes]`; cluster-scoped keys include
-  the cluster name.
+  `clusterKey(cluster)` (`src/lib/queries/cluster-key.ts`): the name for a
+  shared cluster, the id for a private one, so the two never share cache
+  entries when their names collide.
+- One key per resource: views that read the same data use the same factory
+  and differ only in view options such as `staleTime`.
 - Never fetch in `useEffect`.
 - Never store fetched data in component state.
 - `refetchInterval` is opt-in — only for data the user watches in real
