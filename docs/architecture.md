@@ -38,8 +38,8 @@ mounts each generated operation on the middleware chain it needs.
   resource name against prefix-glob rules (`*`, `team-*`, or an exact name).
   Path parameters are percent-decoded exactly once, the same way the
   generated binding decodes them, so RBAC and the handler always see the same
-  name. The topic, group and consumer lists are filtered to what the caller
-  may view.
+  name. The topic, group, consumer, schema subject and SCRAM user lists are
+  filtered to what the caller may view.
 - **Handlers** implement the generated `StrictServerInterface` and talk to
   the kafka layer through small interfaces (`internal/server/stores.go`).
   `internal/kafka` has one `Connections` core (configs, lazily created

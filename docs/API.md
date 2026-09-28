@@ -27,8 +27,9 @@ endpoints that back the web UI — stable, documented, scriptable.
   `group:team-*`). The pattern is `*` (every name), a prefix ending in `*`,
   or an exact name. It is matched against the decoded resource name from
   the path or body, literally: a group, subject or user named `*` is only
-  covered by the pattern `*`. The topic, consumer group and topic consumer
-  lists only return the names the user may view.
+  covered by the pattern `*`. The topic, consumer group, topic consumer,
+  schema subject and SCRAM user lists only return the names the user may
+  view.
 - Every response carries an `X-Request-Id` header. It reuses the inbound
   `X-Vcap-Request-Id`, `traceparent` trace-id or `X-Request-Id` when present,
   and matches the `request_id` field in the server logs.
@@ -482,6 +483,9 @@ curl -s $BASE/api/v1/clusters/$CLUSTER/schemas/subjects/$SUBJECT/versions | jq
 curl -s $BASE/api/v1/clusters/$CLUSTER/schemas/subjects/$SUBJECT/versions/latest | jq
 ```
 
+With RBAC enabled, the subject list only returns the subjects the caller
+has `schema:<subject>` `view` on.
+
 Registering a schema requires `schema`. `schemaType` is `AVRO` (default),
 `JSON` or `PROTOBUF`, spelled exactly; every reference needs `name`,
 `subject` and `version`. Unknown body fields return `400`, and bodies over
@@ -523,6 +527,12 @@ and in the `mechanism` query of `DELETE .../users/{user}`. Aliases such as
 `SHA-256` or lower case return `400`. Omit the query parameter to delete
 both mechanisms; an empty `?mechanism=` returns `400`. The password never
 appears in a response or a log line, not even in validation errors.
+
+With RBAC enabled, the list only returns the users the caller has
+`user:<name>` `view` on, and creating or updating a credential needs `edit`
+on the `user` named in the body (`403` otherwise; a body without `user`
+returns `400`). The name is checked as sent, surrounding whitespace
+included.
 
 ## Errors
 

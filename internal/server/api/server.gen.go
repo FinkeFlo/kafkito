@@ -1285,7 +1285,7 @@ type ServerInterface interface {
 	// ResetGroupOffsets Reset committed offsets of a group.
 	// (POST /api/v1/clusters/{cluster}/groups/{group}/reset-offsets)
 	ResetGroupOffsets(w http.ResponseWriter, r *http.Request, cluster Cluster, group Group, params ResetGroupOffsetsParams)
-	// ListSubjects List Schema Registry subjects with their versions.
+	// ListSubjects List Schema Registry subjects with their versions (filtered by RBAC view permission).
 	// (GET /api/v1/clusters/{cluster}/schemas/subjects)
 	ListSubjects(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListSubjectsParams)
 	// DeleteSubject Delete a subject (soft by default).
@@ -1345,7 +1345,7 @@ type ServerInterface interface {
 	// SampleMessages Sample the last n decoded messages from a topic.
 	// (GET /api/v1/clusters/{cluster}/topics/{topic}/sample)
 	SampleMessages(w http.ResponseWriter, r *http.Request, cluster Cluster, topic Topic, params SampleMessagesParams)
-	// ListScramUsers List SCRAM users.
+	// ListScramUsers List SCRAM users (filtered by RBAC view permission).
 	// (GET /api/v1/clusters/{cluster}/users)
 	ListScramUsers(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListScramUsersParams)
 	// UpsertScramUser Create or update a SCRAM user.
@@ -1453,7 +1453,7 @@ func (_ Unimplemented) ResetGroupOffsets(w http.ResponseWriter, r *http.Request,
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// ListSubjects List Schema Registry subjects with their versions.
+// ListSubjects List Schema Registry subjects with their versions (filtered by RBAC view permission).
 // (GET /api/v1/clusters/{cluster}/schemas/subjects)
 func (_ Unimplemented) ListSubjects(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListSubjectsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -1573,7 +1573,7 @@ func (_ Unimplemented) SampleMessages(w http.ResponseWriter, r *http.Request, cl
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// ListScramUsers List SCRAM users.
+// ListScramUsers List SCRAM users (filtered by RBAC view permission).
 // (GET /api/v1/clusters/{cluster}/users)
 func (_ Unimplemented) ListScramUsers(w http.ResponseWriter, r *http.Request, cluster Cluster, params ListScramUsersParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -8100,7 +8100,7 @@ type StrictServerInterface interface {
 	// ResetGroupOffsets Reset committed offsets of a group.
 	// (POST /api/v1/clusters/{cluster}/groups/{group}/reset-offsets)
 	ResetGroupOffsets(ctx context.Context, request ResetGroupOffsetsRequestObject) (ResetGroupOffsetsResponseObject, error)
-	// ListSubjects List Schema Registry subjects with their versions.
+	// ListSubjects List Schema Registry subjects with their versions (filtered by RBAC view permission).
 	// (GET /api/v1/clusters/{cluster}/schemas/subjects)
 	ListSubjects(ctx context.Context, request ListSubjectsRequestObject) (ListSubjectsResponseObject, error)
 	// DeleteSubject Delete a subject (soft by default).
@@ -8160,7 +8160,7 @@ type StrictServerInterface interface {
 	// SampleMessages Sample the last n decoded messages from a topic.
 	// (GET /api/v1/clusters/{cluster}/topics/{topic}/sample)
 	SampleMessages(ctx context.Context, request SampleMessagesRequestObject) (SampleMessagesResponseObject, error)
-	// ListScramUsers List SCRAM users.
+	// ListScramUsers List SCRAM users (filtered by RBAC view permission).
 	// (GET /api/v1/clusters/{cluster}/users)
 	ListScramUsers(ctx context.Context, request ListScramUsersRequestObject) (ListScramUsersResponseObject, error)
 	// UpsertScramUser Create or update a SCRAM user.
