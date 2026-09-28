@@ -90,7 +90,11 @@ function SchemaTab() {
           Open full view
         </Link>
       </div>
-      <pre className="overflow-auto p-4 font-mono text-[12px] leading-relaxed text-text">
+      <pre
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: a long schema line scrolls horizontally; without a tab stop keyboard users cannot scroll it (axe scrollable-region-focusable).
+        tabIndex={0}
+        className="overflow-auto p-4 font-mono text-[12px] leading-relaxed text-text"
+      >
         {versionQuery.isLoading ? "Loading…" : (versionQuery.data?.schema ?? "(empty)")}
       </pre>
     </div>
