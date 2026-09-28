@@ -57,6 +57,9 @@ frontend/e2e/a11y.spec.ts           axe scan of the main routes, dialogs and for
 frontend/e2e/keyboard-and-form-errors.spec.ts  keyboard-only row activation (Tab to the primary cell,
                                     Enter / Space) and aria-invalid + aria-describedby on form errors
 frontend/e2e/status-indicators.spec.ts  every status indicator keeps a non-colour cue (WCAG 1.4.1)
+frontend/e2e/messages-panel.spec.ts  the topic messages panel: URL search params, browse controls, Load more,
+                                    error/partial/empty states, search form and run lifecycle (real and
+                                    `page.route`-mocked search responses), coachmark and click-to-filter undo
 frontend/e2e/private-cluster-storage.spec.ts  seeds kafkito.private-clusters.v1 and walks the stored
                                     connections; secrets must stay out of the console and the page
 frontend/e2e/private-cluster-same-name.spec.ts  the settings form refuses a private cluster named like the
