@@ -186,8 +186,8 @@ clean:
 # Opt-in: NOT part of the canonical hard gate. CI runs the same flow
 # in .github/workflows/e2e.yml; behaviour parity matters.
 #
-# Requires Docker, Bun, Go, and a one-time `bunx playwright install
-# chromium` under frontend/. See frontend/e2e/README.md.
+# Requires Docker, Bun, Go, curl, jq, and a one-time `bunx playwright
+# install chromium` under frontend/. See frontend/e2e/README.md.
 
 E2E_PORT ?= 47421
 E2E_PID := /tmp/kafkito-e2e.pid

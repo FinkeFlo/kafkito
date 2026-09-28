@@ -39,6 +39,12 @@ same Kafka and Schema Registry containers; `seed.sh` only touches the
 
 ## Quickstart (local)
 
+Prerequisites: Docker (with Compose), Bun, Go, and `curl` and `jq` on your
+PATH. `seed.sh` calls the Schema Registry REST API with curl and jq and
+exits early with a hint if one of them is missing (macOS: `brew install
+jq`; Debian/Ubuntu: `sudo apt-get install -y jq curl`; the GitHub-hosted
+Ubuntu runners have both).
+
 ```bash
 # one-time
 cd frontend && bunx playwright install chromium
