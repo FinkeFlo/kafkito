@@ -35,8 +35,7 @@ func (s *apiServer) ListTopics(ctx context.Context, req gen.ListTopicsRequestObj
 		return nil, clusterError(req.Cluster, "list topics", err)
 	}
 	sort.Slice(topics, func(i, j int) bool { return topics[i].Name < topics[j].Name })
-	if s.policy != nil && s.policy.Enabled() {
-		user := rbacSubject(httpRequestFromContext(ctx), s.policy)
+	if user, ok := s.rbacListSubject(ctx, req.Cluster); ok {
 		topics = filterTopicsByRBAC(topics, s.policy, user, req.Cluster)
 	}
 	return gen.ListTopics200JSONResponse{Cluster: req.Cluster, Topics: topics}, nil
@@ -87,18 +86,9 @@ func (s *apiServer) DeleteTopic(ctx context.Context, req gen.DeleteTopicRequestO
 }
 
 // ListTopicConsumers returns the consumer groups currently reading from the
-// given topic. Bounded by a 5s upstream timeout.
+// given topic, filtered by the caller's RBAC group:view permission. Bounded
+// by a 5s upstream timeout.
 func (s *apiServer) ListTopicConsumers(ctx context.Context, req gen.ListTopicConsumersRequestObject) (gen.ListTopicConsumersResponseObject, error) {
-	var user string
-	rbacOn := s.policy != nil && s.policy.Enabled()
-	if rbacOn {
-		user = rbacSubject(httpRequestFromContext(ctx), s.policy)
-		// Topic-level gate: the user must be allowed to view the topic itself.
-		if !s.policy.Allow(user, req.Cluster, "topic", req.Topic, "view") {
-			return nil, &apiError{Status: http.StatusForbidden, Code: "rbac_denied", Message: "forbidden"}
-		}
-	}
-
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
@@ -118,7 +108,7 @@ func (s *apiServer) ListTopicConsumers(ctx context.Context, req gen.ListTopicCon
 		return nil, clusterError(req.Cluster, "list consumers for topic "+req.Topic, err)
 	}
 
-	if rbacOn {
+	if user, ok := s.rbacListSubject(ctx, req.Cluster); ok {
 		consumers = filterTopicConsumersByRBAC(consumers, s.policy, user, req.Cluster)
 	}
 	return gen.ListTopicConsumers200JSONResponse{Cluster: req.Cluster, Topic: req.Topic, Consumers: consumers}, nil

@@ -4,6 +4,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -23,6 +24,10 @@ type fakeAdhocClusters struct{ clusterStore }
 
 func (fakeAdhocClusters) UseAdhoc(config.ClusterConfig) (string, error) {
 	return kafkapkg.AdhocPrefix + "test", nil
+}
+
+func (fakeAdhocClusters) ListBrokers(context.Context, string) ([]kafkapkg.BrokerInfo, error) {
+	return []kafkapkg.BrokerInfo{{NodeID: 1, Host: "broker-1", Port: 9092, IsController: true}}, nil
 }
 
 // rbacGrantConfig enables RBAC and grants userMallory perms.

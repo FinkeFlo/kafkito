@@ -9,11 +9,13 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/FinkeFlo/kafkito/internal/auth"
 	"github.com/FinkeFlo/kafkito/internal/config"
+	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/FinkeFlo/kafkito/internal/rbac"
 	"github.com/go-chi/chi/v5"
 )
@@ -41,11 +43,26 @@ func rbacSubject(r *http.Request, policy *rbac.Policy) string {
 	return r.Header.Get(policy.Header())
 }
 
+// rbacExemptRoutes are the routes ("METHOD pattern") RBAC lets through
+// without a resource permission, each with the reason. rbacMiddleware denies
+// any other route resolvePermission has no permission for, so a new route
+// is closed until it is mapped or listed here.
+var rbacExemptRoutes = map[string]string{
+	"POST /api/v1/clusters/_test": "probes a cluster definition sent in the body, " +
+		"like a private cluster (which RBAC does not apply to); no configured " +
+		"cluster is involved and the outbound-host guard applies",
+}
+
 // rbacMiddleware enforces RBAC for cluster routes. The identity is resolved
 // from the configured header; the resource/action is derived from the matched
 // chi route pattern and HTTP method, the resource names from the path
-// parameters as the handler binds them (see pathParam).
-func rbacMiddleware(policy *rbac.Policy) func(http.Handler) http.Handler {
+// parameters as the handler binds them (see pathParam). A route without a
+// permission is denied unless it is in rbacExemptRoutes or addresses a
+// private cluster.
+func rbacMiddleware(policy *rbac.Policy, log *slog.Logger) func(http.Handler) http.Handler {
+	if log == nil {
+		log = slog.Default()
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			user := rbacSubject(r, policy)
@@ -64,7 +81,15 @@ func rbacMiddleware(policy *rbac.Policy) func(http.Handler) http.Handler {
 
 			resType, resName, action, bodyField := resolvePermission(r)
 			if resType == "" {
-				next.ServeHTTP(w, r)
+				pattern := routePattern(r)
+				cluster, _ := pathParam(r, "cluster")
+				if _, ok := rbacExemptRoutes[r.Method+" "+pattern]; ok || cluster == config.PrivateClusterSentinel {
+					next.ServeHTTP(w, r)
+					return
+				}
+				log.WarnContext(r.Context(), "rbac: route has no permission mapping, denied",
+					"method", r.Method, "route", pattern)
+				writeJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden", "code": "rbac_denied"})
 				return
 			}
 
@@ -120,6 +145,25 @@ func rbacMiddleware(policy *rbac.Policy) func(http.Handler) http.Handler {
 	}
 }
 
+// rbacListSubject reports whether a handler applies RBAC itself on cluster
+// (to filter a list or check a body name), and for which identity. It does
+// not when RBAC is disabled or for a private (ad-hoc) cluster, which RBAC
+// does not apply to.
+func (s *apiServer) rbacListSubject(ctx context.Context, cluster string) (string, bool) {
+	if s.policy == nil || !s.policy.Enabled() || kafkapkg.IsAdhoc(cluster) {
+		return "", false
+	}
+	return rbacSubject(httpRequestFromContext(ctx), s.policy), true
+}
+
+// routePattern is the matched chi route pattern of r, or "".
+func routePattern(r *http.Request) string {
+	if rctx := chi.RouteContext(r.Context()); rctx != nil {
+		return rctx.RoutePattern()
+	}
+	return ""
+}
+
 // rbacBodyLimit returns the body limit and too-large message prefix of the
 // route whose body rbacMiddleware reads to find the resource name: those of
 // create topic and create group, or of the SCRAM user upsert.
@@ -167,6 +211,8 @@ func resolvePermission(r *http.Request) (resType, resName, action, bodyField str
 		return "cluster", cluster, "view", ""
 	case strings.HasSuffix(pattern, "/capabilities/refresh") && method == http.MethodPost:
 		return "cluster", cluster, "view", ""
+	case strings.HasSuffix(pattern, "/brokers") && method == http.MethodGet:
+		return "cluster", cluster, "view", ""
 
 	// Topics
 	case strings.HasSuffix(pattern, "/topics") && method == http.MethodGet:
@@ -177,6 +223,9 @@ func resolvePermission(r *http.Request) (resType, resName, action, bodyField str
 		return "topic", topic, "view", ""
 	case strings.HasSuffix(pattern, "/topics/{topic}") && method == http.MethodDelete:
 		return "topic", topic, "delete", ""
+	// The handler also drops the consumer groups the caller may not view.
+	case strings.HasSuffix(pattern, "/topics/{topic}/consumers") && method == http.MethodGet:
+		return "topic", topic, "view", ""
 	case strings.HasSuffix(pattern, "/topics/{topic}/configs") && method == http.MethodPatch:
 		return "topic", topic, "edit", ""
 	case strings.HasSuffix(pattern, "/topics/{topic}/records") && method == http.MethodDelete:
@@ -186,6 +235,8 @@ func resolvePermission(r *http.Request) (resType, resName, action, bodyField str
 	case strings.HasSuffix(pattern, "/topics/{topic}/messages/count") && method == http.MethodGet:
 		return "topic", topic, "consume", ""
 	case strings.HasSuffix(pattern, "/topics/{topic}/messages/timeline") && method == http.MethodGet:
+		return "topic", topic, "consume", ""
+	case strings.HasSuffix(pattern, "/topics/{topic}/messages/{partition}/{offset}/raw") && method == http.MethodGet:
 		return "topic", topic, "consume", ""
 	case strings.HasSuffix(pattern, "/topics/{topic}/messages") && method == http.MethodGet:
 		return "topic", topic, "consume", ""

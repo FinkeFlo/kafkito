@@ -29,8 +29,7 @@ func (s *apiServer) ListGroups(ctx context.Context, req gen.ListGroupsRequestObj
 	if err != nil {
 		return nil, clusterError(req.Cluster, "list groups", err)
 	}
-	if s.policy != nil && s.policy.Enabled() {
-		user := rbacSubject(httpRequestFromContext(ctx), s.policy)
+	if user, ok := s.rbacListSubject(ctx, req.Cluster); ok {
 		groups = filterGroupsByRBAC(groups, s.policy, user, req.Cluster)
 	}
 	return gen.ListGroups200JSONResponse{Cluster: req.Cluster, Groups: groups}, nil

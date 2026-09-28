@@ -38,11 +38,9 @@ type apiOp struct {
 	method  string
 	pattern string // chi route pattern == spec path
 	group   string // groupRoot, groupMeta or groupCluster
-	// RBAC permission resolved from the route pattern ("" = no check).
+	// RBAC permission resolved from the route pattern ("" = exempt, see
+	// rbacExemptRoutes).
 	resource, action string
-	// handlerRBAC is the 403 body of an operation whose handler checks
-	// RBAC itself instead of the middleware.
-	handlerRBAC string
 }
 
 const (
@@ -63,22 +61,19 @@ var apiOps = []apiOp{
 	{id: "testCluster", method: http.MethodPost, pattern: "/api/v1/clusters/_test", group: groupCluster},
 	{id: "getCapabilities", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/capabilities", group: groupCluster, resource: "cluster:{cluster}", action: "view"},
 	{id: "refreshCapabilities", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/capabilities/refresh", group: groupCluster, resource: "cluster:{cluster}", action: "view"},
-	{id: "listBrokers", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/brokers", group: groupCluster},
+	{id: "listBrokers", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/brokers", group: groupCluster, resource: "cluster:{cluster}", action: "view"},
 	{id: "listTopics", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics", group: groupCluster, resource: "topic:", action: "view"},
 	{id: "createTopic", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/topics", group: groupCluster, resource: "topic:" + opTopic, action: "edit"},
 	{id: "describeTopic", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics/{topic}", group: groupCluster, resource: "topic:{topic}", action: "view"},
 	{id: "deleteTopic", method: http.MethodDelete, pattern: "/api/v1/clusters/{cluster}/topics/{topic}", group: groupCluster, resource: "topic:{topic}", action: "delete"},
-	// The consumers route has no middleware permission; the handler checks
-	// topic:view itself.
-	{id: "listTopicConsumers", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/consumers", group: groupCluster, handlerRBAC: `{"error":"forbidden","code":"rbac_denied"}`},
+	{id: "listTopicConsumers", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/consumers", group: groupCluster, resource: "topic:{topic}", action: "view"},
 	{id: "alterTopicConfigs", method: http.MethodPatch, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/configs", group: groupCluster, resource: "topic:{topic}", action: "edit"},
 	{id: "deleteRecords", method: http.MethodDelete, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/records", group: groupCluster, resource: "topic:{topic}", action: "delete"},
 	{id: "consumeMessages", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/messages", group: groupCluster, resource: "topic:{topic}", action: "consume"},
 	{id: "produceMessage", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/messages", group: groupCluster, resource: "topic:{topic}", action: "produce"},
 	{id: "countMessages", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/messages/count", group: groupCluster, resource: "topic:{topic}", action: "consume"},
 	{id: "getMessageTimeline", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/messages/timeline", group: groupCluster, resource: "topic:{topic}", action: "consume"},
-	// The raw download route has no permission case in resolvePermission.
-	{id: "downloadMessageRaw", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/messages/{partition}/{offset}/raw", group: groupCluster},
+	{id: "downloadMessageRaw", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/messages/{partition}/{offset}/raw", group: groupCluster, resource: "topic:{topic}", action: "consume"},
 	{id: "sampleMessages", method: http.MethodGet, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/sample", group: groupCluster, resource: "topic:{topic}", action: "consume"},
 	{id: "searchMessages", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/messages/search", group: groupCluster, resource: "topic:{topic}", action: "consume"},
 	{id: "copyMessages", method: http.MethodPost, pattern: "/api/v1/clusters/{cluster}/topics/{topic}/copy", group: groupCluster, resource: "topic:{topic}", action: "consume"},
@@ -259,13 +254,10 @@ func TestAPIOps_RBAC(t *testing.T) {
 			rec := httptest.NewRecorder()
 			h.ServeHTTP(rec, req.WithContext(ctx))
 
-			switch {
-			case op.handlerRBAC != "":
-				require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
-				assert.JSONEq(t, op.handlerRBAC, rec.Body.String())
-			case op.resource == "":
+			if op.resource == "" {
+				assert.Contains(t, rbacExemptRoutes, op.method+" "+op.pattern)
 				assert.NotEqual(t, http.StatusForbidden, rec.Code, rec.Body.String())
-			default:
+			} else {
 				require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 				resource := opParams.Replace(strings.ReplaceAll(op.resource, "{cluster}", "rbac-c"))
 				assert.JSONEq(t, `{"error":"forbidden","resource":"`+resource+`","action":"`+op.action+`"}`, rec.Body.String())
@@ -330,7 +322,7 @@ func TestAPIOps_PrivateClusterParam(t *testing.T) {
 	r.Route("/api/v1", func(v1 chi.Router) {
 		v1.Group(func(g chi.Router) {
 			g.Use(privateClusterMiddleware)
-			g.Use(rbacMiddleware(impl.policy))
+			g.Use(rbacMiddleware(impl.policy, nil))
 			g.Use(resolvePrivateClusterParam(reg))
 			routes.mountClusters(g)
 		})
