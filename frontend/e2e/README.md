@@ -22,12 +22,15 @@ kafkito (Go)      subprocess on PORT=47421       : 47421 (host)  ← Playwright 
                   configured by fixtures/kafkito-e2e.yaml (KAFKITO_CONFIG)
 ```
 
-`make e2e-up` starts both containers with `docker compose up -d --wait kafka
-schema-registry`, so it returns once both healthchecks pass. `make
-e2e-down` (and `make e2e-clean`) stop the kafkito binary and the Schema
-Registry container, but only the container if `make e2e-up` started it:
-a registry that a running `make dev` stack already owns keeps running.
-Kafka is left running, as before.
+`make e2e-up` starts Kafka with `docker compose up -d --wait kafka` and
+then the Schema Registry in the background (`docker compose up -d
+schema-registry`, output in `bin/.e2e-schema-registry-up.log`), so the
+registry's image pull and JVM start overlap the frontend and Go builds.
+`seed.sh` waits up to 120 s for the registry before it registers the
+subjects. `make e2e-down` (and `make e2e-clean`) stop the kafkito binary
+and the Schema Registry container, but only the container if `make e2e-up`
+started it: a registry that a running `make dev` stack already owns keeps
+running. Kafka is left running, as before.
 
 `make dev` keeps using `:37421` (kafkito) and `:37422` (Vite). Both can
 coexist with `make e2e` because the e2e kafkito binds a different port

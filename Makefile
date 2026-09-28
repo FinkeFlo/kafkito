@@ -196,6 +196,8 @@ E2E_LOG := /tmp/kafkito-e2e.log
 # e2e-clean stop the container only when it is present, so an already
 # running `make dev` stack (same compose project) keeps its registry.
 E2E_SR_MARKER := bin/.e2e-schema-registry-started
+# Output of the background `docker compose up -d schema-registry`.
+E2E_SR_UP_LOG := bin/.e2e-schema-registry-up.log
 
 e2e: e2e-up e2e-test e2e-down
 
@@ -208,7 +210,13 @@ e2e-up:
 	@if [ -z "$$(docker compose ps -q --status running schema-registry 2>/dev/null)" ]; then \
 		touch $(E2E_SR_MARKER); \
 	fi
-	docker compose up -d --wait kafka schema-registry
+	docker compose up -d --wait kafka
+	@# Only seed.sh's last step needs the registry, so its image pull and JVM
+	@# start run in the background, next to the builds below; seed.sh waits
+	@# for it (wait_for_schema_registry) and prints $(E2E_SR_UP_LOG) if it
+	@# never comes up.
+	@echo "e2e: starting schema-registry in the background"
+	@docker compose up -d schema-registry > $(E2E_SR_UP_LOG) 2>&1 &
 	cd frontend && bun run build
 	go build -tags devauth -ldflags "-X main.version=e2e-dev" -o bin/kafkito-e2e ./cmd/kafkito
 	@echo "e2e: starting kafkito-e2e on port $(E2E_PORT)"
@@ -233,7 +241,7 @@ e2e-up:
 		cat $(E2E_LOG); \
 		exit 1; \
 	fi
-	bash frontend/e2e/fixtures/seed.sh
+	KAFKITO_E2E_SR_UP_LOG=$(E2E_SR_UP_LOG) bash frontend/e2e/fixtures/seed.sh
 
 e2e-test:
 	cd frontend && mkdir -p test-results && KAFKITO_E2E_BASE_URL=http://localhost:$(E2E_PORT) bunx playwright test
@@ -249,12 +257,13 @@ e2e-down:
 		rm -f $(E2E_SR_MARKER); \
 		echo "e2e: schema-registry stopped"; \
 	fi
+	@rm -f $(E2E_SR_UP_LOG)
 
 e2e-clean:
 	@pids=$$(lsof -nP -iTCP:$(E2E_PORT) -sTCP:LISTEN -t 2>/dev/null); \
 	if [ -n "$$pids" ]; then kill -9 $$pids 2>/dev/null || true; fi
 	@rm -rf frontend/test-results/.playwright-artifacts-*
-	@rm -f $(E2E_PID) $(E2E_LOG)
+	@rm -f $(E2E_PID) $(E2E_LOG) $(E2E_SR_UP_LOG)
 	@if [ -f $(E2E_SR_MARKER) ]; then \
 		docker compose stop schema-registry; \
 		rm -f $(E2E_SR_MARKER); \
