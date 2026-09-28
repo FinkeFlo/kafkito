@@ -32,7 +32,9 @@ GitHub Actions.
 
    `make e2e` is opt-in: it starts Kafka and the Schema Registry via Compose
    and a `devauth` build of kafkito, then runs the Playwright walks in
-   `frontend/e2e/` (including axe accessibility scans). After a failed run,
+   `frontend/e2e/` (including axe accessibility scans). Besides Docker, Bun
+   and Go it needs `curl` and `jq` on your PATH (the fixture seeding talks to
+   the Schema Registry REST API). After a failed run,
    stop the binary and the Schema Registry with `make e2e-down`. See
    [`frontend/e2e/README.md`](https://github.com/FinkeFlo/kafkito/blob/main/frontend/e2e/README.md).
 

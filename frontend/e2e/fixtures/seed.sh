@@ -41,6 +41,23 @@ CONTAINER="${KAFKITO_E2E_KAFKA_CONTAINER:-kafkito-kafka}"
 SR_URL="${KAFKITO_E2E_SR_URL:-http://localhost:38081}"
 SR_CONTENT_TYPE="Content-Type: application/vnd.schemaregistry.v1+json"
 
+# require_tools fails early, with a hint, when a tool the seeding needs is
+# missing: docker for the broker, curl and jq for the Schema Registry REST
+# calls, go for the Avro encoder.
+require_tools() {
+  local missing=()
+  local tool
+  for tool in docker curl jq go; do
+    command -v "${tool}" >/dev/null 2>&1 || missing+=("${tool}")
+  done
+  if [ "${#missing[@]}" -gt 0 ]; then
+    echo "seed: missing required tool(s): ${missing[*]}" >&2
+    echo "seed: install them and retry (jq and curl: 'brew install jq curl' on macOS," >&2
+    echo "seed: 'sudo apt-get install -y jq curl' on Debian/Ubuntu); see the prerequisites in frontend/e2e/README.md" >&2
+    exit 1
+  fi
+}
+
 run_in_kafka() {
   docker exec "${CONTAINER}" "$@"
 }
@@ -505,6 +522,8 @@ produce_masked_key_headers() {
 }
 
 main() {
+  require_tools
+
   echo "seed: waiting for broker on ${BROKER_INTERNAL} (via ${CONTAINER})"
   wait_for_broker
 
