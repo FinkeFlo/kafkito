@@ -15,11 +15,12 @@ import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
 import { useFuzzy, type HighlightRange } from "@/lib/fuzzy";
 import { schemaKeys, schemaQueries } from "@/lib/queries/schemas";
+import { searchParamString } from "@/lib/schema-version";
 
 export const Route = createFileRoute("/clusters/$cluster/schemas/")({
   validateSearch: (s: Record<string, unknown>) => ({
-    subject: typeof s.subject === "string" ? s.subject : undefined,
-    version: typeof s.version === "string" ? s.version : undefined,
+    subject: searchParamString(s.subject),
+    version: searchParamString(s.version),
   }),
   component: SchemasPage,
 });
