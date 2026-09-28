@@ -9,10 +9,11 @@ import {
   fetchSample,
 } from "../api";
 import { type HydratableEncoding, hydrateTruncatedSampleMessages } from "../hydrate-sample";
+import { clusterKey } from "./cluster-key";
 
 /** Key prefixes for invalidating every cached page of a topic. */
 export const messageKeys = {
-  topic: (cluster: string, topic: string) => ["messages", cluster, topic] as const,
+  topic: (cluster: string, topic: string) => ["messages", clusterKey(cluster), topic] as const,
 };
 
 type CountParams = Pick<ConsumeParams, "partition" | "from_ts_ms" | "to_ts_ms">;
@@ -28,17 +29,17 @@ export const messageQueries = {
   /** Newest record, used by the produce form to offer "copy latest". */
   latestProbe: (cluster: string, topic: string) =>
     queryOptions({
-      queryKey: ["produce-latest-probe", cluster, topic] as const,
+      queryKey: ["produce-latest-probe", clusterKey(cluster), topic] as const,
       queryFn: () => fetchMessages(cluster, topic, { from: "end", limit: 1 }),
     }),
   count: (cluster: string, topic: string, params: CountParams) =>
     queryOptions({
-      queryKey: ["message-count", cluster, topic, params] as const,
+      queryKey: ["message-count", clusterKey(cluster), topic, params] as const,
       queryFn: () => fetchMessageCount(cluster, topic, params),
     }),
   timeline: (cluster: string, topic: string, partition: number, range: TimelineRange) =>
     queryOptions({
-      queryKey: ["message-timeline", cluster, topic, partition, range] as const,
+      queryKey: ["message-timeline", clusterKey(cluster), topic, partition, range] as const,
       queryFn: () =>
         fetchMessageTimeline(cluster, topic, {
           partition,
@@ -54,7 +55,7 @@ export const messageQueries = {
    */
   sample: (cluster: string, topic: string, encoding: HydratableEncoding) =>
     queryOptions<SampleResponse>({
-      queryKey: ["sample", cluster, topic, encoding] as const,
+      queryKey: ["sample", clusterKey(cluster), topic, encoding] as const,
       queryFn: async ({ signal }) => {
         const res = await fetchSample(cluster, topic, 5, -1);
         const messages = await hydrateTruncatedSampleMessages(
@@ -71,7 +72,7 @@ export const messageQueries = {
   /** Full raw value of one record, base64-encoded. */
   raw: (cluster: string, topic: string, partition: number, offset: number) =>
     queryOptions({
-      queryKey: ["message-raw", cluster, topic, partition, offset] as const,
+      queryKey: ["message-raw", clusterKey(cluster), topic, partition, offset] as const,
       queryFn: ({ signal }) => fetchMessageRawBase64(cluster, topic, partition, offset, signal),
       staleTime: 5 * 60_000,
       // Deliberately short: these entries are megabyte-sized base64 strings,

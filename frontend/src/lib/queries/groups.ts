@@ -1,15 +1,16 @@
 import { queryOptions } from "@tanstack/react-query";
 import { type ResetOffsetsRequest, fetchGroupDetail, fetchGroups, resetGroupOffsets } from "../api";
+import { clusterKey } from "./cluster-key";
 
 export const groupQueries = {
   list: (cluster: string) =>
     queryOptions({
-      queryKey: ["groups", cluster] as const,
+      queryKey: ["groups", clusterKey(cluster)] as const,
       queryFn: () => fetchGroups(cluster),
     }),
   detail: (cluster: string, group: string) =>
     queryOptions({
-      queryKey: ["group", cluster, group] as const,
+      queryKey: ["group", clusterKey(cluster), group] as const,
       queryFn: () => fetchGroupDetail(cluster, group),
     }),
   /**
@@ -23,7 +24,7 @@ export const groupQueries = {
     confirmProd: boolean,
   ) =>
     queryOptions({
-      queryKey: ["reset-offsets-preview", cluster, group, body] as const,
+      queryKey: ["reset-offsets-preview", clusterKey(cluster), group, body] as const,
       queryFn: () => resetGroupOffsets(cluster, group, { ...body, dry_run: true }, confirmProd),
     }),
 };
