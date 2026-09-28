@@ -116,19 +116,35 @@ test.describe("Topic data (produce, search, raw download, bulk copy)", () => {
       }).observe(document.body, { subtree: true, childList: true, characterData: true });
     });
 
+    const copyResponse = page.waitForResponse(
+      (res) =>
+        res.request().method() === "POST" &&
+        new URL(res.url()).pathname.endsWith(`/topics/${COPY_SOURCE}/copy`),
+    );
     await page.getByRole("button", { name: "Start copy" }).click();
     await expect(
       page.getByText(`Done — ${COPY_TOTAL.toLocaleString("en-US")} messages copied`),
     ).toBeVisible({ timeout: 60_000 });
 
+    // The stream opens with a zero-progress event and reports each page
+    // before the job finishes: progress rises through intermediate counts.
+    // Checked on the SSE body: events that arrive in one network chunk are
+    // handled in one task, so React renders only the last of them and the
+    // DOM cannot be relied on to show every intermediate count.
+    const events = (await (await copyResponse).text())
+      .split("\n")
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => JSON.parse(line.slice(6)) as { copied: number; done?: boolean });
+    const streamed = events.map((ev) => ev.copied);
+    expect(streamed[0]).toBe(0);
+    expect(streamed.filter((n) => n > 0 && n < COPY_TOTAL).length).toBeGreaterThan(0);
+    expect([...streamed].sort((a, b) => a - b)).toEqual(streamed);
+    expect(events.at(-1)).toMatchObject({ copied: COPY_TOTAL, done: true });
+
+    // Whatever counts the panel did render, it rendered them in order.
     const progress = await page.evaluate(
       () => (window as unknown as { __copyProgress: number[] }).__copyProgress,
     );
-    // The stream opens with a zero-progress event and reports each page
-    // before the job finishes: progress rises through intermediate counts.
-    expect(progress[0]).toBe(0);
-    const intermediate = progress.filter((n) => n > 0 && n < COPY_TOTAL);
-    expect(intermediate.length).toBeGreaterThan(0);
     expect([...progress].sort((a, b) => a - b)).toEqual(progress);
 
     await page.goto(topicPath(COPY_DEST, "messages"));
