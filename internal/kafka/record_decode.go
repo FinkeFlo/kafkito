@@ -12,6 +12,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"io"
+	"slices"
 	"unicode/utf8"
 
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -35,9 +36,10 @@ func (r *Messages) recordDecoder(cluster, topic string) recordDecoder {
 }
 
 // message renders rec for a response: the value is truncated to
-// maxMessageValueBytes, decoded via the Schema Registry and masked. Masking
-// runs on the full decoded value (see maskedValue), so a record is masked
-// the same way no matter how large it is.
+// maxMessageValueBytes, decoded via the Schema Registry and masked, and the
+// key and header values are masked. Masking runs on the full decoded value
+// (see maskedValue), so a record is masked the same way no matter how large
+// it is.
 func (d recordDecoder) message(ctx context.Context, rec *kgo.Record) Message {
 	m := recordToMessage(rec)
 	m.applySRDecoder(ctx, d.sr, rec.Key, rec.Value, true)
@@ -54,7 +56,33 @@ func (d recordDecoder) message(ctx context.Context, rec *kgo.Record) Message {
 		// The base64 of a binary value carries the raw, unmasked bytes.
 		m.ValueB64 = ""
 	}
+	d.maskKeyAndHeaders(&m)
 	return m
+}
+
+// maskKeyAndHeaders masks the rendered key and header values of m in place
+// and flags what changed. Unlike the value, neither is ever truncated, so
+// the rendering m holds is the full one. The base64 forms of a masked key
+// or header carry the raw, unmasked bytes and are dropped.
+func (d recordDecoder) maskKeyAndHeaders(m *Message) {
+	if k, did := d.mask.ApplyKey(d.topic, m.Key); did {
+		m.Key = k
+		m.KeyMasked = true
+		m.KeyB64 = ""
+	}
+	for name, v := range m.Headers {
+		mv, did := d.mask.ApplyHeader(d.topic, name, v)
+		if !did {
+			continue
+		}
+		m.Headers[name] = mv
+		delete(m.HeadersB64, name)
+		m.MaskedHeaders = append(m.MaskedHeaders, name)
+	}
+	if len(m.HeadersB64) == 0 {
+		m.HeadersB64 = nil
+	}
+	slices.Sort(m.MaskedHeaders)
 }
 
 // maskedValue applies the masking policy to the full decoded value of rec,
@@ -81,14 +109,15 @@ func (d recordDecoder) valueMasked(ctx context.Context, rec *kgo.Record) bool {
 }
 
 // matchMessage renders rec for the search matchers: full and decoded, with
-// the value masked where the policy applies, so a search only matches what
-// a response would show. It must never end up in a response; see
+// the value, key and headers masked where the policy applies, so a search
+// only matches what a response would show. It must never end up in a response; see
 // recordToMatchMessage.
 func (d recordDecoder) matchMessage(ctx context.Context, rec *kgo.Record) Message {
 	m := recordToMatchMessage(rec)
 	m.applySRDecoder(ctx, d.sr, rec.Key, rec.Value, false)
 	if d.masks {
 		m.Value, _ = d.mask.Apply(d.topic, m.Value)
+		d.maskKeyAndHeaders(&m)
 	}
 	return m
 }

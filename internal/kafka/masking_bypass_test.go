@@ -219,3 +219,206 @@ func TestSearch_ParseErrorsDoNotEchoValuesOnMaskedTopics(t *testing.T) {
 	require.NotEmpty(t, res.Stats.ParseErrorOffsets)
 	assert.Contains(t, res.Stats.ParseErrorOffsets[0].Error, "secret-")
 }
+
+// keyHeaderRules masks customer ids in the key and the values of the
+// authorization and x-secret-* headers of customersTopic.
+func keyHeaderRules(c *config.ClusterConfig) {
+	c.DataMasking = []config.MaskingRule{
+		{
+			Topics:  []string{"^" + customersTopic + "$"},
+			Targets: []string{config.MaskTargetKey},
+			Fields:  []string{"$.customer"},
+			Regex:   []config.RegexMask{{Match: `cust-[0-9a-z]+`, Replacement: "cust-***"}, {Match: `^0x[0-9a-f]+$`}},
+		},
+		{
+			Topics:  []string{"^" + customersTopic + "$"},
+			Targets: []string{config.MaskTargetHeaders},
+			Headers: []string{"^authorization$", "^x-secret-"},
+			Regex:   []config.RegexMask{{Match: `.+`, Replacement: "[redacted]"}},
+		},
+	}
+}
+
+// keyHeaderRecords are the fixture of the key/header masking tests. None of
+// their values is masked; the clear-text secrets all contain "s3cr3t" (the
+// hex of the binary ones: 0x73 0x33 → "7333").
+func keyHeaderRecords() []*kgo.Record {
+	return []*kgo.Record{
+		{
+			Timestamp: time.UnixMilli(fixtureBaseTS),
+			Key:       []byte("cust-1001s3cr3t"),
+			Value:     []byte(`{"order":"o-1"}`),
+			Headers: []kgo.RecordHeader{
+				{Key: "authorization", Value: []byte("Bearer s3cr3t-token")},
+				{Key: "trace-id", Value: []byte("trace-visible")},
+			},
+		},
+		{
+			Timestamp: time.UnixMilli(fixtureBaseTS + 1),
+			Key:       []byte(`{"customer":"s3cr3t-alice","region":"eu"}`),
+			Value:     []byte(`{"order":"o-2"}`),
+			Headers: []kgo.RecordHeader{
+				{Key: "x-secret-bin", Value: []byte{0xff, 's', '3', 'c', 'r', '3', 't'}},
+				{Key: "x-plain-bin", Value: []byte{0xff, 0x01}},
+			},
+		},
+		{
+			Timestamp: time.UnixMilli(fixtureBaseTS + 2),
+			Key:       []byte{0xff, 's', '3'},
+			Value:     []byte(`{"order":"o-3"}`),
+		},
+	}
+}
+
+func assertNoKeyHeaderLeak(t *testing.T, m Message) {
+	t.Helper()
+	assert.NotContains(t, m.Key, "s3cr3t", "offset %d key", m.Offset)
+	assert.NotContains(t, m.Key, "7333", "offset %d key", m.Offset)
+	assert.Empty(t, m.KeyB64, "offset %d: the key base64 carries the unmasked bytes", m.Offset)
+	for k, v := range m.Headers {
+		assert.NotContains(t, v, "s3cr3t", "offset %d header %s", m.Offset, k)
+		assert.NotContains(t, v, "7333", "offset %d header %s", m.Offset, k)
+	}
+	assert.NotContains(t, m.HeadersB64, "x-secret-bin", "offset %d", m.Offset)
+}
+
+func TestConsume_MasksKeysAndHeaders(t *testing.T) {
+	t.Parallel()
+	env := newKfakeEnv(t, customersTopic, 1, keyHeaderRules)
+	env.produce(t, keyHeaderRecords()...)
+
+	res := consumePage(t, env, ConsumeOptions{Partition: -1, Limit: 10, From: FromStart})
+	require.Len(t, res.Messages, 3)
+	byOffset := map[int64]Message{}
+	for _, m := range res.Messages {
+		assertNoKeyHeaderLeak(t, m)
+		assert.False(t, m.Masked, "offset %d: the value is not masked", m.Offset)
+		assert.True(t, m.KeyMasked, "offset %d", m.Offset)
+		assert.True(t, m.AnyMasked(), "offset %d", m.Offset)
+		byOffset[m.Offset] = m
+	}
+
+	m := byOffset[0]
+	assert.Equal(t, "cust-***", m.Key, "regex on the text key")
+	assert.JSONEq(t, `{"order":"o-1"}`, m.Value)
+	assert.Equal(t, map[string]string{"authorization": "[redacted]", "trace-id": "trace-visible"}, m.Headers)
+	assert.Equal(t, []string{"authorization"}, m.MaskedHeaders)
+
+	m = byOffset[1]
+	assert.JSONEq(t, `{"customer":"***","region":"eu"}`, m.Key, "fields apply to a JSON key")
+	assert.Equal(t, "[redacted]", m.Headers["x-secret-bin"])
+	assert.Equal(t, "0xff01", m.Headers["x-plain-bin"], "an unselected header stays as is")
+	assert.Equal(t, map[string]string{"x-plain-bin": "/wE="}, m.HeadersB64, "only the masked header loses its base64")
+	assert.Equal(t, []string{"x-secret-bin"}, m.MaskedHeaders)
+
+	m = byOffset[2]
+	assert.Equal(t, "***", m.Key, "regex on the hex rendering of a binary key")
+	assert.Equal(t, "binary", m.KeyEncoding)
+	assert.Empty(t, m.MaskedHeaders)
+}
+
+func TestConsume_MasksSchemaRegistryDecodedKey(t *testing.T) {
+	t.Parallel()
+	srURL := startFakeSchemaRegistry(t)
+	env := newKfakeEnv(t, "users", 1, func(c *config.ClusterConfig) {
+		c.SchemaRegistry = config.SchemaRegistryConfig{URL: srURL}
+		c.DataMasking = []config.MaskingRule{{Targets: []string{config.MaskTargetKey}, Fields: []string{"$.name"}}}
+	})
+	env.produce(t, &kgo.Record{Key: avroUserFrame(t, 1, "alice"), Value: []byte("v")})
+
+	res := consumePage(t, env, ConsumeOptions{Partition: -1, Limit: 10, From: FromStart})
+	require.Len(t, res.Messages, 1)
+	m := res.Messages[0]
+	assert.True(t, m.KeyMasked)
+	assert.Equal(t, "avro", m.KeyEncoding)
+	assert.NotContains(t, m.Key, "alice")
+	assert.Contains(t, m.Key, `"name":"***"`)
+}
+
+func TestSearch_MatchesOnlyMaskedKeysAndHeaders(t *testing.T) {
+	t.Parallel()
+	env := newKfakeEnv(t, customersTopic, 1, keyHeaderRules)
+	env.produce(t, keyHeaderRecords()...)
+
+	allZones := []SearchZone{ZoneKey, ZoneHeaders, ZoneValue}
+	noHits := []SearchOptions{
+		{Value: "s3cr3t", Zones: allZones},
+		{Value: "1001", Zones: []SearchZone{ZoneKey}},
+		{Value: "7333", Zones: allZones},
+		{Value: "Bearer", Zones: []SearchZone{ZoneHeaders}},
+		{Mode: SearchModeJS, Value: `key.includes("s3cr3t") || key.includes("1001")`},
+		{Mode: SearchModeJS, Value: `Object.values(headers || {}).some(v => v.includes("s3cr3t") || v.includes("Bearer"))`},
+	}
+	for _, opts := range noHits {
+		opts.Partition = -1
+		res := searchTopic(t, env, opts)
+		assert.Empty(t, res.Messages, "%+v finds masked content", opts)
+		assert.Equal(t, 3, res.Stats.Scanned, "%+v", opts)
+	}
+
+	hits := map[string]SearchOptions{
+		"masked key":     {Value: "cust-***", Zones: []SearchZone{ZoneKey}},
+		"masked header":  {Value: "[redacted]", Zones: []SearchZone{ZoneHeaders}},
+		"visible header": {Value: "trace-visible", Zones: []SearchZone{ZoneHeaders}},
+		"js masked key":  {Mode: SearchModeJS, Value: `key === "cust-***"`},
+	}
+	for name, opts := range hits {
+		opts.Partition = -1
+		opts.Direction = DirOldestFirst
+		res := searchTopic(t, env, opts)
+		require.NotEmpty(t, res.Messages, name)
+		for _, m := range res.Messages {
+			assertNoKeyHeaderLeak(t, m)
+			assert.True(t, m.KeyMasked, "%s: offset %d", name, m.Offset)
+		}
+	}
+}
+
+// JS errors can quote the key or a header; a topic with only key/header
+// rules withholds them like a value rule does.
+func TestSearch_ParseErrorsWithheldOnKeyMaskedTopics(t *testing.T) {
+	t.Parallel()
+	env := newKfakeEnv(t, customersTopic, 1, keyHeaderRules)
+	env.produce(t, keyHeaderRecords()[0])
+
+	res := searchTopic(t, env, SearchOptions{Partition: -1, Mode: SearchModeJS, Value: `(() => { throw new Error("got " + key) })()`})
+	require.NotEmpty(t, res.Stats.ParseErrorOffsets)
+	assert.Equal(t, parseErrorWithheld, res.Stats.ParseErrorOffsets[0].Error)
+}
+
+// The raw download returns the value bytes only, so a record whose key or
+// headers alone are masked stays downloadable and the response carries
+// neither.
+func TestFetchRawMessageValue_KeyAndHeaderMaskingLeavesValueDownload(t *testing.T) {
+	t.Parallel()
+	env := newKfakeEnv(t, customersTopic, 1, keyHeaderRules)
+	env.produce(t, keyHeaderRecords()...)
+
+	raw, err := env.reg.FetchRawMessageValue(context.Background(), kfakeCluster, env.topic, 0, 0)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"order":"o-1"}`, string(raw.Value))
+}
+
+// Rules without targets keep masking values only, exactly as before targets
+// existed: keys and headers stay in clear text.
+func TestConsume_RulesWithoutTargetsLeaveKeysAndHeaders(t *testing.T) {
+	t.Parallel()
+	env := newKfakeEnv(t, customersTopic, 1, customerRules)
+	env.produce(t, &kgo.Record{
+		Key:     []byte("iban-de001"),
+		Value:   []byte(`{"email":"alice@example.com"}`),
+		Headers: []kgo.RecordHeader{{Key: "iban", Value: []byte("iban-de002")}},
+	})
+
+	res := consumePage(t, env, ConsumeOptions{Partition: -1, Limit: 10, From: FromStart})
+	require.Len(t, res.Messages, 1)
+	m := res.Messages[0]
+	assert.True(t, m.Masked)
+	assert.False(t, m.KeyMasked)
+	assert.Empty(t, m.MaskedHeaders)
+	assert.Equal(t, "iban-de001", m.Key)
+	assert.Equal(t, map[string]string{"iban": "iban-de002"}, m.Headers)
+
+	search := searchTopic(t, env, SearchOptions{Partition: -1, Value: "iban-de001", Zones: []SearchZone{ZoneKey}})
+	assert.Len(t, search.Messages, 1, "keys stay searchable in clear text")
+}

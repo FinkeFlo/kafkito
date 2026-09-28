@@ -629,8 +629,9 @@ func isTopicMissingErr(err error) bool {
 //
 // Records are skipped, never approximated, in three cases:
 //
-//   - Masked: the source cluster's data_masking policy redacted the value, so
-//     what we hold is a redaction, not the record. Copying it would write the
+//   - Masked: the source cluster's data_masking policy redacted the value,
+//     the key or a header value, so what we hold is a redaction, not the
+//     record. Copying it would write the
 //     redacted rendering into the destination as if it were real data — silent
 //     data corruption that no later step can detect — and un-redacting is by
 //     construction impossible. (Masking is a per-cluster policy, so a
@@ -656,7 +657,7 @@ func isTopicMissingErr(err error) bool {
 // valid UTF-8; without it they would arrive at the destination as the literal
 // display text "0x<hex>" that recordToMessage puts in Headers.
 func copyProduceRequest(msg kafkapkg.Message, preservePartition bool, user string) (kafkapkg.ProduceRequest, bool) {
-	if msg.Masked || msg.ValueTruncated {
+	if msg.AnyMasked() || msg.ValueTruncated {
 		return kafkapkg.ProduceRequest{}, false
 	}
 
