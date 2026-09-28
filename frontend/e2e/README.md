@@ -52,8 +52,10 @@ frontend/e2e/fixtures/seed.sh       seeds the broker via `docker exec kafkito-ka
 frontend/e2e/fixtures/kafkito-e2e.yaml  kafkito config: cluster `local` + data_masking for e2e-masked
 frontend/e2e/*.spec.ts              the actual walks
 frontend/e2e/csp.spec.ts            fails on any Content-Security-Policy violation (needs the Go-served build)
-frontend/e2e/a11y.spec.ts           axe scan of the main routes and dialogs in light and dark theme
-                                    (fixtures/axe.ts); fails on serious/critical violations
+frontend/e2e/a11y.spec.ts           axe scan of the main routes, dialogs and form error states in light
+                                    and dark theme (fixtures/axe.ts); fails on moderate/serious/critical
+frontend/e2e/keyboard-and-form-errors.spec.ts  keyboard-only row activation (Tab to the primary cell,
+                                    Enter / Space) and aria-invalid + aria-describedby on form errors
 frontend/e2e/status-indicators.spec.ts  every status indicator keeps a non-colour cue (WCAG 1.4.1)
 frontend/e2e/private-cluster-storage.spec.ts  seeds kafkito.private-clusters.v1 and walks the stored
                                     connections; secrets must stay out of the console and the page
