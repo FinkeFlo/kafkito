@@ -51,6 +51,16 @@ export const MAX_CHANGELOG_DESCRIPTION_LENGTH = 160;
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.2.0",
+    date: "2026-09-28",
+    items: [
+      {
+        type: "fix",
+        title: "Stability and accessibility improvements",
+      },
+    ],
+  },
+  {
     version: "1.1.19",
     date: "2026-09-25",
     items: [
