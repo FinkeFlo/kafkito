@@ -9,7 +9,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
-  reporter: process.env.CI ? "github" : [["list"], ["html", { open: "never" }]],
+  // In CI the list reporter adds per-test durations to the job log, so a
+  // slowdown of the suite can be traced to the tests that caused it.
+  reporter: process.env.CI ? [["github"], ["list"]] : [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: BASE_URL,
     trace: "retain-on-failure",
