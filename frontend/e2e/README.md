@@ -59,8 +59,9 @@ frontend/e2e/keyboard-and-form-errors.spec.ts  keyboard-only row activation (Tab
 frontend/e2e/status-indicators.spec.ts  every status indicator keeps a non-colour cue (WCAG 1.4.1)
 frontend/e2e/private-cluster-storage.spec.ts  seeds kafkito.private-clusters.v1 and walks the stored
                                     connections; secrets must stay out of the console and the page
-frontend/e2e/private-cluster-same-name.spec.ts  adds a private cluster named like the shared one in the
-                                    UI; each must show its own topics, never the other's cached ones
+frontend/e2e/private-cluster-same-name.spec.ts  the settings form refuses a private cluster named like the
+                                    shared one; a stored entry with that name is flagged, and after the
+                                    rename each cluster shows its own topics, never the other's cached ones
 frontend/e2e/vision-deficiency.spec.ts  opt-in: set KAFKITO_E2E_VISION_DIR to capture the status pages
                                     under deuteranopia / protanopia emulation (Chromium CDP)
 Makefile :: e2e, e2e-up, e2e-test, e2e-down
@@ -97,6 +98,11 @@ Makefile :: e2e, e2e-up, e2e-test, e2e-down
   address (`fixtures/host-address.ts`), because the backend refuses
   loopback brokers for private clusters. It picks the first RFC 1918
   interface address; set `KAFKITO_E2E_HOST_IP` to override.
+  The fixture broker advertises `localhost:39092`, which the backend refuses
+  for private clusters too, so data requests to a private cluster on the
+  fixture broker can fail with 502 once the client dials the advertised
+  address. Specs that need a private cluster's data answer those requests
+  with `page.route` (see `private-cluster-same-name.spec.ts`).
 
 ## What is NOT here yet
 
