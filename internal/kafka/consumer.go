@@ -34,7 +34,14 @@ type Message struct {
 	// (see Registry.Produce) must use instead.
 	HeadersB64 map[string]string `json:"headers_b64,omitempty"`
 
+	// Masked is true when the masking policy changed the value.
 	Masked bool `json:"masked,omitempty"`
+	// KeyMasked is true when the masking policy changed the key; KeyB64 is
+	// then omitted, because it would carry the unmasked bytes.
+	KeyMasked bool `json:"key_masked,omitempty"`
+	// MaskedHeaders lists, sorted, the keys of the headers whose values the
+	// masking policy changed; their HeadersB64 entries are omitted.
+	MaskedHeaders []string `json:"masked_headers,omitempty"`
 
 	// ValueSizeBytes is the untruncated byte length of the raw Kafka value.
 	// Populated whenever the value was read; zero means the record had no
@@ -52,6 +59,12 @@ type Message struct {
 	// / "protobuf") and the rendered field holds JSON-form payload.
 	KeySR   *SRDecodedMeta `json:"key_sr,omitempty"`
 	ValueSR *SRDecodedMeta `json:"value_sr,omitempty"`
+}
+
+// AnyMasked reports whether the masking policy changed any part of the
+// record, so the Message holds a redaction rather than the record.
+func (m Message) AnyMasked() bool {
+	return m.Masked || m.KeyMasked || len(m.MaskedHeaders) > 0
 }
 
 // ConsumeFrom selects where to start consuming from.

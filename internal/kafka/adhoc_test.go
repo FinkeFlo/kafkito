@@ -117,3 +117,23 @@ func TestRegistry_UseAdhoc_DedupsIdenticalConfigsViaFingerprint(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEqual(t, name1, name3, "a different config must get a different internal name")
 }
+
+// Private clusters never carry masking, whatever data_masking their config
+// sends: the user brings their own credentials and sees the raw data.
+func TestUseAdhoc_IgnoresDataMasking(t *testing.T) {
+	t.Parallel()
+	reg := NewRegistry(nil, slog.Default())
+	t.Cleanup(reg.Close)
+	cfg := sampleClusterConfig()
+	cfg.DataMasking = []config.MaskingRule{
+		{Fields: []string{"$.email"}},
+		{Targets: []string{config.MaskTargetKey, config.MaskTargetHeaders}, Regex: []config.RegexMask{{Match: ".+"}}},
+	}
+
+	name, err := reg.UseAdhoc(cfg)
+	require.NoError(t, err)
+
+	p := reg.MaskingPolicy(name)
+	assert.True(t, p.IsEmpty())
+	assert.False(t, p.AppliesTo("orders"))
+}
