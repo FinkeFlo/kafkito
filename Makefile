@@ -246,14 +246,14 @@ e2e-clean:
 
 # --- Dev iteration loop -------------------------------------------------
 # `worktree-init` writes a per-worktree .env.dev with a free port pair.
-# Idempotent: if .env.dev exists, it prints the contents and exits 0.
+# Idempotent: if .env.dev exists, it leaves it alone and exits 0. It never
+# prints the file, since developers may add their own settings to it.
 # The whole recipe runs as ONE shell (chained with `; \`), so the early
 # `exit 0` in the idempotent branch is load-bearing — without it, the
 # port scan below would still run and overwrite .env.dev.
 worktree-init:
 	@if [ -f .env.dev ]; then \
-		echo ".env.dev already exists in this worktree:"; \
-		cat .env.dev; \
+		echo ".env.dev already exists in this worktree; delete it to pick new ports."; \
 		exit 0; \
 	fi; \
 	p=37421; \
@@ -274,8 +274,7 @@ worktree-init:
 		echo "KAFKITO_FRONTEND_PORT=$$((p+1))"; \
 		echo "KAFKITO_KAFKA_BROKERS=localhost:39092"; \
 	} > .env.dev; \
-	echo "wrote .env.dev:"; \
-	cat .env.dev
+	echo "wrote .env.dev: backend port $$p, frontend port $$((p+1))"
 
 # `make dev` — full local loop in one process tree:
 #   - Compose stack (Kafka + Schema Registry) up & healthy
