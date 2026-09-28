@@ -4,6 +4,8 @@ import { expectNoBlockingA11yViolations, expectTheme, pinTheme, THEMES } from ".
 const CLUSTER = process.env.KAFKITO_E2E_CLUSTER ?? "local";
 const TOPIC = "e2e-walk-target";
 const GROUP = "e2e-idle-group";
+// Seeded by seed.sh into the e2e Schema Registry.
+const SUBJECT = "e2e-avro-orders-value";
 
 const c = encodeURIComponent(CLUSTER);
 const topicPath = (tab: string) => `/clusters/${c}/topics/${encodeURIComponent(TOPIC)}/${tab}`;
@@ -94,7 +96,7 @@ const ROUTES: Route[] = [
     path: `/clusters/${c}/schemas`,
     ready: async (page) => {
       await h1(page, "Schemas");
-      await expect(page.getByText(/Schemas not configured/i)).toBeVisible();
+      await expect(page.getByRole("button", { name: new RegExp(`^${SUBJECT}`) })).toBeVisible();
     },
   },
   {

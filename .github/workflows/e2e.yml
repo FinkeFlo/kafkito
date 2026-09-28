@@ -64,6 +64,10 @@ jobs:
           path: /tmp/kafkito-e2e.log
           retention-days: 7
 
+      - name: Print Schema Registry log
+        if: failure()
+        run: docker compose logs --no-color --tail=500 schema-registry || true
+
       - name: Tear down kafkito-e2e (best-effort)
         if: always()
         run: make e2e-down || true
