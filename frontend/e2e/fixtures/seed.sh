@@ -191,12 +191,19 @@ EOF
   cd "${repo_root}" && go run "${tmp_go}" "${broker_host}" "${topic}"
 }
 
+# make e2e-up starts the registry in the background (it is not needed until
+# here), so this wait also covers its image pull and JVM start.
 wait_for_schema_registry() {
-  local tries=60
+  local tries=120
   while ! curl -fsS "${SR_URL}/subjects" >/dev/null 2>&1; do
     tries=$((tries - 1))
     if [ "${tries}" -le 0 ]; then
-      echo "seed: schema registry did not become reachable at ${SR_URL}" >&2
+      echo "seed: schema registry did not become reachable at ${SR_URL} in 120s" >&2
+      if [ -n "${KAFKITO_E2E_SR_UP_LOG:-}" ] && [ -f "${KAFKITO_E2E_SR_UP_LOG}" ]; then
+        echo "seed: output of 'docker compose up -d schema-registry':" >&2
+        cat "${KAFKITO_E2E_SR_UP_LOG}" >&2
+      fi
+      docker logs --tail 40 kafkito-schema-registry >&2 2>&1 || true
       exit 1
     fi
     sleep 1

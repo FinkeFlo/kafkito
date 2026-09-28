@@ -71,7 +71,8 @@ services:
       retries: 6
       start_period: 15s
       # Probe every 2s during start_period so `docker compose up --wait`
-      # (make dev, make e2e-up) returns soon after the registry is up.
+      # (make dev) returns soon after the registry is up. make e2e-up does
+      # not wait here; seed.sh polls the registry itself.
       start_interval: 2s
 
   # Dev container with auth disabled, like the -local image: a devauth
