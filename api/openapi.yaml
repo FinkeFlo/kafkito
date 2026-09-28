@@ -966,7 +966,7 @@ paths:
     get:
       operationId: listSubjects
       tags: [schemas]
-      summary: List Schema Registry subjects with their versions.
+      summary: List Schema Registry subjects with their versions (filtered by RBAC view permission).
       responses:
         "200":
           description: OK
@@ -1150,7 +1150,7 @@ paths:
     get:
       operationId: listScramUsers
       tags: [users]
-      summary: List SCRAM users.
+      summary: List SCRAM users (filtered by RBAC view permission).
       responses:
         "200":
           description: OK
@@ -1168,6 +1168,10 @@ paths:
       operationId: upsertScramUser
       tags: [users]
       summary: Create or update a SCRAM user.
+      description: |
+        With RBAC enabled, requires `edit` on `user:<user>`, where `<user>` is
+        the `user` field of the body, checked as sent. A body without `user`
+        returns 400.
       requestBody:
         required: true
         content:

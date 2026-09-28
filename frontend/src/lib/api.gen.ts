@@ -703,7 +703,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** List Schema Registry subjects with their versions. */
+        /** List Schema Registry subjects with their versions (filtered by RBAC view permission). */
         get: operations["listSubjects"];
         put?: never;
         post?: never;
@@ -826,10 +826,15 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** List SCRAM users. */
+        /** List SCRAM users (filtered by RBAC view permission). */
         get: operations["listScramUsers"];
         put?: never;
-        /** Create or update a SCRAM user. */
+        /**
+         * Create or update a SCRAM user.
+         * @description With RBAC enabled, requires `edit` on `user:<user>`, where `<user>` is
+         *     the `user` field of the body, checked as sent. A body without `user`
+         *     returns 400.
+         */
         post: operations["upsertScramUser"];
         delete?: never;
         options?: never;
