@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { useFieldError } from "@/components/ui/FieldError";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useCluster } from "@/lib/use-cluster";
@@ -63,6 +64,8 @@ function ProduceSection({
   const [templateError, setTemplateError] = useState<string | null>(null);
   const [result, setResult] = useState<ProduceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [valueError, setValueError] = useState<string | null>(null);
+  const valueField = useFieldError(valueError);
   const [confirmProdOpen, setConfirmProdOpen] = useState(false);
   const qc = useQueryClient();
   const { clusters } = useCluster();
@@ -102,6 +105,7 @@ function ProduceSection({
     setTemplating(true);
     setTemplateError(null);
     setError(null);
+    setValueError(null);
     try {
       // Fan out across partitions: we don't know which one holds the freshest
       // record, so pull the tail-most message from each and keep the newest
@@ -156,20 +160,26 @@ function ProduceSection({
     try {
       setValue(JSON.stringify(JSON.parse(value), null, 2));
       setValueFormat("json");
-      setError(null);
+      setValueError(null);
     } catch (e) {
-      setError("Value is not valid JSON: " + (e as Error).message);
+      setValueError(`Value is not valid JSON: ${(e as Error).message}`);
     }
   };
 
   const runProduce = async (confirmProd = false) => {
-    setBusy(true);
     setError(null);
     setResult(null);
-    try {
-      if (valueFormat === "json" && value.trim()) {
+    if (valueFormat === "json" && value.trim()) {
+      try {
         JSON.parse(value);
+      } catch (e) {
+        setValueError(`Value is not valid JSON: ${(e as Error).message}`);
+        return;
       }
+    }
+    setValueError(null);
+    setBusy(true);
+    try {
       const hdrMap: Record<string, string> = {};
       for (const { k, v } of headers) {
         if (k.trim()) hdrMap[k.trim()] = v;
@@ -214,6 +224,7 @@ function ProduceSection({
     setValueFormat("text");
     setResult(null);
     setError(null);
+    setValueError(null);
     setTemplateError(null);
   };
 
@@ -320,11 +331,17 @@ function ProduceSection({
             onChange={(e) => {
               setValue(e.target.value);
               setValueFormat("text");
+              setValueError(null);
             }}
             rows={6}
             placeholder='{"hello":"world"}'
-            className="w-full rounded-md border border-border bg-panel px-3 py-2 text-sm font-mono transition-colors hover:border-border-hover"
+            {...valueField.controlProps}
+            className={
+              "w-full rounded-md border bg-panel px-3 py-2 text-sm font-mono transition-colors " +
+              (valueField.invalid ? "border-danger" : "border-border hover:border-border-hover")
+            }
           />
+          {valueField.message}
         </div>
 
         <div>
