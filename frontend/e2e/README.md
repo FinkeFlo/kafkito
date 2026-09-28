@@ -23,7 +23,7 @@ kafkito (Go)      subprocess on PORT=47421       : 47421 (host)  ← Playwright 
 `make dev` keeps using `:37421` (kafkito) and `:37422` (Vite). Both can
 coexist with `make e2e` because the e2e kafkito binds a different port
 and uses the fresh local Kafka cluster (named `local` in
-`fixtures/kafkito-e2e.yaml`, which also holds the `data_masking` rule the
+`fixtures/kafkito-e2e.yaml`, which also holds the `data_masking` rules the
 masking walk needs).
 
 ## Quickstart (local)
@@ -49,7 +49,7 @@ To override the port: `make e2e E2E_PORT=47431`.
 docker-compose.yml                  apache/kafka:3.8.1 + cp-schema-registry (existing)
 frontend/playwright.config.ts       Playwright bootstrap (testDir = ./e2e)
 frontend/e2e/fixtures/seed.sh       seeds the broker via `docker exec kafkito-kafka`
-frontend/e2e/fixtures/kafkito-e2e.yaml  kafkito config: cluster `local` + data_masking for e2e-masked
+frontend/e2e/fixtures/kafkito-e2e.yaml  kafkito config: cluster `local` + data_masking for e2e-masked(-kh)
 frontend/e2e/*.spec.ts              the actual walks
 frontend/e2e/csp.spec.ts            fails on any Content-Security-Policy violation (needs the Go-served build)
 frontend/e2e/a11y.spec.ts           axe scan of the main routes, dialogs and form error states in light

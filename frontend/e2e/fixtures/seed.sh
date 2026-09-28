@@ -14,6 +14,9 @@
 #   topic e2e-masked           1 partition, 2 JSON messages whose customer.email is
 #                              masked by kafkito-e2e.yaml (masking walk); the
 #                              second is ~100 KB
+#   topic e2e-masked-kh        1 partition, 1 record whose key and authorization
+#                              header kafkito-e2e.yaml masks (masking walk)
+#   topic e2e-masked-kh-dest   1 partition, empty (masking walk copy destination)
 #   consumer group e2e-idle-group  in Empty state (consumed once, then exited)
 #
 # Idempotent: safe to re-run; topics are recreated, the consumer is run
@@ -238,6 +241,19 @@ produce_masked_json() {
   } | produce_spread_lines "${topic}"
 }
 
+# produce_masked_key_headers puts one record whose key and authorization
+# header the data_masking rules in kafkito-e2e.yaml mask; its value and
+# trace-id header stay visible (masking.spec.ts).
+produce_masked_key_headers() {
+  local topic="$1"
+  printf '%s\n' 'authorization:Bearer e2e-token-secret,trace-id:e2e-trace-visible|cust-e2e-4711#{"order":"E2E-MASK-KH-1"}' |
+    run_in_kafka_stdin /opt/kafka/bin/kafka-console-producer.sh \
+      --bootstrap-server "${BROKER_INTERNAL}" --topic "${topic}" \
+      --property parse.headers=true --property headers.delimiter='|' \
+      --property headers.separator=',' --property headers.key.separator=':' \
+      --property parse.key=true --property key.separator='#' >/dev/null 2>&1
+}
+
 main() {
   echo "seed: waiting for broker on ${BROKER_INTERNAL} (via ${CONTAINER})"
   wait_for_broker
@@ -257,6 +273,8 @@ main() {
   recreate_topic "e2e-copy-dest" 1
   recreate_topic "e2e-produce-target" 1
   recreate_topic "e2e-masked" 1
+  recreate_topic "e2e-masked-kh" 1
+  recreate_topic "e2e-masked-kh-dest" 1
 
   echo "seed: producing fixture messages"
   now_ms=$(( $(date +%s) * 1000 ))
@@ -273,6 +291,7 @@ main() {
   produce_large_xml "e2e-large-message-xml"
   produce_root_array_json "e2e-root-array"
   produce_masked_json "e2e-masked"
+  produce_masked_key_headers "e2e-masked-kh"
 
   echo "seed: bringing group e2e-idle-group to Empty"
   leave_group_empty "e2e-walk-target" "e2e-idle-group"
