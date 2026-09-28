@@ -235,11 +235,18 @@ type ClusterConfig struct {
 // one of Fields or Regex must be populated. Topics is a list of topic name
 // patterns (Go regex); the rule triggers when any pattern matches the topic.
 // If Topics is empty, the rule matches all topics.
+//
+// Targets selects the record parts the rule masks (MaskTargetValue,
+// MaskTargetKey, MaskTargetHeaders); empty means the value only. Headers
+// narrows the headers target to header keys matching any of its patterns
+// (Go regex); empty means every header.
 type MaskingRule struct {
 	Topics      []string    `koanf:"topics" json:"topics"`
 	Fields      []string    `koanf:"fields" json:"fields"`           // JSONPath expressions
 	Regex       []RegexMask `koanf:"regex" json:"regex"`             // regex-based replacements applied on the raw string
 	Replacement string      `koanf:"replacement" json:"replacement"` // default replacement for Fields; empty = "***"
+	Targets     []string    `koanf:"targets" json:"targets"`
+	Headers     []string    `koanf:"headers" json:"headers"`
 }
 
 // RegexMask describes a single regex substitution.
@@ -371,6 +378,11 @@ func (c Config) Validate() error {
 		}
 		if err := validateAuth(cl.Auth); err != nil {
 			return fmt.Errorf("clusters[%d] (%s): %w", i, cl.Name, err)
+		}
+		for j, r := range cl.DataMasking {
+			if err := r.Validate(); err != nil {
+				return fmt.Errorf("clusters[%d] (%s): data_masking[%d]: %w", i, cl.Name, j, err)
+			}
 		}
 	}
 	return nil
