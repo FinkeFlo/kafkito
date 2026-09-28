@@ -98,19 +98,24 @@ func waitForTopicMetadata(ctx context.Context, cl *kgo.Client, topic string) {
 	}
 }
 
-// DeleteTopic deletes a topic.
+// DeleteTopic deletes a topic and purges it from the cluster's client.
+//
+// The client would otherwise keep the deleted topic's ID and refuse a topic
+// recreated under the same name (UNKNOWN_TOPIC_ID); see produceSync for the
+// case where another tool deletes and recreates the topic.
 func (r *Topics) DeleteTopic(ctx context.Context, cluster, topic string) error {
-	adm, err := r.Admin(cluster)
+	cl, err := r.Client(cluster)
 	if err != nil {
 		return err
 	}
-	resp, err := adm.DeleteTopic(ctx, topic)
+	resp, err := kadm.NewClient(cl).DeleteTopic(ctx, topic)
 	if err != nil {
 		return fmt.Errorf("delete topic %q: %w", topic, err)
 	}
 	if resp.Err != nil {
 		return fmt.Errorf("delete topic %q: %w", topic, resp.Err)
 	}
+	cl.PurgeTopicsFromClient(topic)
 	return nil
 }
 
