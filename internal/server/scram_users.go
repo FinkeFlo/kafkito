@@ -10,6 +10,7 @@ import (
 	"time"
 
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
+	"github.com/FinkeFlo/kafkito/internal/rbac"
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
 )
 
@@ -20,13 +21,19 @@ const maxSCRAMBodyBytes = 16 << 10
 // names none.
 var scramMechanisms = []gen.DeleteScramUserParamsMechanism{gen.DeleteScramUserParamsMechanismSCRAMSHA256, gen.DeleteScramUserParamsMechanismSCRAMSHA512}
 
-// ListScramUsers returns all users with SCRAM credentials.
+// ListScramUsers returns the users with SCRAM credentials, filtered by the
+// caller's RBAC user:view permission. Private clusters are not filtered:
+// RBAC does not apply to them.
 func (s *apiServer) ListScramUsers(ctx context.Context, req gen.ListScramUsersRequestObject) (gen.ListScramUsersResponseObject, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	users, err := s.scram.ListSCRAMUsers(ctx, req.Cluster)
 	if err != nil {
 		return nil, clusterError(req.Cluster, "list SCRAM users", err)
+	}
+	if s.policy != nil && s.policy.Enabled() && !kafkapkg.IsAdhoc(req.Cluster) {
+		user := rbacSubject(httpRequestFromContext(ctx), s.policy)
+		users = filterSCRAMUsersByRBAC(users, s.policy, user, req.Cluster)
 	}
 	return gen.ListScramUsers200JSONResponse{Cluster: req.Cluster, Users: users}, nil
 }
@@ -82,4 +89,26 @@ func scramError(cluster, op string, err error) error {
 func isSCRAMClientErr(msg string) bool {
 	return strings.Contains(msg, "required") || strings.Contains(msg, "mechanism") ||
 		strings.Contains(msg, "iterations")
+}
+
+// filterSCRAMUsersByRBAC removes the SCRAM users the user is not allowed to
+// view.
+func filterSCRAMUsersByRBAC(users []kafkapkg.SCRAMUser, policy *rbac.Policy, user, cluster string) []kafkapkg.SCRAMUser {
+	globs, all := policy.AllowedResourceNames(user, cluster, "user", "view")
+	if all {
+		return users
+	}
+	if len(globs) == 0 {
+		return []kafkapkg.SCRAMUser{}
+	}
+	out := make([]kafkapkg.SCRAMUser, 0, len(users))
+	for _, u := range users {
+		for _, glob := range globs {
+			if rbac.MatchName(glob, u.User) {
+				out = append(out, u)
+				break
+			}
+		}
+	}
+	return out
 }

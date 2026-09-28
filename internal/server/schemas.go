@@ -11,6 +11,7 @@ import (
 	"time"
 
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
+	"github.com/FinkeFlo/kafkito/internal/rbac"
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
 )
 
@@ -31,7 +32,9 @@ func (s *apiServer) schemaRegistry(cluster string) (schemaClient, error) {
 	return nil, clusterError(cluster, "schema registry client", err)
 }
 
-// ListSubjects lists the Schema Registry subjects with their versions.
+// ListSubjects lists the Schema Registry subjects with their versions,
+// filtered by the caller's RBAC schema:view permission. Private clusters are
+// not filtered: RBAC does not apply to them.
 func (s *apiServer) ListSubjects(ctx context.Context, req gen.ListSubjectsRequestObject) (gen.ListSubjectsResponseObject, error) {
 	sr, err := s.schemaRegistry(req.Cluster)
 	if err != nil {
@@ -44,6 +47,10 @@ func (s *apiServer) ListSubjects(ctx context.Context, req gen.ListSubjectsReques
 		return nil, upstreamError("list subjects", err)
 	}
 	sort.Slice(subs, func(i, j int) bool { return subs[i].Name < subs[j].Name })
+	if s.policy != nil && s.policy.Enabled() && !kafkapkg.IsAdhoc(req.Cluster) {
+		user := rbacSubject(httpRequestFromContext(ctx), s.policy)
+		subs = filterSubjectsByRBAC(subs, s.policy, user, req.Cluster)
+	}
 	return gen.ListSubjects200JSONResponse{Cluster: req.Cluster, Subjects: subs}, nil
 }
 
@@ -126,4 +133,25 @@ func (s *apiServer) DeleteSubject(ctx context.Context, req gen.DeleteSubjectRequ
 		return nil, upstreamError("delete subject", err)
 	}
 	return gen.DeleteSubject200JSONResponse{Deleted: req.Subject, Versions: versions, Permanent: permanent}, nil
+}
+
+// filterSubjectsByRBAC removes the subjects the user is not allowed to view.
+func filterSubjectsByRBAC(subs []kafkapkg.Subject, policy *rbac.Policy, user, cluster string) []kafkapkg.Subject {
+	globs, all := policy.AllowedResourceNames(user, cluster, "schema", "view")
+	if all {
+		return subs
+	}
+	if len(globs) == 0 {
+		return []kafkapkg.Subject{}
+	}
+	out := make([]kafkapkg.Subject, 0, len(subs))
+	for _, sub := range subs {
+		for _, glob := range globs {
+			if rbac.MatchName(glob, sub.Name) {
+				out = append(out, sub)
+				break
+			}
+		}
+	}
+	return out
 }
