@@ -4,13 +4,10 @@ import { MAX_HYDRATE_VALUE_BYTES } from "@/lib/hydrate-sample";
 import { useFormatters } from "@/lib/use-formatters";
 import { StatusBox, StatusIcon } from "@/components/ui/StatusIcon";
 import { PathSense } from "./PathSense";
-import { MessageRangeCountPreview } from "./MessageRangeCountPreview";
 import { MessageRow } from "./MessageRow";
-import { RangePicker } from "./RangePicker";
+import { BrowseToolbar } from "./BrowseToolbar";
 import { computeTimeRange } from "./time-range";
 import { orderForDisplay, type SortOrder } from "./display-order";
-import { clampLimit, clampOffset, offsetBoundsFor, type BrowseFrom } from "./browse-params";
-import { useNumberDraft } from "./use-number-draft";
 import { useMessagesSearchParams } from "./use-messages-search-params";
 import { useTimeRangeState } from "./use-time-range-state";
 import { useBrowseMessages } from "./use-browse-messages";
@@ -32,41 +29,19 @@ export function MessagesPanel({
   partitions: PartitionInfo[];
 }) {
   const fmt = useFormatters();
-  const { partition, limit, from, msgOffset, setPartition, setLimit, setFrom, setMsgOffset } =
-    useMessagesSearchParams();
-
-  const offsetBounds = useMemo(
-    () => offsetBoundsFor(partitions, partition),
-    [partition, partitions],
-  );
-
-  const {
-    draft: offsetDraft,
-    setDraft: setOffsetDraft,
-    commit: commitOffset,
-  } = useNumberDraft(msgOffset, (raw) => clampOffset(raw, offsetBounds), setMsgOffset);
-
+  const searchParams = useMessagesSearchParams();
+  const { partition, limit, from, msgOffset } = searchParams;
   const [live, setLive] = useState<boolean>(false);
-
-  const {
-    draft: limitDraft,
-    setDraft: setLimitDraft,
-    commit: commitLimit,
-  } = useNumberDraft(limit, clampLimit, setLimit);
-
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
 
   // Browse-level time-range filter (separate state from the search panel below)
+  const browseRangeState = useTimeRangeState();
   const {
     mode: browseRangeMode,
     preset: browsePreset,
     customFrom: browseCustomFrom,
     customTo: browseCustomTo,
-    setMode: setBrowseRangeMode,
-    setPreset: setBrowsePreset,
-    setCustomFrom: setBrowseCustomFrom,
-    setCustomTo: setBrowseCustomTo,
-  } = useTimeRangeState();
+  } = browseRangeState;
 
   // Search state
   const [searchOpen, setSearchOpen] = useState(false);
@@ -156,166 +131,30 @@ export function MessagesPanel({
 
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm">
-      <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] p-3">
-        <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
-          <label htmlFor="browse-partition">Partition</label>
-          <select
-            id="browse-partition"
-            value={partition}
-            onChange={(e) => setPartition(Number(e.target.value))}
-            className="rounded border border-[var(--color-border)] px-2 py-1 text-xs"
-          >
-            <option value={-1}>all</option>
-            {partitions.map((p) => (
-              <option key={p.partition} value={p.partition}>
-                {p.partition}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
-          <label htmlFor="browse-from">From</label>
-          <select
-            id="browse-from"
-            value={from}
-            onChange={(e) => setFrom(e.target.value as BrowseFrom)}
-            className="rounded border border-[var(--color-border)] px-2 py-1 text-xs"
-            disabled={!!searchResult}
-          >
-            <option value="end">latest</option>
-            <option value="start">oldest</option>
-            <option value="offset">offset</option>
-          </select>
-          {from === "offset" && (
-            <>
-              <input
-                aria-label="Start offset"
-                value={offsetDraft}
-                onChange={(e) => setOffsetDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    commitOffset();
-                  }
-                }}
-                onBlur={commitOffset}
-                inputMode="numeric"
-                className="w-20 rounded border border-[var(--color-border)] px-2 py-1 text-xs font-mono"
-                placeholder="0"
-                disabled={!!searchResult}
-                title={
-                  offsetBounds
-                    ? partition < 0
-                      ? `Seeks every partition to this offset (valid ${fmt.number(offsetBounds.min)}–${fmt.number(offsetBounds.max)}). Press Enter to apply.`
-                      : `Valid ${fmt.number(offsetBounds.min)}–${fmt.number(offsetBounds.max)}. Press Enter to apply.`
-                    : "Press Enter to apply."
-                }
-              />
-              {offsetBounds && (
-                <span className="text-[var(--color-text-subtle)]">
-                  {partition < 0 ? "all · " : ""}
-                  {fmt.number(offsetBounds.min)}–{fmt.number(offsetBounds.max)}
-                </span>
-              )}
-            </>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
-          <label htmlFor="browse-limit">Limit</label>
-          <input
-            id="browse-limit"
-            type="number"
-            min={1}
-            max={500}
-            value={limitDraft}
-            onChange={(e) => setLimitDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                commitLimit();
-              }
-            }}
-            onBlur={commitLimit}
-            className="w-20 rounded border border-[var(--color-border)] px-2 py-1 text-xs"
-          />
-        </div>
-        <fieldset
-          aria-labelledby="browse-range"
-          className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--color-text-muted)]"
-        >
-          <span id="browse-range">Range</span>
-          <RangePicker
-            mode={browseRangeMode}
-            preset={browsePreset}
-            customFrom={browseCustomFrom}
-            customTo={browseCustomTo}
-            onChange={(m, p, f, t) => {
-              setBrowseRangeMode(m);
-              setBrowsePreset(p);
-              setBrowseCustomFrom(f);
-              setBrowseCustomTo(t);
-            }}
-            disabled={!!searchResult}
-          />
-        </fieldset>
-        <MessageRangeCountPreview
-          cluster={cluster}
-          topic={topic}
-          partition={partition}
-          from_ts_ms={browseRange.from_ts_ms}
-          to_ts_ms={browseRange.to_ts_ms}
-          live={live}
-        />
-        <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
-          <label htmlFor="browse-sort">Sort</label>
-          <select
-            id="browse-sort"
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-            className="rounded border border-[var(--color-border)] px-2 py-1 text-xs"
-            title="Order of displayed messages"
-          >
-            <option value="newest">newest first</option>
-            <option value="oldest">oldest first</option>
-          </select>
-        </div>
-        <label className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
-          <input
-            type="checkbox"
-            checked={live}
-            onChange={(e) => setLive(e.target.checked)}
-            className="h-3.5 w-3.5"
-            disabled={!!searchResult}
-          />
-          Live
-        </label>
-        <button
-          type="button"
-          onClick={() => setSearchOpen((v) => !v)}
-          className={`rounded border px-2 py-1 text-xs ${
-            searchOpen
-              ? "border-accent bg-accent-subtle text-accent"
-              : "border-[var(--color-border)] hover:border-[var(--color-border-strong)]"
-          }`}
-        >
-          {searchOpen ? "Close search" : "Search"}
-        </button>
-        <button
-          type="button"
-          onClick={() => msgsQuery.refetch()}
-          className="ml-auto rounded border border-[var(--color-border)] px-2 py-1 text-xs hover:border-[var(--color-border-strong)]"
-          disabled={!!searchResult}
-        >
-          Refresh
-        </button>
-        <span data-testid="messages-count" className="text-xs text-[var(--color-text-muted)]">
-          {inSearchMode
-            ? fmt.number(searchResult?.stats.matched ?? 0)
-            : fmt.number(displayMessages.length)}
-          {!inSearchMode && msgsQuery.isFetching && " · fetching…"}
-          {searching && ` · ${fmt.number(searchResult?.stats.scanned ?? 0)} scanned · searching…`}
-        </span>
-      </div>
+      <BrowseToolbar
+        cluster={cluster}
+        topic={topic}
+        partitions={partitions}
+        searchParams={searchParams}
+        range={browseRangeState}
+        resolvedRange={browseRange}
+        live={live}
+        onLiveChange={setLive}
+        sortOrder={sortOrder}
+        onSortOrderChange={setSortOrder}
+        searchOpen={searchOpen}
+        onToggleSearch={() => setSearchOpen((v) => !v)}
+        onRefresh={() => msgsQuery.refetch()}
+        locked={!!searchResult}
+        count={{
+          inSearchMode,
+          searching,
+          matched: searchResult?.stats.matched ?? 0,
+          scanned: searchResult?.stats.scanned ?? 0,
+          shown: displayMessages.length,
+          fetching: msgsQuery.isFetching,
+        }}
+      />
 
       {searchOpen && (
         <div className="space-y-3 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3">
