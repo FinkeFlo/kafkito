@@ -34,6 +34,27 @@ func (e HealthResponseStatus) Valid() bool {
 	}
 }
 
+// Defines values for MaskingRuleTargets.
+const (
+	MaskingRuleTargetsHeaders MaskingRuleTargets = "headers"
+	MaskingRuleTargetsKey     MaskingRuleTargets = "key"
+	MaskingRuleTargetsValue   MaskingRuleTargets = "value"
+)
+
+// Valid indicates whether the value is a known member of the MaskingRuleTargets enum.
+func (e MaskingRuleTargets) Valid() bool {
+	switch e {
+	case MaskingRuleTargetsHeaders:
+		return true
+	case MaskingRuleTargetsKey:
+		return true
+	case MaskingRuleTargetsValue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ReadinessResponseStatus.
 const (
 	ReadinessResponseStatusDegraded ReadinessResponseStatus = "degraded"
@@ -138,19 +159,19 @@ func (e SearchRequestOp) Valid() bool {
 
 // Defines values for SearchRequestZones.
 const (
-	Headers SearchRequestZones = "headers"
-	Key     SearchRequestZones = "key"
-	Value   SearchRequestZones = "value"
+	SearchRequestZonesHeaders SearchRequestZones = "headers"
+	SearchRequestZonesKey     SearchRequestZones = "key"
+	SearchRequestZonesValue   SearchRequestZones = "value"
 )
 
 // Valid indicates whether the value is a known member of the SearchRequestZones enum.
 func (e SearchRequestZones) Valid() bool {
 	switch e {
-	case Headers:
+	case SearchRequestZonesHeaders:
 		return true
-	case Key:
+	case SearchRequestZonesKey:
 		return true
-	case Value:
+	case SearchRequestZonesValue:
 		return true
 	default:
 		return false
@@ -365,7 +386,7 @@ type CopyProgressEvent struct {
 	// Error Set on the final event when the job aborted. Omitted when empty. Errors after the stream opened still carry HTTP status 200.
 	Error *string `json:"error,omitempty"`
 
-	// Skipped Source records deliberately left out because they cannot be reproduced byte-for-byte (Schema-Registry-decoded or masked values). Omitted while 0.
+	// Skipped Source records deliberately left out because they cannot be reproduced byte-for-byte (Schema-Registry-decoded, or masked values, keys or header values). Omitted while 0.
 	Skipped *int64 `json:"skipped,omitempty"`
 }
 
@@ -577,15 +598,24 @@ type ListTopicsResponse struct {
 type MaskingRule struct {
 	// Fields JSONPath expressions whose values are replaced.
 	Fields *[]string `json:"fields,omitempty"`
-	Regex  *[]struct {
+
+	// Headers Go regex patterns on header keys that restrict the `headers` target to matching headers. Absent or empty = every header.
+	Headers *[]string `json:"headers,omitempty"`
+	Regex   *[]struct {
 		Match       *string `json:"match,omitempty"`
 		Replacement *string `json:"replacement,omitempty"`
 	} `json:"regex,omitempty"`
 
 	// Replacement Replacement for `fields`; empty = "***".
-	Replacement *string   `json:"replacement,omitempty"`
-	Topics      *[]string `json:"topics,omitempty"`
+	Replacement *string `json:"replacement,omitempty"`
+
+	// Targets Record parts the rule masks. Absent or empty = `[value]`.
+	Targets *[]MaskingRuleTargets `json:"targets,omitempty"`
+	Topics  *[]string             `json:"topics,omitempty"`
 }
+
+// MaskingRuleTargets defines model for MaskingRule.Targets.
+type MaskingRuleTargets string
 
 // MeResponse defines model for MeResponse.
 type MeResponse struct {
