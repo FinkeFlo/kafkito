@@ -55,6 +55,22 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "2026-09-28",
     items: [
       {
+        type: "feature",
+        title: "Search mode follows the topic's messages",
+        description:
+          "Opening Search preselects JSONPath or XPath when the loaded messages are mostly JSON or XML. A mode you pick yourself is kept.",
+      },
+      {
+        type: "feature",
+        title: "Examples and a docs link for JSONPath, XPath and JavaScript search",
+      },
+      {
+        type: "fix",
+        title: "Full pages without a false warning on transactional topics",
+        description:
+          'Latest-first pages returned too few messages and "This page may be incomplete" although nothing timed out. Transaction markers no longer count.',
+      },
+      {
         type: "fix",
         title: "Stability and accessibility improvements",
       },
