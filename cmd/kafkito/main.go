@@ -84,7 +84,10 @@ func run(configPath string) int {
 		logger.Error("auth init failed", "mode", mode, "err", err)
 		return 2
 	}
-	defer cleanup()
+	// Not every auth mode has something to release; xsuaa returns no cleanup.
+	if cleanup != nil {
+		defer cleanup()
+	}
 	logger.Info("auth initialised", "mode", mode)
 
 	// config.Load already applied $PORT and the default address.
