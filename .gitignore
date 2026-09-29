@@ -57,5 +57,9 @@ NEXT_STEPS.md
 .superpowers/
 .followups-ledger.md
 
+# GitHub Copilot CLI instructions and session exports — local only.
+.github/copilot-instructions.md
+copilot-session-*.md
+
 # Local git worktrees
 .worktrees/
