@@ -44,6 +44,21 @@ describe("useSearchForm preselectMode", () => {
     expect(result.current.mode).toBe("contains");
   });
 
+  it("keeps the mode once a value is typed", () => {
+    const { result } = setup();
+    act(() => result.current.setNeedle("order-42"));
+    act(() => result.current.preselectMode(JSON_MSGS));
+    expect(result.current.mode).toBe("contains");
+  });
+
+  it("keeps the mode once a path is typed", () => {
+    const { result } = setup();
+    act(() => result.current.preselectMode(XML_MSGS));
+    act(() => result.current.setPath("/order/id"));
+    act(() => result.current.preselectMode(JSON_MSGS));
+    expect(result.current.mode).toBe("xpath");
+  });
+
   it("detects again after switching to another topic", () => {
     const { result, rerender } = setup("orders");
     act(() => result.current.setMode("js"));

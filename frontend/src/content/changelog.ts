@@ -58,7 +58,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         type: "feature",
         title: "Search mode follows the topic's messages",
         description:
-          "Opening Search preselects JSONPath or XPath when the loaded messages are mostly JSON or XML. A mode you pick yourself is kept.",
+          "Opening Search preselects JSONPath or XPath when the loaded messages contain JSON or XML. A mode you pick yourself is kept.",
       },
       {
         type: "feature",

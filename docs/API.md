@@ -186,10 +186,10 @@ on topics with `data_masking` rules.
 
 ```bash
 # Approximate count for the last 24h
-curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/count?from_ts_ms=$(($(date +%s%3N)-86400000))&to_ts_ms=$(date +%s%3N)" | jq
+curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/count?from_ts_ms=$(( ($(date +%s)-86400)*1000 ))&to_ts_ms=$(( $(date +%s)*1000 ))" | jq
 
 # Hourly volume over the last 24h
-curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/timeline?from_ts_ms=$(($(date +%s%3N)-86400000))&to_ts_ms=$(date +%s%3N)&slot_ms=3600000" | jq '.slots'
+curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/timeline?from_ts_ms=$(( ($(date +%s)-86400)*1000 ))&to_ts_ms=$(( $(date +%s)*1000 ))&slot_ms=3600000" | jq '.slots'
 ```
 
 ### Sample messages

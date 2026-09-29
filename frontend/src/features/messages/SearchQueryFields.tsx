@@ -122,17 +122,17 @@ export function SearchQueryFields({
         )}
       </div>
       {mode === "jsonpath" && (
-        <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-2 text-[11px] text-[var(--color-text-muted)]">
+        <div className="rounded border border-border bg-panel p-2 text-[11px] text-muted">
           Example: <code className="font-mono">$.order.orderNumber</code>. <SearchDocsLink />
         </div>
       )}
       {mode === "xpath" && (
-        <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-2 text-[11px] text-[var(--color-text-muted)]">
+        <div className="rounded border border-border bg-panel p-2 text-[11px] text-muted">
           Example: <code className="font-mono">{"/order/orderNumber"}</code>. <SearchDocsLink />
         </div>
       )}
       {mode === "js" && (
-        <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-2 text-[11px] text-[var(--color-text-muted)]">
+        <div className="rounded border border-border bg-panel p-2 text-[11px] text-muted">
           Variables: <code className="font-mono">key</code>,{" "}
           <code className="font-mono">value</code> (string),{" "}
           <code className="font-mono">parsed</code> (JSON),{" "}

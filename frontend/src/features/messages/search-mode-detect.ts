@@ -1,10 +1,10 @@
 import type { Message, SearchMode } from "@/lib/api";
 
 /**
- * Picks the search mode that fits a topic's payloads, by majority vote over
- * the detected value encodings of a sample: mostly JSON suggests JSONPath,
- * mostly XML suggests XPath (a tie goes to JSONPath), anything else keeps
- * plain text search.
+ * Picks the search mode that fits a topic's payloads from the detected value
+ * encodings of a sample: any JSON or XML value suggests a structured mode,
+ * JSONPath when JSON values are at least as many as XML ones, else XPath.
+ * A sample without either keeps plain text search.
  */
 export function detectSearchMode(messages: Pick<Message, "value_encoding">[]): SearchMode {
   let json = 0;
