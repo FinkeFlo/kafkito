@@ -35,6 +35,10 @@ test.describe("Topic data (produce, search, raw download, bulk copy)", () => {
     await expect(row).toBeVisible();
 
     await page.getByRole("button", { name: "Search", exact: true }).click();
+    // The loaded messages are JSON, so the search opens in JSONPath mode.
+    const mode = page.getByLabel("Mode", { exact: true });
+    await expect(mode).toHaveValue("jsonpath");
+    await mode.selectOption("contains");
     await page.getByLabel("Value", { exact: true }).fill(needle);
     await page.getByRole("button", { name: "Search", exact: true }).click();
     await expect(page.getByTestId("messages-count")).toHaveText("1");

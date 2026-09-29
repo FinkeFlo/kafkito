@@ -29,6 +29,7 @@ test.describe("Large messages (truncation-tolerant search & click-to-filter)", (
     );
 
     await page.getByRole("button", { name: "Search", exact: true }).click();
+    await page.getByLabel("Mode", { exact: true }).selectOption("contains");
     await page.getByLabel("Value", { exact: true }).fill(NEEDLE_TEXT);
     await page.getByRole("button", { name: "Search", exact: true }).click();
 
