@@ -35,6 +35,7 @@ async function expectNoClearText(page: Page, hidden: string[]) {
 
 async function search(page: Page, needle: string) {
   await page.getByRole("button", { name: "Search", exact: true }).click();
+  await page.getByLabel("Mode", { exact: true }).selectOption("contains");
   await page.getByLabel("Value", { exact: true }).fill(needle);
   await page.getByRole("button", { name: "Search", exact: true }).click();
 }
