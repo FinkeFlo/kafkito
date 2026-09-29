@@ -96,7 +96,13 @@ curl -s $BASE/api/v1/clusters | jq '.clusters[] | {name, reachable, tls, auth_ty
 
 # Re-probe capabilities (after granting permissions in the broker)
 curl -sX POST $BASE/api/v1/clusters/$CLUSTER/capabilities/refresh | jq
+
+# List brokers (id, host, port, rack, controller flag)
+curl -s $BASE/api/v1/clusters/$CLUSTER/brokers | jq '.brokers[]'
 ```
+
+`GET /api/v1/clusters/{cluster}/brokers` requires `view` on `cluster:<cluster>`
+with RBAC enabled.
 
 ## Topics
 
@@ -158,6 +164,46 @@ curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages?limit=20&from=end
 
 # Read from the beginning of partition 0
 curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages?partition=0&from=start&limit=100" | jq
+```
+
+### Count and timeline
+
+`GET /api/v1/clusters/{cluster}/topics/{topic}/messages/count` and
+`GET /api/v1/clusters/{cluster}/topics/{topic}/messages/timeline` both resolve
+a timestamp window to per-partition offset deltas without consuming any
+records — fast, approximate volume metrics rather than exact counts.
+
+- **Count** takes the optional `partition`, `from_ts_ms` and `to_ts_ms` query
+  parameters and returns a `MessageCountResponse` (`total_approx_count` plus a
+  per-partition breakdown).
+- **Timeline** requires `from_ts_ms`, `to_ts_ms` and `slot_ms` (the slot width
+  in milliseconds, e.g. `3600000` for hourly) and returns a
+  `MessageTimelineResponse` with one approximate count per time slot, capped
+  at 400 slots per request.
+
+Both mask nothing (no record data leaves the broker), so they work the same
+on topics with `data_masking` rules.
+
+```bash
+# Approximate count for the last 24h
+curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/count?from_ts_ms=$(($(date +%s%3N)-86400000))&to_ts_ms=$(date +%s%3N)" | jq
+
+# Hourly volume over the last 24h
+curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/timeline?from_ts_ms=$(($(date +%s%3N)-86400000))&to_ts_ms=$(date +%s%3N)&slot_ms=3600000" | jq '.slots'
+```
+
+### Sample messages
+
+`GET /api/v1/clusters/{cluster}/topics/{topic}/sample`
+
+Returns up to `n` (query parameter, default 5, clamped to 1..25) most recent
+decoded messages as a `SampleResponse`. Used by the UI's search path-picker to
+build a structural sample of the topic payload; reuses the `topic:consume`
+RBAC permission and applies `data_masking` the same way `GET .../messages`
+does.
+
+```bash
+curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/sample?n=10" | jq '.messages[]'
 ```
 
 ### Download raw value
