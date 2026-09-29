@@ -41,6 +41,9 @@ type recordScan struct {
 type scanCursor struct {
 	lower, upper, pos int64
 	done              bool // the record at upper-1 (or beyond) was seen
+	// forced is set once the drainAfter fallback ended a chunk whose last
+	// offset was never seen; the range then was not read to its end.
+	forced bool
 }
 
 // recordBatch is what one poll of a scan produced.
@@ -49,6 +52,9 @@ type recordBatch struct {
 	records []*kgo.Record
 	// drained lists the partitions whose range this poll finished.
 	drained []int32
+	// ended lists the drained partitions whose range was read to its end,
+	// i.e. not given up by the drainAfter fallback.
+	ended []int32
 }
 
 // scanRecords reads the ranges of s and yields one batch per poll that
@@ -87,11 +93,10 @@ func (r *Messages) scanRecords(ctx context.Context, s recordScan) iter.Seq2[reco
 				emptyPolls = 0
 			}
 			if emptyPolls >= s.drainAfter {
-				for _, c := range cursors {
-					c.done = true
-				}
+				forceDone(cursors)
 			}
-			batch := recordBatch{records: records, drained: exhausted(cursors)}
+			drained := exhausted(cursors)
+			batch := recordBatch{records: records, drained: drained, ended: readToEnd(cursors, drained)}
 			if (len(batch.records) > 0 || len(batch.drained) > 0) && !yield(batch, nil) {
 				return
 			}
@@ -173,6 +178,28 @@ func exhausted(cursors map[int32]*scanCursor) []int32 {
 	var out []int32
 	for p, c := range cursors {
 		if c.done && c.pos <= c.lower {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// forceDone ends the current chunk of every partition, marking the ones
+// whose last offset was not seen as forced.
+func forceDone(cursors map[int32]*scanCursor) {
+	for _, c := range cursors {
+		if !c.done {
+			c.done, c.forced = true, true
+		}
+	}
+}
+
+// readToEnd returns the drained partitions that the drainAfter fallback
+// never cut short.
+func readToEnd(cursors map[int32]*scanCursor, drained []int32) []int32 {
+	var out []int32
+	for _, p := range drained {
+		if !cursors[p].forced {
 			out = append(out, p)
 		}
 	}

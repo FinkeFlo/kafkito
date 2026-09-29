@@ -94,7 +94,21 @@ func TestWindowsComplete(t *testing.T) {
 	t.Parallel()
 	windows := map[int32]pageWindow{0: {begin: 0, stop: 4}}
 	gappy := map[int32][]Message{0: msgsAt(0, 100, 0, 2)}
-	assert.False(t, windowsComplete(windows, gappy, nil), "short and not drained")
-	assert.True(t, windowsComplete(windows, gappy, map[int32]bool{0: true}), "short but drained")
+	assert.False(t, windowsComplete(windows, gappy, nil), "short and not ended")
+	assert.True(t, windowsComplete(windows, gappy, map[int32]bool{0: true}), "short but read to its end")
 	assert.True(t, windowsComplete(windows, map[int32][]Message{0: msgsAt(0, 100, 0, 1, 2, 3)}, nil), "one record per offset")
+}
+
+// A chunk ended by the drainAfter fallback drains its partition but does not
+// count as read to its end, so a from=end page cut short that way is partial.
+func TestReadToEndSkipsForcedDrains(t *testing.T) {
+	t.Parallel()
+	cursors := map[int32]*scanCursor{
+		0: {lower: 0, upper: 4, pos: 0, done: true}, // last offset seen
+		1: {lower: 0, upper: 4, pos: 0},             // stalled
+	}
+	forceDone(cursors)
+	drained := exhausted(cursors)
+	assert.ElementsMatch(t, []int32{0, 1}, drained)
+	assert.Equal(t, []int32{0}, readToEnd(cursors, drained))
 }
