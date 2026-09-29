@@ -110,14 +110,13 @@ type ConsumeResult struct {
 	NextCursor *Cursor // nil when there are no more records in the current direction
 	HasMore    bool
 
-	// Partial is true when a from=end page could not fully collect its
-	// intended tail window before ConsumeOptions.Timeout elapsed (e.g. a
-	// very large record ahead of it in offset order stalled the transfer).
-	// The window is exactly sized to the available records (see
-	// buildWindows), so this only fires on a genuine fetch problem, never
-	// on legitimately running out of history. Callers should surface this
-	// so "latest" pages don't silently pass off an incomplete tail as
-	// complete — see the "partial" field of the consumeMessages response.
+	// Partial is true when a from=end page could not read its windows to
+	// the end before ConsumeOptions.Timeout elapsed (e.g. a very large
+	// record ahead of it in offset order stalled the transfer). Offsets
+	// without a record (transaction markers, compacted records) do not make
+	// a page partial. Callers should surface this so "latest" pages don't
+	// silently pass off an incomplete tail as complete — see the "partial"
+	// field of the consumeMessages response.
 	Partial bool
 }
 
@@ -208,12 +207,12 @@ func (r *Messages) ConsumeMessages(ctx context.Context, cluster, topic string, o
 	direction := opts.direction()
 	deadline := time.Now().Add(opts.Timeout)
 	scan := recordScan{cluster: cluster, topic: topic, role: "consume", cfg: cfg, drainAfter: 2}
-	collected, err := r.collectWindows(ctx, deadline, scan, opts, windows)
+	collected, complete, err := r.collectWindows(ctx, deadline, scan, opts, windows)
 	if err != nil {
 		return nil, err
 	}
-	if direction == CursorBackward && windowsFull(windows, collected) {
-		if err := r.refillCappedWindows(ctx, deadline, scan, opts, windows, collected); err != nil {
+	if direction == CursorBackward && complete {
+		if complete, err = r.refillWindows(ctx, deadline, scan, opts, windows, collected); err != nil {
 			return nil, err
 		}
 	}
@@ -229,7 +228,7 @@ func (r *Messages) ConsumeMessages(ctx context.Context, cluster, topic string, o
 		Messages:   merged,
 		NextCursor: nextCursor,
 		HasMore:    hasMore,
-		Partial:    direction == CursorBackward && !windowsFull(windows, collected),
+		Partial:    direction == CursorBackward && !complete,
 	}, nil
 }
 
@@ -263,21 +262,22 @@ func (o ConsumeOptions) direction() CursorDirection {
 // partition. It stops once the page can be cut (forward: see
 // forwardPageSettled; backward: every window complete), the windows are
 // drained or the deadline passes; a timeout is not an error, the page is
-// then just short.
-func (r *Messages) collectWindows(ctx context.Context, deadline time.Time, s recordScan, opts ConsumeOptions, windows map[int32]pageWindow) (map[int32][]Message, error) {
+// then just short. complete reports whether every window was read to its
+// end (see windowsComplete).
+func (r *Messages) collectWindows(ctx context.Context, deadline time.Time, s recordScan, opts ConsumeOptions, windows map[int32]pageWindow) (collected map[int32][]Message, complete bool, err error) {
 	pollCtx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
 	s.ranges = windowRanges(windows)
 	dec := r.recordDecoder(s.cluster, s.topic)
-	collected := make(map[int32][]Message, len(windows))
+	collected = make(map[int32][]Message, len(windows))
 	drained := make(map[int32]bool, len(windows))
 	forward := opts.direction() == CursorForward
 	for batch, err := range r.scanRecords(pollCtx, s) {
 		if isContextErr(err) {
-			break
+			return collected, windowsComplete(windows, collected, drained), nil
 		}
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		for _, rec := range batch.records {
 			collected[rec.Partition] = append(collected[rec.Partition], dec.message(ctx, rec))
@@ -285,11 +285,11 @@ func (r *Messages) collectWindows(ctx context.Context, deadline time.Time, s rec
 		for _, p := range batch.drained {
 			drained[p] = true
 		}
-		if forward && forwardPageSettled(windows, collected, drained, opts.Limit) || !forward && windowsFull(windows, collected) {
+		if forward && forwardPageSettled(windows, collected, drained, opts.Limit) || !forward && windowsComplete(windows, collected, drained) {
 			break
 		}
 	}
-	return collected, nil
+	return collected, true, nil
 }
 
 // forwardPageSettled reports whether an oldest-first page can be cut: every
@@ -322,42 +322,70 @@ func forwardPageSettled(windows map[int32]pageWindow, collected map[int32][]Mess
 	return true
 }
 
-// refillCappedWindows widens the from=end windows that the fair share may
-// have cut short and reads the extra records into collected.
+// maxRefillRounds bounds how often refillWindows widens the from=end windows.
+const maxRefillRounds = 4
+
+// refillWindows widens the from=end windows that may hold too few records
+// for the page and reads the extra records into collected, until no window
+// needs more, maxRefillRounds is reached or the deadline passes. It reports
+// whether every widened window was read to its end; a round cut short by
+// the deadline is dropped, so the page stays gap-free.
+func (r *Messages) refillWindows(ctx context.Context, deadline time.Time, s recordScan, opts ConsumeOptions, windows map[int32]pageWindow, collected map[int32][]Message) (bool, error) {
+	for range maxRefillRounds {
+		extra := refillPlan(windows, collected, opts.Limit)
+		if len(extra) == 0 {
+			return true, nil
+		}
+		more, complete, err := r.collectWindows(ctx, deadline, s, opts, extra)
+		if err != nil || !complete {
+			return false, err
+		}
+		for p, e := range extra {
+			w := windows[p]
+			w.begin = e.begin
+			windows[p] = w
+			collected[p] = append(more[p], collected[p]...)
+		}
+	}
+	return true, nil
+}
+
+// refillPlan returns the extra [begin, stop) window below every from=end
+// window whose unread records could still belong on the page.
 //
-// A capped partition's unread records are all older than its oldest
-// collected one, so they can only matter if a record just below the window
-// would still rank inside the page. Widening such a window to limit records
-// always suffices, because no page holds more than limit records of one
-// partition, so a single round is enough.
-func (r *Messages) refillCappedWindows(ctx context.Context, deadline time.Time, s recordScan, opts ConsumeOptions, windows map[int32]pageWindow, collected map[int32][]Message) error {
-	page := mergePage(collected, true, opts.Limit)
+// A window can come up short in two ways: the fair share capped it, or
+// offsets inside it hold no record (transaction markers, compaction). Its
+// unread records are all older than its oldest collected one, so they only
+// matter if the page is not full yet or a record just below the window would
+// still rank inside it. The extra window aims at the missing record count,
+// scaled by the share of offsets the window has used so far.
+func refillPlan(windows map[int32]pageWindow, collected map[int32][]Message, limit int) map[int32]pageWindow {
+	page := mergePage(collected, true, limit)
+	full := len(page) == limit
 	extra := make(map[int32]pageWindow)
 	for p, w := range windows {
 		got := collected[p]
-		if w.begin <= w.trueBegin || len(got) == 0 {
+		if w.begin <= w.trueBegin || len(got) >= limit {
 			continue
 		}
-		below := Message{Timestamp: got[0].Timestamp, Partition: p, Offset: w.begin - 1}
-		if len(page) == opts.Limit && compareMessages(below, page[len(page)-1], true) > 0 {
-			continue
+		if full {
+			if len(got) == 0 {
+				continue
+			}
+			below := Message{Timestamp: got[0].Timestamp, Partition: p, Offset: w.begin - 1}
+			if compareMessages(below, page[len(page)-1], true) > 0 {
+				continue
+			}
 		}
-		extra[p] = pageWindow{begin: max(w.trueBegin, w.begin-int64(opts.Limit-len(got))), stop: w.begin}
+		need := int64(limit - len(got))
+		if span := w.stop - w.begin; len(got) > 0 {
+			need = (need*span + int64(len(got)) - 1) / int64(len(got))
+		} else {
+			need += span
+		}
+		extra[p] = pageWindow{begin: max(w.trueBegin, w.begin-need), stop: w.begin, trueBegin: w.trueBegin}
 	}
-	if len(extra) == 0 {
-		return nil
-	}
-	more, err := r.collectWindows(ctx, deadline, s, opts, extra)
-	if err != nil {
-		return err
-	}
-	for p, e := range extra {
-		w := windows[p]
-		w.begin = e.begin
-		windows[p] = w
-		collected[p] = append(more[p], collected[p]...)
-	}
-	return nil
+	return extra
 }
 
 // mergePage merges the collected records, sorts them and cuts to limit.
@@ -373,11 +401,13 @@ func mergePage(collected map[int32][]Message, newestFirst bool, limit int) []Mes
 	return merged
 }
 
-// windowsFull reports whether every window has collected all its records
-// (window size = stop - begin, which is bounded by the fair share).
-func windowsFull(windows map[int32]pageWindow, collected map[int32][]Message) bool {
+// windowsComplete reports whether every window was read to its end: its
+// range is drained, or it holds one record per offset (window size =
+// stop - begin, which is bounded by the fair share). Offsets without a
+// record, like transaction markers, only show up as a drained range.
+func windowsComplete(windows map[int32]pageWindow, collected map[int32][]Message, drained map[int32]bool) bool {
 	for p, w := range windows {
-		if int64(len(collected[p])) < w.stop-w.begin {
+		if !drained[p] && int64(len(collected[p])) < w.stop-w.begin {
 			return false
 		}
 	}

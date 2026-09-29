@@ -192,3 +192,51 @@ func valuesOf(prefix string, hi int) []string {
 	}
 	return out
 }
+
+// Transaction commit markers take up offsets but are no records. from=end
+// windows are sized in offsets, so on a transactional topic a page used to
+// come back with about half its limit and flagged partial, although nothing
+// timed out, and paging still returned every record.
+func TestConsume_FromEndOnTransactionalTopicFillsPageAndIsNotPartial(t *testing.T) {
+	t.Parallel()
+	for name, partitions := range map[string]int32{"one partition": 1, "three partitions": 3} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			env := newKfakeEnv(t, "transactional-tail", partitions, nil)
+			const n = 12
+			recs := make([]*kgo.Record, 0, n)
+			for i := range n {
+				recs = append(recs, &kgo.Record{
+					Partition: int32(i) % partitions,
+					Timestamp: time.UnixMilli(fixtureBaseTS + int64(i)*1000),
+					Value:     []byte(fmt.Sprintf("r-%d", i)),
+				})
+			}
+			env.produceTransactional(t, recs...)
+
+			for _, limit := range []int{1, 4, 6} {
+				start := time.Now()
+				res := consumePage(t, env, ConsumeOptions{Partition: -1, Limit: limit, From: FromEnd, Timeout: 10 * time.Second})
+				assert.Less(t, time.Since(start), 3*time.Second, "limit %d waited for the timeout", limit)
+				assert.Equal(t, valuesOf("r", n-1)[:limit], values(res.Messages), "limit %d", limit)
+				assert.False(t, res.Partial, "limit %d", limit)
+				assert.True(t, res.HasMore, "limit %d", limit)
+			}
+
+			var all []string
+			for _, page := range consumeAllPages(t, env, ConsumeOptions{Partition: -1, Limit: 5, From: FromEnd}) {
+				all = append(all, values(page.Messages)...)
+			}
+			assert.Equal(t, valuesOf("r", n-1), all, "paging returns every record once, newest first")
+		})
+	}
+}
+
+// A from=end page that runs out of time before its windows are read must
+// still be flagged partial.
+func TestConsume_FromEndTimeoutIsPartial(t *testing.T) {
+	t.Parallel()
+	env, _ := newOrdersEnv(t)
+	res := consumePage(t, env, ConsumeOptions{Partition: -1, Limit: 10, From: FromEnd, Timeout: time.Nanosecond})
+	assert.True(t, res.Partial)
+}
