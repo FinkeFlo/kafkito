@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
@@ -239,4 +240,28 @@ func TestConsume_FromEndTimeoutIsPartial(t *testing.T) {
 	env, _ := newOrdersEnv(t)
 	res := consumePage(t, env, ConsumeOptions{Partition: -1, Limit: 10, From: FromEnd, Timeout: time.Nanosecond})
 	assert.True(t, res.Partial)
+}
+
+// A range scanned up to its last offset is reported as read to its end.
+func TestScanRecords_SeenRangeIsReadToEnd(t *testing.T) {
+	t.Parallel()
+	env := newKfakeEnv(t, "read-to-end", 1, nil)
+	for i := range 3 {
+		env.produce(t, &kgo.Record{Partition: 0, Value: fmt.Appendf(nil, "v-%d", i)})
+	}
+	cfg, ok := env.reg.ConfigFor(kfakeCluster)
+	require.True(t, ok)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	var drained, ended []int32
+	for batch, err := range env.reg.scanRecords(ctx, recordScan{
+		cluster: kfakeCluster, topic: "read-to-end", role: "test", cfg: cfg,
+		ranges: map[int32]PartitionRange{0: {Start: 0, End: 3}}, drainAfter: 2,
+	}) {
+		require.NoError(t, err)
+		drained = append(drained, batch.drained...)
+		ended = append(ended, batch.ended...)
+	}
+	assert.Equal(t, []int32{0}, drained)
+	assert.Equal(t, []int32{0}, ended)
 }

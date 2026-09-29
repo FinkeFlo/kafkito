@@ -111,8 +111,8 @@ type ConsumeResult struct {
 	HasMore    bool
 
 	// Partial is true when a from=end page could not read its windows to
-	// the end before ConsumeOptions.Timeout elapsed (e.g. a very large
-	// record ahead of it in offset order stalled the transfer). Offsets
+	// the end, because ConsumeOptions.Timeout elapsed or the fetch stalled
+	// (e.g. a very large record ahead of it in offset order). Offsets
 	// without a record (transaction markers, compacted records) do not make
 	// a page partial. Callers should surface this so "latest" pages don't
 	// silently pass off an incomplete tail as complete — see the "partial"
@@ -271,10 +271,11 @@ func (r *Messages) collectWindows(ctx context.Context, deadline time.Time, s rec
 	dec := r.recordDecoder(s.cluster, s.topic)
 	collected = make(map[int32][]Message, len(windows))
 	drained := make(map[int32]bool, len(windows))
+	ended := make(map[int32]bool, len(windows))
 	forward := opts.direction() == CursorForward
 	for batch, err := range r.scanRecords(pollCtx, s) {
 		if isContextErr(err) {
-			return collected, windowsComplete(windows, collected, drained), nil
+			break
 		}
 		if err != nil {
 			return nil, false, err
@@ -285,11 +286,14 @@ func (r *Messages) collectWindows(ctx context.Context, deadline time.Time, s rec
 		for _, p := range batch.drained {
 			drained[p] = true
 		}
-		if forward && forwardPageSettled(windows, collected, drained, opts.Limit) || !forward && windowsComplete(windows, collected, drained) {
+		for _, p := range batch.ended {
+			ended[p] = true
+		}
+		if forward && forwardPageSettled(windows, collected, drained, opts.Limit) || !forward && windowsComplete(windows, collected, ended) {
 			break
 		}
 	}
-	return collected, true, nil
+	return collected, windowsComplete(windows, collected, ended), nil
 }
 
 // forwardPageSettled reports whether an oldest-first page can be cut: every
@@ -402,12 +406,13 @@ func mergePage(collected map[int32][]Message, newestFirst bool, limit int) []Mes
 }
 
 // windowsComplete reports whether every window was read to its end: its
-// range is drained, or it holds one record per offset (window size =
-// stop - begin, which is bounded by the fair share). Offsets without a
-// record, like transaction markers, only show up as a drained range.
-func windowsComplete(windows map[int32]pageWindow, collected map[int32][]Message, drained map[int32]bool) bool {
+// range ended (seen up to its last offset, see recordBatch.ended), or it
+// holds one record per offset (window size = stop - begin, which is bounded
+// by the fair share). Offsets without a record, like transaction markers,
+// only show up as an ended range.
+func windowsComplete(windows map[int32]pageWindow, collected map[int32][]Message, ended map[int32]bool) bool {
 	for p, w := range windows {
-		if !drained[p] && int64(len(collected[p])) < w.stop-w.begin {
+		if !ended[p] && int64(len(collected[p])) < w.stop-w.begin {
 			return false
 		}
 	}
