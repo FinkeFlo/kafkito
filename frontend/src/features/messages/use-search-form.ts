@@ -1,10 +1,31 @@
-import { useState } from "react";
-import type { SearchDirection, SearchMode, SearchOp } from "@/lib/api";
+import { useCallback, useState } from "react";
+import type { Message, SearchDirection, SearchMode, SearchOp } from "@/lib/api";
+import { detectSearchMode } from "./search-mode-detect";
 import { useTimeRangeState } from "./use-time-range-state";
 
-/** Inputs of the search panel. */
-export function useSearchForm() {
-  const [mode, setMode] = useState<SearchMode>("contains");
+/**
+ * Inputs of the search panel. `topic` scopes the manual-mode flag: once the
+ * user picks a mode for a topic, `preselectMode` leaves it alone until
+ * another topic is shown.
+ */
+export function useSearchForm(topic: string) {
+  const [mode, setModeState] = useState<SearchMode>("contains");
+  const [modeTouchedFor, setModeTouchedFor] = useState<string | null>(null);
+  const modeTouched = modeTouchedFor === topic;
+  const setMode = useCallback(
+    (next: SearchMode) => {
+      setModeTouchedFor(topic);
+      setModeState(next);
+    },
+    [topic],
+  );
+  /** Picks the mode that fits the given (already loaded) messages. */
+  const preselectMode = useCallback(
+    (messages: Pick<Message, "value_encoding">[]) => {
+      if (!modeTouched) setModeState(detectSearchMode(messages));
+    },
+    [modeTouched],
+  );
   const [path, setPath] = useState("");
   const [op, setOp] = useState<SearchOp>("contains");
   const [needle, setNeedle] = useState("");
@@ -17,6 +38,7 @@ export function useSearchForm() {
   return {
     mode,
     setMode,
+    preselectMode,
     path,
     setPath,
     op,

@@ -43,6 +43,15 @@ JSONPath (alternative — when you prefer path expressions):
 $..[?(@.type=='invoice' && @.customerId=='CUST-123' && @.status=='UNPAID' && @.totalAmount>1000 && @.currency=='USD')]
 ```
 
+XPath (for XML payloads):
+
+- Mode: XPath
+- Path: `/invoice/customerId`
+- Operator: `=`
+- Value: `CUST-123`
+
+Use `//customerId` to match the element at any depth, or `/invoice/@status` for an attribute.
+
 Notes:
 - JSONPath filters select nodes; use `exists` to match messages where the expression finds at least one node.
 - JavaScript mode is more robust for complex predicates and has access to: `key`, `value` (raw string), `parsed` (JSON object or `null`), `headers`, `partition`, `offset`, `timestampMs`.
