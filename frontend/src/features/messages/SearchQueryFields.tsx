@@ -121,6 +121,16 @@ export function SearchQueryFields({
           />
         )}
       </div>
+      {mode === "jsonpath" && (
+        <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-2 text-[11px] text-[var(--color-text-muted)]">
+          Example: <code className="font-mono">$.order.orderNumber</code>. <SearchDocsLink />
+        </div>
+      )}
+      {mode === "xpath" && (
+        <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-2 text-[11px] text-[var(--color-text-muted)]">
+          Example: <code className="font-mono">{"/order/orderNumber"}</code>. <SearchDocsLink />
+        </div>
+      )}
       {mode === "js" && (
         <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-2 text-[11px] text-[var(--color-text-muted)]">
           Variables: <code className="font-mono">key</code>,{" "}
@@ -132,9 +142,25 @@ export function SearchQueryFields({
           <code className="font-mono">
             parsed &amp;&amp; parsed.currency === "EUR" &amp;&amp; parsed.amount &gt; 500
           </code>
-          . Limit 100 ms per message.
+          . Limit 100 ms per message. <SearchDocsLink />
         </div>
       )}
     </>
+  );
+}
+
+const SEARCH_DOCS_URL =
+  "https://finkeflo.github.io/kafkito/ui/workflows/#workflow-1-find-a-message-in-a-topic";
+
+function SearchDocsLink() {
+  return (
+    <a
+      href={SEARCH_DOCS_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-accent hover:underline"
+    >
+      More examples
+    </a>
   );
 }

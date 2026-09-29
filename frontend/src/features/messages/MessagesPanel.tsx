@@ -44,7 +44,7 @@ export function MessagesPanel({
 
   // Search state
   const [searchOpen, setSearchOpen] = useState(false);
-  const form = useSearchForm();
+  const form = useSearchForm(topic);
   const search = useMessageSearch(cluster, topic, partition, limit, form);
   const { searching, searchResult, inSearchMode } = search;
 
@@ -77,9 +77,8 @@ export function MessagesPanel({
     msgsQuery.data,
   );
 
-  const rawMessages = inSearchMode
-    ? (searchResult?.messages ?? [])
-    : [...(msgsQuery.data?.messages ?? []), ...tailMessages];
+  const browseMessages = [...(msgsQuery.data?.messages ?? []), ...tailMessages];
+  const rawMessages = inSearchMode ? (searchResult?.messages ?? []) : browseMessages;
   const displayMessages = useMemo(
     () => orderForDisplay(rawMessages, sortOrder),
     [rawMessages, sortOrder],
@@ -101,7 +100,12 @@ export function MessagesPanel({
         sortOrder={sortOrder}
         onSortOrderChange={setSortOrder}
         searchOpen={searchOpen}
-        onToggleSearch={() => setSearchOpen((v) => !v)}
+        onToggleSearch={() => {
+          // Decided from the messages already on screen, so the panel opens
+          // in its final mode instead of switching once a sample arrives.
+          if (!searchOpen) form.preselectMode(browseMessages);
+          setSearchOpen((v) => !v);
+        }}
         onRefresh={() => msgsQuery.refetch()}
         locked={!!searchResult}
         count={{
