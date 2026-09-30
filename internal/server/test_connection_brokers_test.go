@@ -112,18 +112,33 @@ func TestTestCluster_SkippedBrokersAreReported(t *testing.T) {
 	require.NotNil(t, info.Capabilities)
 }
 
+// The skipped note matches the frontend's SkippedNote wording, singular for
+// one broker.
 func TestTestCluster_SkippedBrokersAreNamedInTheSummary(t *testing.T) {
 	t.Parallel()
 
-	issues := []kafkapkg.BrokerIssue{blockedLocalhostIssue}
+	cases := []struct {
+		skipped  int
+		wantNote string
+	}{
+		{1, "1 more broker was not checked"},
+		{36, "36 more brokers were not checked"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.wantNote, func(t *testing.T) {
+			t.Parallel()
 
-	info := postTestCluster(t, fakeClusters{issues: issues, skipped: 36})
+			issues := []kafkapkg.BrokerIssue{blockedLocalhostIssue}
 
-	assert.False(t, info.Reachable)
-	assert.Equal(t, issues, info.BrokerIssues)
-	assert.Equal(t, 36, info.BrokersSkipped)
-	assert.Equal(t, "some advertised brokers cannot be reached: broker 1 advertises localhost:39092 (blocked); "+
-		"36 more brokers were not checked", info.Error)
+			info := postTestCluster(t, fakeClusters{issues: issues, skipped: tc.skipped})
+
+			assert.False(t, info.Reachable)
+			assert.Equal(t, issues, info.BrokerIssues)
+			assert.Equal(t, tc.skipped, info.BrokersSkipped)
+			assert.Equal(t, "some advertised brokers cannot be reached: broker 1 advertises localhost:39092 (blocked); "+
+				tc.wantNote, info.Error)
+		})
+	}
 }
 
 func TestTestCluster_ProbeErrorIsReported(t *testing.T) {
