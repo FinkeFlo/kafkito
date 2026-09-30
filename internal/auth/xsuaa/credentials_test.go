@@ -8,6 +8,9 @@
 package xsuaa_test
 
 import (
+	"bytes"
+	"fmt"
+	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,7 +23,7 @@ const fixtureVCAP = `{
   "xsuaa": [{
     "credentials": {
       "clientid":         "sb-kafkito!t12345",
-      "clientsecret":     "secret",
+      "clientsecret":     "fixture-client-secret-9c1e",
       "credential-type":  "binding-secret",
       "url":              "https://example-tenant.authentication.eu10.hana.ondemand.com",
       "uaadomain":        "authentication.eu10.hana.ondemand.com",
@@ -63,4 +66,23 @@ func TestParseCredentialsFromVCAP_RejectsEmptyXSUAAArray(t *testing.T) {
 	_, err := xsuaa.ParseCredentialsFromVCAP(`{"xsuaa": []}`)
 
 	require.Error(t, err, "empty xsuaa binding array must be rejected")
+}
+
+// Credentials must not keep the binding's client secret, so no %+v or slog
+// output of them can leak it.
+func TestCredentials_NeverCarryTheClientSecret(t *testing.T) {
+	t.Parallel()
+
+	const secret = "fixture-client-secret-9c1e"
+	require.Contains(t, fixtureVCAP, secret, "the fixture must carry the secret for this test to mean anything")
+	c, err := xsuaa.ParseCredentialsFromVCAP(fixtureVCAP)
+	require.NoError(t, err)
+
+	var logs bytes.Buffer
+	slog.New(slog.NewJSONHandler(&logs, nil)).Info("creds", "creds", c)
+	slog.New(slog.NewTextHandler(&logs, nil)).Info("creds", "creds", c)
+
+	assert.NotContains(t, fmt.Sprintf("%+v", c), secret)
+	assert.NotContains(t, fmt.Sprintf("%#v", c), secret)
+	assert.NotContains(t, logs.String(), secret)
 }

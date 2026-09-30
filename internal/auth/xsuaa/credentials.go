@@ -14,10 +14,11 @@ import (
 )
 
 // Credentials holds the XSUAA fields kafkito needs at runtime. The shape mirrors
-// VCAP_SERVICES.xsuaa[0].credentials on SAP BTP Cloud Foundry.
+// VCAP_SERVICES.xsuaa[0].credentials on SAP BTP Cloud Foundry. kafkito only
+// validates tokens and never requests one, so the binding's clientsecret is
+// deliberately not read: it cannot end up in logs or error output.
 type Credentials struct {
 	ClientID       string `json:"clientid"`
-	ClientSecret   string `json:"clientsecret"`
 	CredentialType string `json:"credential-type"`
 	URL            string `json:"url"`            // issuer base
 	UAADomain      string `json:"uaadomain"`      // jku host suffix allow-list
