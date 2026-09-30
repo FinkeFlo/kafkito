@@ -34,12 +34,16 @@ func Middleware(v Validator) func(http.Handler) http.Handler {
 	}
 }
 
+// bearerToken returns the token of a Bearer Authorization header, or "".
+// The scheme is matched case-insensitively (RFC 7235 section 2.1), and
+// whitespace around the value and after the scheme is dropped.
 func bearerToken(r *http.Request) string {
-	h := r.Header.Get("Authorization")
-	if !strings.HasPrefix(h, "Bearer ") {
+	h := strings.TrimSpace(r.Header.Get("Authorization"))
+	i := strings.IndexAny(h, " \t")
+	if i < 0 || !strings.EqualFold(h[:i], "Bearer") {
 		return ""
 	}
-	return strings.TrimPrefix(h, "Bearer ")
+	return strings.TrimSpace(h[i+1:])
 }
 
 func deny(w http.ResponseWriter, msg string) {
