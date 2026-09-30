@@ -278,6 +278,34 @@ func TestConsumeCharacterization_FromEndAndStartWithinTimeWindow(t *testing.T) {
 	assert.False(t, forward.HasMore)
 }
 
+func TestConsumeCharacterization_FromOffsetWithinTimeWindow(t *testing.T) {
+	t.Parallel()
+	env, _ := newOrdersEnv(t)
+	from := fixtureBaseTS + 5_000
+	to := fixtureBaseTS + 15_000
+	// The window holds seqs 5..14; p1 holds seqs 1,5,7,11,13,17,... at
+	// offsets 0,1,2,3,4,5,..., so offset 0 is lifted to offset 1 (seq 5) and
+	// the page stops before offset 5 (seq 17, past to_ts).
+	want := []int{5, 7, 11, 13}
+
+	res := consumePage(t, env, ConsumeOptions{Partition: 1, Limit: 50, From: FromOffset, Offset: 0, FromTSMs: from, ToTSMs: to})
+	assert.Equal(t, want, seqs(t, res.Messages))
+	for _, m := range res.Messages {
+		assert.Equal(t, int32(1), m.Partition)
+	}
+	assert.False(t, res.HasMore)
+
+	res = consumePage(t, env, ConsumeOptions{
+		Partition: -1, Limit: 50, From: FromOffset, FromTSMs: from, ToTSMs: to,
+		PartitionOffsets: map[int32]int64{1: 0},
+	})
+	assert.Equal(t, want, seqs(t, res.Messages))
+	assert.False(t, res.HasMore)
+
+	pages := consumeAllPages(t, env, ConsumeOptions{Partition: 1, Limit: 2, From: FromOffset, Offset: 0, FromTSMs: from, ToTSMs: to})
+	assert.Equal(t, chunk(want, 2), pageSeqs(t, pages))
+}
+
 func TestConsumeCharacterization_EmptyRangeReturnsEmptyPage(t *testing.T) {
 	t.Parallel()
 	env, _ := newOrdersEnv(t)

@@ -141,6 +141,65 @@ func TestBuildWindowsFromStartTimeBounds(t *testing.T) {
 	require.Equal(t, int64(700), windows[1].stop)
 }
 
+// TestBuildWindowsFromOffsetTimeBounds verifies that from=offset honors both
+// time bounds, for a single offset and for partition_offsets alike.
+func TestBuildWindowsFromOffsetTimeBounds(t *testing.T) {
+	t.Parallel()
+	startMap := map[int32]int64{0: 0, 1: 0}
+	endMap := map[int32]int64{0: 1000, 1: 1000}
+	fromOff := map[int32]int64{0: 300, 1: 300}
+	toOff := map[int32]int64{0: 500, 1: 500}
+
+	t.Run("single offset below from_ts is lifted, stop clamped to to_ts", func(t *testing.T) {
+		t.Parallel()
+		opts := ConsumeOptions{From: FromOffset, Offset: 100, FromTSMs: 1, ToTSMs: 1}
+		windows, err := buildWindows([]int32{0}, opts, startMap, endMap, fromOff, toOff)
+		require.NoError(t, err)
+		require.Equal(t, int64(300), windows[0].begin)
+		require.Equal(t, int64(500), windows[0].stop)
+	})
+
+	t.Run("single offset inside the window keeps its offset", func(t *testing.T) {
+		t.Parallel()
+		opts := ConsumeOptions{From: FromOffset, Offset: 400, FromTSMs: 1, ToTSMs: 1}
+		windows, err := buildWindows([]int32{0}, opts, startMap, endMap, fromOff, toOff)
+		require.NoError(t, err)
+		require.Equal(t, int64(400), windows[0].begin)
+		require.Equal(t, int64(500), windows[0].stop)
+	})
+
+	t.Run("single offset at or past to_ts yields no window", func(t *testing.T) {
+		t.Parallel()
+		opts := ConsumeOptions{From: FromOffset, Offset: 600, FromTSMs: 1, ToTSMs: 1}
+		windows, err := buildWindows([]int32{0}, opts, startMap, endMap, fromOff, toOff)
+		require.NoError(t, err)
+		require.Empty(t, windows)
+	})
+
+	t.Run("partition_offsets are lifted to from_ts", func(t *testing.T) {
+		t.Parallel()
+		opts := ConsumeOptions{
+			From: FromOffset, FromTSMs: 1, ToTSMs: 1,
+			PartitionOffsets: map[int32]int64{0: 100, 1: 450},
+		}
+		windows, err := buildWindows([]int32{0, 1}, opts, startMap, endMap, fromOff, toOff)
+		require.NoError(t, err)
+		require.Equal(t, int64(300), windows[0].begin)
+		require.Equal(t, int64(450), windows[1].begin)
+		require.Equal(t, int64(500), windows[0].stop)
+		require.Equal(t, int64(500), windows[1].stop)
+	})
+
+	t.Run("no time bounds leave the offset window open-ended", func(t *testing.T) {
+		t.Parallel()
+		opts := ConsumeOptions{From: FromOffset, Offset: 100}
+		windows, err := buildWindows([]int32{0}, opts, startMap, endMap, nil, nil)
+		require.NoError(t, err)
+		require.Equal(t, int64(100), windows[0].begin)
+		require.Equal(t, int64(1000), windows[0].stop)
+	})
+}
+
 // TestBuildNextCursorBackwardUsesQueryLowerBound verifies the backward path
 // compares against the full query lower bound, not the narrowed per-page
 // fetch begin.
