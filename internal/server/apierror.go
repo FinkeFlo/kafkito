@@ -112,6 +112,11 @@ func (ew errorWriter) writeError(w http.ResponseWriter, r *http.Request, err err
 	ae := toAPIError(err)
 	if ae.Status >= http.StatusInternalServerError && ew.log != nil {
 		var attrs []any
+		// The registry name as the handler saw it: the configured name, or
+		// __adhoc_<fingerprint> for a private cluster. Never header content.
+		if cluster, _ := pathParam(r, "cluster"); cluster != "" {
+			attrs = append(attrs, "cluster", cluster)
+		}
 		if ae.Op != "" {
 			attrs = append(attrs, "detail", ae.Op)
 		}

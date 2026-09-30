@@ -57,9 +57,10 @@ turns them into responses. Domain sentinel errors (`ErrUnknownCluster`,
 status, code and message; everything else becomes an opaque `500`, and broker
 or Schema Registry failures a generic `502 kafka_upstream`. The body is always
 `{"error": "...", "code": "..."}` (code optional). Only 5xx causes are logged,
-server-side. Messages are static texts or name the failed rule, never the
-submitted value, so they never contain credentials or the raw
-`X-Kafkito-Cluster` header.
+server-side. The log line names the cluster (`cluster`) when the route has
+one. Messages are static texts or name the failed rule, never the submitted
+value, so they never contain credentials or the raw `X-Kafkito-Cluster`
+header.
 
 ## OpenAPI as the contract
 
@@ -117,7 +118,11 @@ inline scripts or styles), `X-Content-Type-Options`, `Referrer-Policy`,
   request for the path segment `__private__`. The server validates it and
   persists nothing; it only keeps the Kafka client in memory until it has
   been idle for 15 minutes. The raw header and its credentials never appear
-  in logs, error bodies or validation messages.
+  in logs, error bodies or validation messages. Broker and Schema Registry
+  host names and resolved IPs may appear in operator logs (franz-go
+  connection warnings, the 5xx error log, the Test connection warnings,
+  which name the cluster as `cluster=__adhoc_<fingerprint>`); credentials
+  and the raw header never do. `private_cluster_leak_test.go` pins both.
 - RBAC does not apply, lists included; the broker's own ACLs do.
 - Anyone who can run script in the page can read them, which is why the CSP
   is strict. On a shared machine, other users of the same browser profile
