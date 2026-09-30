@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
 	"github.com/twmb/franz-go/pkg/kerr"
@@ -36,7 +37,7 @@ func (s *apiServer) ConsumeMessages(ctx context.Context, req gen.ConsumeMessages
 		return nil, clusterError(req.Cluster, "consume messages", err)
 	}
 	resp := gen.ConsumeMessages200JSONResponse{
-		Cluster:  req.Cluster,
+		Cluster:  config.PublicClusterName(req.Cluster),
 		Topic:    req.Topic,
 		Messages: res.Messages,
 		HasMore:  res.HasMore,
@@ -122,7 +123,7 @@ func (s *apiServer) CountMessages(ctx context.Context, req gen.CountMessagesRequ
 		return nil, clusterError(req.Cluster, "count messages", err)
 	}
 	return gen.CountMessages200JSONResponse{
-		Cluster:          req.Cluster,
+		Cluster:          config.PublicClusterName(req.Cluster),
 		Topic:            req.Topic,
 		TotalApproxCount: res.TotalApproxCount,
 		Partitions:       res.Partitions,
@@ -147,7 +148,7 @@ func (s *apiServer) GetMessageTimeline(ctx context.Context, req gen.GetMessageTi
 		return nil, clusterError(req.Cluster, "message timeline", err)
 	}
 	return gen.GetMessageTimeline200JSONResponse{
-		Cluster:  req.Cluster,
+		Cluster:  config.PublicClusterName(req.Cluster),
 		Topic:    req.Topic,
 		FromTsMs: res.FromTSMs,
 		ToTsMs:   res.ToTSMs,
@@ -169,7 +170,7 @@ func (s *apiServer) SampleMessages(ctx context.Context, req gen.SampleMessagesRe
 		return nil, clusterError(req.Cluster, "sample messages", err)
 	}
 	return gen.SampleMessages200JSONResponse{
-		Cluster:   req.Cluster,
+		Cluster:   config.PublicClusterName(req.Cluster),
 		Topic:     req.Topic,
 		Messages:  res.Messages,
 		SampledAt: time.Now().UnixMilli(),
@@ -198,7 +199,7 @@ func (s *apiServer) SearchMessages(ctx context.Context, req gen.SearchMessagesRe
 		return nil, clusterError(req.Cluster, "search messages", err)
 	}
 	return gen.SearchMessages200JSONResponse{
-		Cluster:  req.Cluster,
+		Cluster:  config.PublicClusterName(req.Cluster),
 		Topic:    req.Topic,
 		Messages: &res.Messages,
 		Search:   res.Stats,

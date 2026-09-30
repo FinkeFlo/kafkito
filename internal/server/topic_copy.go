@@ -577,9 +577,9 @@ func (s *apiServer) validateCopyDestination(ctx context.Context, job copyJob) er
 	destDetail, err := s.copyReg.DescribeTopic(ctx, job.destCluster, job.destTopic)
 	switch {
 	case errors.Is(err, kafkapkg.ErrUnknownCluster):
-		return unknownDestClusterError(job.destCluster)
+		return unknownDestClusterError(config.PublicClusterName(job.destCluster))
 	case err != nil && isTopicMissingErr(err):
-		return badRequest(fmt.Sprintf("dest_topic %q does not exist on cluster %q: create it first (kafkito does not auto-create the destination)", job.destTopic, job.destCluster))
+		return badRequest(fmt.Sprintf("dest_topic %q does not exist on cluster %q: create it first (kafkito does not auto-create the destination)", job.destTopic, config.PublicClusterName(job.destCluster)))
 	case err != nil:
 		s.log.WarnContext(ctx, "copy: destination pre-flight check skipped",
 			"cluster", job.destCluster, "topic", job.destTopic, "err", err)

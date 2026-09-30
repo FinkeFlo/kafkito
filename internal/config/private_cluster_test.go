@@ -49,3 +49,18 @@ func TestValidate_PrivateClusterNamesReserved(t *testing.T) {
 		}
 	}
 }
+
+func TestPublicClusterName(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct{ name, want string }{
+		{AdhocClusterPrefix + "0123456789abcdef", PrivateClusterSentinel},
+		{AdhocClusterPrefix, PrivateClusterSentinel},
+		{PrivateClusterSentinel, PrivateClusterSentinel},
+		{"prod", "prod"},
+		{"", ""},
+		{"x" + AdhocClusterPrefix + "0123456789abcdef", "x" + AdhocClusterPrefix + "0123456789abcdef"},
+	} {
+		assert.Equal(t, tc.want, PublicClusterName(tc.name), "%q", tc.name)
+	}
+}

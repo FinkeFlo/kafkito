@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/FinkeFlo/kafkito/internal/netguard"
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
@@ -47,6 +48,7 @@ func TestToAPIError(t *testing.T) {
 		{"value masked", fmt.Errorf("fetch: %w", kafkapkg.ErrValueMasked), 403, "value_masked", "value is masked and cannot be downloaded"},
 		{"upstream", upstreamError("list brokers", errors.New("dial broker-7.internal:9092")), 502, "kafka_upstream", "upstream kafka error"},
 		{"cluster error unknown", clusterError("c1", "op", kafkapkg.ErrUnknownCluster), 404, "", "unknown cluster: c1"},
+		{"cluster error unknown private", clusterError(config.AdhocClusterPrefix+"0123456789abcdef", "op", kafkapkg.ErrUnknownCluster), 404, "", "unknown cluster: " + config.PrivateClusterSentinel},
 		{"cluster error upstream", clusterError("c1", "op", errors.New("boom")), 502, "kafka_upstream", "upstream kafka error"},
 		{"path not found", routers.ErrPathNotFound, 404, "", "not found"},
 		{"method not allowed", routers.ErrMethodNotAllowed, 405, "", "method not allowed"},

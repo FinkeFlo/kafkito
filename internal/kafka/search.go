@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FinkeFlo/kafkito/internal/config"
 	"github.com/antchfx/xpath"
 	"github.com/ohler55/ojg/jp"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -233,7 +234,7 @@ const (
 func (r *Messages) SearchMessages(ctx context.Context, cluster, topic string, opts SearchOptions) (*SearchResult, error) {
 	cfg, ok := r.ConfigFor(cluster)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, cluster)
+		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, config.PublicClusterName(cluster))
 	}
 	opts = opts.withDefaults()
 	mt, err := opts.compile()

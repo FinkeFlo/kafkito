@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/FinkeFlo/kafkito/internal/config"
 )
 
 // MaxTimelineSlots caps the number of time slots returned by MessageTimeline
@@ -96,7 +98,7 @@ func messageTimelineWithAdmin(
 	for i, ts := range edges {
 		listed, err := adm.ListOffsetsAfterMilli(admCtx, ts, topic)
 		if err != nil {
-			return nil, fmt.Errorf("resolve offsets at ts=%d for topic %q on cluster %q: %w", ts, topic, cluster, err)
+			return nil, fmt.Errorf("resolve offsets at ts=%d for topic %q on cluster %q: %w", ts, topic, config.PublicClusterName(cluster), err)
 		}
 		m := make(map[int32]int64, len(offs.parts))
 		for _, p := range offs.parts {

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/FinkeFlo/kafkito/internal/rbac"
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
@@ -32,7 +33,7 @@ func (s *apiServer) ListGroups(ctx context.Context, req gen.ListGroupsRequestObj
 	if user, ok := s.rbacListSubject(ctx, req.Cluster); ok {
 		groups = filterGroupsByRBAC(groups, s.policy, user, req.Cluster)
 	}
-	return gen.ListGroups200JSONResponse{Cluster: req.Cluster, Groups: groups}, nil
+	return gen.ListGroups200JSONResponse{Cluster: config.PublicClusterName(req.Cluster), Groups: groups}, nil
 }
 
 // CreateGroup creates a new consumer group bound to a single topic.

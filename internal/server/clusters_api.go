@@ -132,7 +132,7 @@ func (s *apiServer) GetCapabilities(ctx context.Context, req gen.GetCapabilities
 	if err != nil {
 		return nil, err
 	}
-	return gen.GetCapabilities200JSONResponse{Cluster: req.Cluster, Capabilities: caps}, nil
+	return gen.GetCapabilities200JSONResponse{Cluster: config.PublicClusterName(req.Cluster), Capabilities: caps}, nil
 }
 
 // RefreshCapabilities invalidates the probe cache and re-runs it.
@@ -142,7 +142,7 @@ func (s *apiServer) RefreshCapabilities(ctx context.Context, req gen.RefreshCapa
 	if err != nil {
 		return nil, err
 	}
-	return gen.RefreshCapabilities200JSONResponse{Cluster: req.Cluster, Capabilities: caps}, nil
+	return gen.RefreshCapabilities200JSONResponse{Cluster: config.PublicClusterName(req.Cluster), Capabilities: caps}, nil
 }
 
 func (s *apiServer) capabilities(ctx context.Context, cluster string) (kafkapkg.Capabilities, error) {
@@ -166,5 +166,5 @@ func (s *apiServer) ListBrokers(ctx context.Context, req gen.ListBrokersRequestO
 	if err != nil {
 		return nil, clusterError(req.Cluster, "list brokers", err)
 	}
-	return gen.ListBrokers200JSONResponse{Cluster: req.Cluster, Brokers: brokers}, nil
+	return gen.ListBrokers200JSONResponse{Cluster: config.PublicClusterName(req.Cluster), Brokers: brokers}, nil
 }

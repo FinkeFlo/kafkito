@@ -151,7 +151,7 @@ func (r *Messages) scanClient(s recordScan, cursors map[int32]*scanCursor) (*kgo
 	)
 	cl, err := kgo.NewClient(opts...)
 	if err != nil {
-		return nil, fmt.Errorf("create %s client for topic %q on cluster %q: %w", s.role, s.topic, s.cluster, err)
+		return nil, fmt.Errorf("create %s client for topic %q on cluster %q: %w", s.role, s.topic, config.PublicClusterName(s.cluster), err)
 	}
 	return cl, nil
 }
@@ -163,7 +163,7 @@ func (s recordScan) fetchError(fetches kgo.Fetches) error {
 		if isContextErr(e.Err) {
 			continue
 		}
-		return fmt.Errorf("fetch topic %q partition %d on cluster %q: %w", s.topic, e.Partition, s.cluster, e.Err)
+		return fmt.Errorf("fetch topic %q partition %d on cluster %q: %w", s.topic, e.Partition, config.PublicClusterName(s.cluster), e.Err)
 	}
 	return nil
 }
