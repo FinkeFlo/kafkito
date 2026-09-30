@@ -792,7 +792,7 @@ type SchemaVersion = kafka.SchemaVersion
 
 // SearchRequest All fields are optional; server-side defaults apply.
 type SearchRequest struct {
-	// Budget Maximum records to scan.
+	// Budget Maximum number of records a call reads.
 	Budget *int `json:"budget,omitempty"`
 
 	// Cursors Per-partition continuation offsets from `next_cursors`, keyed by partition id.
@@ -800,7 +800,7 @@ type SearchRequest struct {
 	Direction *SearchRequestDirection `json:"direction,omitempty"`
 	FromTsMs  *int64                  `json:"from_ts_ms,omitempty"`
 
-	// Limit Maximum matches to return.
+	// Limit Page size: the maximum number of matches to return. Matches beyond it are not lost; `next_cursors` stops at the first one, so the next call returns it.
 	Limit *int               `json:"limit,omitempty"`
 	Mode  *SearchRequestMode `json:"mode,omitempty"`
 	Op    *SearchRequestOp   `json:"op,omitempty"`
@@ -809,9 +809,11 @@ type SearchRequest struct {
 	Partition *int32 `json:"partition,omitempty"`
 
 	// Path JSONPath or XPath expression for modes `jsonpath` and `xpath`; unused otherwise.
-	Path        *string `json:"path,omitempty"`
-	StopOnLimit *bool   `json:"stop_on_limit,omitempty"`
-	ToTsMs      *int64  `json:"to_ts_ms,omitempty"`
+	Path *string `json:"path,omitempty"`
+
+	// StopOnLimit Return as soon as `limit` matches were found. Without it the call reads its whole budget; either way it returns at most `limit` matches and the cursors keep the rest reachable.
+	StopOnLimit *bool  `json:"stop_on_limit,omitempty"`
+	ToTsMs      *int64 `json:"to_ts_ms,omitempty"`
 
 	// Value Search text for mode `contains`, comparison value for `jsonpath` and `xpath` (not needed with op `exists`), JS filter source for mode `js`.
 	Value *string               `json:"value,omitempty"`
@@ -832,13 +834,15 @@ type SearchRequestZones string
 
 // SearchResponse defines model for SearchResponse.
 type SearchResponse struct {
-	Cluster  string      `json:"cluster"`
-	Messages *[]Message  `json:"messages"`
-	Search   SearchStats `json:"search"`
-	Topic    string      `json:"topic"`
+	Cluster  string     `json:"cluster"`
+	Messages *[]Message `json:"messages"`
+
+	// Search Scan statistics of one search call. `scanned`, `matched` and `parse_errors` count only what lies behind `next_cursors`, i.e. what a follow-up call does not read again, so their sums across a chain of calls are exact totals.
+	Search SearchStats `json:"search"`
+	Topic  string      `json:"topic"`
 }
 
-// SearchStats defines model for SearchStats.
+// SearchStats Scan statistics of one search call. `scanned`, `matched` and `parse_errors` count only what lies behind `next_cursors`, i.e. what a follow-up call does not read again, so their sums across a chain of calls are exact totals.
 type SearchStats = kafka.SearchStats
 
 // SchemaSubject defines model for Subject.

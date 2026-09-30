@@ -282,10 +282,17 @@ Bounded content search with a scan budget. The body is a `SearchRequest`
 `js`), `path` (the JSONPath or XPath expression), `op` (`exists` | `eq` |
 `contains` | `regex` | …), `value` (the needle, or the JS predicate in `js`
 mode), `zones` (e.g. `["value","headers","key"]`), `direction`
-(`newest_first` | `oldest_first`), `limit` (matches) and `budget` (records to
-scan). The response carries the matches in `messages` and the scan statistics
-in `search`; pass `search.next_cursors` back as `cursors` to continue. Bodies
-over 1 MiB return `400`.
+(`newest_first` | `oldest_first`), `limit` (matches per call) and `budget`
+(records a call reads at most). The response carries the matches in `messages`
+and the scan statistics in `search`; pass `search.next_cursors` back as
+`cursors` to continue. Bodies over 1 MiB return `400`.
+
+`limit` is the page size, with or without `stop_on_limit`: matches beyond it
+are not dropped, `next_cursors` stops at the first of them and the next call
+returns it. `search.scanned`, `search.matched` and `search.parse_errors` count
+only what lies behind `next_cursors`, so summed across a chain of calls they
+are exact totals; `search.read` counts every record the call read, including
+those the next call reads again.
 
 Quick example — simple contains across message value:
 

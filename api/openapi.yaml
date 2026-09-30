@@ -1889,10 +1889,23 @@ components:
       description: All fields are optional; server-side defaults apply.
       properties:
         partition: { type: integer, format: int32, description: "Absent or -1 = all partitions." }
-        limit: { type: integer, description: Maximum matches to return. }
-        budget: { type: integer, description: Maximum records to scan. }
+        limit:
+          type: integer
+          description: >
+            Page size: the maximum number of matches to return. Matches beyond
+            it are not lost; `next_cursors` stops at the first one, so the next
+            call returns it.
+        budget:
+          type: integer
+          description: Maximum number of records a call reads.
         direction: { type: string, enum: [newest_first, oldest_first] }
-        stop_on_limit: { type: boolean, default: true }
+        stop_on_limit:
+          type: boolean
+          default: true
+          description: >
+            Return as soon as `limit` matches were found. Without it the call
+            reads its whole budget; either way it returns at most `limit`
+            matches and the cursors keep the rest reachable.
         mode: { type: string, enum: [contains, jsonpath, xpath, js] }
         path: { type: string, maxLength: 2048, description: "JSONPath or XPath expression for modes `jsonpath` and `xpath`; unused otherwise." }
         op: { type: string, enum: [exists, eq, ne, contains, regex, gt, lt, gte, lte] }
@@ -1923,24 +1936,53 @@ components:
         error: { type: string }
     SearchStats:
       type: object
+      description: >
+        Scan statistics of one search call. `scanned`, `matched` and
+        `parse_errors` count only what lies behind `next_cursors`, i.e. what a
+        follow-up call does not read again, so their sums across a chain of
+        calls are exact totals.
       required: [scanned, matched, budget_exhausted, timed_out, more_available, direction, parse_errors]
       properties:
-        scanned: { type: integer }
-        matched: { type: integer }
+        scanned:
+          type: integer
+          description: Records this call read that `next_cursors` moved past. Never more than `read`.
+        read:
+          type: integer
+          description: >
+            Records this call read, including those a follow-up call reads
+            again (a chunk not read to its end, or records after a match cut
+            off by `limit`). Never more than the budget.
+        matched:
+          type: integer
+          description: Matches this call returns, i.e. every match `next_cursors` moved past.
         budget_exhausted: { type: boolean }
         timed_out: { type: boolean }
-        more_available: { type: boolean }
+        more_available:
+          type: boolean
+          description: >
+            True when a follow-up call with `next_cursors` would search more
+            records or return more matches, including matches cut off by
+            `limit`.
         direction: { type: string, enum: [newest_first, oldest_first] }
         next_cursors:
           type: object
           additionalProperties: { type: integer, format: int64 }
+          description: >
+            Per-partition continuation offsets, to pass back as `cursors`. A
+            cursor never skips a record this call did not return or scan, and
+            it stops at the first match cut off by `limit`. Oldest first it is
+            the next offset to read; newest first the follow-up reads the
+            offsets below it.
         resolved_range:
           type: object
           additionalProperties: { $ref: "#/components/schemas/PartitionRange" }
-        parse_errors: { type: integer }
+        parse_errors:
+          type: integer
+          description: Records behind `next_cursors` that could not be evaluated.
         parse_error_offsets:
           type: array
           items: { $ref: "#/components/schemas/ParseErrorOffset" }
+          description: Up to 50 locations of the counted parse errors.
         durations_ms:
           type: object
           additionalProperties: { type: integer, format: int64 }

@@ -1284,13 +1284,16 @@ export interface components {
              * @description Absent or -1 = all partitions.
              */
             partition?: number;
-            /** @description Maximum matches to return. */
+            /** @description Page size: the maximum number of matches to return. Matches beyond it are not lost; `next_cursors` stops at the first one, so the next call returns it. */
             limit?: number;
-            /** @description Maximum records to scan. */
+            /** @description Maximum number of records a call reads. */
             budget?: number;
             /** @enum {string} */
             direction?: "newest_first" | "oldest_first";
-            /** @default true */
+            /**
+             * @description Return as soon as `limit` matches were found. Without it the call reads its whole budget; either way it returns at most `limit` matches and the cursors keep the rest reachable.
+             * @default true
+             */
             stop_on_limit?: boolean;
             /** @enum {string} */
             mode?: "contains" | "jsonpath" | "xpath" | "js";
@@ -1323,21 +1326,30 @@ export interface components {
             offset: number;
             error: string;
         };
+        /** @description Scan statistics of one search call. `scanned`, `matched` and `parse_errors` count only what lies behind `next_cursors`, i.e. what a follow-up call does not read again, so their sums across a chain of calls are exact totals. */
         SearchStats: {
+            /** @description Records this call read that `next_cursors` moved past. Never more than `read`. */
             scanned: number;
+            /** @description Records this call read, including those a follow-up call reads again (a chunk not read to its end, or records after a match cut off by `limit`). Never more than the budget. */
+            read?: number;
+            /** @description Matches this call returns, i.e. every match `next_cursors` moved past. */
             matched: number;
             budget_exhausted: boolean;
             timed_out: boolean;
+            /** @description True when a follow-up call with `next_cursors` would search more records or return more matches, including matches cut off by `limit`. */
             more_available: boolean;
             /** @enum {string} */
             direction: "newest_first" | "oldest_first";
+            /** @description Per-partition continuation offsets, to pass back as `cursors`. A cursor never skips a record this call did not return or scan, and it stops at the first match cut off by `limit`. Oldest first it is the next offset to read; newest first the follow-up reads the offsets below it. */
             next_cursors?: {
                 [key: string]: number;
             };
             resolved_range?: {
                 [key: string]: components["schemas"]["PartitionRange"];
             };
+            /** @description Records behind `next_cursors` that could not be evaluated. */
             parse_errors: number;
+            /** @description Up to 50 locations of the counted parse errors. */
             parse_error_offsets?: components["schemas"]["ParseErrorOffset"][];
             durations_ms?: {
                 [key: string]: number;
