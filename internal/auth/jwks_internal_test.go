@@ -6,11 +6,13 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -371,4 +373,33 @@ func TestKeySource_FailedRefresh_KeepsThePreviousSet(t *testing.T) {
 	require.NoError(t, err, "a failed refresh must not drop the cached set")
 	assert.True(t, hasKeyID(set, "k1"))
 	assert.Equal(t, int32(2), js.hits.Load())
+}
+
+// A key source for a token-supplied URL (an xsuaa jku) logs a failed fetch
+// without the URL; one for a configured URL names it for the operator.
+func TestKeySource_FailedFetchLog_HidesTokenSuppliedURL(t *testing.T) {
+	t.Parallel()
+
+	for _, hide := range []bool{false, true} {
+		js := newJWKSServer(t, "k1")
+		js.fail(http.StatusInternalServerError)
+		var opts []KeySourceOption
+		if hide {
+			opts = append(opts, WithURLHiddenInLogs())
+		}
+		s := NewKeySource(js.url(), opts...)
+		var logs bytes.Buffer
+		s.logger = slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+		t.Cleanup(s.Close)
+
+		_, err := s.Keys(context.Background(), "k1")
+		require.ErrorIs(t, err, ErrKeysUnavailable)
+
+		require.Contains(t, logs.String(), "jwks fetch failed")
+		if hide {
+			assert.NotContains(t, logs.String(), js.srv.Listener.Addr().String(), "a token-supplied URL must not reach the log")
+		} else {
+			assert.Contains(t, logs.String(), js.url(), "a configured URL is logged")
+		}
+	}
 }

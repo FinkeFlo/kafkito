@@ -258,7 +258,9 @@ func (x *Validator) keySource(jku string) (*auth.KeySource, error) {
 	if len(x.sources) >= maxJKUs {
 		return nil, errJKUTooMany
 	}
-	src := auth.NewKeySource(jku)
+	// Only the binding's own jku comes from configuration; any other one
+	// comes from a token header and stays out of the logs.
+	src := auth.NewKeySource(jku, auth.WithURLHiddenInLogs())
 	x.sources[jku] = src
 	return src, nil
 }

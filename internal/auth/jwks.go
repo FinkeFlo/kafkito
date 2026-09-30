@@ -47,8 +47,10 @@ var (
 // ends) and then fails instead of hanging. Close stops a running fetch. The
 // zero value is not usable; call NewKeySource.
 type KeySource struct {
-	url    string
-	client jwk.HTTPClient
+	url     string
+	client  jwk.HTTPClient
+	hideURL bool         // keep url out of logs; see WithURLHiddenInLogs
+	logger  *slog.Logger // nil means slog.Default(); internal tests set it
 
 	// The clock and the durations below are fixed by NewKeySource; internal
 	// tests may replace them, but only before the first Keys call, because
@@ -70,11 +72,21 @@ type KeySource struct {
 	closed      bool
 }
 
+// KeySourceOption configures a KeySource.
+type KeySourceOption func(*KeySource)
+
+// WithURLHiddenInLogs keeps the URL, and error text that may carry it, out of
+// the log line for a failed fetch. Use it when the URL comes from a token
+// header rather than from configuration.
+func WithURLHiddenInLogs() KeySourceOption {
+	return func(s *KeySource) { s.hideURL = true }
+}
+
 // NewKeySource returns a KeySource for the JWKS at url. It does no I/O; the
 // first Keys call (or a validator's WarmUp) loads the set.
-func NewKeySource(url string) *KeySource {
+func NewKeySource(url string, opts ...KeySourceOption) *KeySource {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &KeySource{
+	s := &KeySource{
 		url:             url,
 		client:          jwk.DefaultHTTPClient(),
 		now:             time.Now,
@@ -84,6 +96,10 @@ func NewKeySource(url string) *KeySource {
 		ctx:             ctx,
 		cancel:          cancel,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // Keys returns the key set to verify a token whose header names kid.
@@ -178,7 +194,7 @@ func (s *KeySource) fetch(done chan struct{}) {
 		err = errEmptyKeySet
 	}
 	if err != nil && s.ctx.Err() == nil {
-		slog.Warn("jwks fetch failed", "url", s.url, "err", err)
+		s.logFetchFailure(err)
 	}
 
 	s.mu.Lock()
@@ -189,6 +205,27 @@ func (s *KeySource) fetch(done chan struct{}) {
 	s.inflight = nil
 	s.mu.Unlock()
 	close(done)
+}
+
+// logFetchFailure logs a failed fetch at WARN. With hideURL the jwx error is
+// replaced by a coarse cause, because its text names the URL.
+func (s *KeySource) logFetchFailure(err error) {
+	logger := s.logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	if !s.hideURL {
+		logger.Warn("jwks fetch failed", "url", s.url, "err", err)
+		return
+	}
+	cause := "request or parse failed"
+	switch {
+	case errors.Is(err, errEmptyKeySet):
+		cause = errEmptyKeySet.Error()
+	case errors.Is(err, context.DeadlineExceeded):
+		cause = "timeout"
+	}
+	logger.Warn("jwks fetch failed", "url", "(token jku, not logged)", "err", cause)
 }
 
 func hasKeyID(set jwk.Set, kid string) bool {
