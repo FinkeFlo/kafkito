@@ -161,11 +161,18 @@ network path can read them. Run kafkito only behind TLS:
   closes the client and drops all of it once no request (a running copy
   included) has used the cluster for 15 minutes. The periodic metrics
   collection does not count as use. The raw header and its credentials never
-  appear in logs, error bodies or validation messages. Broker and Schema
-  Registry host names and resolved IPs may appear in operator logs (franz-go
-  connection warnings, the 5xx error log, the Test connection warnings);
-  credentials and the raw header never do. `private_cluster_leak_test.go`
-  pins both.
+  appear in logs, error bodies or validation messages.
+- Operator logs do contain the addresses of private clusters: broker and
+  Schema Registry host names, resolved IPs and ports. This is intentional;
+  they are needed to troubleshoot connections. Lines that carry them include
+  the franz-go client warnings (for example
+  `unable to open connection to broker` with `"addr":"10.0.0.5:9092"`), the
+  `err` field of the 5xx error log, the Test connection warnings
+  (`testCluster ping failed`, `testCluster broker probe failed`) and the
+  topic copy warnings; at `debug` level, more lines can. Credentials and the
+  raw header never appear; `private_cluster_leak_test.go` pins both. Treat
+  the logs as containing infrastructure details of your users' clusters and
+  restrict who can read them.
 - The server keeps the client under an internal name derived from every
   setting of the definition except its display name: brokers in the given
   order, SASL, TLS, Schema Registry and `is_prod` (`data_masking` is
