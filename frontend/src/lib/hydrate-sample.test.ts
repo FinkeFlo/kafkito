@@ -142,16 +142,38 @@ describe("hydrateTruncatedSampleMessages", () => {
     expect(result[2]).toEqual(msgs[2]);
   });
 
-  it("skips Schema Registry values, whose raw bytes are not JSON", async () => {
+  it.each(["avro", "json_schema"])("hydrates %s values with their decoded JSON", async (format) => {
+    fetchMessageRawBase64.mockResolvedValue(
+      Buffer.from('{"order":{"id":"A1"}}', "utf8").toString("base64"),
+    );
     const msgs = [
       message({
         value: '{"order":{"id":"A1"',
+        value_encoding: format,
         value_truncated: true,
-        value_sr: { format: "json", schema_id: 7 },
-      } as Partial<Message>),
+        value_sr: { format, schema_id: 7 },
+      }),
     ];
 
     const result = await hydrateTruncatedSampleMessages("c", "t", msgs);
+
+    expect(result).toEqual([
+      { ...msgs[0], value: '{"order":{"id":"A1"}}', value_truncated: false },
+    ]);
+    expect(fetchMessageRawBase64).toHaveBeenCalledWith("c", "t", 0, 1, undefined);
+  });
+
+  it("does not hydrate Schema Registry values for the XML tree", async () => {
+    const msgs = [
+      message({
+        value: '{"order":{"id":"A1"',
+        value_encoding: "avro",
+        value_truncated: true,
+        value_sr: { format: "avro", schema_id: 7 },
+      }),
+    ];
+
+    const result = await hydrateTruncatedSampleMessages("c", "t", msgs, undefined, "xml");
 
     expect(result).toEqual(msgs);
     expect(fetchMessageRawBase64).not.toHaveBeenCalled();

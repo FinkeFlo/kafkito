@@ -12,11 +12,12 @@
 // ReplayModal's full-value fetch, since most rows are never expanded and an
 // automatic fetch for every truncated row would be wasteful.
 //
-// Three cases deliberately do *not* offer the button:
+// Schema-Registry values decoded to JSON (Avro, JSON Schema) are JSON here
+// too: /raw serves them decoded, like the list. Protobuf is never decoded, so
+// its value stays binary and gets no button.
 //
-//   - Schema-Registry values. The list value is the *decoded* JSON rendering,
-//     but /raw returns the raw Avro/Protobuf wire bytes, which JSON.parse can
-//     never read. Offering the button there would guarantee an error.
+// Two cases deliberately do *not* offer the button:
+//
 //   - Masked values. The server refuses their raw download, since the raw
 //     bytes would bypass the masking.
 //   - Values above JsonInteractive's own SIZE_LIMIT_BYTES. Downloading them
@@ -24,7 +25,7 @@
 //     front with a disabled button and a visible reason.
 import { useMemo, useState } from "react";
 import { base64ToUtf8, RawValueTooLargeError, type Message } from "@/lib/api";
-import { prettyValue } from "@/lib/format";
+import { isJsonLikeEncoding, prettyValue } from "@/lib/format";
 import type { Token } from "@/lib/path-builder";
 import { useFormatters } from "@/lib/use-formatters";
 import { useMessageRawValue } from "@/lib/use-message-raw-value";
@@ -62,11 +63,11 @@ export function ValueBody({
   // Since the search fix, the backend classifies a value cut off
   // mid-structure by its first non-whitespace byte, so `value_encoding`
   // stays "json" for truncated JSON instead of degrading to "text".
-  const isTruncatedJson = m.value_truncated === true && m.value_encoding === "json";
-  const isSchemaRegistry = !!m.value_sr;
+  const isJsonLike = isJsonLikeEncoding(m.value_encoding);
+  const isTruncatedJson = m.value_truncated === true && isJsonLike;
   const isMasked = m.masked === true;
   const tooLargeForTree = (m.value_size_bytes ?? 0) > SIZE_LIMIT_BYTES;
-  const canLoadFull = isTruncatedJson && !isSchemaRegistry && !isMasked && !tooLargeForTree;
+  const canLoadFull = isTruncatedJson && !isMasked && !tooLargeForTree;
 
   // Hooks must run unconditionally, so the query is declared before any of
   // the branches below can return. `enabled` keeps it inert until the user
@@ -90,13 +91,13 @@ export function ValueBody({
   }, [rawQuery.data]);
 
   const inlineParsed = useMemo(() => {
-    if (m.value_encoding !== "json" || !m.value || m.value_truncated) return undefined;
+    if (!isJsonLike || !m.value || m.value_truncated) return undefined;
     try {
       return { ok: true as const, value: JSON.parse(m.value) };
     } catch {
       return undefined;
     }
-  }, [m.value, m.value_encoding, m.value_truncated]);
+  }, [m.value, isJsonLike, m.value_truncated]);
 
   if (isTruncatedJson) {
     if (fullParsed?.ok) {
@@ -122,11 +123,6 @@ export function ValueBody({
             <p className="text-[11px] text-muted">
               Click to filter is not available for masked values — the full value can&apos;t be
               loaded. Enter the path manually instead.
-            </p>
-          ) : isSchemaRegistry ? (
-            <p className="text-[11px] text-muted">
-              Click to filter is not available for Schema Registry values — the full record is only
-              downloadable in its encoded wire format. Enter the path manually instead.
             </p>
           ) : tooLargeForTree ? (
             <>
@@ -173,7 +169,7 @@ export function ValueBody({
                 >
                   {rawQuery.error
                     ? rawQuery.error instanceof RawValueTooLargeError
-                      ? `Full value (${sizeLabel}) exceeds the download limit. Enter the path manually instead.`
+                      ? "The full value exceeds the download limit. Enter the path manually instead."
                       : `${rawQuery.error.message} — enter the path manually instead.`
                     : "Full value could not be parsed as JSON. Enter the path manually instead."}
                 </Notice>

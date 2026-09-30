@@ -627,8 +627,9 @@ export async function testCluster(cfg: PrivateCluster): Promise<ClusterInfo> {
 }
 
 /**
- * Downloads the full raw value of a single Kafka record identified by
- * partition and offset. Triggers a browser file-save dialog.
+ * Downloads the full value of a single Kafka record identified by partition
+ * and offset — a Schema-Registry value as its decoded JSON. Triggers a
+ * browser file-save dialog.
  * Throws on HTTP error: RawValueTooLargeError on 413 (value exceeds the
  * server cap), RawValueMaskedError on 403 `value_masked`.
  */
@@ -703,11 +704,12 @@ export function base64ToUtf8(b64: string): string {
 }
 
 /**
- * Fetches the full raw value of a single Kafka record identified by
- * partition and offset, returning it as a base64 string (rather than
- * triggering a file download like downloadMessageRaw). Used by the Replay
- * dialog to recover the untruncated bytes of a value that was cut to 64 KB
- * for the message list preview. Throws RawValueTooLargeError on HTTP 413,
+ * Fetches the full value of a single Kafka record identified by partition
+ * and offset, returning it as a base64 string (rather than triggering a file
+ * download like downloadMessageRaw). A Schema-Registry value comes back as
+ * the decoded JSON the message list shows, unless `decoded` is false: then
+ * the stored wire-format bytes come back, which is what the Replay dialog
+ * needs to re-produce a record. Throws RawValueTooLargeError on HTTP 413,
  * RawValueMaskedError on HTTP 403 `value_masked`, a plain Error on any other
  * HTTP error.
  */
@@ -717,10 +719,15 @@ export async function fetchMessageRawBase64(
   partition: number,
   offset: number,
   signal?: AbortSignal,
+  decoded = true,
 ): Promise<string> {
   const buf = await call(
     client.GET("/api/v1/clusters/{cluster}/topics/{topic}/messages/{partition}/{offset}/raw", {
-      params: { path: { cluster, topic, partition, offset } },
+      params: {
+        path: { cluster, topic, partition, offset },
+        // Omitted when true, the server default.
+        query: decoded ? undefined : { decoded: false },
+      },
       parseAs: "arrayBuffer",
       signal,
     }),

@@ -6,6 +6,8 @@ import {
   formatDuration,
   formatNumber,
   formatRate,
+  isJsonLikeEncoding,
+  prettyValue,
 } from "./format";
 
 const oneSecondMs = 1_000;
@@ -173,5 +175,28 @@ describe("locale-aware separators (regression: real de-DE behavior)", () => {
     expect(formatDecimal(null, 1)).toBe("—");
     expect(formatDecimal(undefined, 1)).toBe("—");
     expect(formatDecimal(Number.NaN, 1)).toBe("—");
+  });
+});
+
+describe("prettyValue", () => {
+  it.each(["json", "avro", "json_schema"])("indents a %s value", (encoding) => {
+    expect(prettyValue('{"a":1}', encoding)).toBe('{\n  "a": 1\n}');
+  });
+
+  it.each(["text", "xml", "binary", "protobuf"])("leaves a %s value as is", (encoding) => {
+    expect(prettyValue('{"a":1}', encoding)).toBe('{"a":1}');
+  });
+
+  it("falls back to the original string when the value does not parse", () => {
+    expect(prettyValue('{"a":1', "avro")).toBe('{"a":1');
+  });
+});
+
+describe("isJsonLikeEncoding", () => {
+  it("covers the encodings whose value is JSON", () => {
+    expect(["json", "avro", "json_schema"].every(isJsonLikeEncoding)).toBe(true);
+    expect(["text", "xml", "binary", "protobuf", "null", "empty"].some(isJsonLikeEncoding)).toBe(
+      false,
+    );
   });
 });

@@ -97,6 +97,7 @@ describe("ValueBody", () => {
       0,
       42,
       expect.anything(),
+      true,
     );
     // The newly loaded content is announced to assistive technology.
     expect(screen.getByRole("status")).toHaveTextContent(/full value loaded/i);
@@ -116,6 +117,9 @@ describe("ValueBody", () => {
       expect(screen.getByRole("alert")).toHaveTextContent(/exceeds the download limit/i),
     );
     expect(screen.getByRole("alert")).toHaveTextContent(/enter the path manually instead/i);
+    // value_size_bytes is the stored size; a decoded value can be larger, so
+    // the message must not present it as the size of the download.
+    expect(screen.getByRole("alert")).not.toHaveTextContent(/KiB|MiB|unknown size/);
   });
 
   it("shows a parse error when the fetched full value is not valid JSON", async () => {
@@ -173,15 +177,61 @@ describe("ValueBody", () => {
     expect(new Set(units).size).toBe(1);
   });
 
-  it("does not offer the button for Schema Registry values, whose raw bytes are not JSON", () => {
+  it.each(["avro", "json_schema"])(
+    "loads the decoded JSON of a truncated %s value and renders the interactive tree",
+    async (format) => {
+      fetchMessageRawBase64.mockResolvedValue(
+        Buffer.from(JSON.stringify({ orderId: "A1" }), "utf8").toString("base64"),
+      );
+      const user = userEvent.setup();
+      const { onPick } = renderValueBody(
+        message({ value_encoding: format, value_sr: { format, schema_id: 7 } }),
+      );
+
+      await user.click(screen.getByRole("button", { name: LOAD_BUTTON }));
+
+      await waitFor(() => expect(screen.getByText('"A1"')).toBeInTheDocument());
+      expect(fetchMessageRawBase64).toHaveBeenCalledWith(
+        "my-cluster",
+        "my-topic",
+        0,
+        42,
+        expect.anything(),
+        true,
+      );
+      await user.click(screen.getByText('"A1"'));
+      expect(onPick).toHaveBeenCalledWith([{ kind: "key", name: "orderId" }], "A1");
+    },
+  );
+
+  it("renders the interactive tree directly for a non-truncated Avro value", async () => {
+    const user = userEvent.setup();
+    const { onPick } = renderValueBody(
+      message({
+        value: '{"orderId":"A1"}',
+        value_encoding: "avro",
+        value_sr: { format: "avro", schema_id: 7 },
+        value_truncated: false,
+        value_size_bytes: 12,
+      }),
+    );
+
+    await user.click(screen.getByText('"A1"'));
+
+    expect(onPick).toHaveBeenCalledWith([{ kind: "key", name: "orderId" }], "A1");
+    expect(fetchMessageRawBase64).not.toHaveBeenCalled();
+  });
+
+  it("does not offer the button for a Protobuf value, which is not decoded", () => {
     renderValueBody(
       message({
-        value_sr: { format: "json", schema_id: 7 },
-      } as Partial<Message>),
+        value: "0x000000000908",
+        value_encoding: "binary",
+        value_sr: { format: "protobuf", schema_id: 9 },
+      }),
     );
 
     expect(screen.queryByRole("button", { name: LOAD_BUTTON })).not.toBeInTheDocument();
-    expect(screen.getByText(/not available for schema registry values/i)).toBeInTheDocument();
     expect(fetchMessageRawBase64).not.toHaveBeenCalled();
   });
 

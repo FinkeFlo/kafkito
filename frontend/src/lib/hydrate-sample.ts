@@ -1,4 +1,5 @@
 import { base64ToUtf8, fetchMessageRawBase64, type Message } from "./api";
+import { isJsonLikeEncoding } from "./format";
 
 /**
  * Upper bound on the raw size of a sample value this helper will download.
@@ -36,9 +37,8 @@ export function isTooLargeToScan(m: Message): boolean {
  * still contributes whatever fields survived truncation instead of being
  * dropped.
  *
- * Schema-Registry values are skipped: their `value` is the *decoded* JSON
- * rendering, while the raw-download endpoint returns the encoded wire bytes,
- * which would not parse as JSON.
+ * Schema-Registry values decoded to JSON (Avro, JSON Schema) count as JSON:
+ * the raw-download endpoint serves them decoded, like the sample.
  *
  * Masked values are skipped too: the server refuses their raw download, and
  * the suggestions must not be built from anything but the masked rendering.
@@ -57,10 +57,11 @@ export async function hydrateTruncatedSampleMessages(
 ): Promise<Message[]> {
   return Promise.all(
     messages.map(async (m) => {
+      const matchesTree =
+        encoding === "json" ? isJsonLikeEncoding(m.value_encoding) : m.value_encoding === encoding;
       const needsHydration =
         m.value_truncated === true &&
-        m.value_encoding === encoding &&
-        !m.value_sr &&
+        matchesTree &&
         !m.masked &&
         (m.value_size_bytes ?? 0) <= MAX_HYDRATE_VALUE_BYTES;
       if (!needsHydration) return m;

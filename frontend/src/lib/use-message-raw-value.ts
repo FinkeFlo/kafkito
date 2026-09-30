@@ -17,10 +17,15 @@ export function useMessageRawValue(params: {
   partition: number;
   offset: number;
   enabled: boolean;
+  /**
+   * False fetches the stored bytes instead of the Schema-Registry decoded
+   * JSON; ReplayModal needs them to re-produce the record. Default true.
+   */
+  decoded?: boolean;
 }) {
-  const { cluster, topic, partition, offset, enabled } = params;
+  const { cluster, topic, partition, offset, enabled, decoded = true } = params;
   return useQuery({
-    ...messageQueries.raw(cluster, topic, partition, offset),
+    ...messageQueries.raw(cluster, topic, partition, offset, decoded),
     enabled: enabled && !!cluster && !!topic,
   });
 }
