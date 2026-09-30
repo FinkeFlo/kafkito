@@ -117,7 +117,10 @@ func brokerIssuesSummary(issues []kafkapkg.BrokerIssue, skipped int) string {
 			is.NodeID, net.JoinHostPort(is.Host, strconv.Itoa(int(is.Port))), is.Reason))
 	}
 	summary := "some advertised brokers cannot be reached: " + strings.Join(parts, "; ")
-	if skipped > 0 {
+	switch {
+	case skipped == 1:
+		summary += "; 1 more broker was not checked"
+	case skipped > 1:
 		summary += fmt.Sprintf("; %d more brokers were not checked", skipped)
 	}
 	return summary
