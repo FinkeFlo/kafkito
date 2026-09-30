@@ -5,8 +5,11 @@ package kafka
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"net"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -17,6 +20,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 
 	"github.com/FinkeFlo/kafkito/internal/config"
+	"github.com/FinkeFlo/kafkito/internal/connerr"
 )
 
 // newCapsCluster starts a kfake cluster and counts the DeleteTopics requests
@@ -259,4 +263,36 @@ func TestCapabilities_NotCachedWhenRequestEndsDuringProbe(t *testing.T) {
 	assert.True(t, caps.CreateTopic)
 	assert.True(t, caps.AlterConfigs)
 	assert.Empty(t, caps.Errors)
+}
+
+// On a private cluster a failed probe reports the class text of a
+// connection error, never the address it failed to reach. Broker error
+// codes and an empty broker list keep their own text; configured clusters
+// keep the full error.
+func TestCapabilityErr(t *testing.T) {
+	t.Parallel()
+
+	dialErr := fmt.Errorf("unable to dial: %w", &net.OpError{
+		Op: "dial", Net: "tcp",
+		Addr: &net.TCPAddr{IP: net.ParseIP("192.0.2.7"), Port: 9092},
+		Err:  syscall.ECONNREFUSED,
+	})
+	tests := []struct {
+		name    string
+		err     error
+		private bool
+		want    string
+	}{
+		{"private dial error", dialErr, true, connerr.Refused.Message()},
+		{"private broker code", kerr.ClusterAuthorizationFailed, true, kerr.ClusterAuthorizationFailed.Message},
+		{"private no brokers", errNoBrokersReturned, true, "no brokers returned"},
+		{"configured dial error", dialErr, false, dialErr.Error()},
+		{"configured broker code", kerr.ClusterAuthorizationFailed, false, kerr.ClusterAuthorizationFailed.Message},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, capabilityErr(tc.err, tc.private))
+		})
+	}
 }

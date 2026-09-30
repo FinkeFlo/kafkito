@@ -48,11 +48,12 @@ Connection test/save errors or missing availability in certain tabs (for example
 
 **What can I do?**  
 1. **First test is slow/timeout**: on cold DNS, first probe can be slow; retry is often much faster.  
-2. **Schemas unavailable**: without Schema Registry URL, Schemas cannot be used. Configure SR in cluster settings.  
-3. **Auth failure**: verify `Auth type` matches broker setup and credentials are complete.  
-4. **Produce warning on prod**: if a cluster is marked as Production, producing a message requires an extra confirmation step.  
-5. **Name conflicts**: if a private cluster has the same name as a shared cluster, shared cluster wins in selector. Use distinct names.  
-6. **Delete is local**: deleting removes the entry only from the current browser. Export before deleting if needed.
+2. **Generic error texts**: a failed test only says what went wrong: `connection refused`, `connection timed out`, `host name could not be resolved`, `TLS handshake failed`, `authentication failed`, `destination not allowed` or `broker not reachable`. A rejected broker is named by its position in your list (`broker 2: ...`), not by its address. Your operator finds the full error in the server log.  
+3. **Schemas unavailable**: without Schema Registry URL, Schemas cannot be used. Configure SR in cluster settings.  
+4. **Auth failure**: verify `Auth type` matches broker setup and credentials are complete.  
+5. **Produce warning on prod**: if a cluster is marked as Production, producing a message requires an extra confirmation step.  
+6. **Name conflicts**: if a private cluster has the same name as a shared cluster, shared cluster wins in selector. Use distinct names.  
+7. **Delete is local**: deleting removes the entry only from the current browser. Export before deleting if needed.
 
 ![Production warning before produce](../assets/screenshots/ui-produce-prod-warning.png)
 

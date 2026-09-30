@@ -85,8 +85,11 @@ The server keeps nothing between requests.
   ```
 
 - A malformed header, a missing header on a `__private__` path, or a broker
-  or Schema Registry host the SSRF guard refuses returns `400`. Neither the
-  raw header nor the credentials in it appear in a response or a log line.
+  or Schema Registry host the SSRF guard refuses returns `400`. The message
+  names the field and a fixed reason, a broker by its 1-based position, for
+  example `X-Kafkito-Cluster: broker 2: host name could not be resolved`;
+  it repeats no value from the definition. Neither the raw header nor the
+  credentials in it appear in a response or a log line.
 - Responses and error messages name a private cluster `__private__`, for
   example in the `cluster` field. Only `__private__` with the header
   selects it; no other `{cluster}` value does.
@@ -98,11 +101,41 @@ The server keeps nothing between requests.
   (the "Test connection" button). It checks the seed and then every broker
   the cluster advertises; a broker that is blocked for private clusters or
   does not answer is listed in `broker_issues`, and `reachable` is false.
-  At most 64 brokers are checked; `brokers_skipped` counts the rest.
+  At most 64 brokers are checked; `brokers_skipped` counts the rest. See
+  [Test connection](#test-connection) for the error classes.
 
 ```bash
 PRIVATE=$(printf '%s' '{"name":"mine","brokers":["broker.example.com:9092"],"auth":{"type":"none"},"tls":{"enabled":false}}' | base64 | tr -d '\n')
 curl -s -H "X-Kafkito-Cluster: $PRIVATE" "$BASE/api/v1/clusters/__private__/topics" | jq '.topics[].name'
+```
+
+### Test connection
+
+`POST /api/v1/clusters/_test` answers a probe that fails with `200`,
+`reachable: false`, the class of the failure in `error_class` and the
+class's fixed text in `error`. Every entry of `broker_issues` has its own
+`error_class` and `error`.
+
+| `error_class` | `error` |
+| ------------- | ------- |
+| `refused` | connection refused |
+| `timeout` | connection timed out |
+| `dns` | host name could not be resolved |
+| `tls` | TLS handshake failed |
+| `sasl` | authentication failed |
+| `blocked` | destination not allowed |
+| `unreachable` | broker not reachable (any other failure) |
+
+Apart from the advertised `host` and `port` of a broker issue, the response
+names no address, port, resolver or operating system error; the server log
+has the full error. A definition that fails validation is a
+`400` whose message names the field and a fixed reason, for example
+`broker 2: destination not allowed` or `schema_registry.url: invalid URL`.
+
+```bash
+curl -s -X POST "$BASE/api/v1/clusters/_test" -H 'Content-Type: application/json' \
+  -d '{"brokers":["broker.example.com:9092"],"auth":{"type":"none"},"tls":{"enabled":true}}' \
+  | jq '{reachable, error_class, error}'
 ```
 
 ## Contract and live docs

@@ -144,7 +144,9 @@ test.describe("Private-cluster storage v1", () => {
       password: SCRAM_PASSWORD,
     });
     expect(scramSent.tls).toEqual({ enabled: true, insecure_skip_verify: true });
-    await expect(page.getByText(/blocked address/).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/destination not allowed/).first()).toBeVisible({
+      timeout: 20_000,
+    });
 
     const body = (await page.locator("body").innerText()) ?? "";
     const secrets = [SCRAM_PASSWORD, SR_PASSWORD, ...new Set(headers)];

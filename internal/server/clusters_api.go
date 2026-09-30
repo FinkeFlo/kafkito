@@ -5,6 +5,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/FinkeFlo/kafkito/internal/config"
+	"github.com/FinkeFlo/kafkito/internal/connerr"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
 )
@@ -32,7 +34,7 @@ func (s *apiServer) TestCluster(ctx context.Context, req gen.TestClusterRequestO
 	var cfg config.ClusterConfig
 	if req.Body != nil {
 		cfg = *req.Body
-		if err := validateClusterPolicy(cfg); err != nil {
+		if err := validateClusterPolicy(ctx, cfg); err != nil {
 			return nil, badRequest(err.Error())
 		}
 	} else if ctxCfg, ok := privateClusterFromContext(ctx); ok {
@@ -42,15 +44,16 @@ func (s *apiServer) TestCluster(ctx context.Context, req gen.TestClusterRequestO
 	}
 	name, err := s.clusters.UseAdhoc(cfg)
 	if err != nil {
-		return nil, badRequest(err.Error())
+		return nil, badRequest(errTextAdhocRegister)
 	}
 	// Cheap config validation: build the kgo client up-front so that
 	// misconfigured TLS / unparseable broker URLs surface as a 400 here
 	// rather than burning the full Ping budget. Client construction is
 	// synchronous and does not dial; the resulting client is cached on
-	// the registry, so the subsequent Ping reuses it.
+	// the registry, so the subsequent Ping reuses it. Its error can quote
+	// a broker address, so the client gets a fixed text.
 	if _, cerr := s.clusters.Client(name); cerr != nil {
-		return nil, badRequest(cerr.Error())
+		return nil, badRequest("private cluster client could not be created; check the broker addresses")
 	}
 	pingCtx, pingCancel := context.WithTimeout(ctx, s.testConnectionTimeout())
 	defer pingCancel()
@@ -65,32 +68,33 @@ func (s *apiServer) TestCluster(ctx context.Context, req gen.TestClusterRequestO
 		info.AuthType = "none"
 	}
 	if err := s.clusters.Ping(pingCtx, name); err != nil {
-		// Intentional: testCluster is a user-invoked diagnostic for a cluster
-		// the caller supplied and owns. Returning the raw connection error is
-		// the point of this endpoint — it tells the user exactly why their
-		// broker is unreachable (wrong host/port, TLS mismatch, SASL failure,
-		// etc.). This is NOT an accidental upstream-error leak; do not route
-		// through upstreamError here.
+		// The caller learns the class of the failure (connerr), not the
+		// raw error: that names resolved addresses, ports and OS errors
+		// as seen from the server's network position. The log keeps it.
 		if s.log != nil {
 			s.log.WarnContext(pingCtx, "testCluster ping failed", "cluster", config.ClusterLogName(name), "err", err)
 		}
 		info.Reachable = false
-		info.Error = err.Error()
+		info.Error = connerr.Message(err)
+		info.ErrorClass = connerr.Classify(err)
 	} else if issues, skipped, perr := s.clusters.ProbeBrokers(pingCtx, name); perr != nil || len(issues) > 0 {
 		// The seed answered, but kafkito talks to the brokers the cluster
 		// advertises, not to the seed (#126). Each one must be reachable.
-		// The raw errors are returned for the same reason as above; the
-		// hosts are the ones the caller's own cluster advertises.
+		// Every issue carries the class of its failure; host and port are
+		// the ones the caller's own cluster advertises.
 		info.Reachable = false
 		info.BrokerIssues = issues
 		info.BrokersSkipped = skipped
+		logErr := perr
 		if perr != nil {
-			info.Error = perr.Error()
+			info.Error = connerr.Message(perr)
+			info.ErrorClass = connerr.Classify(perr)
 		} else {
 			info.Error = brokerIssuesSummary(issues, skipped)
+			logErr = brokerIssuesCause(issues)
 		}
 		if s.log != nil {
-			s.log.WarnContext(pingCtx, "testCluster broker probe failed", "cluster", config.ClusterLogName(name), "err", info.Error)
+			s.log.WarnContext(pingCtx, "testCluster broker probe failed", "cluster", config.ClusterLogName(name), "err", logErr)
 		}
 	} else {
 		// Brokers beyond the probe cap were not checked. That alone is no
@@ -109,12 +113,13 @@ func (s *apiServer) TestCluster(ctx context.Context, req gen.TestClusterRequestO
 
 // brokerIssuesSummary is the ClusterInfo.Error text for a cluster whose seed
 // answered but whose advertised brokers did not all do so. skipped is the
-// number of advertised brokers the probe did not check.
+// number of advertised brokers the probe did not check. It names each
+// broker by node ID with the class text of its failure; the addresses are
+// in the issues themselves.
 func brokerIssuesSummary(issues []kafkapkg.BrokerIssue, skipped int) string {
 	parts := make([]string, 0, len(issues))
 	for _, is := range issues {
-		parts = append(parts, fmt.Sprintf("broker %d advertises %s (%s)",
-			is.NodeID, net.JoinHostPort(is.Host, strconv.Itoa(int(is.Port))), is.Reason))
+		parts = append(parts, fmt.Sprintf("node %d: %s", is.NodeID, is.Error))
 	}
 	summary := "some advertised brokers cannot be reached: " + strings.Join(parts, "; ")
 	switch {
@@ -124,6 +129,17 @@ func brokerIssuesSummary(issues []kafkapkg.BrokerIssue, skipped int) string {
 		summary += fmt.Sprintf("; %d more brokers were not checked", skipped)
 	}
 	return summary
+}
+
+// brokerIssuesCause is the server log counterpart of brokerIssuesSummary:
+// the advertised address, reason and full error of every failed broker.
+func brokerIssuesCause(issues []kafkapkg.BrokerIssue) error {
+	parts := make([]string, 0, len(issues))
+	for _, is := range issues {
+		parts = append(parts, fmt.Sprintf("broker %d advertises %s (%s): %v",
+			is.NodeID, net.JoinHostPort(is.Host, strconv.Itoa(int(is.Port))), is.Reason, is.Cause))
+	}
+	return errors.New(strings.Join(parts, "; "))
 }
 
 // GetCapabilities returns the cached capability probe for a cluster.

@@ -178,7 +178,7 @@ test.describe("Status indicators never rely on colour alone", () => {
     // a real failure here.
     await brokers.fill("localhost:1");
     await testButton.click();
-    const failed = dialog.getByRole("alert").filter({ hasText: /blocked address/ });
+    const failed = dialog.getByRole("alert").filter({ hasText: /destination not allowed/ });
     await expect(failed).toBeVisible({ timeout: 20_000 });
     const errorIcon = failed.getByRole("img", { name: "Error" });
     await expect(errorIcon).toBeVisible();

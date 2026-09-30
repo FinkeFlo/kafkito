@@ -4,9 +4,11 @@
 package server
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,6 +19,7 @@ import (
 
 	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
+	"github.com/FinkeFlo/kafkito/internal/netguard"
 )
 
 func encodeHeader(t *testing.T, cfg config.ClusterConfig) string {
@@ -36,7 +39,7 @@ func TestDecodePrivateClusterHeader_AcceptsValidConfig(t *testing.T) {
 		Auth:    config.AuthConfig{Type: "none"},
 	}
 
-	got, err := decodePrivateClusterHeader(encodeHeader(t, good))
+	got, err := decodePrivateClusterHeader(t.Context(), encodeHeader(t, good))
 
 	require.NoError(t, err)
 	require.Len(t, got.Brokers, 1)
@@ -75,7 +78,7 @@ func TestDecodePrivateClusterHeader_RejectsInvalidEncoding(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := decodePrivateClusterHeader(tc.raw)
+			_, err := decodePrivateClusterHeader(t.Context(), tc.raw)
 
 			assert.Error(t, err, "decodePrivateClusterHeader(%q) must reject", tc.name)
 		})
@@ -257,9 +260,10 @@ func TestValidatePrivateClusterConfig_BlocksSSRFSchemaRegistry(t *testing.T) {
 		},
 	}
 
-	err := validatePrivateClusterConfig(cfg)
+	err := validatePrivateClusterConfig(t.Context(), cfg)
 
-	assert.Error(t, err, "SR URL pointing at the metadata endpoint must be rejected")
+	require.EqualError(t, err, "schema_registry.url: destination not allowed",
+		"SR URL pointing at the metadata endpoint must be rejected")
 }
 
 func TestValidatePrivateClusterConfig_BlocksSSRFBroker(t *testing.T) {
@@ -270,8 +274,26 @@ func TestValidatePrivateClusterConfig_BlocksSSRFBroker(t *testing.T) {
 		Auth:    config.AuthConfig{Type: "none"},
 	}
 
-	err := validatePrivateClusterConfig(cfg)
+	err := validatePrivateClusterConfig(t.Context(), cfg)
 
-	require.Error(t, err, "a loopback broker must be rejected even after a valid one")
-	assert.Contains(t, err.Error(), `broker "127.0.0.1:9092"`)
+	require.EqualError(t, err, "broker 2: destination not allowed",
+		"a loopback broker must be rejected even after a valid one, named by its position")
+}
+
+// A failed lookup is reported as a fixed text: the resolver's error names
+// the resolver's own address.
+func TestValidateClusterPolicy_LookupErrorIsFixedText(t *testing.T) {
+	t.Parallel()
+
+	lookup := func(_ context.Context, host string) ([]string, error) {
+		return nil, &net.DNSError{Err: "no such host", Name: host, Server: "192.168.65.7:53", IsNotFound: true}
+	}
+	cfg := config.ClusterConfig{
+		Brokers:        []string{"203.0.113.10:9092"},
+		SchemaRegistry: config.SchemaRegistryConfig{URL: "https://echo-sr.example.test"},
+	}
+
+	err := validateClusterPolicyWith(t.Context(), cfg, netguard.NewHostValidator(lookup))
+
+	require.EqualError(t, err, "schema_registry.url: host name could not be resolved")
 }

@@ -26,22 +26,23 @@ describe("TestConnectionResult", () => {
       ...base,
       reachable: false,
       error:
-        "some advertised brokers cannot be reached: broker 1 advertises localhost:39092 (blocked)",
+        "some advertised brokers cannot be reached: node 1: destination not allowed; node 2: connection timed out",
       broker_issues: [
         {
           node_id: 1,
           host: "localhost",
           port: 39092,
           reason: "blocked",
-          error:
-            'unable to dial: dial refused: address resolves to a blocked range: host "localhost" -> ::1',
+          error: "destination not allowed",
+          error_class: "blocked",
         },
         {
           node_id: 2,
           host: "fd00::7",
           port: 9092,
           reason: "unreachable",
-          error: "dial tcp [fd00::7]:9092: i/o timeout",
+          error: "connection timed out",
+          error_class: "timeout",
         },
       ],
     };
@@ -54,17 +55,33 @@ describe("TestConnectionResult", () => {
     );
     expect(items.map((li) => li.textContent)).toEqual([
       "Broker 1 advertises localhost:39092, which is not allowed for private clusters (it resolves to a loopback, link-local, multicast or unspecified address).",
-      "Broker 2 advertises [fd00::7]:9092, which did not answer: dial tcp [fd00::7]:9092: i/o timeout",
+      "Broker 2 advertises [fd00::7]:9092, which did not answer: connection timed out",
     ]);
     expect(alert).not.toHaveTextContent(/^Unreachable: /);
   });
 
-  it("reports a failed seed with the raw error and the cold-DNS hint", () => {
-    const info: ClusterInfo = { ...base, reachable: false, error: "unable to dial: i/o timeout" };
+  it("reports a seed timeout with the cold-DNS hint", () => {
+    const info: ClusterInfo = {
+      ...base,
+      reachable: false,
+      error: "connection timed out",
+      error_class: "timeout",
+    };
     render(<TestConnectionResult outcome={{ kind: "probed", info }} />);
     expect(screen.getByRole("alert")).toHaveTextContent(
-      /^Unreachable: unable to dial: i\/o timeout — first probe is slow on cold broker DNS/,
+      /^Unreachable: connection timed out — first probe is slow on cold broker DNS/,
     );
+  });
+
+  it("reports any other seed failure by its text alone", () => {
+    const info: ClusterInfo = {
+      ...base,
+      reachable: false,
+      error: "connection refused",
+      error_class: "refused",
+    };
+    render(<TestConnectionResult outcome={{ kind: "probed", info }} />);
+    expect(screen.getByRole("alert")).toHaveTextContent(/^Unreachable: connection refused$/);
   });
 
   it("reports a request error", () => {
@@ -88,7 +105,14 @@ describe("TestConnectionResult", () => {
       reachable: false,
       brokers_skipped: 1,
       broker_issues: [
-        { node_id: 4, host: "10.0.0.4", port: 9092, reason: "unreachable", error: "i/o timeout" },
+        {
+          node_id: 4,
+          host: "10.0.0.4",
+          port: 9092,
+          reason: "unreachable",
+          error: "connection timed out",
+          error_class: "timeout",
+        },
       ],
     };
     render(<TestConnectionResult outcome={{ kind: "probed", info }} />);

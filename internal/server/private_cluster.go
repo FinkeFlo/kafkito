@@ -60,7 +60,7 @@ func privateClusterMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		cfg, err := decodePrivateClusterHeader(raw)
+		cfg, err := decodePrivateClusterHeader(r.Context(), raw)
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{
 				"error": PrivateClusterHeader + ": " + err.Error(),
@@ -72,7 +72,9 @@ func privateClusterMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func decodePrivateClusterHeader(raw string) (config.ClusterConfig, error) {
+// decodePrivateClusterHeader decodes and validates the header value. Its
+// errors are fixed texts that never repeat a value from the header.
+func decodePrivateClusterHeader(ctx context.Context, raw string) (config.ClusterConfig, error) {
 	if len(raw) > maxPrivateClusterHeaderBytes*2 {
 		return config.ClusterConfig{}, fmt.Errorf("header too large")
 	}
@@ -87,7 +89,7 @@ func decodePrivateClusterHeader(raw string) (config.ClusterConfig, error) {
 	if err := json.Unmarshal(payload, &cfg); err != nil {
 		return config.ClusterConfig{}, fmt.Errorf("invalid JSON")
 	}
-	if err := validatePrivateClusterConfig(cfg); err != nil {
+	if err := validatePrivateClusterConfig(ctx, cfg); err != nil {
 		return config.ClusterConfig{}, err
 	}
 	return cfg, nil
@@ -101,11 +103,11 @@ func privateClusterFromContext(ctx context.Context) (config.ClusterConfig, bool)
 // validatePrivateClusterConfig enforces the minimum fields required to
 // connect. Matches the rules in config.Validate for static clusters minus
 // the name (caller-facing name doesn't matter for ad-hoc).
-func validatePrivateClusterConfig(cfg config.ClusterConfig) error {
+func validatePrivateClusterConfig(ctx context.Context, cfg config.ClusterConfig) error {
 	if len(cfg.Brokers) == 0 {
 		return errors.New("at least one broker is required")
 	}
-	return validateClusterPolicy(cfg)
+	return validateClusterPolicy(ctx, cfg)
 }
 
 // validateClusterPolicy checks the rules the OpenAPI document does not
@@ -115,32 +117,47 @@ func validatePrivateClusterConfig(cfg config.ClusterConfig) error {
 // X-Kafkito-Cluster header can carry: that header is not schema-validated
 // and accepts auth.type case-insensitively and trimmed, while request
 // bodies are held to the spec's lowercase enum by the request validator.
-func validateClusterPolicy(cfg config.ClusterConfig) error {
-	for _, b := range cfg.Brokers {
-		if strings.TrimSpace(b) == "" {
-			return errors.New("broker address must not be empty")
+//
+// Its messages are fixed texts that name a broker by its 1-based position.
+// They never repeat a submitted value (host, URL, auth type), a resolved
+// address or a resolver error, because the caller returns them to the
+// client.
+func validateClusterPolicy(ctx context.Context, cfg config.ClusterConfig) error {
+	return validateClusterPolicyWith(ctx, cfg, netguard.NewHostValidator(nil))
+}
+
+// validateClusterPolicyWith is validateClusterPolicy with the host checks
+// of v, which resolves each distinct host once.
+func validateClusterPolicyWith(ctx context.Context, cfg config.ClusterConfig, v *netguard.HostValidator) error {
+	for i, b := range cfg.Brokers {
+		b = strings.TrimSpace(b)
+		if b == "" {
+			return fmt.Errorf("broker %d: address must not be empty", i+1)
 		}
-		if err := netguard.ValidateHost(strings.TrimSpace(b)); err != nil {
-			return fmt.Errorf("broker %q: %w", b, err)
+		if err := v.Host(ctx, b); err != nil {
+			return fmt.Errorf("broker %d: %w", i+1, err)
 		}
 	}
-	t := strings.ToLower(strings.TrimSpace(cfg.Auth.Type))
-	switch t {
+	switch strings.ToLower(strings.TrimSpace(cfg.Auth.Type)) {
 	case "", "none":
 	case "plain", "scram-sha-256", "scram-sha-512":
 		if cfg.Auth.Username == "" || cfg.Auth.Password == "" {
-			return fmt.Errorf("auth %q requires username and password", t)
+			return errors.New("auth.username and auth.password are required for SASL")
 		}
 	default:
-		return fmt.Errorf("auth.type %q not supported", cfg.Auth.Type)
+		return errors.New("auth.type not supported")
 	}
 	if u := strings.TrimSpace(cfg.SchemaRegistry.URL); u != "" {
-		if err := netguard.ValidateURL(u); err != nil {
+		if err := v.URL(ctx, u); err != nil {
 			return fmt.Errorf("schema_registry.url: %w", err)
 		}
 	}
 	return nil
 }
+
+// errTextAdhocRegister is the client text for a failed UseAdhoc. The
+// registry's own errors can name internal cluster names.
+const errTextAdhocRegister = "private cluster settings could not be registered"
 
 // resolvePrivateClusterParam is a Chi middleware that rewrites the
 // "cluster" URL parameter from the private-cluster sentinel to the
@@ -177,7 +194,7 @@ func resolvePrivateClusterParam(reg adhocClusters) func(http.Handler) http.Handl
 			effective, err := reg.UseAdhoc(cfg)
 			if err != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]string{
-					"error": err.Error(),
+					"error": errTextAdhocRegister,
 				})
 				return
 			}

@@ -105,7 +105,7 @@ func GuardedDialWith(
 			return nil, err
 		}
 		if len(ips) == 0 {
-			return nil, fmt.Errorf("dial %s: no addresses", host)
+			return nil, fmt.Errorf("dial %s: %w", host, ErrUnresolvable)
 		}
 		// Refuse the whole dial if ANY resolved address is blocked (all-or-nothing
 		// policy prevents split-brain rebinding where only some IPs are safe).
