@@ -179,8 +179,8 @@ func TestSearch_UnmaskedTopicMatchesClearValue(t *testing.T) {
 }
 
 // Parser and JS errors can quote the value they failed on. On a masked
-// topic neither the response nor the log carries them. Not parallel: it
-// swaps the default logger.
+// topic the response withholds them, and no topic's log carries them. Not
+// parallel: it swaps the default logger.
 func TestSearch_ParseErrorsDoNotEchoValuesOnMaskedTopics(t *testing.T) {
 	var logs bytes.Buffer
 	prev := slog.Default()
@@ -211,13 +211,15 @@ func TestSearch_ParseErrorsDoNotEchoValuesOnMaskedTopics(t *testing.T) {
 			assert.Equal(t, parseErrorWithheld, pe.Error, "%+v", opts)
 		}
 	}
-	assert.NotContains(t, logs.String(), "secret-")
-	assert.Contains(t, logs.String(), "details withheld")
+	for _, kind := range []string{"kinds.json_parse_error=1", "kinds.xml_parse_error=1", "kinds.js_error=2"} {
+		assert.Contains(t, logs.String(), kind)
+	}
 
 	// Without a masking rule the details stay available for debugging.
 	res := searchTopic(t, plain, searches[2])
 	require.NotEmpty(t, res.Stats.ParseErrorOffsets)
 	assert.Contains(t, res.Stats.ParseErrorOffsets[0].Error, "secret-")
+	assert.NotContains(t, logs.String(), "secret-")
 }
 
 // keyHeaderRules masks customer ids in the key and the values of the
