@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -39,6 +40,8 @@ var (
 	errJKUTooMany  = errors.New("jku rejected: too many distinct jku URLs")
 	errNoOwnJKU    = errors.New("xsuaa: credentials url does not yield an allowed jku")
 	errJKUNotOwned = errors.New("jku host outside uaadomain")
+	errJKUHost     = errors.New("jku host must be a DNS name")
+	errJKUPort     = errors.New("jku must not name a port other than 443")
 )
 
 // Validator validates RS256 tokens issued by an XSUAA tenant. Construct via
@@ -177,22 +180,35 @@ func (x *Validator) Validate(ctx context.Context, raw string) (*auth.Principal, 
 	return principalFromToken(tok, x.creds.LocalScopePrefix()), nil
 }
 
-// canonicalJKU applies the jku policy and returns the URL to fetch:
-// scheme://host[:port]/token_keys with a lower-case host. Plain http passes
-// only for loopback IPs and only when allowLoopbackHTTP is set (tests).
+// canonicalJKU applies the jku policy and returns the URL to fetch,
+// https://host/token_keys with a lower-case host. The host must be a DNS name
+// (LDH labels, so IP literals, zones and raw Unicode fail; punycode passes)
+// equal to or under the uaadomain, on the default port 443. Plain http passes
+// only for loopback IPs and only when allowLoopbackHTTP is set (tests); that
+// case keeps the host's port.
 func (x *Validator) canonicalJKU(raw string) (string, error) {
 	u, err := url.Parse(raw)
 	if err != nil || !u.IsAbs() || u.Host == "" || u.Opaque != "" {
 		return "", errJKUInvalid
 	}
+	host := strings.ToLower(u.Hostname())
+	loopback := false
 	switch {
 	case u.Scheme == "https":
-	case u.Scheme == "http" && x.allowLoopbackHTTP && isLoopbackIP(u.Hostname()):
+	case u.Scheme == "http" && x.allowLoopbackHTTP && isLoopbackIP(host):
+		loopback = true
 	default:
 		return "", errJKUScheme
 	}
-	if !auth.HostBelongsToDomain(raw, x.creds.UAADomain) {
+	if !loopback && !isDNSName(host) {
+		return "", errJKUHost
+	}
+	domain := strings.ToLower(x.creds.UAADomain)
+	if host != domain && !strings.HasSuffix(host, "."+domain) {
 		return "", fmt.Errorf("%w %q", errJKUNotOwned, x.creds.UAADomain)
+	}
+	if port := u.Port(); !loopback && port != "" && port != "443" {
+		return "", errJKUPort
 	}
 	if u.Path != tokenKeysPath {
 		return "", errJKUPath
@@ -200,7 +216,33 @@ func (x *Validator) canonicalJKU(raw string) (string, error) {
 	if u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
 		return "", errJKUExtras
 	}
-	return u.Scheme + "://" + strings.ToLower(u.Host) + tokenKeysPath, nil
+	if loopback {
+		return "http://" + strings.ToLower(u.Host) + tokenKeysPath, nil
+	}
+	return (&url.URL{Scheme: "https", Host: host, Path: tokenKeysPath}).String(), nil
+}
+
+// dnsLabel is one LDH label: letters, digits and inner hyphens, 1-63 bytes.
+var dnsLabel = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+
+// allDigits matches a label of digits only.
+var allDigits = regexp.MustCompile(`^[0-9]+$`)
+
+// isDNSName reports whether host is a lower-case DNS name of LDH labels
+// joined by single dots, without a trailing dot, at most 253 bytes long.
+// A last label of digits only is refused (RFC 3696 section 2), so dotted
+// IPv4 literals, which are LDH too, do not pass.
+func isDNSName(host string) bool {
+	if host == "" || len(host) > 253 {
+		return false
+	}
+	labels := strings.Split(host, ".")
+	for _, label := range labels {
+		if !dnsLabel.MatchString(label) {
+			return false
+		}
+	}
+	return !allDigits.MatchString(labels[len(labels)-1])
 }
 
 // keySource returns the key source for a canonical jku, creating it while
