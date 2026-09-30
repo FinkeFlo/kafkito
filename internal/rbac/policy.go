@@ -25,6 +25,16 @@ const (
 // AllActions is the full set of canonical actions.
 var AllActions = []string{ActionView, ActionConsume, ActionProduce, ActionEdit, ActionDelete, ActionAdmin}
 
+// The permission private_cluster:use lets a subject use private clusters
+// when private_clusters.mode is role. It concerns no named resource: callers
+// check it with an empty name, so a rule on the type private_cluster grants
+// it whatever its name part, and so does a rule on "*" with the action use
+// or "*", like any other permission.
+const (
+	ResourcePrivateCluster = "private_cluster"
+	ActionUse              = "use"
+)
+
 // Policy is a compiled RBAC policy ready for evaluation.
 type Policy struct {
 	enabled     bool

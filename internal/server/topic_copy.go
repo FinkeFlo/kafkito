@@ -221,9 +221,9 @@ func (s *apiServer) CopyMessages(ctx context.Context, req gen.CopyMessagesReques
 	// destination is an arbitrary cluster/topic named in the body, so it
 	// needs its own explicit "topic:produce" check here, mirroring what
 	// produceMessage gets from the middleware for its own {cluster}/{topic}.
-	// Ad-hoc/private destinations bypass RBAC entirely, same as elsewhere:
-	// the caller supplies their own credentials and the broker enforces its
-	// own ACLs.
+	// RBAC does not apply to a private destination, same as elsewhere: it
+	// passed privateClusterAccess.check in copyJobFor, the caller supplies
+	// their own credentials and the broker enforces its own ACLs.
 	if !job.adhocDest && s.policy.Enabled() {
 		if !s.policy.Allow(job.user, job.destCluster, "topic", job.destTopic, "produce") {
 			resource, action := "topic:"+job.destTopic, "produce"
@@ -303,6 +303,13 @@ func (s *apiServer) copyJobFor(req gen.CopyMessagesRequestObject, r *http.Reques
 		limit:             deref(body.Limit),
 		preservePartition: deref(body.PreservePartition),
 		user:              rbacSubject(r, s.policy),
+	}
+	// A dest_cluster_config is a private cluster: private_clusters.mode
+	// applies before anything in it is read.
+	if body.DestClusterConfig != nil {
+		if err := s.privateClusters.check(r); err != nil {
+			return job, err
+		}
 	}
 	if job.destTopic == "" {
 		return job, badRequest("dest_topic is required")

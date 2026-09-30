@@ -41,8 +41,10 @@ endpoints that back the web UI — stable, documented, scriptable.
 - Every cluster route checks a permission; the spec and the sections below
   name it where it is not obvious (for example the raw download needs
   `topic:consume`, the broker list `cluster:view`). A route without one is
-  denied with `403` `{"error":"forbidden","code":"rbac_denied"}`; only
-  `POST /api/v1/clusters/_test` runs without a resource permission.
+  denied with `403` `{"error":"forbidden","code":"rbac_denied"}`, on private
+  clusters too; only `POST /api/v1/clusters/_test` runs without a resource
+  permission (`private_clusters.mode` applies to it, see
+  [Private clusters](#private-clusters)).
 - Every response carries an `X-Request-Id` header. It reuses the inbound
   `X-Vcap-Request-Id`, `traceparent` trace-id or `X-Request-Id` when present,
   and matches the `request_id` field in the server logs.
@@ -62,14 +64,34 @@ the cluster definition as base64-encoded JSON (`ClusterConfig` in the spec,
 at most 8 KiB decoded) in the `X-Kafkito-Cluster` header on every request.
 The server keeps nothing between requests.
 
+- Operators can disable private clusters or restrict them to a role with
+  `private_clusters.mode` (env `KAFKITO_PRIVATE_CLUSTERS`). `on`, the
+  default, allows them for every caller. `off` answers `403`
+  `{"error":"private clusters are disabled","code":"private_clusters_disabled"}`.
+  `role` requires RBAC and the permission `private_cluster:use`, and answers
+  `403` with `"code":"private_clusters_forbidden"` without it. The mode
+  applies to the `__private__` path segment, to
+  `POST /api/v1/clusters/_test` and to copies into a `dest_cluster_config`.
+  When it refuses the caller, the header is not read: a `__private__`
+  request gets the `403` whatever the header holds, and other requests
+  ignore it. `GET /api/v1/me` reports `private_clusters.mode` and
+  `private_clusters.allowed` for the caller. The permission is granted with
+  a rule on the type, or on `*` with the action `use` or `*`:
+
+  ```yaml
+  permissions:
+    - resource: private_cluster
+      actions: [use]
+  ```
+
 - A malformed header, a missing header on a `__private__` path, or a broker
   or Schema Registry host the SSRF guard refuses returns `400`. Neither the
   raw header nor the credentials in it appear in a response or a log line.
 - Responses and error messages name a private cluster `__private__`, for
   example in the `cluster` field. Only `__private__` with the header
   selects it; no other `{cluster}` value does.
-- RBAC does not apply to private clusters, and their lists are not
-  filtered; only the broker's own ACLs apply.
+- Once the mode allows a request, RBAC does not apply to the private
+  cluster, and its lists are not filtered; only the broker's own ACLs apply.
 - `POST /api/v1/clusters/_test` probes a cluster definition sent in the body
   (the "Test connection" button). It checks the seed and then every broker
   the cluster advertises; a broker that is blocked for private clusters or
@@ -99,7 +121,7 @@ curl -s -H "X-Kafkito-Cluster: $PRIVATE" "$BASE/api/v1/clusters/__private__/topi
 | GET    | `/healthz`             | Liveness (always 200 while the process is up).   |
 | GET    | `/readyz`              | Readiness. 503 if any configured cluster is down.|
 | GET    | `/api/v1/info`         | Build name + version.                            |
-| GET    | `/api/v1/me`           | Resolved caller identity + effective permissions.|
+| GET    | `/api/v1/me`           | Resolved caller identity + effective permissions, and whether private clusters are available.|
 | GET    | `/api/v1/openapi.yaml` | The OpenAPI document (see above).                |
 
 ## Clusters
@@ -504,7 +526,7 @@ Status codes returned **before** the stream starts:
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 200  | Job started; body is `text/event-stream`.                                                                                                                                |
 | 400  | Invalid body (including unknown fields or a body over 32 KiB), missing `dest_topic`, both or neither destination field, destination equal to the source cluster+topic (would never terminate), unknown `dest_cluster`, `dest_topic` does not exist (the destination is never auto-created), or `preserve_partition` with too few destination partitions. |
-| 403  | RBAC denied consume on the source or produce on the destination.                                                                                                          |
+| 403  | RBAC denied consume on the source or produce on the destination, or `private_clusters.mode` refuses a `dest_cluster_config` (`private_clusters_disabled`, `private_clusters_forbidden`). |
 | 428  | Destination cluster is marked `is_prod` and the `X-Kafkito-Confirm-Prod: true` header is missing.                                                                         |
 | 429  | Too many concurrent copy jobs server-wide (4); body carries `code: copy_concurrency_limit` and the response has a `Retry-After: 30` header. Copies hold broker connections for their whole run, so the server sheds load instead of queueing. |
 
@@ -512,12 +534,13 @@ Status codes returned **before** the stream starts:
 middleware (from the URL); the destination is checked as `topic:produce` by the
 handler, against the cluster/topic named in the body.
 
-An ad-hoc `dest_cluster_config` destination **bypasses RBAC entirely** — the
-caller supplies their own broker credentials and only the destination broker's
-own ACLs apply. This is a deliberate, pre-existing property of private clusters,
-but it means a user holding nothing but `topic:consume` can stream a readable
-topic to a broker of their choosing. Operators who care about egress should
-disable private clusters rather than rely on the copy endpoint's RBAC checks.
+A `dest_cluster_config` destination is a private cluster:
+`private_clusters.mode` applies to it before the handler validates or contacts
+it (see [Private clusters](#private-clusters)). Once the mode allows it, RBAC
+does not apply to the destination; the caller supplies their own broker
+credentials and only the destination broker's own ACLs apply. Operators can
+disable private clusters or restrict them to a role to limit copies to
+destinations outside the configured clusters.
 
 **Not transactional, not resumable.** An error leaves the records copied so far
 in the destination topic, and re-running the copy duplicates them.
@@ -652,7 +675,8 @@ All error responses share the `Error` schema from the spec:
 
 `error` is always present. `code` is set where a machine-readable code
 exists; the spec's `Error` schema lists them (`kafka_upstream`,
-`private_cluster_address_blocked`, `invalid_request`, `value_masked`, `production_confirmation_required`,
+`private_cluster_address_blocked`, `private_clusters_disabled`, `private_clusters_forbidden`,
+`invalid_request`, `value_masked`, `production_confirmation_required`,
 `copy_concurrency_limit`, …). RBAC denials add `resource` and `action`, and
 401s from the auth middleware add `message`. Upstream Kafka/Schema Registry
 details are only logged server-side; the response carries
@@ -692,7 +716,7 @@ Status codes used by the server:
 | ---- | --------------------------------------------------------------- |
 | 400  | Request body/query parameter/header is invalid.                 |
 | 401  | Bearer token missing or invalid (see [Base URL and auth](#base-url-and-auth)). |
-| 403  | RBAC denied the action, the broker denied the credential (`kafka_not_authorized`), or the value is masked (`value_masked`). |
+| 403  | RBAC denied the action, the broker denied the credential (`kafka_not_authorized`), the value is masked (`value_masked`), or `private_clusters.mode` refuses private clusters (`private_clusters_disabled`, `private_clusters_forbidden`). |
 | 404  | Cluster/topic/group/subject not found.                          |
 | 409  | Conflict (topic already exists, group not empty, etc.).         |
 | 413  | Produce body over 15 MiB, record too large for the broker, or raw value over 15 MB. |

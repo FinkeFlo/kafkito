@@ -119,7 +119,7 @@ func TestOpenAPI31_ResponseValidation(t *testing.T) {
 	require.Error(t, validate("/healthz", `{"status":"OK"}`), "const")
 
 	me := func(scopes string) string {
-		return `{"user":"","email":"","tenant":"","scopes":` + scopes + `,"roles":null,"permissions":{},"anonymous":true,"jwt":false,"rbac_enabled":false}`
+		return `{"user":"","email":"","tenant":"","scopes":` + scopes + `,"roles":null,"permissions":{},"anonymous":true,"jwt":false,"rbac_enabled":false,"private_clusters":{"mode":"on","allowed":true}}`
 	}
 	require.NoError(t, validate("/api/v1/me", me(`null`)))
 	require.NoError(t, validate("/api/v1/me", me(`["a"]`)))

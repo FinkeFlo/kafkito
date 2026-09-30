@@ -27,7 +27,7 @@ func (s *apiServer) ListClusters(ctx context.Context, _ gen.ListClustersRequestO
 // request body or as the X-Kafkito-Cluster header, with body winning) and
 // reports reachability plus a short capability probe. Used by the frontend
 // settings UI to validate private-cluster credentials before storing them
-// in the browser.
+// in the browser. privateClusterGate applies private_clusters.mode first.
 func (s *apiServer) TestCluster(ctx context.Context, req gen.TestClusterRequestObject) (gen.TestClusterResponseObject, error) {
 	var cfg config.ClusterConfig
 	if req.Body != nil {

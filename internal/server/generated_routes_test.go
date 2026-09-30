@@ -324,6 +324,7 @@ func TestAPIOps_PrivateClusterParam(t *testing.T) {
 	r.Route("/api/v1", func(v1 chi.Router) {
 		v1.Group(func(g chi.Router) {
 			g.Use(rejectInternalClusterNames(errorWriter{}))
+			g.Use(privateClusterGate(impl.privateClusters, errorWriter{}))
 			g.Use(privateClusterMiddleware)
 			g.Use(rbacMiddleware(impl.policy, nil))
 			g.Use(resolvePrivateClusterParam(reg))

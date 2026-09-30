@@ -328,3 +328,32 @@ func TestEnabled_ReflectsCompiledPolicyConfig(t *testing.T) {
 		})
 	}
 }
+
+// private_cluster:use is checked with an empty name. A wildcard rule grants
+// it like any other permission; a rule on another type or action does not.
+func TestAllow_PrivateClusterUse(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		perm config.PermissionConfig
+		want bool
+	}{
+		{"type and action", config.PermissionConfig{Resource: "private_cluster", Actions: []string{"use"}}, true},
+		{"type and all actions", config.PermissionConfig{Resource: "private_cluster", Actions: []string{"*"}}, true},
+		{"type with a name part", config.PermissionConfig{Resource: "private_cluster:anything", Actions: []string{"use"}}, true},
+		{"wildcard resource and all actions", config.PermissionConfig{Resource: "*", Actions: []string{"*"}}, true},
+		{"wildcard resource and use", config.PermissionConfig{Resource: "*", Actions: []string{"use"}}, true},
+		{"wildcard resource and view", config.PermissionConfig{Resource: "*", Actions: []string{"view"}}, false},
+		{"type with another action", config.PermissionConfig{Resource: "private_cluster", Actions: []string{"view"}}, false},
+		{"another type", config.PermissionConfig{Resource: "cluster:*", Actions: []string{"*"}}, false},
+	} {
+		p := Compile(config.RBACConfig{
+			Enabled:  true,
+			Roles:    []config.RoleConfig{{Name: "r", Permissions: []config.PermissionConfig{tc.perm}}},
+			Subjects: []config.SubjectConfig{{User: "u", Roles: []string{"r"}}},
+		})
+		assert.Equal(t, tc.want, p.Allow("u", "", ResourcePrivateCluster, "", ActionUse), tc.name)
+		assert.False(t, p.Allow("other", "", ResourcePrivateCluster, "", ActionUse), "%s: subject without the role", tc.name)
+	}
+}
