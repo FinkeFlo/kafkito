@@ -168,6 +168,11 @@ type fakeMessages struct {
 	consume  func(opts kafkapkg.ConsumeOptions) (*kafkapkg.ConsumeResult, error)
 	count    func(opts kafkapkg.CountMessagesOptions) (*kafkapkg.MessageCountResult, error)
 	timeline func(opts kafkapkg.MessageTimelineOptions) (*kafkapkg.MessageTimelineResult, error)
+	search   func(opts kafkapkg.SearchOptions) (*kafkapkg.SearchResult, error)
+}
+
+func (f fakeMessages) SearchMessages(_ context.Context, _, _ string, opts kafkapkg.SearchOptions) (*kafkapkg.SearchResult, error) {
+	return f.search(opts)
 }
 
 func (f fakeMessages) FetchRawMessageValue(_ context.Context, _, topic string, partition int32, offset int64) (*kafkapkg.RawMessageValue, error) {
@@ -191,6 +196,21 @@ type fakeTopics struct {
 	topicStore
 	topics    []kafkapkg.TopicInfo
 	consumers []kafkapkg.TopicConsumer
+	// writeErr, when set, fails CreateTopic, AlterTopicConfigs and
+	// DeleteRecords.
+	writeErr error
+}
+
+func (f fakeTopics) CreateTopic(context.Context, string, kafkapkg.CreateTopicRequest) error {
+	return f.writeErr
+}
+
+func (f fakeTopics) AlterTopicConfigs(context.Context, string, string, kafkapkg.AlterTopicConfigsRequest) ([]kafkapkg.AlterTopicConfigsResult, error) {
+	return nil, f.writeErr
+}
+
+func (f fakeTopics) DeleteRecords(context.Context, string, string, kafkapkg.DeleteRecordsRequest) ([]kafkapkg.DeleteRecordsResult, error) {
+	return nil, f.writeErr
 }
 
 func (f fakeTopics) ListTopics(context.Context, string) ([]kafkapkg.TopicInfo, error) {

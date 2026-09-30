@@ -41,6 +41,9 @@ func (s *apiServer) CreateGroup(ctx context.Context, req gen.CreateGroupRequestO
 	defer cancel()
 	res, err := s.groups.CreateGroup(ctx, req.Cluster, *req.Body)
 	if err != nil {
+		if blocked := blockedAddressError("create group", err); blocked != nil {
+			return nil, blocked
+		}
 		switch {
 		case errors.Is(err, kafkapkg.ErrUnknownCluster):
 			return nil, clusterError(req.Cluster, "create group", err)
@@ -90,6 +93,9 @@ func (s *apiServer) ResetGroupOffsets(ctx context.Context, req gen.ResetGroupOff
 	defer cancel()
 	res, err := s.groups.ResetOffsets(ctx, req.Cluster, req.Group, *req.Body)
 	if err != nil {
+		if blocked := blockedAddressError("reset group offsets", err); blocked != nil {
+			return nil, blocked
+		}
 		if msg := err.Error(); !errors.Is(err, kafkapkg.ErrUnknownCluster) &&
 			(strings.Contains(msg, "required") || strings.Contains(msg, "unknown strategy") || strings.Contains(msg, "not found")) {
 			return nil, badRequest("kafka: " + msg)

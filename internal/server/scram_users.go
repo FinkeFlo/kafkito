@@ -85,6 +85,9 @@ func (s *apiServer) DeleteScramUser(ctx context.Context, req gen.DeleteScramUser
 // scramError maps a failed SCRAM write: input the registry rejected is a
 // 400 naming the reason, anything else an upstream error.
 func scramError(cluster, op string, err error) error {
+	if blocked := blockedAddressError(op, err); blocked != nil {
+		return blocked
+	}
 	if msg := err.Error(); !errors.Is(err, kafkapkg.ErrUnknownCluster) && isSCRAMClientErr(msg) {
 		return badRequest("kafka: " + msg)
 	}
