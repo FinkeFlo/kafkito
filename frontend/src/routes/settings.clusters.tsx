@@ -31,6 +31,9 @@ import { testCluster } from "@/lib/api";
 import { PrivateClustersNotice } from "@/features/clusters/PrivateClustersNotice";
 import { TestConnectionResult, type TestOutcome } from "@/features/clusters/TestConnectionResult";
 import { TransportSecurityWarning } from "@/features/clusters/TransportSecurityWarning";
+import { ExportClustersModal } from "@/features/clusters/ExportClustersModal";
+import { ImportPassphraseModal } from "@/features/clusters/ImportPassphraseModal";
+import { isEncryptedExport } from "@/lib/private-clusters-export-crypto";
 import { removePrivateClusterQueries } from "@/lib/queries/cluster-key";
 import { useCluster } from "@/lib/use-cluster";
 import { usePrivateClusterAccess } from "@/lib/use-private-cluster-access";
@@ -149,6 +152,12 @@ function ClusterSettingsPage() {
   const [form, setForm] = useState<FormState | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<PrivateCluster | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [pendingExport, setPendingExport] = useState<{ plaintext: string; count: number } | null>(
+    null,
+  );
+  const [encryptedImport, setEncryptedImport] = useState<{ name: string; text: string } | null>(
+    null,
+  );
 
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   // Drop ids for clusters that no longer exist (e.g. after delete or
@@ -199,9 +208,13 @@ function ClusterSettingsPage() {
   const openEdit = (c: PrivateCluster) => setForm(fromPrivateCluster(c));
   const closeForm = () => setForm(null);
 
-  const onExport = () => {
+  const openExport = () => {
     const bundle = exportBundle(selected.size > 0 ? selected : undefined);
-    const blob = new Blob([JSON.stringify(bundle, null, 2)], {
+    setPendingExport({ plaintext: JSON.stringify(bundle, null, 2), count: bundle.clusters.length });
+  };
+
+  const downloadExport = (file: string) => {
+    const blob = new Blob([file], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
@@ -217,20 +230,41 @@ function ClusterSettingsPage() {
 
   const exportLabel = selected.size > 0 ? `Export ${selected.size} selected` : "Export JSON";
 
-  const onImportFile = async (file: File) => {
+  const applyImport = (text: string, description?: string) => {
     try {
-      const text = await file.text();
       const before = listPrivateClusters();
       const res = importBundle(text);
       const after = new Map(listPrivateClusters().map((c) => [c.id, JSON.stringify(c)]));
       for (const c of before) {
         if (after.get(c.id) !== JSON.stringify(c)) removePrivateClusterQueries(qc, c.id);
       }
-      toast.success(`Imported: ${res.added} added, ${res.updated} updated, ${res.skipped} skipped`);
+      toast.success(
+        `Imported: ${res.added} added, ${res.updated} updated, ${res.skipped} skipped`,
+        { description },
+      );
       forceRefresh();
     } catch (e) {
       toast.error(`Import failed: ${(e as Error).message}`);
     }
+  };
+
+  const onImportFile = async (file: File) => {
+    let text: string;
+    try {
+      text = await file.text();
+    } catch (e) {
+      toast.error(`Import failed: ${(e as Error).message}`);
+      return;
+    }
+    if (isEncryptedExport(text)) {
+      setEncryptedImport({ name: file.name, text });
+      return;
+    }
+    // Plaintext files from before exports were encrypted still import.
+    applyImport(
+      text,
+      "This file was not encrypted. Export again for an encrypted copy, and delete the unencrypted file.",
+    );
   };
 
   return (
@@ -254,7 +288,7 @@ function ClusterSettingsPage() {
               variant="secondary"
               size="sm"
               leadingIcon={<Download className="h-4 w-4" aria-hidden />}
-              onClick={onExport}
+              onClick={openExport}
               disabled={items.length === 0}
             >
               {exportLabel}
@@ -422,6 +456,30 @@ function ClusterSettingsPage() {
         />
       )}
 
+      {pendingExport && (
+        <ExportClustersModal
+          count={pendingExport.count}
+          plaintext={pendingExport.plaintext}
+          onClose={() => setPendingExport(null)}
+          onEncrypted={(file) => {
+            setPendingExport(null);
+            downloadExport(file);
+          }}
+        />
+      )}
+
+      {encryptedImport && (
+        <ImportPassphraseModal
+          fileName={encryptedImport.name}
+          fileText={encryptedImport.text}
+          onClose={() => setEncryptedImport(null)}
+          onDecrypted={(plaintext) => {
+            setEncryptedImport(null);
+            applyImport(plaintext);
+          }}
+        />
+      )}
+
       <ConfirmDialog
         open={!!confirmDelete}
         onOpenChange={(o) => !o && setConfirmDelete(null)}
@@ -542,8 +600,8 @@ function ClusterForm({
       }
     >
       <p className="text-sm text-muted">
-        Credentials are stored in this browser's localStorage in plaintext. Use Export/Import to
-        migrate between devices.
+        Credentials are stored unencrypted in this browser's localStorage. Exports are encrypted
+        with a passphrase you choose; use Export/Import to move clusters between devices.
       </p>
       {unavailableId && (
         <PrivateClustersNotice id={unavailableId} mode={privateAccess.mode} className="mt-4" />

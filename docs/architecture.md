@@ -212,8 +212,16 @@ network path can read them. Run kafkito only behind TLS:
 - Anyone who can run script in the page can read them, which is why the CSP
   is strict. On a shared machine, other users of the same browser profile
   can read them too.
-- Users can export and import their clusters as JSON (the export contains
-  the passwords).
+- Users can export and import their clusters. The export file is encrypted
+  with a passphrase the user chooses (at least 12 characters): PBKDF2-SHA-256
+  with 600,000 iterations and a random salt derives an AES-256-GCM key, and
+  the envelope header (format, version, KDF and cipher parameters) is
+  authenticated as additional data
+  (`frontend/src/lib/private-clusters-export-crypto.ts`). The file cannot be
+  opened without the passphrase, and kafkito cannot recover a lost one.
+  Import still accepts the plaintext files that earlier versions wrote.
+  WebCrypto needs a secure context, so exporting and importing an encrypted
+  file only work over HTTPS or on localhost.
 - The storage format is kept stable: `private-clusters-v1-compat.test.ts`
   and the `private-cluster-storage` e2e walk pin the stored shape.
 
