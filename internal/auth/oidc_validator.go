@@ -9,8 +9,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
-	"time"
 
 	"github.com/lestrrat-go/jwx/v3/jws"
 	"github.com/lestrrat-go/jwx/v3/jwt"
@@ -18,9 +16,9 @@ import (
 
 // OIDCConfig configures a generic OIDC JWT validator.
 type OIDCConfig struct {
-	// IssuerURL is the expected "iss" claim. Tokens whose iss does not equal
-	// this value (or, for compatibility with multi-tenant IdPs, sit immediately
-	// under it via "<IssuerURL>/...") are rejected.
+	// IssuerURL is the expected "iss" claim. Tokens whose iss is not exactly
+	// this string are rejected; nothing is normalized, so a trailing slash
+	// counts.
 	IssuerURL string
 	// Audience is the expected "aud" claim. Tokens whose aud claim does not
 	// contain this value are rejected.
@@ -31,7 +29,10 @@ type OIDCConfig struct {
 	JWKSEndpoint string
 }
 
-// OIDCValidator validates RS-signed JWTs against a fixed issuer/audience and
+// errIssuerMismatch rejects a token whose iss is not exactly IssuerURL.
+var errIssuerMismatch = errors.New("iss does not match the configured issuer")
+
+// OIDCValidator validates asymmetrically signed JWTs against a fixed issuer/audience and
 // a JWKS endpoint. Use this as the default "mock" mode validator, and as a
 // drop-in for any OIDC IdP that publishes a JWKS URL.
 type OIDCValidator struct {
@@ -71,7 +72,8 @@ func (o *OIDCValidator) Close() {
 	o.keys.Close()
 }
 
-// Validate parses and signature-verifies raw, then enforces iss/aud/exp/nbf.
+// Validate parses and signature-verifies raw (see ParseToken for the
+// algorithm and exp/nbf/sub rules), then enforces iss and aud.
 func (o *OIDCValidator) Validate(ctx context.Context, raw string) (*Principal, error) {
 	if raw == "" {
 		return nil, errors.New("empty bearer token")
@@ -82,18 +84,13 @@ func (o *OIDCValidator) Validate(ctx context.Context, raw string) (*Principal, e
 		return nil, fmt.Errorf("fetch jwks: %w", err)
 	}
 
-	tok, err := jwt.Parse([]byte(raw),
-		jwt.WithKeySet(set),
-		jwt.WithValidate(true),
-		jwt.WithAcceptableSkew(60*time.Second),
-	)
+	tok, err := ParseToken(raw, set)
 	if err != nil {
-		return nil, fmt.Errorf("verify jwt: %w", err)
+		return nil, err
 	}
 
-	iss, issOK := tok.Issuer()
-	if !issOK || (iss != o.cfg.IssuerURL && !strings.HasPrefix(iss, o.cfg.IssuerURL+"/")) {
-		return nil, fmt.Errorf("iss %q not under %q", iss, o.cfg.IssuerURL)
+	if iss, ok := tok.Issuer(); !ok || iss != o.cfg.IssuerURL {
+		return nil, errIssuerMismatch
 	}
 
 	auds, _ := tok.Audience()

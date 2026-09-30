@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -29,10 +31,10 @@ const algNoneToken = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0." + // gitleaks:allow
 // newOIDCValidator returns a generic mock issuer (no scope prefix, no zid)
 // wired up to a freshly constructed OIDCValidator. The audience is fixed to
 // "test-audience" so callers can mint matching/mismatching tokens.
-func newOIDCValidator(t *testing.T) (*auth.MockOIDC, *auth.OIDCValidator, string) {
+func newOIDCValidator(t *testing.T, opts ...auth.MockOIDCOption) (*auth.MockOIDC, *auth.OIDCValidator, string) {
 	t.Helper()
 
-	mock, err := auth.NewMockOIDC()
+	mock, err := auth.NewMockOIDC(opts...)
 	require.NoError(t, err, "NewMockOIDC")
 	t.Cleanup(mock.Close)
 
@@ -118,18 +120,124 @@ func TestNewOIDCValidator_RejectsMissingConfigFields(t *testing.T) {
 	}
 }
 
-func TestOIDCValidator_AcceptsMultiTenantIssuerPrefix(t *testing.T) {
+// The issuer must match IssuerURL exactly: no sub-path, no trailing-slash
+// normalization.
+func TestOIDCValidator_RejectsIssuerThatIsNotAnExactMatch(t *testing.T) {
 	t.Parallel()
 
-	mock, v, aud := newOIDCValidator(t)
-	tenantIss := mock.Server.URL + "/tenant-42"
-	tok, err := mock.Issue("user-mt", aud, tenantIss, []string{"read"}, nil)
+	cases := []struct {
+		name   string
+		issuer func(base string) string
+	}{
+		{name: "tenant_sub_path", issuer: func(base string) string { return base + "/tenant-42" }},
+		{name: "trailing_slash", issuer: func(base string) string { return base + "/" }},
+		{name: "prefix_without_boundary", issuer: func(base string) string { return base + "0" }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mock, v, aud := newOIDCValidator(t)
+			tok, err := mock.Issue("user-mt", aud, tc.issuer(mock.Server.URL), []string{"read"}, nil)
+			require.NoError(t, err, "Issue")
+
+			_, err = v.Validate(context.Background(), tok)
+
+			require.ErrorContains(t, err, "iss", "Validate must reject an iss that is not exactly IssuerURL")
+			assert.NotContains(t, err.Error(), mock.Server.URL, "the error must not echo the claim")
+		})
+	}
+}
+
+func TestOIDCValidator_TrailingSlashInIssuerURLMustMatchExactly(t *testing.T) {
+	t.Parallel()
+
+	mock, err := auth.NewMockOIDC()
+	require.NoError(t, err, "NewMockOIDC")
+	t.Cleanup(mock.Close)
+	v, err := auth.NewOIDCValidator(auth.OIDCConfig{
+		IssuerURL:    mock.Server.URL + "/",
+		Audience:     "aud",
+		JWKSEndpoint: mock.JKU(),
+	})
+	require.NoError(t, err, "NewOIDCValidator")
+	t.Cleanup(v.Close)
+
+	withSlash, err := mock.Issue("u", "aud", mock.Server.URL+"/", nil, nil)
+	require.NoError(t, err, "Issue")
+	withoutSlash, err := mock.Issue("u", "aud", mock.Server.URL, nil, nil)
 	require.NoError(t, err, "Issue")
 
-	p, err := v.Validate(context.Background(), tok)
+	_, err = v.Validate(context.Background(), withSlash)
+	require.NoError(t, err, "the configured issuer with its slash is accepted")
+	_, err = v.Validate(context.Background(), withoutSlash)
+	require.ErrorContains(t, err, "iss", "the issuer without the slash is a different issuer")
+}
 
-	require.NoError(t, err, "Validate must accept iss that sits under the configured IssuerURL")
-	assert.Equal(t, "user-mt", p.Subject)
+// Keys published without "alg" are usable: the algorithm is inferred from the
+// key type and must match the token header.
+func TestOIDCValidator_KeyWithoutAlg_AcceptsAsymmetricAlgorithms(t *testing.T) {
+	t.Parallel()
+
+	for _, alg := range []jwa.SignatureAlgorithm{jwa.RS256(), jwa.RS512(), jwa.PS256()} {
+		t.Run(alg.String(), func(t *testing.T) {
+			t.Parallel()
+
+			mock, v, aud := newOIDCValidator(t, auth.WithoutJWKAlg())
+			tok, err := mock.Token("u", aud, mock.Server.URL).Alg(alg).Sign()
+			require.NoError(t, err, "Sign")
+
+			p, err := v.Validate(context.Background(), tok)
+
+			require.NoError(t, err, "Validate")
+			assert.Equal(t, "u", p.Subject)
+		})
+	}
+}
+
+// Algorithm pinning: HMAC and none are never accepted, and a key's own alg
+// wins over the token header.
+func TestOIDCValidator_RejectsAlgorithmOutsidePolicy(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		keyAlg   bool // the JWKS key carries alg=RS256
+		alg      jwa.SignatureAlgorithm
+		rawToken string
+	}{
+		{name: "hs256_with_public_key", keyAlg: true, alg: jwa.HS256()},
+		{name: "hs256_with_public_key_key_without_alg", keyAlg: false, alg: jwa.HS256()},
+		{name: "hs512_with_public_key_key_without_alg", keyAlg: false, alg: jwa.HS512()},
+		{name: "header_alg_differs_from_key_alg", keyAlg: true, alg: jwa.RS512()},
+		{name: "header_ps256_key_rs256", keyAlg: true, alg: jwa.PS256()},
+		{name: "alg_none", keyAlg: true, rawToken: algNoneToken},
+		{name: "alg_none_key_without_alg", keyAlg: false, rawToken: algNoneToken},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var opts []auth.MockOIDCOption
+			if !tc.keyAlg {
+				opts = append(opts, auth.WithoutJWKAlg())
+			}
+			mock, v, aud := newOIDCValidator(t, opts...)
+			tok := tc.rawToken
+			if tok == "" {
+				var err error
+				tok, err = mock.Token("u", aud, mock.Server.URL).Alg(tc.alg).Sign()
+				require.NoError(t, err, "Sign")
+			}
+
+			_, err := v.Validate(context.Background(), tok)
+
+			require.Error(t, err, "Validate must reject the algorithm")
+			if tc.rawToken == "" {
+				assert.ErrorContains(t, err, "token alg", "the algorithm policy must reject it")
+			}
+		})
+	}
 }
 
 func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
@@ -195,6 +303,47 @@ func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Issue")
 				return tok
 			},
+		},
+		{
+			name: "missing_exp",
+			issue: func(t *testing.T, mock *auth.MockOIDC, aud string) string {
+				t.Helper()
+				tok, err := mock.Token("u", aud, mock.Server.URL).Without(jwt.ExpirationKey).Sign()
+				require.NoError(t, err, "Sign")
+				return tok
+			},
+			wantErrSubstring: "exp",
+		},
+		{
+			name: "missing_sub",
+			issue: func(t *testing.T, mock *auth.MockOIDC, aud string) string {
+				t.Helper()
+				tok, err := mock.Token("u", aud, mock.Server.URL).Without(jwt.SubjectKey).Sign()
+				require.NoError(t, err, "Sign")
+				return tok
+			},
+			wantErrSubstring: "sub",
+		},
+		{
+			name: "empty_sub",
+			issue: func(t *testing.T, mock *auth.MockOIDC, aud string) string {
+				t.Helper()
+				tok, err := mock.Token("", aud, mock.Server.URL).Sign()
+				require.NoError(t, err, "Sign")
+				return tok
+			},
+			wantErrSubstring: "sub",
+		},
+		{
+			name: "nbf_in_the_future",
+			issue: func(t *testing.T, mock *auth.MockOIDC, aud string) string {
+				t.Helper()
+				tok, err := mock.Token("u", aud, mock.Server.URL).
+					Claim(jwt.NotBeforeKey, time.Now().Add(10*time.Minute).Unix()).Sign()
+				require.NoError(t, err, "Sign")
+				return tok
+			},
+			wantErrSubstring: "nbf",
 		},
 		{
 			name:     "malformed_token_garbage",
