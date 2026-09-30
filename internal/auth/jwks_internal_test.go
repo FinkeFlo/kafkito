@@ -12,6 +12,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -381,25 +382,29 @@ func TestKeySource_FailedFetchLog_HidesTokenSuppliedURL(t *testing.T) {
 	t.Parallel()
 
 	for _, hide := range []bool{false, true} {
-		js := newJWKSServer(t, "k1")
-		js.fail(http.StatusInternalServerError)
-		var opts []KeySourceOption
-		if hide {
-			opts = append(opts, WithURLHiddenInLogs())
-		}
-		s := NewKeySource(js.url(), opts...)
-		var logs bytes.Buffer
-		s.logger = slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
-		t.Cleanup(s.Close)
+		t.Run(fmt.Sprintf("hide=%t", hide), func(t *testing.T) {
+			t.Parallel()
 
-		_, err := s.Keys(context.Background(), "k1")
-		require.ErrorIs(t, err, ErrKeysUnavailable)
+			js := newJWKSServer(t, "k1")
+			js.fail(http.StatusInternalServerError)
+			var opts []KeySourceOption
+			if hide {
+				opts = append(opts, WithURLHiddenInLogs())
+			}
+			s := NewKeySource(js.url(), opts...)
+			var logs bytes.Buffer
+			s.logger = slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+			t.Cleanup(s.Close)
 
-		require.Contains(t, logs.String(), "jwks fetch failed")
-		if hide {
-			assert.NotContains(t, logs.String(), js.srv.Listener.Addr().String(), "a token-supplied URL must not reach the log")
-		} else {
-			assert.Contains(t, logs.String(), js.url(), "a configured URL is logged")
-		}
+			_, err := s.Keys(context.Background(), "k1")
+			require.ErrorIs(t, err, ErrKeysUnavailable)
+
+			require.Contains(t, logs.String(), "jwks fetch failed")
+			if hide {
+				assert.NotContains(t, logs.String(), js.srv.Listener.Addr().String(), "a token-supplied URL must not reach the log")
+			} else {
+				assert.Contains(t, logs.String(), js.url(), "a configured URL is logged")
+			}
+		})
 	}
 }

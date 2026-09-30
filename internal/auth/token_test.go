@@ -159,3 +159,20 @@ func signRS256(t *testing.T, priv *rsa.PrivateKey, kid string, claims map[string
 	require.NoError(t, err)
 	return string(signed)
 }
+
+// A verified token whose claim set cannot be decoded is a claims failure, not
+// a signature failure.
+func TestParseToken_UndecodableClaim_IsAClaimsFailure(t *testing.T) {
+	t.Parallel()
+
+	priv, set := newRSAKeySet(t, true)
+	hdr := jws.NewHeaders()
+	require.NoError(t, hdr.Set(jws.KeyIDKey, "k1"))
+	payload := []byte(`{"sub":"u","exp":"not-a-time"}`)
+	signed, err := jws.Sign(payload, jws.WithKey(jwa.RS256(), priv, jws.WithProtectedHeaders(hdr)))
+	require.NoError(t, err)
+
+	_, err = auth.ParseToken(string(signed), set)
+
+	require.ErrorIs(t, err, auth.ErrTokenClaims)
+}

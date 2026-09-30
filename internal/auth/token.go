@@ -58,7 +58,8 @@ var (
 	ErrTokenNotYetValid = errors.New("token not yet valid (nbf)")
 	// ErrTokenIssuedAt rejects a token whose iat lies in the future.
 	ErrTokenIssuedAt = errors.New("token iat is in the future")
-	// ErrTokenClaims rejects a claim set that fails any other validation.
+	// ErrTokenClaims is the catch-all for a verified token whose claim set
+	// cannot be decoded or fails a validation not named above.
 	ErrTokenClaims = errors.New("token claims invalid")
 	// ErrSubMissing rejects a token without a non-empty sub claim.
 	ErrSubMissing = errors.New("sub claim missing")
@@ -98,7 +99,7 @@ func ParseToken(raw string, set jwk.Set) (jwt.Token, error) {
 		jwt.WithKeySet(set, jws.WithInferAlgorithmFromKey(true)),
 		jwt.WithValidate(true),
 		jwt.WithAcceptableSkew(clockSkew),
-		jwt.WithRequiredClaim(jwt.ExpirationKey),
+		jwt.WithRequiredClaim(jwt.ExpirationKey), // jwtError maps a missing required claim to ErrExpMissing
 	)
 	if err != nil {
 		return nil, jwtError(err)
@@ -120,11 +121,13 @@ func jwtError(err error) error {
 	case errors.Is(err, jwt.InvalidIssuedAtError()):
 		return ErrTokenIssuedAt
 	case errors.Is(err, jwt.MissingRequiredClaimError()):
-		return ErrExpMissing // exp is the only claim ParseToken requires
-	case errors.Is(err, jwt.ValidateError()):
-		return ErrTokenClaims
-	default:
+		// exp is the only claim ParseToken requires; a second required
+		// claim needs its own sentinel here.
+		return ErrExpMissing
+	case errors.Is(err, jws.VerifyError()), errors.Is(err, jws.VerificationError()):
 		return ErrTokenInvalid
+	default:
+		return ErrTokenClaims
 	}
 }
 
