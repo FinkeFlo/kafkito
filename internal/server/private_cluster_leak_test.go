@@ -263,7 +263,7 @@ func TestPrivateClusterMessages_RepeatNoSubmittedValue(t *testing.T) {
 	defs := []struct {
 		name   string
 		cfg    config.ClusterConfig
-		want   string // checked where the request validator does not answer first
+		want   string
 		absent []string
 	}{
 		{
@@ -303,6 +303,11 @@ func TestPrivateClusterMessages_RepeatNoSubmittedValue(t *testing.T) {
 				Auth:    config.AuthConfig{Type: "echo-auth-marker", Username: "u", Password: leakPassword},
 			},
 			absent: []string{"echo-auth-marker", leakPassword},
+		},
+		{
+			name: "too many brokers", cfg: config.ClusterConfig{Brokers: manyBrokers(60)},
+			want:   "too many brokers (max 50)",
+			absent: []string{"echo-broker", "example.test", "9092"},
 		},
 	}
 	source := encodeHeader(t, config.ClusterConfig{Brokers: []string{unreachableBroker}})
@@ -351,9 +356,10 @@ func TestPrivateClusterMessages_RepeatNoSubmittedValue(t *testing.T) {
 
 				require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 				body := rec.Body.String()
-				if d.want != "" {
+				switch {
+				case d.want != "":
 					assert.Contains(t, body, d.want)
-				} else if !p.validated {
+				case !p.validated:
 					assert.Contains(t, body, "auth.type not supported")
 				}
 				for _, s := range d.absent {

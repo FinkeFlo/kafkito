@@ -28,6 +28,12 @@ const PrivateClusterHeader = "X-Kafkito-Cluster"
 // bound memory and quickly reject obvious abuse.
 const maxPrivateClusterHeaderBytes = 8 * 1024
 
+// maxBrokersPerCluster caps the brokers of a private cluster definition (the
+// X-Kafkito-Cluster header, a Test connection body, a dest_cluster_config).
+// It is checked in code on every path; the OpenAPI document states the
+// limit in the description only, so the request contract stays compatible.
+const maxBrokersPerCluster = 50
+
 // rejectInternalClusterNames answers a {cluster} path value in the internal
 // namespace of private clusters (config.AdhocClusterPrefix) with the 404 of
 // any unknown cluster, before RBAC or a handler sees the name. Such names
@@ -47,7 +53,33 @@ func rejectInternalClusterNames(errs errorWriter) func(http.Handler) http.Handle
 	}
 }
 
-type privateCtxKey struct{}
+type (
+	privateCtxKey       struct{}
+	hostValidatorCtxKey struct{}
+)
+
+// hostValidatorMiddleware gives each request one netguard.HostValidator that
+// resolves with lookup (nil: the default resolver). Every cluster definition
+// of the request (the X-Kafkito-Cluster header, a Test connection body, a
+// dest_cluster_config) is checked with it, so each distinct host is resolved
+// at most once per request.
+func hostValidatorMiddleware(lookup netguard.LookupFunc) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := context.WithValue(r.Context(), hostValidatorCtxKey{}, netguard.NewHostValidator(lookup))
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+// requestHostValidator returns the HostValidator of the request (see
+// hostValidatorMiddleware), or a new one.
+func requestHostValidator(ctx context.Context) *netguard.HostValidator {
+	if v, ok := ctx.Value(hostValidatorCtxKey{}).(*netguard.HostValidator); ok {
+		return v
+	}
+	return netguard.NewHostValidator(nil)
+}
 
 // privateClusterMiddleware inspects the PrivateClusterHeader on every request.
 // When present it decodes and validates a ClusterConfig and stashes it in the
@@ -110,25 +142,33 @@ func validatePrivateClusterConfig(ctx context.Context, cfg config.ClusterConfig)
 	return validateClusterPolicy(ctx, cfg)
 }
 
-// validateClusterPolicy checks the rules the OpenAPI document does not
-// express: non-blank broker addresses, the outbound-host (SSRF) policy for
-// broker and Schema Registry hosts, and the credentials a SASL mechanism
-// requires. It also rejects unknown auth types, which only the
-// X-Kafkito-Cluster header can carry: that header is not schema-validated
-// and accepts auth.type case-insensitively and trimmed, while request
-// bodies are held to the spec's lowercase enum by the request validator.
+// validateClusterPolicy checks the rules of a cluster definition that the
+// OpenAPI document does not express, or does not apply to the
+// X-Kafkito-Cluster header because the header is not schema-validated: at
+// most maxBrokersPerCluster brokers, non-blank broker addresses, the
+// outbound-host (SSRF) policy for broker and Schema Registry hosts, and the
+// credentials a SASL mechanism requires. It also rejects unknown auth
+// types, which only the header can carry: it accepts auth.type
+// case-insensitively and trimmed, while request bodies are held to the
+// spec's lowercase enum by the request validator.
+//
+// The broker count is checked before any host is resolved; the host checks
+// use the request's HostValidator (requestHostValidator).
 //
 // Its messages are fixed texts that name a broker by its 1-based position.
 // They never repeat a submitted value (host, URL, auth type), a resolved
 // address or a resolver error, because the caller returns them to the
 // client.
 func validateClusterPolicy(ctx context.Context, cfg config.ClusterConfig) error {
-	return validateClusterPolicyWith(ctx, cfg, netguard.NewHostValidator(nil))
+	return validateClusterPolicyWith(ctx, cfg, requestHostValidator(ctx))
 }
 
 // validateClusterPolicyWith is validateClusterPolicy with the host checks
 // of v, which resolves each distinct host once.
 func validateClusterPolicyWith(ctx context.Context, cfg config.ClusterConfig, v *netguard.HostValidator) error {
+	if len(cfg.Brokers) > maxBrokersPerCluster {
+		return fmt.Errorf("too many brokers (max %d)", maxBrokersPerCluster)
+	}
 	for i, b := range cfg.Brokers {
 		b = strings.TrimSpace(b)
 		if b == "" {

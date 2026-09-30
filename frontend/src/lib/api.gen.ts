@@ -136,12 +136,19 @@ export interface paths {
          *     A definition that fails validation is a 400. Its message names a
          *     broker by its 1-based position in `brokers` and never repeats a
          *     submitted value, for example `broker 2: host name could not be
-         *     resolved` or `schema_registry.url: invalid URL`.
+         *     resolved` or `schema_registry.url: invalid URL`. A definition names
+         *     at most 50 brokers.
          *
          *     The probed definition is a private cluster, so `private_clusters.mode`
          *     applies: 403 `private_clusters_disabled` or
          *     `private_clusters_forbidden` when the caller may not use private
          *     clusters. No other RBAC permission is required.
+         *
+         *     Each caller may send 10 requests at once, then one every 6 seconds;
+         *     more get 429 `rate_limited` (see the response). The caller is the
+         *     verified principal of the request, else the client address of the
+         *     connection; request headers do not count. A request the mode refuses
+         *     does not count.
          */
         post: operations["testCluster"];
         delete?: never;
@@ -154,7 +161,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -177,7 +184,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -200,7 +207,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -226,7 +233,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -250,7 +257,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -275,7 +282,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -303,7 +310,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -327,7 +334,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -351,7 +358,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -417,7 +424,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -445,7 +452,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -474,7 +481,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -524,7 +531,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -553,7 +560,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -577,7 +584,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -649,7 +656,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -679,7 +686,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -709,7 +716,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -737,7 +744,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -760,7 +767,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -784,7 +791,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -809,7 +816,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -835,7 +842,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -860,7 +867,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -889,7 +896,7 @@ export interface paths {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -917,7 +924,7 @@ export interface components {
         Error: {
             /** @description Human-readable message (`unauthorized`, `forbidden`, `not found`, ...). */
             error: string;
-            /** @description Machine-readable code where one exists, e.g. `kafka_upstream`, `private_cluster_address_blocked`, `private_clusters_disabled`, `private_clusters_forbidden`, `production_confirmation_required`, `copy_concurrency_limit`, `kafka_message_too_large`, `kafka_not_authorized`, `rbac_denied`, `topic_consumers_timeout`, `value_masked`, `invalid_request` (the request does not match this document; `error` names the parameter or body field and the violated rule, never the submitted value). */
+            /** @description Machine-readable code where one exists, e.g. `kafka_upstream`, `private_cluster_address_blocked`, `private_clusters_disabled`, `private_clusters_forbidden`, `production_confirmation_required`, `copy_concurrency_limit`, `rate_limited`, `kafka_message_too_large`, `kafka_not_authorized`, `rbac_denied`, `topic_consumers_timeout`, `value_masked`, `invalid_request` (the request does not match this document; `error` names the parameter or body field and the violated rule, never the submitted value). */
             code?: string;
             /** @description Detail for 401 responses from the auth middleware. */
             message?: string;
@@ -1459,6 +1466,7 @@ export interface components {
         ClusterConfig: {
             name?: string;
             is_prod?: boolean;
+            /** @description Seed broker addresses (`host:port`), at most 50. A definition with more gets 400 `too many brokers (max 50)`. */
             brokers: string[];
             auth?: {
                 /**
@@ -1829,7 +1837,7 @@ export interface components {
         Topic: string;
         Group: string;
         Subject: string;
-        /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+        /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
         PrivateClusterHeader: string;
         /** @description Must be `true` when the target cluster is marked `is_prod`; the request is rejected with 428 otherwise. Send only after explicit user confirmation. */
         ProdConfirmHeader: "true";
@@ -1993,7 +2001,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path?: never;
@@ -2018,13 +2026,25 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            /** @description The caller sent more than 10 Test connection requests in a burst or more than one every 6 seconds after that. The body is `{"error": "too many requests", "code": "rate_limited"}`. */
+            429: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    /** @description Whole seconds until the next request is accepted. */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     getCapabilities: {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2056,7 +2076,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2088,7 +2108,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2120,7 +2140,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2152,7 +2172,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2188,7 +2208,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2221,7 +2241,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
                 /** @description Must be `true` when the target cluster is marked `is_prod`; the request is rejected with 428 otherwise. Send only after explicit user confirmation. */
                 "X-Kafkito-Confirm-Prod"?: components["parameters"]["ProdConfirmHeader"];
@@ -2257,7 +2277,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2300,7 +2320,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2337,7 +2357,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
                 /** @description Must be `true` when the target cluster is marked `is_prod`; the request is rejected with 428 otherwise. Send only after explicit user confirmation. */
                 "X-Kafkito-Confirm-Prod"?: components["parameters"]["ProdConfirmHeader"];
@@ -2394,7 +2414,7 @@ export interface operations {
                 cursor?: string;
             };
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2427,7 +2447,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
                 /** @description Must be `true` when the target cluster is marked `is_prod`; the request is rejected with 428 otherwise. Send only after explicit user confirmation. */
                 "X-Kafkito-Confirm-Prod"?: components["parameters"]["ProdConfirmHeader"];
@@ -2477,7 +2497,7 @@ export interface operations {
                 to_ts_ms?: components["parameters"]["ToTsMsQuery"];
             };
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2519,7 +2539,7 @@ export interface operations {
                 slot_ms: number;
             };
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2555,7 +2575,7 @@ export interface operations {
                 decoded?: boolean;
             };
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2612,7 +2632,7 @@ export interface operations {
                 partition?: components["parameters"]["PartitionQuery"];
             };
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2645,7 +2665,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2682,7 +2702,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
                 /** @description Must be `true` when the target cluster is marked `is_prod`; the request is rejected with 428 otherwise. Send only after explicit user confirmation. */
                 "X-Kafkito-Confirm-Prod"?: components["parameters"]["ProdConfirmHeader"];
@@ -2758,7 +2778,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2790,7 +2810,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2836,7 +2856,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2869,7 +2889,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2902,7 +2922,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
                 /** @description Must be `true` when the target cluster is marked `is_prod`; the request is rejected with 428 otherwise. Send only after explicit user confirmation. */
                 "X-Kafkito-Confirm-Prod"?: components["parameters"]["ProdConfirmHeader"];
@@ -2942,7 +2962,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -2977,7 +2997,7 @@ export interface operations {
                 permanent?: boolean;
             };
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -3010,7 +3030,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -3043,7 +3063,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -3080,7 +3100,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -3115,7 +3135,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -3147,7 +3167,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -3183,7 +3203,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -3219,7 +3239,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -3251,7 +3271,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {
@@ -3290,7 +3310,7 @@ export interface operations {
                 mechanism?: "SCRAM-SHA-256" | "SCRAM-SHA-512";
             };
             header?: {
-                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
+                /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header or a definition that fails validation is rejected with 400; the message names the field and a fixed reason, a broker by its 1-based position, and never repeats a value from the header. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
             };
             path: {

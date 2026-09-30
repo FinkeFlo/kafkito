@@ -10,6 +10,7 @@ import (
 	"net/netip"
 	"net/url"
 	"strings"
+	"sync"
 )
 
 // Errors of the pre-flight checks. Their texts are fixed: they never contain
@@ -36,16 +37,18 @@ var (
 type LookupFunc func(ctx context.Context, host string) ([]string, error)
 
 // HostValidator runs the pre-flight checks of ValidateHost and ValidateURL
-// for one request. It keeps the result per host, so a definition that names
-// the same host several times costs one lookup. It is not safe for
-// concurrent use.
+// for one request. It keeps the result per host, so the definitions of a
+// request that name the same host several times cost one lookup. It is safe
+// for concurrent use; checks run one at a time.
 //
 // These checks turn obviously unsafe destinations into a validation error
 // before any connection is attempted. They are not the enforcement point:
 // DNS can change between the check and the dial, so outbound connections
 // must still go through GuardedDialContext.
 type HostValidator struct {
-	lookup  LookupFunc
+	lookup LookupFunc
+
+	mu      sync.Mutex
 	results map[string]error
 }
 
@@ -73,6 +76,8 @@ func (v *HostValidator) Host(ctx context.Context, host string) error {
 		return ErrEmptyHost
 	}
 	key := strings.ToLower(host)
+	v.mu.Lock()
+	defer v.mu.Unlock()
 	if err, ok := v.results[key]; ok {
 		return err
 	}

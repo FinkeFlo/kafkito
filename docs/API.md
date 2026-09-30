@@ -90,6 +90,9 @@ The server keeps nothing between requests.
   example `X-Kafkito-Cluster: broker 2: host name could not be resolved`;
   it repeats no value from the definition. Neither the raw header nor the
   credentials in it appear in a response or a log line.
+- A definition names at most 50 brokers. More get `400`
+  `too many brokers (max 50)`, prefixed with `X-Kafkito-Cluster: ` or
+  `dest_cluster_config: ` where the definition comes from there.
 - Responses and error messages name a private cluster `__private__`, for
   example in the `cluster` field. Only `__private__` with the header
   selects it; no other `{cluster}` value does.
@@ -102,7 +105,8 @@ The server keeps nothing between requests.
   the cluster advertises; a broker that is blocked for private clusters or
   does not answer is listed in `broker_issues`, and `reachable` is false.
   At most 64 brokers are checked; `brokers_skipped` counts the rest. See
-  [Test connection](#test-connection) for the error classes.
+  [Test connection](#test-connection) for the error classes and the rate
+  limit.
 
 ```bash
 PRIVATE=$(printf '%s' '{"name":"mine","brokers":["broker.example.com:9092"],"auth":{"type":"none"},"tls":{"enabled":false}}' | base64 | tr -d '\n')
@@ -137,6 +141,20 @@ curl -s -X POST "$BASE/api/v1/clusters/_test" -H 'Content-Type: application/json
   -d '{"brokers":["broker.example.com:9092"],"auth":{"type":"none"},"tls":{"enabled":true}}' \
   | jq '{reachable, error_class, error}'
 ```
+
+Test connection is rate limited per caller: 10 requests at once, then one
+every 6 seconds. A request over the limit gets `429` with a `Retry-After`
+header in whole seconds:
+
+```json
+{ "error": "too many requests", "code": "rate_limited" }
+```
+
+The caller is the principal of the bearer token (its user name, else its
+subject) or, without one, the client address of the connection. No request
+header counts, `X-Kafkito-User` and `X-Forwarded-For` included, so behind a
+reverse proxy without authentication all callers share one limit. A request
+that `private_clusters.mode` refuses gets its `403` and does not count.
 
 ## Contract and live docs
 
@@ -722,7 +740,7 @@ All error responses share the `Error` schema from the spec:
 exists; the spec's `Error` schema lists them (`kafka_upstream`,
 `private_cluster_address_blocked`, `private_clusters_disabled`, `private_clusters_forbidden`,
 `invalid_request`, `value_masked`, `production_confirmation_required`,
-`copy_concurrency_limit`, …). RBAC denials add `resource` and `action`, and
+`copy_concurrency_limit`, `rate_limited`, …). RBAC denials add `resource` and `action`, and
 401s from the auth middleware add `message`. Upstream Kafka/Schema Registry
 details are only logged server-side; the response carries
 `"error": "upstream kafka error"`. A private cluster whose broker or Schema
@@ -766,7 +784,7 @@ Status codes used by the server:
 | 409  | Conflict (topic already exists, group not empty, etc.).         |
 | 413  | Produce body over 15 MiB, record too large for the broker, or raw value over 15 MB. |
 | 428  | Production cluster needs `X-Kafkito-Confirm-Prod: true`.        |
-| 429  | Too many concurrent long-running jobs (e.g. topic copies).      |
+| 429  | Too many concurrent long-running jobs (e.g. topic copies), or too many Test connection requests (`rate_limited`). |
 | 502  | Kafka broker or Schema Registry returned an error.              |
 | 504  | Request to Kafka/SR timed out.                                  |
 
