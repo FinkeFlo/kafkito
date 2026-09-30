@@ -52,6 +52,8 @@ type Config struct {
 	RBAC     RBACConfig      `koanf:"rbac"`
 	Auth     AppAuthConfig   `koanf:"auth"`
 	Log      LogConfig       `koanf:"log"`
+
+	PrivateClusters PrivateClustersConfig `koanf:"private_clusters"`
 }
 
 // Log levels and formats accepted by LogConfig.
@@ -400,6 +402,8 @@ func Defaults() Config {
 			FrameAncestors:        DefaultFrameAncestors,
 		},
 		Log: LogConfig{Level: LogLevelInfo, Format: LogFormatJSON},
+
+		PrivateClusters: PrivateClustersConfig{Mode: PrivateClustersOn},
 	}
 }
 
@@ -435,6 +439,14 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("merge env: %w", err)
 	}
 
+	// The YAML parser reads true and false as booleans, which Unmarshal
+	// would turn into "1" and "0".
+	if b, ok := k.Get(privateClustersModeKey).(bool); ok {
+		if err := k.Set(privateClustersModeKey, string(privateClusterModeOf(b))); err != nil {
+			return Config{}, fmt.Errorf("set %s: %w", privateClustersModeKey, err)
+		}
+	}
+
 	var out Config
 	if err := k.Unmarshal("", &out); err != nil {
 		return Config{}, fmt.Errorf("unmarshal: %w", err)
@@ -461,6 +473,9 @@ func (c Config) Validate() error {
 		return err
 	}
 	if err := c.Auth.validate(); err != nil {
+		return err
+	}
+	if err := c.PrivateClusters.validate(c.RBAC.Enabled); err != nil {
 		return err
 	}
 	seen := make(map[string]struct{}, len(c.Clusters))
@@ -529,6 +544,7 @@ var envKeyAliases = map[string]string{
 	"KAFKITO_AUTH_OIDC_JWKS_URL":      "auth.oidc.jwks_url",
 	"KAFKITO_AUTH_OIDC_REQUIRED_TYP":  "auth.oidc.required_typ",
 	"KAFKITO_AUTH_OIDC_ALLOWED_AZP":   "auth.oidc.allowed_azp",
+	"KAFKITO_PRIVATE_CLUSTERS":        privateClustersModeKey,
 }
 
 // envListKeys are aliased keys whose value is a comma-separated list.
