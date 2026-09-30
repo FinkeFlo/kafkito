@@ -78,7 +78,9 @@ type Connections struct {
 	srDecoders map[string]*SRDecoder
 
 	// adhocDial, when non-nil, replaces netguard.GuardedDialContext as the
-	// guarded dial of ad-hoc clusters (TLS still wraps it). Tests set it,
+	// guarded dial of ad-hoc clusters (TLS still wraps it). Never set it
+	// outside tests: a func that is not a netguard guarded dial disables
+	// the SSRF guard for every private cluster. Tests set it,
 	// before the first client is built, to a netguard.GuardedDialWith whose
 	// resolver and dial redirect a test host to a local fake broker. It is a
 	// field rather than a package variable so parallel tests stay isolated.
