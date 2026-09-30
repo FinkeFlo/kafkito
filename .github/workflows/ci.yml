@@ -12,7 +12,8 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        tags: ["", "btp"]
+        # devauth swaps in the synthetic "off" mode; test and lint it too.
+        tags: ["", "btp", "devauth"]
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
