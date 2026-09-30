@@ -20,6 +20,8 @@ async function testConnection(page: Page, brokers: string) {
   const dialog = await openAddClusterDialog(page);
   await dialog.getByRole("textbox", { name: /^Name\*?$/ }).fill("e2e-test-connection");
   await dialog.getByRole("textbox", { name: /^Brokers \(comma-separated\)/ }).fill(brokers);
+  // TLS is on for new clusters; the fixture broker listens without TLS.
+  await dialog.getByLabel("Enabled", { exact: true }).uncheck();
   const response = page.waitForResponse(
     (r) => r.url().endsWith("/api/v1/clusters/_test") && r.request().method() === "POST",
   );

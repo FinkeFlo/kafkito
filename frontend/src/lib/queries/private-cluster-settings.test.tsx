@@ -69,6 +69,15 @@ function row(name: string) {
   return screen.getByRole("row", { name: new RegExp(`Select ${name} for export`) });
 }
 
+function stored(): PrivateCluster[] {
+  return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
+}
+
+async function openAddForm(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("button", { name: "Add cluster" }));
+  return screen.findByRole("dialog", { name: "Add private cluster" });
+}
+
 beforeEach(() => {
   fetchClusters.mockReset().mockResolvedValue([
     {
@@ -172,5 +181,104 @@ describe("private cluster settings", () => {
     await waitFor(() => expect(qc.getQueryData(b[0])).toBeUndefined());
     for (const key of b) expect(qc.getQueryData(key)).toBeUndefined();
     for (const key of shared) expect(qc.getQueryData(key)).toBe("cached");
+  });
+});
+
+// TLS to the broker is on for new clusters; the form warns about settings
+// that expose credentials or data, without blocking Save or Test connection.
+describe("private cluster transport security", () => {
+  it("turns TLS on for a new cluster", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+    const form = await openAddForm(user);
+    expect(within(form).getByLabelText("Enabled")).toBeChecked();
+    expect(within(form).getByLabelText("Skip verify")).not.toBeChecked();
+    expect(within(form).queryByRole("alert")).not.toBeInTheDocument();
+
+    await user.type(within(form).getByPlaceholderText("my-dev-cluster"), "secure");
+    await user.type(within(form).getByPlaceholderText("host1:9092, host2:9092"), "10.0.0.1:9093");
+    await user.click(within(form).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(stored()).toEqual([
+      expect.objectContaining({
+        name: "secure",
+        tls: { enabled: true, insecure_skip_verify: false },
+      }),
+    ]);
+  });
+
+  it("warns about an unencrypted connection and still saves it", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+    const form = await openAddForm(user);
+    const tls = within(form).getByLabelText("Enabled");
+
+    await user.click(tls);
+    expect(within(form).getByRole("alert")).toHaveTextContent(
+      "Without TLS, all data travels unencrypted.",
+    );
+
+    await user.selectOptions(within(form).getByLabelText("Auth type"), "plain");
+    const alert = within(form).getByRole("alert");
+    expect(alert).toHaveTextContent(
+      "SASL/PLAIN without TLS sends the username and password in cleartext, and all data as well.",
+    );
+    expect(within(alert).getByRole("img", { name: "Warning" })).toBeInTheDocument();
+
+    await user.click(tls);
+    expect(within(form).queryByRole("alert")).not.toBeInTheDocument();
+    await user.click(tls);
+
+    await user.type(within(form).getByPlaceholderText("my-dev-cluster"), "cleartext");
+    await user.type(within(form).getByPlaceholderText("host1:9092, host2:9092"), "10.0.0.1:9092");
+    await user.type(within(form).getByLabelText(/^Username/), "alice");
+    await user.type(within(form).getByLabelText(/^Password/), "secret");
+    expect(within(form).getByRole("alert")).toHaveTextContent(/username and password in cleartext/);
+    expect(within(form).getByRole("button", { name: "Test connection" })).toBeEnabled();
+    await user.click(within(form).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(stored()).toEqual([
+      expect.objectContaining({
+        name: "cleartext",
+        auth: { type: "plain", username: "alice", password: "secret" },
+        tls: { enabled: false, insecure_skip_verify: false },
+      }),
+    ]);
+  });
+
+  // Clicking the nested Skip verify checkbox is not exercised here: happy-dom
+  // also activates the wrapping TLS field label, which browsers do not do.
+  it("keeps the stored TLS settings of existing clusters and warns about them", async () => {
+    const user = userEvent.setup();
+    store(privateCluster("pc_old", "old"), {
+      ...privateCluster("pc_unverified", "unverified"),
+      tls: { enabled: true, insecure_skip_verify: true },
+    });
+    renderSettings();
+
+    await user.click(
+      within(await screen.findByRole("row", { name: /Select old for export/ })).getByRole(
+        "button",
+        { name: "Edit" },
+      ),
+    );
+    let form = await screen.findByRole("dialog", { name: "Edit private cluster" });
+    expect(within(form).getByLabelText("Enabled")).not.toBeChecked();
+    expect(within(form).getByRole("alert")).toHaveTextContent(
+      "Without TLS, all data travels unencrypted.",
+    );
+    expect(within(form).getByRole("button", { name: "Save" })).toBeEnabled();
+    await user.click(within(form).getByRole("button", { name: "Cancel" }));
+
+    await user.click(within(row("unverified")).getByRole("button", { name: "Edit" }));
+    form = await screen.findByRole("dialog", { name: "Edit private cluster" });
+    expect(within(form).getByLabelText("Enabled")).toBeChecked();
+    expect(within(form).getByLabelText("Skip verify")).toBeChecked();
+    expect(within(form).getByRole("alert")).toHaveTextContent(
+      "With Skip verify, the broker's certificate is not checked, so the connection can be intercepted.",
+    );
+    expect(within(form).getByRole("button", { name: "Save" })).toBeEnabled();
   });
 });
