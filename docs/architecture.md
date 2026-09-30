@@ -149,8 +149,13 @@ inline scripts or styles), `X-Content-Type-Options`, `Referrer-Policy`,
   connection warnings, the 5xx error log, the Test connection warnings);
   credentials and the raw header never do. `private_cluster_leak_test.go`
   pins both.
-- The server keeps the client under an internal name derived from the
-  definition. Clients never see that name and cannot use it: responses and
+- The server keeps the client under an internal name derived from every
+  setting of the definition except its display name: brokers in the given
+  order, SASL, TLS, Schema Registry and `is_prod` (`data_masking` is
+  ignored, private clusters never mask). Identical settings share one
+  client; any difference, `is_prod` included, gets its own entry, so the
+  production confirmation follows the definition sent with the request.
+  Clients never see that name and cannot use it: responses and
   error messages name the cluster `__private__`; as a `{cluster}` path
   segment the internal name is an unknown cluster (`404`), as a copy
   `dest_cluster` an unknown `dest_cluster` (`400`). Log lines name a
