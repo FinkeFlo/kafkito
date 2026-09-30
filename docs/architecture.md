@@ -140,14 +140,17 @@ inline scripts or styles), `X-Content-Type-Options`, `Referrer-Policy`,
   been idle for 15 minutes. The raw header and its credentials never appear
   in logs, error bodies or validation messages. Broker and Schema Registry
   host names and resolved IPs may appear in operator logs (franz-go
-  connection warnings, the 5xx error log, the Test connection warnings,
-  which name the cluster as `cluster=__adhoc_<fingerprint>`); credentials
-  and the raw header never do. `private_cluster_leak_test.go` pins both.
+  connection warnings, the 5xx error log, the Test connection warnings);
+  credentials and the raw header never do. `private_cluster_leak_test.go`
+  pins both.
 - The server keeps the client under an internal name derived from the
   definition. Clients never see that name and cannot use it: responses and
   error messages name the cluster `__private__`; as a `{cluster}` path
   segment the internal name is an unknown cluster (`404`), as a copy
-  `dest_cluster` an unknown `dest_cluster` (`400`).
+  `dest_cluster` an unknown `dest_cluster` (`400`). Log lines name a
+  private cluster `private-<12 hex digits>`, a one-way id of the internal
+  name that stays the same while the server runs, so an operator can
+  correlate one cluster's lines; that id is not a cluster name either.
   `private_cluster_names_test.go` pins this.
 - RBAC does not apply, lists included; the broker's own ACLs do.
 - Anyone who can run script in the page can read them, which is why the CSP

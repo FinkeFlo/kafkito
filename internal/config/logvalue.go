@@ -43,7 +43,7 @@ func (s SchemaRegistryConfig) LogValue() slog.Value {
 // embedded credentials when dumped via slog.Any.
 func (c ClusterConfig) LogValue() slog.Value {
 	return slog.GroupValue(
-		slog.String("name", c.Name),
+		slog.String("name", ClusterLogName(c.Name)),
 		slog.Any("brokers", c.Brokers),
 		slog.Any("auth", c.Auth),
 		slog.Bool("tls_enabled", c.TLS.Enabled),

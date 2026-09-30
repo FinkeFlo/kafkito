@@ -72,7 +72,7 @@ func (s *apiServer) TestCluster(ctx context.Context, req gen.TestClusterRequestO
 		// etc.). This is NOT an accidental upstream-error leak; do not route
 		// through upstreamError here.
 		if s.log != nil {
-			s.log.WarnContext(pingCtx, "testCluster ping failed", "cluster", name, "err", err)
+			s.log.WarnContext(pingCtx, "testCluster ping failed", "cluster", config.ClusterLogName(name), "err", err)
 		}
 		info.Reachable = false
 		info.Error = err.Error()
@@ -90,7 +90,7 @@ func (s *apiServer) TestCluster(ctx context.Context, req gen.TestClusterRequestO
 			info.Error = brokerIssuesSummary(issues, skipped)
 		}
 		if s.log != nil {
-			s.log.WarnContext(pingCtx, "testCluster broker probe failed", "cluster", name, "err", info.Error)
+			s.log.WarnContext(pingCtx, "testCluster broker probe failed", "cluster", config.ClusterLogName(name), "err", info.Error)
 		}
 	} else {
 		// Brokers beyond the probe cap were not checked. That alone is no

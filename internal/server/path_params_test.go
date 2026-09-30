@@ -251,6 +251,7 @@ func invalidEscapeRequest(t *testing.T, method, pathFmt string) *http.Request {
 // An escaped private-cluster sentinel is the sentinel: it needs the
 // header, bypasses RBAC only as a private cluster and reaches the handler
 // under the ad-hoc registry name, never under the sentinel or a raw form.
+// The request log carries the derived log name, never the registry name.
 func TestPathParams_EscapedPrivateClusterSentinel(t *testing.T) {
 	t.Parallel()
 
@@ -287,8 +288,10 @@ func TestPathParams_EscapedPrivateClusterSentinel(t *testing.T) {
 			assert.Equal(t, adhoc, got.values["Cluster"])
 			assert.Equal(t, "orders", got.values["Topic"])
 
-			// The request log names the ad-hoc cluster, never the header.
-			assert.Contains(t, logs.String(), `"cluster":"`+adhoc+`"`)
+			// The request log names the private cluster by its log name,
+			// never by the registry name or the header.
+			assert.Contains(t, logs.String(), `"cluster":"`+config.ClusterLogName(adhoc)+`"`)
+			assert.NotContains(t, logs.String(), adhoc)
 			assert.NotContains(t, logs.String(), header)
 		})
 	}

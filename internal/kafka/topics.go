@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FinkeFlo/kafkito/internal/config"
 	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kmsg"
@@ -269,7 +270,7 @@ func (r *Topics) describeCachedTopicConfigs(ctx context.Context, cluster, topic 
 		if configsErr == "" {
 			configsErr = "unavailable"
 		}
-		r.log.Warn("describe topic configs failed", "cluster", cluster, "topic", topic, "err", err)
+		r.log.Warn("describe topic configs failed", "cluster", config.ClusterLogName(cluster), "topic", topic, "err", err)
 	}
 
 	ttl := cfgCacheTTLSuccess

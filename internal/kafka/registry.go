@@ -290,7 +290,7 @@ func (r *Connections) Client(name string) (*kgo.Client, error) {
 		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, config.PublicClusterName(name))
 	}
 
-	cl, err := kgo.NewClient(clientOptsDial(cfg, r.log.With("cluster", name), r.adhocDial)...)
+	cl, err := kgo.NewClient(clientOptsDial(cfg, r.log.With("cluster", config.ClusterLogName(name)), r.adhocDial)...)
 	if err != nil {
 		return nil, fmt.Errorf("kgo.NewClient for %s: %w", config.PublicClusterName(name), err)
 	}
@@ -338,7 +338,7 @@ func clientOptsDial(cfg config.ClusterConfig, log *slog.Logger, adhocDial dialFu
 
 	if cfg.TLS.Enabled && cfg.TLS.InsecureSkipVerify {
 		log.Warn("TLS verification disabled for cluster (InsecureSkipVerify=true)",
-			slog.String("cluster", cfg.Name))
+			slog.String("cluster", config.ClusterLogName(cfg.Name)))
 	}
 
 	// Ad-hoc clusters originate from untrusted user-supplied broker addresses,

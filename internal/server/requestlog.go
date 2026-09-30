@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/FinkeFlo/kafkito/internal/auth"
+	"github.com/FinkeFlo/kafkito/internal/config"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -64,9 +65,9 @@ func requestIDFromContext(ctx context.Context) string {
 // with the 500 the recoverer writes. It also installs a chi LogEntry so the
 // recoverer reports panics through slog instead of printing to stderr.
 //
-// Only method, route pattern, status, size, duration, user and cluster name
-// are logged: never query strings, headers or bodies, which can carry
-// credentials or message payloads.
+// Only method, route pattern, status, size, duration, user and cluster
+// (config.ClusterLogName) are logged: never query strings, headers or
+// bodies, which can carry credentials or message payloads.
 func requestLogMiddleware(log *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -118,7 +119,7 @@ func requestLogMiddleware(log *slog.Logger) func(http.Handler) http.Handler {
 				slog.Int64("duration_ms", elapsed.Milliseconds()),
 				slog.Int("bytes", ww.BytesWritten()),
 				slog.String("user", info.user),
-				slog.String("cluster", cluster),
+				slog.String("cluster", config.ClusterLogName(cluster)),
 			}
 			if slow {
 				attrs = append(attrs, slog.Bool("slow", true))

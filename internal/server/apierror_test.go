@@ -239,8 +239,10 @@ func TestWriteError_BlockedAddress(t *testing.T) {
 		`{"error":"`+privateClusterAddressBlockedMsg+`","code":"private_cluster_address_blocked"}`,
 		rec.Body.String())
 	assert.NotContains(t, rec.Body.String(), "localhost", "the response never names the refused host")
-	// #118: the operator log keeps the cause, host included, and the cluster.
-	assert.Contains(t, logs.String(), `"cluster":"__adhoc_0123456789abcdef"`)
+	// #118: the operator log keeps the cause, host included, and the cluster
+	// under its log name.
+	assert.Contains(t, logs.String(), `"cluster":"`+config.ClusterLogName("__adhoc_0123456789abcdef")+`"`)
+	assert.NotContains(t, logs.String(), config.AdhocClusterPrefix)
 	assert.Contains(t, logs.String(), `host \"localhost\" -> ::1`)
 }
 

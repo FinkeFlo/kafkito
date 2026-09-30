@@ -18,21 +18,27 @@ import (
 )
 
 // adhocKfakeRegistry is a Registry with one private cluster, registered
-// through UseAdhoc, for a kfake cluster holding topic. Private clusters dial
-// through the outbound guard, which refuses loopback, so the registry dials
-// kfake directly.
+// through UseAdhoc, for a kfake cluster holding topic.
 func adhocKfakeRegistry(t *testing.T, topic string) (reg *Registry, name string) {
 	t.Helper()
 	c, err := kfake.NewCluster(kfake.NumBrokers(1), kfake.SeedTopics(1, topic))
 	require.NoError(t, err)
 	t.Cleanup(c.Close)
-	reg = NewRegistry(nil, slog.New(slog.DiscardHandler))
+	return adhocRegistryFor(t, c, slog.New(slog.DiscardHandler))
+}
+
+// adhocRegistryFor is a Registry logging to log with one private cluster,
+// registered through UseAdhoc, for c. Private clusters dial through the
+// outbound guard, which refuses loopback, so the registry dials c directly.
+func adhocRegistryFor(t *testing.T, c *kfake.Cluster, log *slog.Logger) (reg *Registry, name string) {
+	t.Helper()
+	reg = NewRegistry(nil, log)
 	t.Cleanup(reg.Close)
 	reg.adhocDial = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		var d net.Dialer
 		return d.DialContext(ctx, network, addr)
 	}
-	name, err = reg.UseAdhoc(config.ClusterConfig{Brokers: c.ListenAddrs()})
+	name, err := reg.UseAdhoc(config.ClusterConfig{Brokers: c.ListenAddrs()})
 	require.NoError(t, err)
 	require.True(t, config.IsAdhocClusterName(name))
 	return reg, name
