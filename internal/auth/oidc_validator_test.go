@@ -7,6 +7,9 @@ package auth_test
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -26,7 +29,7 @@ const algNoneToken = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0." + // gitleaks:allow
 // newOIDCValidator returns a generic mock issuer (no scope prefix, no zid)
 // wired up to a freshly constructed OIDCValidator. The audience is fixed to
 // "test-audience" so callers can mint matching/mismatching tokens.
-func newOIDCValidator(t *testing.T) (*auth.MockOIDC, auth.Validator, string) {
+func newOIDCValidator(t *testing.T) (*auth.MockOIDC, *auth.OIDCValidator, string) {
 	t.Helper()
 
 	mock, err := auth.NewMockOIDC()
@@ -40,6 +43,7 @@ func newOIDCValidator(t *testing.T) (*auth.MockOIDC, auth.Validator, string) {
 		JWKSEndpoint: mock.JKU(),
 	})
 	require.NoError(t, err, "NewOIDCValidator")
+	t.Cleanup(v.Close)
 
 	return mock, v, audience
 }
@@ -223,4 +227,90 @@ func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Replicates the production race of #100: the first requests after a start
+// arrive together at a fresh validator. All must pass, with one JWKS fetch.
+func TestOIDCValidator_ConcurrentFirstRequests_AllSucceed(t *testing.T) {
+	t.Parallel()
+
+	mock, v, aud := newOIDCValidator(t)
+	tok, err := mock.Issue("user-1", aud, mock.Server.URL, []string{"read"}, nil)
+	require.NoError(t, err, "Issue")
+
+	const requests = 32
+	start := make(chan struct{})
+	errs := make(chan error, requests)
+	var wg sync.WaitGroup
+	for range requests {
+		wg.Go(func() {
+			<-start
+			_, err := v.Validate(context.Background(), tok)
+			errs <- err
+		})
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		require.NoError(t, err, "no first request may fail")
+	}
+	assert.Equal(t, int64(1), mock.JWKSRequests(), "concurrent first requests must share one JWKS fetch")
+}
+
+func TestOIDCValidator_WarmUp_LoadsTheKeysBeforeTheFirstRequest(t *testing.T) {
+	t.Parallel()
+
+	mock, v, aud := newOIDCValidator(t)
+	require.NoError(t, v.WarmUp(context.Background()), "WarmUp")
+	require.Equal(t, int64(1), mock.JWKSRequests())
+	tok, err := mock.Issue("user-1", aud, mock.Server.URL, nil, nil)
+	require.NoError(t, err, "Issue")
+
+	_, err = v.Validate(context.Background(), tok)
+
+	require.NoError(t, err, "Validate")
+	assert.Equal(t, int64(1), mock.JWKSRequests(), "Validate must use the warmed-up keys")
+}
+
+func TestOIDCValidator_IdPDown_FailsFastInsteadOfHanging(t *testing.T) {
+	t.Parallel()
+
+	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	t.Cleanup(down.Close)
+	mock, err := auth.NewMockOIDC()
+	require.NoError(t, err, "NewMockOIDC")
+	t.Cleanup(mock.Close)
+	v, err := auth.NewOIDCValidator(auth.OIDCConfig{
+		IssuerURL:    mock.Server.URL,
+		Audience:     "test-audience",
+		JWKSEndpoint: down.URL + "/jwks",
+	})
+	require.NoError(t, err, "NewOIDCValidator")
+	t.Cleanup(v.Close)
+	tok, err := mock.Issue("u", "test-audience", mock.Server.URL, nil, nil)
+	require.NoError(t, err, "Issue")
+
+	require.ErrorIs(t, v.WarmUp(context.Background()), auth.ErrKeysUnavailable, "WarmUp reports the outage")
+	begin := time.Now()
+	_, err = v.Validate(context.Background(), tok)
+
+	require.ErrorIs(t, err, auth.ErrKeysUnavailable)
+	assert.Less(t, time.Since(begin), time.Second, "a request after a failed fetch must not wait")
+}
+
+func TestOIDCValidator_Close_RejectsLaterTokens(t *testing.T) {
+	t.Parallel()
+
+	mock, v, aud := newOIDCValidator(t)
+	tok, err := mock.Issue("u", aud, mock.Server.URL, nil, nil)
+	require.NoError(t, err, "Issue")
+
+	v.Close()
+	_, err = v.Validate(context.Background(), tok)
+
+	require.ErrorIs(t, err, auth.ErrKeySourceClosed)
 }
