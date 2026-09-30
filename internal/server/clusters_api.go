@@ -5,6 +5,9 @@ package server
 
 import (
 	"context"
+	"fmt"
+	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -73,8 +76,28 @@ func (s *apiServer) TestCluster(ctx context.Context, req gen.TestClusterRequestO
 		}
 		info.Reachable = false
 		info.Error = err.Error()
+	} else if issues, skipped, perr := s.clusters.ProbeBrokers(pingCtx, name); perr != nil || len(issues) > 0 {
+		// The seed answered, but kafkito talks to the brokers the cluster
+		// advertises, not to the seed (#126). Each one must be reachable.
+		// The raw errors are returned for the same reason as above; the
+		// hosts are the ones the caller's own cluster advertises.
+		info.Reachable = false
+		info.BrokerIssues = issues
+		info.BrokersSkipped = skipped
+		if perr != nil {
+			info.Error = perr.Error()
+		} else {
+			info.Error = brokerIssuesSummary(issues, skipped)
+		}
+		if s.log != nil {
+			s.log.WarnContext(pingCtx, "testCluster broker probe failed", "cluster", name, "err", info.Error)
+		}
 	} else {
+		// Brokers beyond the probe cap were not checked. That alone is no
+		// reason to call the cluster unreachable; brokers_skipped tells the
+		// caller the check was partial.
 		info.Reachable = true
+		info.BrokersSkipped = skipped
 		capCtx, capCancel := context.WithTimeout(ctx, 4*time.Second)
 		if caps, cerr := s.clusters.Capabilities(capCtx, name); cerr == nil {
 			info.Capabilities = caps
@@ -82,6 +105,22 @@ func (s *apiServer) TestCluster(ctx context.Context, req gen.TestClusterRequestO
 		capCancel()
 	}
 	return gen.TestCluster200JSONResponse(info), nil
+}
+
+// brokerIssuesSummary is the ClusterInfo.Error text for a cluster whose seed
+// answered but whose advertised brokers did not all do so. skipped is the
+// number of advertised brokers the probe did not check.
+func brokerIssuesSummary(issues []kafkapkg.BrokerIssue, skipped int) string {
+	parts := make([]string, 0, len(issues))
+	for _, is := range issues {
+		parts = append(parts, fmt.Sprintf("broker %d advertises %s (%s)",
+			is.NodeID, net.JoinHostPort(is.Host, strconv.Itoa(int(is.Port))), is.Reason))
+	}
+	summary := "some advertised brokers cannot be reached: " + strings.Join(parts, "; ")
+	if skipped > 0 {
+		summary += fmt.Sprintf("; %d more brokers were not checked", skipped)
+	}
+	return summary
 }
 
 // GetCapabilities returns the cached capability probe for a cluster.

@@ -157,13 +157,18 @@ paths:
       tags: [clusters]
       summary: Probe an ad-hoc cluster definition without storing it.
       description: |
-        Validates a user-supplied cluster definition, pings the brokers and
-        runs a short capability probe. The definition is taken from the
+        Validates a user-supplied cluster definition, pings a seed broker,
+        then sends a request to every broker the metadata response advertises
+        and runs a short capability probe. The definition is taken from the
         request body or, when the body is empty, from the `X-Kafkito-Cluster`
-        header (the body wins). A failed ping is **not** an HTTP error: the
+        header (the body wins). A failed probe is **not** an HTTP error: the
         response is 200 with `reachable: false` and the raw connection error
         in `error`, because diagnosing the caller's own broker is the point of
-        this endpoint. The probe budget defaults to 15 s
+        this endpoint. When the seed answers but an advertised broker is
+        blocked by the outbound address guard or does not answer, `reachable`
+        is false and `broker_issues` lists each such broker. At most 64
+        advertised brokers are checked; `brokers_skipped` counts the rest.
+        The whole probe shares one budget, 15 s by default
         (`KAFKITO_TEST_CONNECTION_TIMEOUT`).
       parameters:
         - $ref: "#/components/parameters/PrivateClusterHeader"
@@ -1466,6 +1471,20 @@ components:
         tls: { type: boolean }
         schema_registry: { type: boolean }
         capabilities: { $ref: "#/components/schemas/Capabilities" }
+        broker_issues:
+          type: array
+          description: >
+            Test connection only: advertised brokers that could not be
+            reached although a seed broker answered. Absent when every
+            broker answered; a non-empty list implies `reachable: false`.
+          items: { $ref: "#/components/schemas/BrokerIssue" }
+        brokers_skipped:
+          type: integer
+          description: >
+            Test connection only: how many advertised brokers were not
+            checked because the probe dials at most 64 of them. Absent when
+            every advertised broker was checked. On its own it does not make
+            `reachable` false.
         brokers:
           type: integer
           description: Aggregate metrics below are best-effort and absent until known.
@@ -1474,6 +1493,26 @@ components:
         total_messages: { type: integer, format: int64 }
         total_lag: { type: integer, format: int64 }
         total_rate_per_sec: { type: number, format: double }
+    BrokerIssue:
+      type: object
+      required: [node_id, host, port, reason, error]
+      properties:
+        node_id: { type: integer, format: int32 }
+        host:
+          type: string
+          description: Host the broker advertises in its metadata response.
+        port: { type: integer, format: int32 }
+        reason:
+          type: string
+          enum: [blocked, unreachable]
+          description: >
+            `blocked`: the address resolves to a range the outbound address
+            guard refuses for private clusters. `unreachable`: the address
+            is allowed but the broker did not answer (refused, timeout, TLS
+            or SASL failure).
+        error:
+          type: string
+          description: Raw connection error, for diagnosis.
     Capabilities:
       type: object
       required: [describe_cluster, list_topics, describe_configs, list_groups, create_topic, delete_topic, alter_configs, probed_at]
