@@ -130,14 +130,14 @@ keys and headers) are described in [docs/data-masking.md](docs/data-masking.md).
 how kafkito checks the bearer token on `/api/v1/*`; `/healthz` and `/readyz`
 are never authenticated. kafkito builds the validator before it listens and
 then logs `auth initialised` with the mode. An unknown mode, or one the build
-cannot serve, logs `auth init failed` at `error` and exits with code 2. A generic `oidc` mode does not exist yet
-(#95).
+cannot serve, logs `auth init failed` at `error` and exits with code 2. A
+generic `oidc` mode does not exist yet (#95).
 
 | Mode    | Builds                          | Startup | IdP outage |
 | ------- | ------------------------------- | ------- | ---------- |
 | `off`   | served only by `-tags devauth` builds (`-local` image); other builds exit with code 2 | Every request gets the synthetic principal `dev-user`. Exits with code 2 (`insecure auth configuration`) always on Cloud Foundry (`VCAP_APPLICATION` set), and on a non-loopback address unless `KAFKITO_INSECURE_AUTH_OFF=true`. | No IdP involved. |
 | `mock`  | every build                     | Starts an issuer on a random `127.0.0.1` port with a signing key created at startup and loads its keys. No client can get a token, so every API request gets `401`. | No external IdP: the issuer runs inside the process. |
-| `xsuaa` | `-btp` builds                   | Reads the first `xsuaa` binding from `VCAP_SERVICES`; a missing variable or binding, or one without `url`, `uaadomain` or `xsappname`, exits with code 2 (`auth init failed`). Then loads the keys from `<url>/token_keys`, waiting at most 5 s. | At startup: logs `auth: JWKS warm-up failed; startup continues` at `warn` (also when `<url>/token_keys` breaks the `jku` rules below) and serves; API requests get `401` until the keys load, and `/readyz` does not change. Later: requests keep working with the keys already loaded; a new signing key is only picked up once the IdP answers again. |
+| `xsuaa` | `-btp` builds                   | Reads the first `xsuaa` binding from `VCAP_SERVICES`; a missing variable or binding, invalid JSON, or a binding without `url`, `uaadomain` or `xsappname` (or with a scheme or port in `uaadomain`) exits with code 2 (`auth init failed`). Then loads the keys from `<url>/token_keys`, waiting at most 5 s. | At startup: logs `auth: JWKS warm-up failed; startup continues` at `warn` (also when `<url>/token_keys` breaks the `jku` rules below) and serves; API requests get `401` until the keys load, and `/readyz` does not change. Later: requests keep working with the keys already loaded; a new signing key, or a `jku` first seen during the outage, gets `401` until the IdP answers again. |
 
 How `mock` and `xsuaa` load keys:
 
@@ -146,9 +146,10 @@ How `mock` and `xsuaa` load keys:
   to 10 s, so a slow IdP still fills the cache for later requests.
 - A load starts at most once per minute per URL: for the first keys, when a
   token names a `kid` the cached keys lack (key rotation), or in the
-  background once the keys are 15 min old. For the rest of that minute
-  requests do not wait: without keys they get `401` at once, and a token
-  with an unknown `kid` is checked against the cached keys and rejected.
+  background on the first request after the keys are 15 min old. Once that
+  load has ended, requests in the rest of the minute do not wait: without
+  keys they get `401` at once, and a token with an unknown `kid` is checked
+  against the cached keys and rejected.
 - Nothing retries on a timer: after a failed start the next load begins with
   the first API request at least a minute later.
 - A failed load logs `jwks fetch failed` at `warn` and keeps the previous
@@ -166,7 +167,7 @@ Tokens (`mock` and `xsuaa`) must meet all of these:
   `PS512`, `ES256`, `ES384`, `ES512` or `EdDSA` (HMAC and `none` are always
   rejected) and equals the key's `alg` when the key has one.
 - `exp` is present and not past; `nbf` and `iat`, when present, are checked
-  too, with 60 s clock skew each way.
+  too, with 60 s clock skew allowed.
 - `sub` is a non-empty string and `aud` is present.
 - `mock`: `iss` equals the embedded issuer URL exactly, `aud` contains
   `mock-client`.
@@ -175,7 +176,8 @@ Tokens (`mock` and `xsuaa`) must meet all of these:
   `identityzoneid` when that is set, and the `jku` header is
   `https://<uaadomain or a subdomain>/token_keys` (a DNS name, no port other
   than 443, no user info, query or fragment). At most 16 different `jku`
-  URLs are accepted per process; tokens naming further ones get `401`.
+  URLs, the binding's own included, are accepted per process; tokens naming
+  further ones get `401`.
 
 ### Logging
 
