@@ -65,6 +65,8 @@ The server keeps nothing between requests.
 - A malformed header, a missing header on a `__private__` path, or a broker
   or Schema Registry host the SSRF guard refuses returns `400`. Neither the
   raw header nor the credentials in it appear in a response or a log line.
+- Only `__private__` with the header selects a private cluster; no other
+  `{cluster}` value does.
 - RBAC does not apply to private clusters, and their lists are not
   filtered; only the broker's own ACLs apply.
 - `POST /api/v1/clusters/_test` probes a cluster definition sent in the body

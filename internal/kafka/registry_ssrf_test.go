@@ -26,10 +26,11 @@ import (
 // avoids any race with local services that happen to listen on port 9092.
 const blockedBroker = "169.254.169.254:9092"
 
-// adhocClusterName returns a cluster name that passes IsAdhoc.
-func adhocName() string { return AdhocPrefix + "test-cluster" }
+// adhocName returns a cluster name that passes config.IsAdhocClusterName.
+func adhocName() string { return config.AdhocClusterPrefix + "test-cluster" }
 
-// configuredName returns a cluster name that does NOT pass IsAdhoc.
+// configuredName returns a cluster name that does NOT pass
+// config.IsAdhocClusterName.
 func configuredName() string { return "my-configured-cluster" }
 
 // TestClientOpts_AdhocCluster_DialBlockedAddress verifies that an ad-hoc kgo
@@ -151,16 +152,4 @@ func TestClientOpts_ConfiguredCluster_TLSEnabled_UsesDialTLSConfigPath(t *testin
 	require.NoError(t, err, "operator TLS cluster must construct cleanly via DialTLSConfig")
 	require.NotNil(t, cl)
 	cl.Close()
-}
-
-// TestAdhocPrefixMatchesConfigConstant guards a safety invariant:
-// the ad-hoc detection in internal/kafka (AdhocPrefix) and the validation guard in
-// internal/config (AdhocClusterPrefix) are two independent "__adhoc_" constants.
-// They must stay equal or operator-config validation and ad-hoc routing could
-// disagree about which names are reserved.
-func TestAdhocPrefixMatchesConfigConstant(t *testing.T) {
-	t.Parallel()
-
-	assert.Equal(t, config.AdhocClusterPrefix, AdhocPrefix,
-		"internal/kafka.AdhocPrefix and internal/config.AdhocClusterPrefix must stay equal")
 }

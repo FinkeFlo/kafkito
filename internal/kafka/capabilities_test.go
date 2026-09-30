@@ -219,7 +219,7 @@ func TestSweepAdhoc_DropsCapabilitiesEntry(t *testing.T) {
 	require.NoError(t, err)
 	busy, err := reg.UseAdhoc(config.ClusterConfig{Brokers: []string{"busy.invalid:9092"}})
 	require.NoError(t, err)
-	require.True(t, IsAdhoc(idle))
+	require.True(t, config.IsAdhocClusterName(idle))
 
 	reg.mu.Lock()
 	reg.caps[idle] = capCache{caps: &Capabilities{}, at: time.Now()}

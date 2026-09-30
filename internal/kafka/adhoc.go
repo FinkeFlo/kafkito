@@ -17,22 +17,10 @@ import (
 	"github.com/FinkeFlo/kafkito/internal/masking"
 )
 
-// AdhocPrefix is the internal cluster-name prefix used for ephemeral clusters
-// that originate from a per-request X-Kafkito-Cluster header (private clusters
-// stored in the user's browser). Shared cluster names never collide because
-// config.Load rejects empty names, and this prefix is reserved.
-const AdhocPrefix = "__adhoc_"
-
 // adhocIdleTTL is how long an unused ad-hoc cluster entry (and its kgo.Client)
 // is kept before being evicted. Kept conservative: keeps hot tabs snappy but
 // releases resources for closed ones.
 const adhocIdleTTL = 15 * time.Minute
-
-// IsAdhoc reports whether a cluster name belongs to an ad-hoc (private)
-// cluster registered via UseAdhoc.
-func IsAdhoc(name string) bool {
-	return len(name) > len(AdhocPrefix) && name[:len(AdhocPrefix)] == AdhocPrefix
-}
 
 // adhocFPKey returns the process-local secret used to key the ad-hoc
 // fingerprint HMAC, generating it on first use. The key never leaves the
@@ -105,7 +93,7 @@ func (r *Connections) UseAdhoc(cfg config.ClusterConfig) (string, error) {
 		}
 	}
 	fp := Fingerprint(cfg, r.adhocFPKey())
-	name := AdhocPrefix + fp
+	name := config.AdhocClusterPrefix + fp
 
 	r.mu.Lock()
 	defer r.mu.Unlock()

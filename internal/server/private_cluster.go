@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/FinkeFlo/kafkito/internal/config"
+	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/FinkeFlo/kafkito/internal/netguard"
 	"github.com/go-chi/chi/v5"
 )
@@ -26,6 +27,25 @@ const PrivateClusterHeader = "X-Kafkito-Cluster"
 // maxPrivateClusterHeaderBytes caps the size of the decoded header payload to
 // bound memory and quickly reject obvious abuse.
 const maxPrivateClusterHeaderBytes = 8 * 1024
+
+// rejectInternalClusterNames answers a {cluster} path value in the internal
+// namespace of private clusters (config.AdhocClusterPrefix) with the 404 of
+// any unknown cluster, before RBAC or a handler sees the name. Such names
+// are only valid as the result of resolvePrivateClusterParam, which derives
+// them from __private__ and the X-Kafkito-Cluster header of the same
+// request. It runs first in the cluster route group.
+func rejectInternalClusterNames(errs errorWriter) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// A value that does not decode is left to the 400 further down.
+			if cluster, err := pathParam(r, "cluster"); err == nil && config.IsAdhocClusterName(cluster) {
+				errs.writeError(w, r, unknownClusterError(cluster, kafkapkg.ErrUnknownCluster))
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
 
 type privateCtxKey struct{}
 
@@ -127,7 +147,9 @@ func validateClusterPolicy(cfg config.ClusterConfig) error {
 // deterministic ad-hoc registry name. It runs AFTER rbacMiddleware so that
 // RBAC observes the sentinel value and can bypass policy enforcement; all
 // downstream handlers, in contrast, observe the real registry name and
-// operate normally against the ad-hoc cluster.
+// operate normally against the ad-hoc cluster. It is the only source of
+// ad-hoc names in a request: rejectInternalClusterNames refuses them as a
+// path value.
 func resolvePrivateClusterParam(reg adhocClusters) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

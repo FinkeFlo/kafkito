@@ -123,8 +123,9 @@ func TestRegistry_SchemaRegistry_GuardednessFromNamePrefix(t *testing.T) {
 	srCfg := config.SchemaRegistryConfig{URL: srv.URL}
 
 	// Build a registry that knows two clusters: one operator-configured
-	// (plain name) and one adhoc-named (AdhocPrefix + fingerprint).
-	adhocName := AdhocPrefix + "deadbeef01234567"
+	// (plain name) and one adhoc-named (config.AdhocClusterPrefix +
+	// fingerprint).
+	adhocName := config.AdhocClusterPrefix + "deadbeef01234567"
 	reg := NewRegistry([]config.ClusterConfig{
 		{Name: "configured", Brokers: []string{"localhost:9092"}, SchemaRegistry: srCfg},
 		{Name: adhocName, Brokers: []string{"localhost:9092"}, SchemaRegistry: config.SchemaRegistryConfig{URL: "http://127.0.0.1:9/"}},

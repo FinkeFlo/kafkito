@@ -88,9 +88,15 @@ func blockedAddressError(op string, err error) error {
 // an unknown cluster is a 404 naming it, anything else an upstream error.
 func clusterError(cluster, op string, err error) error {
 	if errors.Is(err, kafkapkg.ErrUnknownCluster) {
-		return &apiError{Status: http.StatusNotFound, Message: "unknown cluster: " + cluster, Err: err}
+		return unknownClusterError(cluster, err)
 	}
 	return upstreamError(op, err)
+}
+
+// unknownClusterError is the 404 for a {cluster} name the server does not
+// serve.
+func unknownClusterError(cluster string, err error) *apiError {
+	return &apiError{Status: http.StatusNotFound, Message: "unknown cluster: " + cluster, Err: err}
 }
 
 // valueMaskedCode marks a refused raw download of a masked record.

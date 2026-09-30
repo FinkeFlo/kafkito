@@ -81,7 +81,7 @@ func TestSchemaOps_PrivateClusterSchemaRegistry(t *testing.T) {
 		header := encodeHeader(t, config.ClusterConfig{Brokers: []string{unreachableBroker}})
 		rec := sendPrivate(t, h, header, http.MethodGet, privateSubjects, "", 5*time.Second)
 		assert.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())
-		assert.Contains(t, rec.Body.String(), `"error":"schema registry not configured for cluster: `+kafkapkg.AdhocPrefix)
+		assert.Contains(t, rec.Body.String(), `"error":"schema registry not configured for cluster: `+config.AdhocClusterPrefix)
 		assert.NotContains(t, rec.Body.String(), header)
 		assert.NotContains(t, logs.String(), header)
 	})

@@ -23,7 +23,7 @@ import (
 type fakeAdhocClusters struct{ clusterStore }
 
 func (fakeAdhocClusters) UseAdhoc(config.ClusterConfig) (string, error) {
-	return kafkapkg.AdhocPrefix + "test", nil
+	return config.AdhocClusterPrefix + "test", nil
 }
 
 func (fakeAdhocClusters) ListBrokers(context.Context, string) ([]kafkapkg.BrokerInfo, error) {

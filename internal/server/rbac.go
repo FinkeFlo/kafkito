@@ -15,7 +15,6 @@ import (
 
 	"github.com/FinkeFlo/kafkito/internal/auth"
 	"github.com/FinkeFlo/kafkito/internal/config"
-	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/FinkeFlo/kafkito/internal/rbac"
 	"github.com/go-chi/chi/v5"
 )
@@ -150,7 +149,7 @@ func rbacMiddleware(policy *rbac.Policy, log *slog.Logger) func(http.Handler) ht
 // not when RBAC is disabled or for a private (ad-hoc) cluster, which RBAC
 // does not apply to.
 func (s *apiServer) rbacListSubject(ctx context.Context, cluster string) (string, bool) {
-	if s.policy == nil || !s.policy.Enabled() || kafkapkg.IsAdhoc(cluster) {
+	if s.policy == nil || !s.policy.Enabled() || config.IsAdhocClusterName(cluster) {
 		return "", false
 	}
 	return rbacSubject(httpRequestFromContext(ctx), s.policy), true
