@@ -188,8 +188,9 @@ func (r *Messages) ConsumeMessages(ctx context.Context, cluster, topic string, o
 
 	// Time bounds are resolved up front so buildWindows can stay pure
 	// (offset-only). They apply to FromTimestamp (the seek mechanism), to
-	// FromEnd / FromStart (where they clamp the browse window) and cap
-	// forward cursor pages.
+	// FromEnd / FromStart (where they clamp the browse window) and to
+	// FromOffset, where they lift the offset (or a forward cursor's
+	// partition_offsets) to from_ts and cap the page at to_ts.
 	offs, err := r.readerOffsets(ctx, cluster, topic, offsetsQuery{
 		partition: opts.Partition, fromTSMs: opts.FromTSMs, toTSMs: opts.ToTSMs,
 	})
@@ -451,14 +452,15 @@ func buildWindows(
 			add(p, b, e)
 		}
 	case FromOffset:
-		// A forward cursor continues a time-range query, so the exclusive
-		// upper time bound still applies to partition_offsets.
-		offsets, upper := opts.PartitionOffsets, toOff
+		// Time bounds apply to from=offset as well: the offset (or a forward
+		// cursor's partition_offsets) is lifted to from_ts and the window
+		// stops at to_ts.
+		offsets := opts.PartitionOffsets
 		if len(offsets) == 0 {
 			if len(parts) != 1 {
 				return nil, fmt.Errorf("from=offset with partition=-1 requires partition_offsets")
 			}
-			offsets, upper = map[int32]int64{parts[0]: opts.Offset}, nil
+			offsets = map[int32]int64{parts[0]: opts.Offset}
 		}
 		for p, b := range offsets {
 			e, ok := endMap[p]
@@ -468,7 +470,7 @@ func buildWindows(
 			if s, ok := startMap[p]; ok {
 				b = max(b, s)
 			}
-			_, e = clampRange(p, b, e, nil, upper)
+			b, e = clampRange(p, b, e, fromOff, toOff)
 			add(p, b, e)
 		}
 	default: // FromEnd
