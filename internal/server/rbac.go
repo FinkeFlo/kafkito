@@ -47,17 +47,18 @@ func rbacSubject(r *http.Request, policy *rbac.Policy) string {
 // any other route resolvePermission has no permission for, so a new route
 // is closed until it is mapped or listed here.
 var rbacExemptRoutes = map[string]string{
-	"POST /api/v1/clusters/_test": "probes a cluster definition sent in the body, " +
-		"like a private cluster (which RBAC does not apply to); no configured " +
-		"cluster is involved and the outbound-host guard applies",
+	testClusterRoute: "probes a private cluster definition sent in the body " +
+		"or header: privateClusterGate applies private_clusters.mode, no " +
+		"configured cluster is involved and the outbound-host guard applies",
 }
 
 // rbacMiddleware enforces RBAC for cluster routes. The identity is resolved
 // from the configured header; the resource/action is derived from the matched
 // chi route pattern and HTTP method, the resource names from the path
 // parameters as the handler binds them (see pathParam). A route without a
-// permission is denied unless it is in rbacExemptRoutes or addresses a
-// private cluster.
+// permission is denied unless it is in rbacExemptRoutes, on a private
+// cluster too. A route with a permission passes without a policy check on a
+// private cluster, which privateClusterGate admitted the caller to.
 func rbacMiddleware(policy *rbac.Policy, log *slog.Logger) func(http.Handler) http.Handler {
 	if log == nil {
 		log = slog.Default()
@@ -81,8 +82,7 @@ func rbacMiddleware(policy *rbac.Policy, log *slog.Logger) func(http.Handler) ht
 			resType, resName, action, bodyField := resolvePermission(r)
 			if resType == "" {
 				pattern := routePattern(r)
-				cluster, _ := pathParam(r, "cluster")
-				if _, ok := rbacExemptRoutes[r.Method+" "+pattern]; ok || cluster == config.PrivateClusterSentinel {
+				if _, ok := rbacExemptRoutes[r.Method+" "+pattern]; ok {
 					next.ServeHTTP(w, r)
 					return
 				}
@@ -124,9 +124,10 @@ func rbacMiddleware(policy *rbac.Policy, log *slog.Logger) func(http.Handler) ht
 			}
 
 			cluster, _ := pathParam(r, "cluster")
-			// Private clusters bypass RBAC entirely: the user supplies their
-			// own Kafka credentials via the X-Kafkito-Cluster header, and the
-			// broker enforces its own ACLs.
+			// RBAC does not apply to a private cluster: privateClusterGate
+			// admitted the caller under private_clusters.mode, the caller
+			// supplies their own Kafka credentials via the X-Kafkito-Cluster
+			// header, and the broker enforces its own ACLs.
 			if cluster == config.PrivateClusterSentinel {
 				next.ServeHTTP(w, r)
 				return
@@ -146,8 +147,9 @@ func rbacMiddleware(policy *rbac.Policy, log *slog.Logger) func(http.Handler) ht
 
 // rbacListSubject reports whether a handler applies RBAC itself on cluster
 // (to filter a list or check a body name), and for which identity. It does
-// not when RBAC is disabled or for a private (ad-hoc) cluster, which RBAC
-// does not apply to.
+// not when RBAC is disabled or for a private (ad-hoc) cluster: RBAC does not
+// apply there, as in rbacMiddleware, once privateClusterGate admitted the
+// caller.
 func (s *apiServer) rbacListSubject(ctx context.Context, cluster string) (string, bool) {
 	if s.policy == nil || !s.policy.Enabled() || config.IsAdhocClusterName(cluster) {
 		return "", false

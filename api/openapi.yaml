@@ -27,8 +27,17 @@ info:
 
     Private (browser-stored) clusters: use the cluster path segment
     `__private__` and send the cluster definition base64-encoded in the
-    `X-Kafkito-Cluster` header. Such requests bypass RBAC, and their lists are
-    not filtered; only the broker's own ACLs apply.
+    `X-Kafkito-Cluster` header. Operators can disable private clusters or
+    restrict them to a role with `private_clusters.mode`
+    (`KAFKITO_PRIVATE_CLUSTERS`): `on` (the default) allows them for every
+    caller, `off` answers with 403 `private_clusters_disabled`, and `role`
+    requires the RBAC permission `private_cluster:use` (403
+    `private_clusters_forbidden` otherwise). The mode applies to the
+    `__private__` path segment, to Test connection
+    (`POST /api/v1/clusters/_test`) and to copies into a
+    `dest_cluster_config`; `GET /api/v1/me` reports it. Once a request is
+    allowed, kafkito's RBAC does not apply to the private cluster and its
+    lists are not filtered; the broker's own ACLs apply.
 
     Conventions:
     - List endpoints return objects (`{ "<resource>": [...] }`), never bare
@@ -170,6 +179,11 @@ paths:
         advertised brokers are checked; `brokers_skipped` counts the rest.
         The whole probe shares one budget, 15 s by default
         (`KAFKITO_TEST_CONNECTION_TIMEOUT`).
+
+        The probed definition is a private cluster, so `private_clusters.mode`
+        applies: 403 `private_clusters_disabled` or
+        `private_clusters_forbidden` when the caller may not use private
+        clusters. No other RBAC permission is required.
       parameters:
         - $ref: "#/components/parameters/PrivateClusterHeader"
       requestBody:
@@ -187,6 +201,7 @@ paths:
               schema: { $ref: "#/components/schemas/ClusterInfo" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /api/v1/clusters/{cluster}/capabilities:
     parameters:
       - $ref: "#/components/parameters/Cluster"
@@ -205,6 +220,7 @@ paths:
               schema: { $ref: "#/components/schemas/CapabilitiesResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "502": { $ref: "#/components/responses/BadGateway" }
   /api/v1/clusters/{cluster}/capabilities/refresh:
@@ -225,6 +241,7 @@ paths:
               schema: { $ref: "#/components/schemas/CapabilitiesResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "502": { $ref: "#/components/responses/BadGateway" }
   /api/v1/clusters/{cluster}/brokers:
@@ -808,11 +825,13 @@ paths:
         Authorization: the source needs `topic:consume` (checked by the RBAC
         middleware from the URL) and the destination needs `topic:produce`
         (checked by the handler against the cluster/topic named in the body).
-        An ad-hoc `dest_cluster_config` destination **bypasses RBAC** — the
-        caller supplies their own broker credentials and only that broker's own
-        ACLs apply, so a user holding nothing but `topic:consume` can stream a
-        readable topic to a broker of their choosing. This is a deliberate,
-        pre-existing property of private clusters.
+        A `dest_cluster_config` destination is a private cluster:
+        `private_clusters.mode` applies to it (403 `private_clusters_disabled`
+        or `private_clusters_forbidden`, checked before the handler validates
+        or contacts the destination). Once allowed, RBAC does not apply to the
+        destination; the caller supplies their own broker credentials and
+        that broker's ACLs apply. Operators can disable private clusters or
+        restrict them to a role to limit such copies.
 
         The copy is neither transactional nor resumable: on error the records
         copied so far stay in the destination topic, and re-running the copy
@@ -1315,8 +1334,12 @@ components:
       description: >
         Base64-encoded JSON `ClusterConfig` of a private (browser-stored)
         cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment
-        is `__private__` (required then). RBAC is bypassed for private
-        clusters. A malformed header is rejected with 400.
+        is `__private__` (required then). A malformed header is rejected with
+        400. When `private_clusters.mode` does not allow the caller private
+        clusters, the header is never read: a `__private__` request gets 403
+        (`private_clusters_disabled` or `private_clusters_forbidden`), and any
+        other request ignores it. On an allowed request kafkito's RBAC does
+        not apply to the private cluster; the broker's ACLs do.
     ProdConfirmHeader:
       in: header
       name: X-Kafkito-Confirm-Prod
@@ -1362,8 +1385,12 @@ components:
     Forbidden:
       description: >
         RBAC denied the action (`error: forbidden` plus `resource` and
-        `action`, or `code: rbac_denied`), or the broker rejected the
-        credential's ACLs (`code: kafka_not_authorized`).
+        `action`, or `code: rbac_denied`), the broker rejected the
+        credential's ACLs (`code: kafka_not_authorized`), or
+        `private_clusters.mode` does not allow the caller private clusters
+        (`code: private_clusters_disabled` for mode `off`,
+        `private_clusters_forbidden` for mode `role` without
+        `private_cluster:use`).
       headers:
         X-Request-Id: { $ref: "#/components/headers/RequestId" }
       content:
@@ -1419,7 +1446,8 @@ components:
           type: string
           description: >
             Machine-readable code where one exists, e.g. `kafka_upstream`,
-            `private_cluster_address_blocked`,
+            `private_cluster_address_blocked`, `private_clusters_disabled`,
+            `private_clusters_forbidden`,
             `production_confirmation_required`, `copy_concurrency_limit`,
             `kafka_message_too_large`, `kafka_not_authorized`, `rbac_denied`,
             `topic_consumers_timeout`, `value_masked`, `invalid_request` (the
@@ -1458,7 +1486,7 @@ components:
         version: { type: string }
     MeResponse:
       type: object
-      required: [user, email, tenant, scopes, roles, permissions, anonymous, jwt, rbac_enabled]
+      required: [user, email, tenant, scopes, roles, permissions, anonymous, jwt, rbac_enabled, private_clusters]
       properties:
         user: { type: string, description: Resolved RBAC subject; empty when anonymous. }
         email: { type: string }
@@ -1478,6 +1506,21 @@ components:
         anonymous: { type: boolean }
         jwt: { type: boolean, description: True when a validated principal is present. }
         rbac_enabled: { type: boolean }
+        private_clusters: { $ref: "#/components/schemas/PrivateClustersStatus" }
+    PrivateClustersStatus:
+      type: object
+      required: [mode, allowed]
+      description: Whether the caller may use private clusters.
+      properties:
+        mode:
+          type: string
+          enum: ["on", "off", "role"]
+          description: The server's `private_clusters.mode`.
+        allowed:
+          type: boolean
+          description: >
+            True for mode `on`, false for `off`; for `role`, true when the
+            caller holds the RBAC permission `private_cluster:use`.
     ListClustersResponse:
       type: object
       required: [clusters]
@@ -2046,7 +2089,8 @@ components:
           description: >
             Ad-hoc ("private") destination cluster, same shape the
             `X-Kafkito-Cluster` header carries. Mutually exclusive with
-            `dest_cluster`. Bypasses RBAC on the destination.
+            `dest_cluster`. Subject to `private_clusters.mode`; once allowed,
+            RBAC does not apply to the destination.
         dest_topic:
           type: string
           description: Destination topic. Must already exist.

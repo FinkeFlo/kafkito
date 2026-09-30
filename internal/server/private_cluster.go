@@ -145,7 +145,7 @@ func validateClusterPolicy(cfg config.ClusterConfig) error {
 // resolvePrivateClusterParam is a Chi middleware that rewrites the
 // "cluster" URL parameter from the private-cluster sentinel to the
 // deterministic ad-hoc registry name. It runs AFTER rbacMiddleware so that
-// RBAC observes the sentinel value and can bypass policy enforcement; all
+// RBAC observes the sentinel value and skips the policy check; all
 // downstream handlers, in contrast, observe the real registry name and
 // operate normally against the ad-hoc cluster. It is the only source of
 // ad-hoc names in a request: rejectInternalClusterNames refuses them as a

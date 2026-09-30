@@ -86,3 +86,54 @@ func TestHandleMe_WithoutJWT_FallsThroughToHeaderTrust(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body), "body=%s", rec.Body.String())
 	assert.Equal(t, false, body["jwt"])
 }
+
+// /me reports private_clusters.mode and whether the caller may use private
+// clusters; in mode role the verified principal needs private_cluster:use.
+func TestHandleMe_ReportsPrivateClusters(t *testing.T) {
+	t.Parallel()
+
+	withMode := func(mode config.PrivateClusterMode, perms ...config.PermissionConfig) config.Config {
+		cfg := config.Defaults()
+		cfg.PrivateClusters.Mode = mode
+		if perms != nil {
+			cfg.RBAC = config.RBACConfig{
+				Enabled:  true,
+				Roles:    []config.RoleConfig{{Name: "r", Permissions: perms}},
+				Subjects: []config.SubjectConfig{{User: "dev-user", Roles: []string{"r"}}},
+			}
+		}
+		return cfg
+	}
+	use := config.PermissionConfig{Resource: "private_cluster", Actions: []string{"use"}}
+	view := config.PermissionConfig{Resource: "topic:*", Actions: []string{"view"}}
+
+	for _, tc := range []struct {
+		name string
+		cfg  config.Config
+		want string
+	}{
+		{"zero config", config.Config{}, `{"mode":"on","allowed":true}`},
+		{"on", withMode(config.PrivateClustersOn), `{"mode":"on","allowed":true}`},
+		{"off", withMode(config.PrivateClustersOff), `{"mode":"off","allowed":false}`},
+		{"role with the permission", withMode(config.PrivateClustersRole, use), `{"mode":"role","allowed":true}`},
+		{"role without the permission", withMode(config.PrivateClustersRole, view), `{"mode":"role","allowed":false}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			v := stubValidator{p: &auth.Principal{Subject: "u-1", UserName: "dev-user"}}
+			h := server.New(server.Options{Version: "test", Config: tc.cfg, Auth: v})
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+			req.Header.Set("Authorization", "Bearer ignored-by-stub")
+			rec := httptest.NewRecorder()
+
+			h.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusOK, rec.Code, "body=%s", rec.Body.String())
+			var body struct {
+				PrivateClusters json.RawMessage `json:"private_clusters"`
+			}
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body), "body=%s", rec.Body.String())
+			assert.JSONEq(t, tc.want, string(body.PrivateClusters))
+		})
+	}
+}

@@ -24,6 +24,7 @@ import (
 type apiServer struct {
 	version         string
 	policy          *rbac.Policy
+	privateClusters privateClusterAccess
 	stores          // all nil without kafka configuration
 	log             *slog.Logger
 	testConnTimeout time.Duration
@@ -97,7 +98,8 @@ func (s *apiServer) GetMe(ctx context.Context, _ gen.GetMeRequestObject) (gen.Ge
 		tenant = p.Tenant
 	}
 	// rbacSubject is the single identity resolver: principal first, header fallback.
-	user := rbacSubject(httpRequestFromContext(ctx), s.policy)
+	r := httpRequestFromContext(ctx)
+	user := rbacSubject(r, s.policy)
 	return gen.GetMe200JSONResponse{
 		User:        user,
 		Email:       email,
@@ -108,6 +110,10 @@ func (s *apiServer) GetMe(ctx context.Context, _ gen.GetMeRequestObject) (gen.Ge
 		Anonymous:   user == "",
 		Jwt:         hasJWT,
 		RbacEnabled: s.policy.Enabled(),
+		PrivateClusters: gen.PrivateClustersStatus{
+			Mode:    s.privateClusters.mode(),
+			Allowed: s.privateClusters.check(r) == nil,
+		},
 	}, nil
 }
 

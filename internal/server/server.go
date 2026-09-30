@@ -71,9 +71,11 @@ func New(opts Options) http.Handler {
 	}
 
 	errs := errorWriter{log: handlerLog}
+	privateClusters := privateClusterAccess{cfg: opts.Config.PrivateClusters, policy: policy}
 	generated, err := newGeneratedRoutes(&apiServer{
 		version:         opts.Version,
 		policy:          policy,
+		privateClusters: privateClusters,
 		stores:          st,
 		log:             handlerLog,
 		testConnTimeout: opts.Config.Server.TestConnectionTimeout,
@@ -95,6 +97,7 @@ func New(opts Options) http.Handler {
 			if opts.Registry != nil || opts.stores != nil {
 				v1.Group(func(g chi.Router) {
 					g.Use(rejectInternalClusterNames(errs))
+					g.Use(privateClusterGate(privateClusters, errs))
 					g.Use(privateClusterMiddleware)
 					g.Use(rbacMiddleware(policy, withRequestIDLogging(baseLog)))
 					g.Use(resolvePrivateClusterParam(st.clusters))

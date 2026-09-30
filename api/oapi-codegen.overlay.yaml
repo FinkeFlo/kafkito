@@ -159,6 +159,11 @@ actions:
       x-go-type: kafka.SCRAMUser
       x-go-type-import:
         path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.PrivateClustersStatus.properties.mode
+    update:
+      x-go-type: config.PrivateClusterMode
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/config
   # The header is decoded and validated by privateClusterMiddleware; the
   # generated binding only passes the raw value through.
   - target: $.components.parameters.PrivateClusterHeader.schema

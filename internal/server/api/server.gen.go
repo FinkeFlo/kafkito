@@ -487,7 +487,7 @@ type Error struct {
 	// Action RBAC-denied action (403 only).
 	Action *string `json:"action,omitempty"`
 
-	// Code Machine-readable code where one exists, e.g. `kafka_upstream`, `private_cluster_address_blocked`, `production_confirmation_required`, `copy_concurrency_limit`, `kafka_message_too_large`, `kafka_not_authorized`, `rbac_denied`, `topic_consumers_timeout`, `value_masked`, `invalid_request` (the request does not match this document; `error` names the parameter or body field and the violated rule, never the submitted value).
+	// Code Machine-readable code where one exists, e.g. `kafka_upstream`, `private_cluster_address_blocked`, `private_clusters_disabled`, `private_clusters_forbidden`, `production_confirmation_required`, `copy_concurrency_limit`, `kafka_message_too_large`, `kafka_not_authorized`, `rbac_denied`, `topic_consumers_timeout`, `value_masked`, `invalid_request` (the request does not match this document; `error` names the parameter or body field and the violated rule, never the submitted value).
 	Code *string `json:"code,omitempty"`
 
 	// Error Human-readable message (`unauthorized`, `forbidden`, `not found`, ...).
@@ -630,10 +630,13 @@ type MeResponse struct {
 
 	// Permissions Map of resource type (or `*`) to allowed actions.
 	Permissions map[string][]string `json:"permissions"`
-	RbacEnabled bool                `json:"rbac_enabled"`
-	Roles       *[]string           `json:"roles"`
-	Scopes      *[]string           `json:"scopes"`
-	Tenant      string              `json:"tenant"`
+
+	// PrivateClusters Whether the caller may use private clusters.
+	PrivateClusters PrivateClustersStatus `json:"private_clusters"`
+	RbacEnabled     bool                  `json:"rbac_enabled"`
+	Roles           *[]string             `json:"roles"`
+	Scopes          *[]string             `json:"scopes"`
+	Tenant          string                `json:"tenant"`
 
 	// User Resolved RBAC subject; empty when anonymous.
 	User string `json:"user"`
@@ -710,6 +713,15 @@ type PartitionInfo struct {
 type PartitionRange struct {
 	End   int64 `json:"end"`
 	Start int64 `json:"start"`
+}
+
+// PrivateClustersStatus Whether the caller may use private clusters.
+type PrivateClustersStatus struct {
+	// Allowed True for mode `on`, false for `off`; for `role`, true when the caller holds the RBAC permission `private_cluster:use`.
+	Allowed bool `json:"allowed"`
+
+	// Mode The server's `private_clusters.mode`.
+	Mode config.PrivateClusterMode `json:"mode"`
 }
 
 // ProduceRequest defines model for ProduceRequest.
@@ -935,67 +947,67 @@ type Unauthorized = Error
 
 // TestClusterParams defines parameters for TestCluster.
 type TestClusterParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // DeleteAclParams defines parameters for DeleteAcl.
 type DeleteAclParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // ListAclsParams defines parameters for ListAcls.
 type ListAclsParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // CreateAclParams defines parameters for CreateAcl.
 type CreateAclParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // ListBrokersParams defines parameters for ListBrokers.
 type ListBrokersParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // GetCapabilitiesParams defines parameters for GetCapabilities.
 type GetCapabilitiesParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // RefreshCapabilitiesParams defines parameters for RefreshCapabilities.
 type RefreshCapabilitiesParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // ListGroupsParams defines parameters for ListGroups.
 type ListGroupsParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // CreateGroupParams defines parameters for CreateGroup.
 type CreateGroupParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // DeleteGroupParams defines parameters for DeleteGroup.
 type DeleteGroupParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // DescribeGroupParams defines parameters for DescribeGroup.
 type DescribeGroupParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
@@ -1004,7 +1016,7 @@ type ResetGroupOffsetsParams struct {
 	// XKafkitoConfirmProd Must be `true` when the target cluster is marked `is_prod`; the request is rejected with 428 otherwise. Send only after explicit user confirmation.
 	XKafkitoConfirmProd *ResetGroupOffsetsParamsXKafkitoConfirmProd `json:"X-Kafkito-Confirm-Prod,omitempty"`
 
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
@@ -1013,7 +1025,7 @@ type ResetGroupOffsetsParamsXKafkitoConfirmProd string
 
 // ListSubjectsParams defines parameters for ListSubjects.
 type ListSubjectsParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
@@ -1022,37 +1034,37 @@ type DeleteSubjectParams struct {
 	// Permanent `true` performs a hard delete. Only `true` and `false` are accepted.
 	Permanent *bool `form:"permanent,omitempty" json:"permanent,omitempty"`
 
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // ListSchemaVersionsParams defines parameters for ListSchemaVersions.
 type ListSchemaVersionsParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // RegisterSchemaParams defines parameters for RegisterSchema.
 type RegisterSchemaParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // GetSchemaVersionParams defines parameters for GetSchemaVersion.
 type GetSchemaVersionParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // ListTopicsParams defines parameters for ListTopics.
 type ListTopicsParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // CreateTopicParams defines parameters for CreateTopic.
 type CreateTopicParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
@@ -1061,7 +1073,7 @@ type DeleteTopicParams struct {
 	// XKafkitoConfirmProd Must be `true` when the target cluster is marked `is_prod`; the request is rejected with 428 otherwise. Send only after explicit user confirmation.
 	XKafkitoConfirmProd *DeleteTopicParamsXKafkitoConfirmProd `json:"X-Kafkito-Confirm-Prod,omitempty"`
 
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
@@ -1070,19 +1082,19 @@ type DeleteTopicParamsXKafkitoConfirmProd string
 
 // DescribeTopicParams defines parameters for DescribeTopic.
 type DescribeTopicParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // AlterTopicConfigsParams defines parameters for AlterTopicConfigs.
 type AlterTopicConfigsParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // ListTopicConsumersParams defines parameters for ListTopicConsumers.
 type ListTopicConsumersParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
@@ -1091,7 +1103,7 @@ type CopyMessagesParams struct {
 	// XKafkitoConfirmProd Must be `true` when the target cluster is marked `is_prod`; the request is rejected with 428 otherwise. Send only after explicit user confirmation.
 	XKafkitoConfirmProd *CopyMessagesParamsXKafkitoConfirmProd `json:"X-Kafkito-Confirm-Prod,omitempty"`
 
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
@@ -1124,7 +1136,7 @@ type ConsumeMessagesParams struct {
 	// Cursor Opaque continuation token from a previous `next_cursor`.
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
@@ -1139,7 +1151,7 @@ type ProduceMessageParams struct {
 	// ContentEncoding Set to `gzip` when the JSON body is gzip-compressed.
 	ContentEncoding *ProduceMessageParamsContentEncoding `json:"Content-Encoding,omitempty"`
 
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
@@ -1160,13 +1172,13 @@ type CountMessagesParams struct {
 	// ToTsMs Optional exclusive upper timestamp bound in Unix milliseconds.
 	ToTsMs *ToTsMsQuery `form:"to_ts_ms,omitempty" json:"to_ts_ms,omitempty"`
 
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // SearchMessagesParams defines parameters for SearchMessages.
 type SearchMessagesParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
@@ -1184,7 +1196,7 @@ type GetMessageTimelineParams struct {
 	// SlotMs Time-slot width in milliseconds (e.g. 3600000 for hourly, 86400000 for daily).
 	SlotMs int64 `form:"slot_ms" json:"slot_ms"`
 
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
@@ -1193,7 +1205,7 @@ type DownloadMessageRawParams struct {
 	// Decoded `false` serves the value bytes as stored in Kafka instead of the Schema Registry decoded JSON. Only `true` and `false` are accepted.
 	Decoded *bool `form:"decoded,omitempty" json:"decoded,omitempty"`
 
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
@@ -1202,7 +1214,7 @@ type DeleteRecordsParams struct {
 	// XKafkitoConfirmProd Must be `true` when the target cluster is marked `is_prod`; the request is rejected with 428 otherwise. Send only after explicit user confirmation.
 	XKafkitoConfirmProd *DeleteRecordsParamsXKafkitoConfirmProd `json:"X-Kafkito-Confirm-Prod,omitempty"`
 
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
@@ -1217,19 +1229,19 @@ type SampleMessagesParams struct {
 	// Partition Partition number; -1 = all partitions.
 	Partition *PartitionQuery `form:"partition,omitempty" json:"partition,omitempty"`
 
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // ListScramUsersParams defines parameters for ListScramUsers.
 type ListScramUsersParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
 // UpsertScramUserParams defines parameters for UpsertScramUser.
 type UpsertScramUserParams struct {
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
@@ -1238,7 +1250,7 @@ type DeleteScramUserParams struct {
 	// Mechanism Mechanism to delete. Omitted = both mechanisms are tried.
 	Mechanism *DeleteScramUserParamsMechanism `form:"mechanism,omitempty" json:"mechanism,omitempty"`
 
-	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
+	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). A malformed header is rejected with 400. When `private_clusters.mode` does not allow the caller private clusters, the header is never read: a `__private__` request gets 403 (`private_clusters_disabled` or `private_clusters_forbidden`), and any other request ignores it. On an allowed request kafkito's RBAC does not apply to the private cluster; the broker's ACLs do.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
 
@@ -4438,6 +4450,20 @@ func (response TestCluster401JSONResponse) VisitTestClusterResponse(w http.Respo
 	return err
 }
 
+type TestCluster403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response TestCluster403JSONResponse) VisitTestClusterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type DeleteAclRequestObject struct {
 	Cluster Cluster `json:"cluster"`
 	Params  DeleteAclParams
@@ -4878,6 +4904,20 @@ func (response GetCapabilities401JSONResponse) VisitGetCapabilitiesResponse(w ht
 	return err
 }
 
+type GetCapabilities403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetCapabilities403JSONResponse) VisitGetCapabilitiesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetCapabilities404JSONResponse struct{ NotFoundJSONResponse }
 
 func (response GetCapabilities404JSONResponse) VisitGetCapabilitiesResponse(w http.ResponseWriter) error {
@@ -4956,6 +4996,20 @@ func (response RefreshCapabilities401JSONResponse) VisitRefreshCapabilitiesRespo
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RefreshCapabilities403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response RefreshCapabilities403JSONResponse) VisitRefreshCapabilitiesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
 	_, err := buf.WriteTo(w)
 	return err
 }

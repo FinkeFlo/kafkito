@@ -14,7 +14,7 @@ flowchart TD
     B[Browser / SPA] --> P["Auth proxy (optional, e.g. approuter)"]
     P --> M["Security headers, request log, 30 s timeout"]
     M --> A[Auth middleware]
-    A --> PC["Internal cluster name refusal, private-cluster header decode + SSRF pre-check"]
+    A --> PC["Internal cluster name refusal, private cluster mode, private-cluster header decode + SSRF pre-check"]
     PC --> R[RBAC]
     R --> PR[Private-cluster resolution]
     PR --> V["Body limit + OpenAPI request validation (kin-openapi)"]
@@ -45,10 +45,12 @@ mounts each generated operation on the middleware chain it needs.
   Path parameters are percent-decoded exactly once, the same way the
   generated binding decodes them, so RBAC and the handler always see the same
   name. A route without a permission is denied unless it is listed in
-  `rbacExemptRoutes`, and a test walks the router so every cluster route has
-  one or the other. The topic, group, consumer, schema subject and SCRAM
-  user lists are filtered to what the caller may view, except on private
-  clusters.
+  `rbacExemptRoutes`, on private clusters too, and a test walks the router
+  so every cluster route has one or the other. The topic, group, consumer,
+  schema subject and SCRAM user lists are filtered to what the caller may
+  view, except on private clusters. With `private_clusters.mode: role` the
+  permission `private_cluster:use` decides who may use private clusters
+  (see [Private clusters](#private-clusters)).
 - **Handlers** implement the generated `StrictServerInterface` and talk to
   the kafka layer through small interfaces (`internal/server/stores.go`).
   `internal/kafka` has one `Connections` core (configs, lazily created
@@ -152,7 +154,19 @@ inline scripts or styles), `X-Content-Type-Options`, `Referrer-Policy`,
   name that stays the same while the server runs, so an operator can
   correlate one cluster's lines; that id is not a cluster name either.
   `private_cluster_names_test.go` pins this.
-- RBAC does not apply, lists included; the broker's own ACLs do.
+- Operators can disable private clusters or restrict them to a role with
+  `private_clusters.mode` (`KAFKITO_PRIVATE_CLUSTERS`): `on` (the default),
+  `off`, or `role`, which requires RBAC and the permission
+  `private_cluster:use` (a rule on the type `private_cluster` or on `*`
+  grants it). `privateClusterGate` applies the mode to the `__private__`
+  path segment and to Test connection before the header is decoded, the
+  copy handler to a `dest_cluster_config`. A caller the mode refuses gets
+  `403 private_clusters_disabled` or `403 private_clusters_forbidden`, and
+  the header is ignored on their other requests. `GET /api/v1/me` reports
+  the mode and whether the caller may use private clusters.
+  `private_cluster_access_test.go` pins this.
+- Once the mode allows a request, RBAC does not apply, lists included; the
+  broker's own ACLs do.
 - Anyone who can run script in the page can read them, which is why the CSP
   is strict. On a shared machine, other users of the same browser profile
   can read them too.
