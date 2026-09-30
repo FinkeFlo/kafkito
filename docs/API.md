@@ -387,6 +387,7 @@ Notes:
 - Use `zones` to control where the scanner looks (`value`, `headers`, `key`).
 - Matching runs against each record's full, untruncated content, so `contains`/`jsonpath`/`xpath`/`js` all find hits anywhere in large values (there is no size limit on what is *searched*). Only the message previews in the response stay capped at 64 KB per value, same as `GET .../messages` — use the raw-download endpoint to fetch a full value for a hit.
 - On topics with a `data_masking` rule, the value is matched in its **masked** form — the same rendering `GET .../messages` returns — so masked content is not searchable in clear text. The same holds for keys and header values on topics with a `key` or `headers` rule (the `contains` key/headers zones and `key`/`headers` in `js`); header keys are not masked and are matched as they are. Parse errors on such topics report `value could not be evaluated (details withheld: data masking applies to this topic)` in `parse_error_offsets[].error` instead of the parser's message, which can quote the value.
+- The server log gets one warning per search that skipped records: the count per error kind (`json_parse_error`, `xml_parse_error`, `js_error`, `js_timeout`) and the partition and offset of the first skipped record. Error texts are never logged, on any cluster, because they can quote record content.
 
 ### Produce
 

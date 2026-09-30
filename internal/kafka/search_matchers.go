@@ -23,6 +23,37 @@ type matcher interface {
 	match(m *Message) (bool, error)
 }
 
+// Kinds of matchError. They name the failure class in the search log.
+const (
+	matchErrJSONParse = "json_parse_error"
+	matchErrXMLParse  = "xml_parse_error"
+	matchErrJS        = "js_error"
+	matchErrJSTimeout = "js_timeout"
+	// matchErrOther is the kind of a matcher error that carries none.
+	matchErrOther = "match_error"
+)
+
+// matchError is the error a matcher returns for a record it cannot
+// evaluate. Its text can quote the record's key, value or headers; kind
+// does not and is the only part of it that is logged.
+type matchError struct {
+	kind string
+	err  error
+}
+
+func (e *matchError) Error() string { return e.err.Error() }
+
+func (e *matchError) Unwrap() error { return e.err }
+
+// matchErrorKind returns the kind of a matcher error.
+func matchErrorKind(err error) string {
+	var me *matchError
+	if errors.As(err, &me) {
+		return me.kind
+	}
+	return matchErrOther
+}
+
 type passAllMatcher struct{}
 
 func (passAllMatcher) match(*Message) (bool, error) { return true, nil }
@@ -147,7 +178,7 @@ func jsonPathEval(expr jp.Expr) pathEval {
 		}
 		parsed, err := oj.ParseString(trimmed)
 		if err != nil {
-			return nil, false, err
+			return nil, false, &matchError{kind: matchErrJSONParse, err: err}
 		}
 		nodes := expr.Get(parsed)
 		out := make([]string, 0, len(nodes))
@@ -189,7 +220,7 @@ func xmlPathEval(expr *xpath.Expr) pathEval {
 		}
 		doc, err := xmlquery.Parse(strings.NewReader(trimmed))
 		if err != nil {
-			return nil, false, err
+			return nil, false, &matchError{kind: matchErrXMLParse, err: err}
 		}
 		result := expr.Evaluate(xmlquery.CreateXPathNavigator(doc))
 		out := []string{}
@@ -312,7 +343,13 @@ func (j *jsMatcher) match(m *Message) (bool, error) {
 		j.rt.ToValue(m.Timestamp),
 	)
 	if err != nil {
-		return false, fmt.Errorf("js filter run: %w", err)
+		kind := matchErrJS
+		// The runtime is only interrupted by the timer above.
+		var interrupted *goja.InterruptedError
+		if errors.As(err, &interrupted) {
+			kind = matchErrJSTimeout
+		}
+		return false, &matchError{kind: kind, err: fmt.Errorf("js filter run: %w", err)}
 	}
 	return res.ToBoolean(), nil
 }

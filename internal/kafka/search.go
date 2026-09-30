@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -268,6 +269,7 @@ func (r *Messages) SearchMessages(ctx context.Context, cluster, topic string, op
 		scan.chunk = searchChunk(opts.Budget, len(ranges))
 	}
 	budgetExhausted, timedOut, err := r.runSearch(ctx, scan, opts, sc)
+	sc.logParseErrors(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -403,6 +405,10 @@ type searchScan struct {
 	// errDetails keeps up to parseErrorOffsetsCap parse errors per
 	// partition, in the order they were read.
 	errDetails map[int32][]ParseErrorOffset
+	// parseErrorKinds counts the parse errors per matchError kind, and
+	// firstErr is the location of the first one; both feed the search log.
+	parseErrorKinds map[string]int
+	firstErr        *ParseErrorOffset
 	// confirmed counts the matches at or above their partition's frontier,
 	// i.e. the matches this call can return (before the limit).
 	confirmed int
@@ -493,7 +499,7 @@ func (sc *searchScan) visit(ctx context.Context, rec *kgo.Record) {
 	full := sc.dec.matchMessage(ctx, rec)
 	hit, err := sc.match.match(&full)
 	if err != nil {
-		sc.parseError(ctx, rec, err)
+		sc.parseError(rec, err)
 		return
 	}
 	if hit {
@@ -566,15 +572,20 @@ func (sc *searchScan) confirmedMatches() []Message {
 // masking rule: parser and JS errors can quote parts of the value.
 const parseErrorWithheld = "value could not be evaluated (details withheld: data masking applies to this topic)"
 
-func (sc *searchScan) parseError(ctx context.Context, rec *kgo.Record, err error) {
+// parseError records a record the matcher could not evaluate. The error
+// text goes to the response only, withheld where masking applies.
+func (sc *searchScan) parseError(rec *kgo.Record, err error) {
+	if sc.parseErrorKinds == nil {
+		sc.parseErrorKinds = make(map[string]int, 1)
+	}
+	sc.parseErrorKinds[matchErrorKind(err)]++
+	if sc.firstErr == nil {
+		sc.firstErr = &ParseErrorOffset{Partition: rec.Partition, Offset: rec.Offset}
+	}
 	msg := err.Error()
 	if sc.dec.masks {
 		msg = parseErrorWithheld
 	}
-	slog.WarnContext(ctx, "search: skipping message – parse error",
-		"partition", rec.Partition,
-		"offset", rec.Offset,
-		"error", msg)
 	p := rec.Partition
 	sc.errored[p] = append(sc.errored[p], rec.Offset)
 	pe := ParseErrorOffset{Partition: p, Offset: rec.Offset, Error: msg}
@@ -596,6 +607,27 @@ func (sc *searchScan) parseError(ctx context.Context, rec *kgo.Record, err error
 			ds[lowest] = pe
 		}
 	}
+}
+
+// logParseErrors writes one warning per search that skipped records: the
+// count per error kind and the location of the first skipped record. The
+// error texts are never logged, whether or not masking applies, because
+// they can quote record content.
+func (sc *searchScan) logParseErrors(ctx context.Context) {
+	if sc.firstErr == nil {
+		return
+	}
+	count := 0
+	kinds := make([]any, 0, 2*len(sc.parseErrorKinds))
+	for _, kind := range slices.Sorted(maps.Keys(sc.parseErrorKinds)) {
+		count += sc.parseErrorKinds[kind]
+		kinds = append(kinds, kind, sc.parseErrorKinds[kind])
+	}
+	slog.WarnContext(ctx, "search: skipped messages that could not be evaluated",
+		"count", count,
+		slog.Group("kinds", kinds...),
+		"first_partition", sc.firstErr.Partition,
+		"first_offset", sc.firstErr.Offset)
 }
 
 // pageFull reports whether reading on could not change this call's page:
