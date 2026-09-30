@@ -20,12 +20,15 @@ var ErrModeUnavailable = errors.New("auth mode unavailable in this build")
 type ModeConfig struct {
 	// Mode selects which registered factory to use (e.g. "off", "mock"). The
 	// set of valid values depends on the build tags the binary was compiled
-	// with: a default build registers "off" and "mock"; tagged builds may
+	// with: every build registers "off", "mock" and "oidc"; tagged builds may
 	// register additional IdP-specific modes.
 	Mode string
 	// VCAPServices is the raw VCAP_SERVICES JSON, used by IdP modes that
 	// expect their credentials in a Cloud Foundry service binding.
 	VCAPServices string
+	// OIDC configures the generic "oidc" mode. An empty JWKSEndpoint triggers
+	// OpenID Connect discovery at startup.
+	OIDC OIDCConfig
 }
 
 // ModeFactory constructs a Validator for a registered auth mode. The returned
@@ -34,9 +37,9 @@ type ModeConfig struct {
 type ModeFactory func(cfg ModeConfig) (Validator, func(), error)
 
 // modes is the registry of mode-name -> factory. Generic modes register
-// themselves from init() in mode_default.go, mode_off.go and mode_devauth.go;
-// IdP-specific subpackages register themselves via init() behind their
-// respective build tags. Look up via BuildValidator.
+// themselves from init() in mode_default.go, mode_oidc.go, mode_off.go and
+// mode_devauth.go; IdP-specific subpackages register themselves via init()
+// behind their respective build tags. Look up via BuildValidator.
 var modes = map[string]ModeFactory{}
 
 // modesMu guards modes, so Register and BuildValidator are safe to call
