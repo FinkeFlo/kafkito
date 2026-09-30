@@ -7,10 +7,9 @@ export type TestOutcome =
   | { kind: "probed"; info: ClusterInfo }
   | { kind: "error"; message: string };
 
-// Dial errors on a cold broker DNS cache are often transient; say so.
-function coldDNSHint(msg: string): string {
-  const m = msg.toLowerCase();
-  if (m.includes("i/o timeout") || m.includes("dial")) {
+// A timeout on a cold broker DNS cache is often transient; say so.
+function coldDNSHint(errorClass: ClusterInfo["error_class"]): string {
+  if (errorClass === "timeout") {
     return " — first probe is slow on cold broker DNS; cluster connections cache for ~15min after first contact, so a retry usually succeeds in <1s.";
   }
   return "";
@@ -48,7 +47,7 @@ export function TestConnectionResult({
   if (outcome.kind === "error") {
     return (
       <Notice intent="danger" className={className}>
-        {`Error: ${outcome.message}${coldDNSHint(outcome.message)}`}
+        {`Error: ${outcome.message}`}
       </Notice>
     );
   }
@@ -81,7 +80,7 @@ export function TestConnectionResult({
   const err = info.error ?? "unknown error";
   return (
     <Notice intent="danger" className={className}>
-      {`Unreachable: ${err}${coldDNSHint(err)}`}
+      {`Unreachable: ${err}${coldDNSHint(info.error_class)}`}
     </Notice>
   );
 }

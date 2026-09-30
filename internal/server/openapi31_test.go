@@ -91,7 +91,7 @@ func TestOpenAPI31_RequestValidation_NullableArray(t *testing.T) {
 			assert.Contains(t, rec.Body.String(), `"code":"invalid_request"`, tc.value)
 			assert.Contains(t, rec.Body.String(), `/data_masking`, tc.value)
 		} else {
-			assert.Contains(t, rec.Body.String(), `broker \"127.0.0.1:9092\"`, tc.value)
+			assert.Contains(t, rec.Body.String(), `broker 1: destination not allowed`, tc.value)
 		}
 	}
 }

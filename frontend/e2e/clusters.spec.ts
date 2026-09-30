@@ -130,6 +130,8 @@ test.describe("Clusters", () => {
   test("test connection rejects a loopback broker", async ({ page }) => {
     const { dialog, response } = await testConnection(page, `localhost:${KAFKA_HOST_PORT}`);
     expect(response.status()).toBe(400);
-    await expect(dialog.getByText(/^Error: HTTP 400: broker "localhost:39092": /)).toBeVisible();
+    await expect(
+      dialog.getByText("Error: HTTP 400: broker 1: destination not allowed"),
+    ).toBeVisible();
   });
 });

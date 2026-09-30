@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/FinkeFlo/kafkito/internal/config"
+	"github.com/FinkeFlo/kafkito/internal/connerr"
 	"github.com/FinkeFlo/kafkito/internal/masking"
 	"github.com/FinkeFlo/kafkito/internal/netguard"
 	"github.com/twmb/franz-go/pkg/kadm"
@@ -467,7 +468,10 @@ func guardedTLSDialer(tlsCfg config.TLSConfig, guarded dialFunc) dialFunc {
 		tlsConn := tls.Client(conn, cfg)
 		if hsErr := tlsConn.HandshakeContext(ctx); hsErr != nil {
 			_ = conn.Close()
-			return nil, fmt.Errorf("tls handshake to %s: %w", host, hsErr)
+			// Marked, because a peer without TLS often just closes the
+			// connection or never answers: the cause alone reads as EOF
+			// or a timeout.
+			return nil, connerr.WithClass(connerr.TLS, fmt.Errorf("tls handshake to %s: %w", host, hsErr))
 		}
 		return tlsConn, nil
 	}

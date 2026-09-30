@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/FinkeFlo/kafkito/api"
+	"github.com/FinkeFlo/kafkito/internal/connerr"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
@@ -116,4 +117,26 @@ func missing(have, in map[string]bool) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// The spec's ConnectionErrorClass enum lists exactly the classes of
+// internal/connerr, which the Test connection response serialises.
+func TestOpenAPISpec_ConnectionErrorClassMatchesConnerr(t *testing.T) {
+	t.Parallel()
+
+	doc, err := loadSpec()
+	require.NoError(t, err)
+	schema := doc.Components.Schemas["ConnectionErrorClass"]
+	require.NotNil(t, schema)
+	var spec []string
+	for _, v := range schema.Value.Enum {
+		s, ok := v.(string)
+		require.True(t, ok, "enum value %v", v)
+		spec = append(spec, s)
+	}
+	var classes []string
+	for _, c := range connerr.Classes() {
+		classes = append(classes, string(c))
+	}
+	assert.ElementsMatch(t, classes, spec)
 }

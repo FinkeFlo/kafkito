@@ -13,6 +13,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 
+	"github.com/FinkeFlo/kafkito/internal/connerr"
 	"github.com/FinkeFlo/kafkito/internal/netguard"
 )
 
@@ -42,7 +43,12 @@ type BrokerIssue struct {
 	Host   string `json:"host"`
 	Port   int32  `json:"port"`
 	Reason string `json:"reason"`
-	Error  string `json:"error"`
+	// Error is the fixed text of ErrorClass. It never names an address;
+	// Host and Port do.
+	Error      string        `json:"error"`
+	ErrorClass connerr.Class `json:"error_class"`
+	// Cause is the full error, for the server log only.
+	Cause error `json:"-"`
 }
 
 // ProbeBrokers asks a seed broker of the named cluster for the brokers it
@@ -92,8 +98,8 @@ func (r *Connections) ProbeBrokers(ctx context.Context, name string) (issues []B
 					reason = BrokerIssueBlocked
 				}
 				results[i] = &BrokerIssue{
-					NodeID: b.NodeID, Host: b.Host, Port: b.Port,
-					Reason: reason, Error: err.Error(),
+					NodeID: b.NodeID, Host: b.Host, Port: b.Port, Reason: reason,
+					Error: connerr.Message(err), ErrorClass: connerr.Classify(err), Cause: err,
 				}
 			}
 		})

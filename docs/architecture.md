@@ -69,8 +69,10 @@ private cluster's address. The body is always
 `{"error": "...", "code": "..."}` (code optional). Only 5xx causes are logged,
 server-side. The log line names the cluster (`cluster`) when the route has
 one. Messages are static texts or name the failed rule, never the submitted
-value, so they never contain credentials or the raw `X-Kafkito-Cluster`
-header.
+value, so they never contain credentials, host names or the raw
+`X-Kafkito-Cluster` header. Connection failures of private clusters are
+reported by class, see
+[Outbound connections](#outbound-connections-ssrf-guard).
 
 ## OpenAPI as the contract
 
@@ -123,6 +125,28 @@ the same budget, and reports each blocked or unreachable one in
 broker return `502 private_cluster_address_blocked` with a static message
 that names no host.
 
+Error texts are fixed: they never name an address, a port, the resolver or
+an operating system error. A definition the pre-check refuses gets a `400`
+that names the field and the reason, a broker by its 1-based position:
+`broker 2: host name could not be resolved`,
+`broker 1: destination not allowed` or `schema_registry.url: invalid URL`.
+Test connection answers a failed probe with `reachable: false`, the class
+of the failure in `error_class` (`internal/connerr`) and the class's text
+in `error`:
+
+| Class | Text |
+| ----- | ---- |
+| `refused` | connection refused |
+| `timeout` | connection timed out |
+| `dns` | host name could not be resolved |
+| `tls` | TLS handshake failed |
+| `sasl` | authentication failed |
+| `blocked` | destination not allowed |
+| `unreachable` | broker not reachable (any other failure) |
+
+Each `broker_issues` entry carries its own class; its `host` and `port` are
+the ones the cluster advertises. The full error goes to the server log only.
+
 ## Security headers
 
 Every response carries a strict Content-Security-Policy (`'self'` only, no
@@ -161,15 +185,18 @@ network path can read them. Run kafkito only behind TLS:
   closes the client and drops all of it once no request (a running copy
   included) has used the cluster for 15 minutes. The periodic metrics
   collection does not count as use. The raw header and its credentials never
-  appear in logs, error bodies or validation messages.
+  appear in logs, error bodies or validation messages. Error bodies and
+  validation messages repeat no other value of the definition either: no
+  host name, URL or auth type.
 - Operator logs do contain the addresses of private clusters: broker and
   Schema Registry host names, resolved IPs and ports. This is intentional;
   they are needed to troubleshoot connections. Lines that carry them include
   the franz-go client warnings (for example
   `unable to open connection to broker` with `"addr":"10.0.0.5:9092"`), the
   `err` field of the 5xx error log, the Test connection warnings
-  (`testCluster ping failed`, `testCluster broker probe failed`) and the
-  topic copy warnings; at `debug` level, more lines can. Credentials and the
+  (`testCluster ping failed`, `testCluster broker probe failed`, with the
+  full error of a failure the caller only sees as a class) and the topic
+  copy warnings; at `debug` level, more lines can. Credentials and the
   raw header never appear; `private_cluster_leak_test.go` pins both. Treat
   the logs as containing infrastructure details of your users' clusters and
   restrict who can read them.

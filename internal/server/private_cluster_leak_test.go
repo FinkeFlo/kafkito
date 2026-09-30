@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/FinkeFlo/kafkito/internal/config"
+	"github.com/FinkeFlo/kafkito/internal/connerr"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 )
 
@@ -246,6 +247,160 @@ func TestPrivateClusterLogs_HostsAllowedSecretsNever(t *testing.T) {
 			assert.NotContains(t, logged, leakPassword, "credentials are never logged")
 			assert.NotContains(t, logged, "leak-user", "SASL user names are never logged")
 			assert.NotContains(t, logged, header, "the raw header is never logged")
+		})
+	}
+}
+
+// Messages about a private cluster definition, from the X-Kafkito-Cluster
+// header, a Test connection body or a copy's dest_cluster_config, are fixed
+// texts. They name a broker by its position and never repeat a submitted
+// host, URL, auth type, user name or password, a resolved address, resolver
+// output or an operating system error.
+func TestPrivateClusterMessages_RepeatNoSubmittedValue(t *testing.T) {
+	t.Parallel()
+
+	const srUser = "echo-sr-user"
+	defs := []struct {
+		name   string
+		cfg    config.ClusterConfig
+		want   string // checked where the request validator does not answer first
+		absent []string
+	}{
+		{
+			name: "unresolvable broker", cfg: config.ClusterConfig{Brokers: []string{"echo-marker.invalid:9092"}},
+			want:   "broker 1: host name could not be resolved",
+			absent: []string{"echo-marker", ".invalid", "lookup", "no such host", ":53", "9092"},
+		},
+		{
+			name: "blocked broker address", cfg: config.ClusterConfig{Brokers: []string{"203.0.113.10:9092", "169.254.169.254:9092"}},
+			want:   "broker 2: destination not allowed",
+			absent: []string{"169.254", "203.0.113.10", "blocked range"},
+		},
+		{
+			name: "broker resolving to a blocked address", cfg: config.ClusterConfig{Brokers: []string{"localhost:9092"}},
+			want:   "broker 1: destination not allowed",
+			absent: []string{"localhost", "127.0.0.1", "::1"},
+		},
+		{
+			name: "schema registry URL with credentials", cfg: config.ClusterConfig{
+				Brokers:        []string{"203.0.113.10:9092"},
+				SchemaRegistry: config.SchemaRegistryConfig{URL: "http://" + srUser + ":" + leakPassword + "@bad host:8081"},
+			},
+			want:   "schema_registry.url: invalid URL",
+			absent: []string{leakPassword, srUser, "bad host", "8081", "http://"},
+		},
+		{
+			name: "SASL without password", cfg: config.ClusterConfig{
+				Brokers: []string{"203.0.113.10:9092"},
+				Auth:    config.AuthConfig{Type: "scram-sha-512", Username: "echo-sasl-user"},
+			},
+			want:   "auth.username and auth.password are required for SASL",
+			absent: []string{"scram", "echo-sasl-user"},
+		},
+		{
+			name: "unknown auth type", cfg: config.ClusterConfig{
+				Brokers: []string{"203.0.113.10:9092"},
+				Auth:    config.AuthConfig{Type: "echo-auth-marker", Username: "u", Password: leakPassword},
+			},
+			absent: []string{"echo-auth-marker", leakPassword},
+		},
+	}
+	source := encodeHeader(t, config.ClusterConfig{Brokers: []string{unreachableBroker}})
+	paths := []struct {
+		name string
+		req  func(cfg config.ClusterConfig) *http.Request
+		// validated says whether the request validator sees the definition.
+		validated bool
+	}{
+		{"header", func(cfg config.ClusterConfig) *http.Request {
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/__private__/topics", nil)
+			req.Header.Set(PrivateClusterHeader, encodeHeader(t, cfg))
+			return req
+		}, false},
+		{"test connection header", func(cfg config.ClusterConfig) *http.Request {
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters/_test", nil)
+			req.Header.Set(PrivateClusterHeader, encodeHeader(t, cfg))
+			return req
+		}, false},
+		{"test connection body", func(cfg config.ClusterConfig) *http.Request {
+			body, err := json.Marshal(cfg)
+			require.NoError(t, err)
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters/_test", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			return req
+		}, true},
+		{"copy dest_cluster_config", func(cfg config.ClusterConfig) *http.Request {
+			body, err := json.Marshal(map[string]any{"dest_topic": "t", "dest_cluster_config": cfg})
+			require.NoError(t, err)
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters/__private__/topics/orders/copy", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set(PrivateClusterHeader, source)
+			return req
+		}, true},
+	}
+	for _, p := range paths {
+		for _, d := range defs {
+			t.Run(p.name+"/"+d.name, func(t *testing.T) {
+				t.Parallel()
+
+				reg := kafkapkg.NewRegistry(nil, slog.New(slog.DiscardHandler))
+				t.Cleanup(reg.Close)
+				h := New(Options{Version: "x", Logger: slog.New(slog.DiscardHandler), Registry: reg, Config: config.Defaults()})
+				rec := httptest.NewRecorder()
+				h.ServeHTTP(rec, p.req(d.cfg))
+
+				require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+				body := rec.Body.String()
+				if d.want != "" {
+					assert.Contains(t, body, d.want)
+				} else if !p.validated {
+					assert.Contains(t, body, "auth.type not supported")
+				}
+				for _, s := range d.absent {
+					assert.NotContains(t, body, s)
+				}
+			})
+		}
+	}
+}
+
+// A Test connection that fails to connect reports the class of the
+// failure, not the dial error with the address the server tried.
+func TestTestCluster_ConnectionFailureNamesNoAddress(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.ClusterConfig{Brokers: []string{unreachableBroker}}
+	body, err := json.Marshal(cfg)
+	require.NoError(t, err)
+	for name, req := range map[string]*http.Request{
+		"body":   httptest.NewRequest(http.MethodPost, "/api/v1/clusters/_test", bytes.NewReader(body)),
+		"header": httptest.NewRequest(http.MethodPost, "/api/v1/clusters/_test", nil),
+	} {
+		if name == "body" {
+			req.Header.Set("Content-Type", "application/json")
+		} else {
+			req.Header.Set(PrivateClusterHeader, encodeHeader(t, cfg))
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			reg := kafkapkg.NewRegistry(nil, slog.New(slog.DiscardHandler))
+			t.Cleanup(reg.Close)
+			c := config.Defaults()
+			c.Server.TestConnectionTimeout = 300 * time.Millisecond
+			h := New(Options{Version: "x", Logger: slog.New(slog.DiscardHandler), Registry: reg, Config: c})
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+			var info kafkapkg.ClusterInfo
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &info))
+			assert.False(t, info.Reachable)
+			assert.Equal(t, connerr.Timeout, info.ErrorClass)
+			assert.Equal(t, connerr.Timeout.Message(), info.Error)
+			for _, s := range []string{"192.0.2.1", "9092", "dial tcp", "connect:", "i/o timeout", "context deadline"} {
+				assert.NotContains(t, rec.Body.String(), s)
+			}
 		})
 	}
 }

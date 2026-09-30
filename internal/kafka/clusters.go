@@ -7,6 +7,8 @@ import (
 	"context"
 	"strings"
 	"time"
+
+	"github.com/FinkeFlo/kafkito/internal/connerr"
 )
 
 // ClusterInfo describes a configured cluster and whether it is currently reachable.
@@ -19,6 +21,10 @@ type ClusterInfo struct {
 	TLS            bool          `json:"tls"`
 	SchemaRegistry bool          `json:"schema_registry"`
 	Capabilities   *Capabilities `json:"capabilities,omitempty"`
+	// ErrorClass is the class of Error when a Test connection could not
+	// reach the seed or list the brokers (see connerr); Error is then the
+	// class's fixed text. Only the Test connection endpoint fills it.
+	ErrorClass connerr.Class `json:"error_class,omitempty"`
 	// BrokerIssues lists the advertised brokers a Test connection could not
 	// reach (see Connections.ProbeBrokers). Only the Test connection
 	// endpoint fills it; a non-empty list implies Reachable is false.

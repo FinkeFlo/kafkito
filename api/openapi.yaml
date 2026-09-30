@@ -171,14 +171,21 @@ paths:
         and runs a short capability probe. The definition is taken from the
         request body or, when the body is empty, from the `X-Kafkito-Cluster`
         header (the body wins). A failed probe is **not** an HTTP error: the
-        response is 200 with `reachable: false` and the raw connection error
-        in `error`, because diagnosing the caller's own broker is the point of
-        this endpoint. When the seed answers but an advertised broker is
-        blocked by the outbound address guard or does not answer, `reachable`
-        is false and `broker_issues` lists each such broker. At most 64
-        advertised brokers are checked; `brokers_skipped` counts the rest.
-        The whole probe shares one budget, 15 s by default
+        response is 200 with `reachable: false`, the class of the failure in
+        `error_class` (see `ConnectionErrorClass`) and its fixed text in
+        `error`, for example `connection refused`. Neither names an address,
+        a port or an operating system error; the server log keeps the full
+        error. When the seed answers but an advertised broker is blocked by
+        the outbound address guard or does not answer, `reachable` is false
+        and `broker_issues` lists each such broker with its own class. At
+        most 64 advertised brokers are checked; `brokers_skipped` counts the
+        rest. The whole probe shares one budget, 15 s by default
         (`KAFKITO_TEST_CONNECTION_TIMEOUT`).
+
+        A definition that fails validation is a 400. Its message names a
+        broker by its 1-based position in `brokers` and never repeats a
+        submitted value, for example `broker 2: host name could not be
+        resolved` or `schema_registry.url: invalid URL`.
 
         The probed definition is a private cluster, so `private_clusters.mode`
         applies: 403 `private_clusters_disabled` or
@@ -1334,8 +1341,11 @@ components:
       description: >
         Base64-encoded JSON `ClusterConfig` of a private (browser-stored)
         cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment
-        is `__private__` (required then). A malformed header is rejected with
-        400. When `private_clusters.mode` does not allow the caller private
+        is `__private__` (required then). A malformed header or a definition
+        that fails validation is rejected with 400; the message names the
+        field and a fixed reason, a broker by its 1-based position, and never
+        repeats a value from the header. When `private_clusters.mode` does
+        not allow the caller private
         clusters, the header is never read: a `__private__` request gets 403
         (`private_clusters_disabled` or `private_clusters_forbidden`), and any
         other request ignores it. On an allowed request kafkito's RBAC does
@@ -1535,6 +1545,13 @@ components:
         name: { type: string }
         reachable: { type: boolean }
         error: { type: string }
+        error_class:
+          $ref: "#/components/schemas/ConnectionErrorClass"
+          description: >
+            Test connection only: the class of `error` when the seed broker
+            or the broker list could not be reached. Absent when
+            `reachable` is true and when only `broker_issues` failed; each
+            issue carries its own class.
         is_prod: { type: boolean }
         auth_type: { type: string }
         tls: { type: boolean }
@@ -1564,7 +1581,7 @@ components:
         total_rate_per_sec: { type: number, format: double }
     BrokerIssue:
       type: object
-      required: [node_id, host, port, reason, error]
+      required: [node_id, host, port, reason, error, error_class]
       properties:
         node_id: { type: integer, format: int32 }
         host:
@@ -1581,7 +1598,20 @@ components:
             or SASL failure).
         error:
           type: string
-          description: Raw connection error, for diagnosis.
+          description: >
+            Fixed text of `error_class`, for example `connection refused`.
+            It names no address; `host` and `port` do.
+        error_class: { $ref: "#/components/schemas/ConnectionErrorClass" }
+    ConnectionErrorClass:
+      type: string
+      enum: [refused, timeout, dns, tls, sasl, blocked, unreachable]
+      description: >
+        Class of a failed connection attempt to a private cluster. Each class
+        has a fixed text: `refused` connection refused, `timeout` connection
+        timed out, `dns` host name could not be resolved, `tls` TLS handshake
+        failed, `sasl` authentication failed, `blocked` destination not
+        allowed (outbound address guard), `unreachable` broker not reachable
+        (any other failure).
     Capabilities:
       type: object
       required: [describe_cluster, list_topics, describe_configs, list_groups, create_topic, delete_topic, alter_configs, probed_at]
@@ -2155,7 +2185,10 @@ components:
         Ad-hoc ("private") cluster definition supplied per request instead of
         from the server config — the same JSON the `X-Kafkito-Cluster` header
         carries (base64-encoded there). Broker and Schema Registry hosts are
-        subject to the server's outbound-host (SSRF) policy.
+        subject to the server's outbound-host (SSRF) policy. A definition
+        that violates it or fails validation gets a 400 whose message names
+        the field (a broker by its 1-based position) and a fixed reason,
+        never the submitted value.
       properties:
         name: { type: string }
         is_prod: { type: boolean }

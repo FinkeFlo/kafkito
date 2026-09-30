@@ -10,6 +10,8 @@ package kafka
 import (
 	"context"
 	"log/slog"
+	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/FinkeFlo/kafkito/internal/config"
+	"github.com/FinkeFlo/kafkito/internal/connerr"
 	"github.com/FinkeFlo/kafkito/internal/netguard"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
@@ -152,4 +155,71 @@ func TestClientOpts_ConfiguredCluster_TLSEnabled_UsesDialTLSConfigPath(t *testin
 	require.NoError(t, err, "operator TLS cluster must construct cleanly via DialTLSConfig")
 	require.NotNil(t, cl)
 	cl.Close()
+}
+
+// serveTCP accepts connections on a loopback port and hands each to handle.
+func serveTCP(t *testing.T, handle func(net.Conn)) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ln.Close() })
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			handle(c)
+		}
+	}()
+	return ln.Addr().String()
+}
+
+// A failed TLS handshake is the tls class even when the peer only closes
+// the connection or never answers, which is what a broker without TLS
+// does. A failed dial keeps its own class.
+func TestGuardedTLSDialer_HandshakeFailureIsTLSClass(t *testing.T) {
+	t.Parallel()
+
+	var mu sync.Mutex
+	var held []net.Conn
+	t.Cleanup(func() {
+		mu.Lock()
+		defer mu.Unlock()
+		for _, c := range held {
+			_ = c.Close()
+		}
+	})
+	closed, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	closedAddr := closed.Addr().String()
+	require.NoError(t, closed.Close())
+
+	tests := []struct {
+		name string
+		addr string
+		want connerr.Class
+	}{
+		{"peer closes", serveTCP(t, func(c net.Conn) { _ = c.Close() }), connerr.TLS},
+		{"peer never answers", serveTCP(t, func(c net.Conn) {
+			mu.Lock()
+			held = append(held, c)
+			mu.Unlock()
+		}), connerr.TLS},
+		{"nothing listens", closedAddr, connerr.Refused},
+	}
+	dial := guardedTLSDialer(config.TLSConfig{Enabled: true}, (&net.Dialer{}).DialContext)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+			defer cancel()
+			conn, err := dial(ctx, "tcp", tc.addr)
+			if conn != nil {
+				_ = conn.Close()
+			}
+			require.Error(t, err)
+			assert.Equal(t, tc.want, connerr.Classify(err), err.Error())
+		})
+	}
 }

@@ -32,6 +32,11 @@ actions:
       x-go-type: kafka.BrokerIssue
       x-go-type-import:
         path: github.com/FinkeFlo/kafkito/internal/kafka
+  - target: $.components.schemas.ConnectionErrorClass
+    update:
+      x-go-type: connerr.Class
+      x-go-type-import:
+        path: github.com/FinkeFlo/kafkito/internal/connerr
   - target: $.components.schemas.TopicInfo
     update:
       x-go-type: kafka.TopicInfo

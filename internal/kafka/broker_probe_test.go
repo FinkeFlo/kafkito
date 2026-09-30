@@ -21,6 +21,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kfake"
 
 	"github.com/FinkeFlo/kafkito/internal/config"
+	"github.com/FinkeFlo/kafkito/internal/connerr"
 	"github.com/FinkeFlo/kafkito/internal/netguard"
 )
 
@@ -164,7 +165,10 @@ func TestProbeBrokers_ReportsBlockedAdvertisedBroker(t *testing.T) {
 	assert.Equal(t, "127.0.0.1", is.Host)
 	assert.NotZero(t, is.Port)
 	assert.Equal(t, BrokerIssueBlocked, is.Reason)
-	assert.Contains(t, is.Error, netguard.ErrBlockedAddress.Error())
+	assert.Equal(t, connerr.Blocked, is.ErrorClass)
+	assert.Equal(t, connerr.Blocked.Message(), is.Error)
+	require.ErrorIs(t, is.Cause, netguard.ErrBlockedAddress)
+	assert.NotContains(t, is.Error, "127.0.0.1", "the address is in Host, not in the error text")
 }
 
 func TestProbeBrokers_AllReachable(t *testing.T) {
@@ -192,10 +196,13 @@ func TestProbeBrokers_ReportsEachBrokerWithItsReason(t *testing.T) {
 	assert.Equal(t, int32(1), issues[0].NodeID)
 	assert.Equal(t, "192.0.2.21", issues[0].Host)
 	assert.Equal(t, BrokerIssueUnreachable, issues[0].Reason)
-	assert.NotContains(t, issues[0].Error, netguard.ErrBlockedAddress.Error())
+	assert.Equal(t, connerr.Refused, issues[0].ErrorClass)
+	assert.Equal(t, connerr.Refused.Message(), issues[0].Error)
+	require.ErrorIs(t, issues[0].Cause, syscall.ECONNREFUSED)
 	assert.Equal(t, int32(2), issues[1].NodeID)
 	assert.Equal(t, "127.0.0.1", issues[1].Host)
 	assert.Equal(t, BrokerIssueBlocked, issues[1].Reason)
+	assert.Equal(t, connerr.Blocked, issues[1].ErrorClass)
 }
 
 func TestProbeBrokers_UnknownCluster(t *testing.T) {

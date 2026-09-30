@@ -329,12 +329,12 @@ func (s *apiServer) copyJobFor(req gen.CopyMessagesRequestObject, r *http.Reques
 	// correctly detects "same actual cluster" even across differently
 	// labelled private-cluster configs that point at the same broker.
 	if cfg := body.DestClusterConfig; cfg != nil {
-		if err := validatePrivateClusterConfig(*cfg); err != nil {
+		if err := validatePrivateClusterConfig(r.Context(), *cfg); err != nil {
 			return job, badRequest(fmt.Errorf("dest_cluster_config: %w", err).Error())
 		}
 		name, err := s.copyReg.UseAdhoc(*cfg)
 		if err != nil {
-			return job, badRequest(fmt.Errorf("dest_cluster_config: %w", err).Error())
+			return job, badRequest("dest_cluster_config: " + errTextAdhocRegister)
 		}
 		job.destCluster, job.adhocDest = name, true
 	} else {

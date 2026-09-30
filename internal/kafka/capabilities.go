@@ -10,6 +10,9 @@ import (
 
 	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kerr"
+
+	"github.com/FinkeFlo/kafkito/internal/config"
+	"github.com/FinkeFlo/kafkito/internal/connerr"
 )
 
 // Capabilities reports which admin-level operations the configured Kafka
@@ -96,11 +99,12 @@ func (r *Clusters) probeCapabilities(ctx context.Context, cluster string) (*Capa
 
 	// All probes run sequentially with short timeouts. A failing probe
 	// only flips its own flag, never aborts the whole thing.
+	private := config.IsAdhocClusterName(cluster)
 	probe := func(name string, fn func(ctx context.Context) error) bool {
 		pctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
 		if err := fn(pctx); err != nil {
-			caps.Errors[name] = classifyErr(err)
+			caps.Errors[name] = capabilityErr(err, private)
 			return false
 		}
 		return true
@@ -112,7 +116,7 @@ func (r *Clusters) probeCapabilities(ctx context.Context, cluster string) (*Capa
 			return err
 		}
 		if len(bds) == 0 {
-			return errors.New("no brokers returned")
+			return errNoBrokersReturned
 		}
 		return nil
 	})
@@ -211,6 +215,9 @@ func (r *Clusters) probeCapabilities(ctx context.Context, cluster string) (*Capa
 
 func strPtr(s string) *string { return &s }
 
+// errNoBrokersReturned: the cluster answered, but without brokers.
+var errNoBrokersReturned = errors.New("no brokers returned")
+
 // classifyErr returns a compact, UI-friendly label for an error.
 func classifyErr(err error) string {
 	if err == nil {
@@ -220,4 +227,15 @@ func classifyErr(err error) string {
 		return ke.Message
 	}
 	return err.Error()
+}
+
+// capabilityErr is classifyErr for a failed capability probe. On a private
+// cluster any other error than a broker error code or an empty broker list
+// is a connection error and becomes the fixed text of its class (see
+// connerr), which never names an address.
+func capabilityErr(err error, private bool) string {
+	if _, isCode := errors.AsType[*kerr.Error](err); private && !isCode && !errors.Is(err, errNoBrokersReturned) {
+		return connerr.Message(err)
+	}
+	return classifyErr(err)
 }
