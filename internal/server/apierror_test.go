@@ -4,6 +4,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,6 +16,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers"
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -169,4 +171,28 @@ func TestNoRequestBody(t *testing.T) {
 	}))
 	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", strings.NewReader("junk")))
 	assert.Equal(t, "seen", string(got))
+}
+
+// requestWithCluster is a request as the handler sees it after routing,
+// with the cluster path parameter resolved.
+func requestWithCluster(cluster string) *http.Request {
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("cluster", cluster)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/__private__/topics", nil)
+	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+}
+
+// #118: the 5xx log names the cluster; requests without one omit the attr.
+func TestWriteError_ClusterAttr(t *testing.T) {
+	t.Parallel()
+
+	logs := &syncBuffer{}
+	ew := errorWriter{log: slog.New(slog.NewJSONHandler(logs, nil))}
+	ew.writeError(httptest.NewRecorder(), requestWithCluster("prod-eu"), upstreamError("list brokers", errors.New("boom")))
+	assert.Contains(t, logs.String(), `"cluster":"prod-eu"`)
+
+	logs2 := &syncBuffer{}
+	ew2 := errorWriter{log: slog.New(slog.NewJSONHandler(logs2, nil))}
+	ew2.writeError(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/v1/info", nil), errors.New("db exploded"))
+	assert.NotContains(t, logs2.String(), `"cluster"`)
 }

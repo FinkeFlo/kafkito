@@ -69,7 +69,7 @@ func (s *apiServer) TestCluster(ctx context.Context, req gen.TestClusterRequestO
 		// etc.). This is NOT an accidental upstream-error leak; do not route
 		// through upstreamError here.
 		if s.log != nil {
-			s.log.ErrorContext(pingCtx, "testCluster ping failed", "err", err)
+			s.log.WarnContext(pingCtx, "testCluster ping failed", "cluster", name, "err", err)
 		}
 		info.Reachable = false
 		info.Error = err.Error()
