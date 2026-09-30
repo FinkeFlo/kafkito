@@ -35,19 +35,24 @@ container alongside it on a shared docker network.
 
 ```sh
 docker run --rm -p 37421:37421 \
-  -e KAFKITO_AUTH_MODE=mock \
+  -e KAFKITO_AUTH_MODE=oidc \
+  -e KAFKITO_AUTH_OIDC_ISSUER_URL=https://idp.example.com/realms/kafkito \
+  -e KAFKITO_AUTH_OIDC_AUDIENCE=kafkito-api \
   -e KAFKITO_KAFKA_BROKERS=host.docker.internal:9092 \
   ghcr.io/finkeflo/kafkito:latest
 ```
 
-The default image enforces auth and does not start without
-`KAFKITO_AUTH_MODE`. The only mode it can serve today is `mock`, which
-checks tokens against a signing key kafkito creates in memory at every start
-and never hands out. No client can get a token that passes, so every
-`/api/v1/*` request is answered with `401`: the UI shell, `/healthz` and
-`/readyz` work, the API does not. Use it to smoke-test the image, not to
-serve users. For real logins use the `-btp` image with XSUAA; a generic OIDC
-mode is in progress (#95). See [Auth modes](#auth-modes).
+Replace the issuer and audience with your IdP's values; with the example
+values discovery fails and the container exits with code 2. The default
+image enforces auth and does not start without `KAFKITO_AUTH_MODE`. kafkito has no login flow of its own: put an auth proxy
+(for example oauth2-proxy) in front of it that handles the login and
+forwards `Authorization: Bearer <access token>`. In mode `oidc` kafkito
+checks that token against your OpenID Connect issuer; the signing keys are
+found through `<issuer>/.well-known/openid-configuration` unless
+`KAFKITO_AUTH_OIDC_JWKS_URL` is set. Mode `mock` checks tokens against a
+signing key kafkito creates in memory and never hands out, so every
+`/api/v1/*` request gets `401`; use it only to smoke-test the image. See
+[Auth modes](#auth-modes).
 
 ### SAP BTP / XSUAA
 
@@ -115,7 +120,12 @@ YAML file → `KAFKITO_*` variables → `$PORT`.
 | `KAFKITO_TEST_CONNECTION_TIMEOUT` | `server.test_connection_timeout` | `15s`     | Go duration (`30s`, `2m`) for the private-cluster "Test connection" probe. `0` means the default; invalid or negative values fail startup. |
 | `KAFKITO_SERVER_FRAME_ANCESTORS`  | `server.frame_ancestors`         | `'none'`  | CSP `frame-ancestors` source list, see [Security headers](#security-headers). |
 | `KAFKITO_KAFKA_BROKERS`           | —                                | —         | Env-only shortcut: when no `clusters` are configured, defines one cluster named `local` from a comma-separated broker list. |
-| `KAFKITO_AUTH_MODE`               | `auth.mode`                      | `off`     | `mock` (every build), `xsuaa` (`-btp` build) or `off` (served only by `-tags devauth` builds such as the `-local` image). A mode the build cannot serve fails startup, so the default and `-btp` builds need this set. See [Auth modes](#auth-modes). |
+| `KAFKITO_AUTH_MODE`               | `auth.mode`                      | `off`     | `oidc` or `mock` (every build), `xsuaa` (`-btp` build) or `off` (served only by `-tags devauth` builds such as the `-local` image). A mode the build cannot serve fails startup, so the default and `-btp` builds need this set. See [Auth modes](#auth-modes). |
+| `KAFKITO_AUTH_OIDC_ISSUER_URL`    | `auth.oidc.issuer_url`           | —         | Mode `oidc`, required: the exact `iss` of accepted tokens and the base for discovery. `https` (plain `http` only on a loopback host), no query or fragment. |
+| `KAFKITO_AUTH_OIDC_AUDIENCE`      | `auth.oidc.audience`             | —         | Mode `oidc`, required: a value the token's `aud` must contain. Use the identifier of the kafkito API, not the client ID of the auth proxy. |
+| `KAFKITO_AUTH_OIDC_JWKS_URL`      | `auth.oidc.jwks_url`             | —         | Mode `oidc`: the signing-key (JWKS) URL. Empty means discovery at startup. Same URL rule as the issuer. |
+| `KAFKITO_AUTH_OIDC_REQUIRED_TYP`  | `auth.oidc.required_typ`         | —         | Mode `oidc`: when set (for example `at+jwt`), tokens must carry this `typ` header. |
+| `KAFKITO_AUTH_OIDC_ALLOWED_AZP`   | `auth.oidc.allowed_azp`          | —         | Mode `oidc`: when set, a comma-separated list (YAML: a list) of accepted `azp` values; tokens without `azp` are rejected. |
 | `KAFKITO_INSECURE_AUTH_OFF`       | —                                | —         | `true` allows mode `off` on a non-loopback address. Ignored on Cloud Foundry, where `off` always fails startup. |
 
 An invalid listen address (for example `PORT=abc`) fails startup with exit
@@ -130,16 +140,16 @@ keys and headers) are described in [docs/data-masking.md](docs/data-masking.md).
 how kafkito checks the bearer token on `/api/v1/*`; `/healthz` and `/readyz`
 are never authenticated. kafkito builds the validator before it listens and
 then logs `auth initialised` with the mode. An unknown mode, or one the build
-cannot serve, logs `auth init failed` at `error` and exits with code 2. A
-generic `oidc` mode does not exist yet (#95).
+cannot serve, logs `auth init failed` at `error` and exits with code 2.
 
 | Mode    | Builds                          | Startup | IdP outage |
 | ------- | ------------------------------- | ------- | ---------- |
 | `off`   | served only by `-tags devauth` builds (`-local` image); other builds exit with code 2 | Every request gets the synthetic principal `dev-user`. Exits with code 2 (`insecure auth configuration`) always on Cloud Foundry (`VCAP_APPLICATION` set), and on a non-loopback address unless `KAFKITO_INSECURE_AUTH_OFF=true`. | No IdP involved. |
 | `mock`  | every build                     | Starts an issuer on a random `127.0.0.1` port with a signing key created at startup and loads its keys. No client can get a token, so every API request gets `401`. | No external IdP: the issuer runs inside the process. |
+| `oidc`  | every build                     | Needs `KAFKITO_AUTH_OIDC_ISSUER_URL` and `KAFKITO_AUTH_OIDC_AUDIENCE`; a missing value, or an issuer or JWKS URL that is not `https` (plain `http` only on a loopback host), exits with code 2. Without `KAFKITO_AUTH_OIDC_JWKS_URL`, reads `<issuer>/.well-known/openid-configuration` (10 s timeout, 1 MB limit, at most 5 redirects, none from `https` to `http`, each target following the same URL rule); its `issuer` must equal the configured issuer exactly and its `jwks_uri` must follow the same URL rule (and be `https` when the issuer is). If that fails, kafkito logs `auth init failed` and exits with code 2. Then loads the keys, waiting at most 5 s, and logs `auth initialised` with issuer, audience and JWKS URL. | At startup: when discovery fails, exits with code 2 (see Startup). When the keys do not load (with `KAFKITO_AUTH_OIDC_JWKS_URL` set, or after a successful discovery), logs `auth: JWKS warm-up failed; startup continues` at `warn` and serves; API requests get `401` until the keys load, and `/readyz` does not change. Later: requests keep working with the keys already loaded; a token signed with a new key gets `401` until the IdP answers again. |
 | `xsuaa` | `-btp` builds                   | Reads the first `xsuaa` binding from `VCAP_SERVICES`; a missing variable or binding, invalid JSON, or a binding without `url`, `uaadomain` or `xsappname` (or with a scheme or port in `uaadomain`) exits with code 2 (`auth init failed`). Then loads the keys from `<url>/token_keys`, waiting at most 5 s. | At startup: logs `auth: JWKS warm-up failed; startup continues` at `warn` (also when `<url>/token_keys` breaks the `jku` rules below) and serves; API requests get `401` until the keys load, and `/readyz` does not change. Later: requests keep working with the keys already loaded; a token signed with a new key, or naming a `jku` first seen during the outage, gets `401` until the IdP answers again. |
 
-How `mock` and `xsuaa` load keys:
+How `mock`, `oidc` and `xsuaa` load keys:
 
 - One load per key URL runs at a time and all requests share it. A request
   waits at most 5 s for it and then gets `401`; the load itself may take up
@@ -159,7 +169,7 @@ How `mock` and `xsuaa` load keys:
   the rule that failed and no claim values); the `401` itself appears in the
   request log at `info`.
 
-Tokens (`mock` and `xsuaa`) must meet all of these:
+Tokens (`mock`, `oidc` and `xsuaa`) must meet all of these:
 
 - A compact JWS with exactly one signature, a `kid` header and a JSON claim
   set as payload.
@@ -171,6 +181,18 @@ Tokens (`mock` and `xsuaa`) must meet all of these:
 - `sub` is a non-empty string and `aud` is present.
 - `mock`: `iss` equals the embedded issuer URL exactly, `aud` contains
   `mock-client`.
+- `oidc`: `iss` equals `KAFKITO_AUTH_OIDC_ISSUER_URL` exactly (no
+  normalization, so a trailing slash counts), and `aud` contains
+  `KAFKITO_AUTH_OIDC_AUDIENCE`. With `KAFKITO_AUTH_OIDC_REQUIRED_TYP` set,
+  the `typ` header must match it (case-insensitive, an `application/` prefix
+  is ignored); with `KAFKITO_AUTH_OIDC_ALLOWED_AZP` set, `azp` must be one of
+  the listed values. Both are off by default. Set the audience to the
+  identifier of the kafkito API rather than the client ID of the auth proxy:
+  many IdPs put the client ID into the `aud` of ID tokens, and `required_typ`
+  (`at+jwt` for RFC 9068 access tokens) keeps ID tokens out where the IdP
+  sets `typ`. The RBAC identity is `user_name`, else `preferred_username`,
+  else `sub`; check that your IdP does not let users change the claim you
+  map RBAC subjects to.
 - `xsuaa`: `iss` is the binding `url` or a path below it, `aud` contains the
   binding `clientid` or `xsappname`, `zid` equals the binding
   `identityzoneid` when that is set, and the `jku` header is
@@ -234,7 +256,7 @@ policy allows no inline scripts or styles and no third-party origins.
 - **Graceful with limited permissions** — works with read-only ACLs on individual topics; does not require cluster-admin rights.
 - **Built-in RBAC & data masking** — YAML-policy based, OSS, no enterprise gating.
 - **Powerful message browser** — JavaScript-DSL filters, JSON/text/binary values, Schema-Registry aware (Avro and JSON Schema decoding; Protobuf payloads are detected but not decoded yet).
-- **Cloud-native ready** — stateless, 12-Factor, JWT auth (XSUAA build), distroless image.
+- **Cloud-native ready** — stateless, 12-Factor, JWT auth (generic OIDC or XSUAA), distroless image.
 
 ## Tech Stack
 

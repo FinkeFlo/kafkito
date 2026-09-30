@@ -9,19 +9,21 @@ endpoints that back the web UI — stable, documented, scriptable.
   with `./bin/kafkito --config .local/kafkito.yaml`, that's typically
   `http://localhost:37421`.
 - No built-in login. Login and sessions are handled by an upstream auth
-  proxy (SAP Approuter with the `-btp` build; a generic OIDC mode for other
-  proxies such as oauth2-proxy is in progress, #95), which forwards
-  requests with `Authorization: Bearer <JWT>`. kafkito validates that token
-  on every `/api/v1/*` request according to `KAFKITO_AUTH_MODE` (`mock`,
+  proxy (SAP Approuter with the `-btp` build and mode `xsuaa`; for example
+  oauth2-proxy with mode `oidc`), which forwards requests with
+  `Authorization: Bearer <JWT>`. kafkito validates that token on every
+  `/api/v1/*` request according to `KAFKITO_AUTH_MODE` (`oidc`, `mock`,
   `xsuaa` in `-tags btp` builds, `off` only in `-tags devauth` builds) and
   answers `401` when it is missing or invalid, before any routing or RBAC:
   `{"error": "unauthorized", "message": "missing bearer token"}` (or
   `"invalid token"`) with `WWW-Authenticate: Bearer realm="kafkito"`.
   `/healthz` and `/readyz` are never authenticated. `mock` accepts no token
   a client can obtain, so every `/api/v1/*` request gets `401`. What each
-  mode needs at startup, how it behaves while the IdP is unreachable
+  mode needs at startup (for `oidc`: issuer and audience, and a JWKS URL or
+  a working discovery), how it behaves while the IdP is unreachable
   (including `401` until the signing keys load) and the rules a token must
-  meet (`alg`, `kid`, `exp`, `sub`, `iss`, `aud`) are listed in the README
+  meet (`alg`, `kid`, `exp`, `sub`, `iss`, `aud`, and optionally `typ` and
+  `azp` in mode `oidc`) are listed in the README
   under [Auth modes](https://github.com/FinkeFlo/kafkito/blob/main/README.md#auth-modes).
 - The verified JWT principal is the RBAC identity. The identity header
   (`X-Kafkito-User` by default, configurable via `rbac.identity.header`) is
