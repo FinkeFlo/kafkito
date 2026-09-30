@@ -132,6 +132,23 @@ inline scripts or styles), `X-Content-Type-Options`, `Referrer-Policy`,
 `frame_ancestors` setting are in the
 [README](https://github.com/FinkeFlo/kafkito/blob/main/README.md#security-headers).
 
+## Running behind TLS
+
+kafkito serves plain HTTP only. It has no TLS listener, listens on `:37421`
+on all interfaces by default (`KAFKITO_SERVER_ADDR`), and does not send
+`Strict-Transport-Security`. API requests carry the user's bearer token, and
+every request for a private cluster carries that cluster's broker and Schema
+Registry credentials in `X-Kafkito-Cluster`. Over plain HTTP, anyone on the
+network path can read them. Run kafkito only behind TLS:
+
+- Terminate TLS in a reverse proxy or platform router in front of kafkito
+  (on SAP BTP Cloud Foundry, the platform router does this) and send
+  `Strict-Transport-Security` from there.
+- Do not expose port 37421 directly on an untrusted network; only the proxy
+  should reach it. When the proxy runs on the same host, keep the port on
+  loopback, for example with `KAFKITO_SERVER_ADDR=127.0.0.1:37421` or
+  `docker run -p 127.0.0.1:37421:37421`.
+
 ## Private clusters
 
 - Clusters a user adds in the UI live only in that browser's localStorage,

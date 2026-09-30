@@ -62,3 +62,5 @@ Use this when connectivity behaves unexpectedly or a newly added cluster is not 
 ## Security note
 
 Private-cluster credentials are stored in your browser and sent to backend only for requests targeting the selected private cluster. Export files include the same data.
+
+The credentials travel in a request header, so only add a private cluster when kafkito is served over HTTPS (see [Running behind TLS](../architecture.md#running-behind-tls)).
