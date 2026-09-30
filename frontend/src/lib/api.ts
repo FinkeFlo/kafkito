@@ -18,6 +18,7 @@ export type Message = Schemas["Message"];
 export type MessagesPage = Schemas["MessagesPage"];
 export type MessageCountResponse = Schemas["MessageCountResponse"];
 export type BrokerInfo = Schemas["BrokerInfo"];
+export type BrokerIssue = Schemas["BrokerIssue"];
 export type TopicConsumer = Schemas["TopicConsumer"];
 export type MessageTimelineSlot = Schemas["MessageTimelineSlot"];
 export type MessageTimelineResponse = Schemas["MessageTimelineResponse"];
