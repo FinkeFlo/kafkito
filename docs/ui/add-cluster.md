@@ -17,7 +17,7 @@ Under **Settings → Private clusters**, you get a table of browser-local cluste
 3. Choose `Auth type` (`none`, `SASL/PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`).  
 4. For auth types other than `none`, provide username/password.  
 5. Optionally mark the cluster as **Production**.  
-6. Optionally configure `TLS` and `Skip verify`.  
+6. `TLS` is on by default. The form warns when it is off (all data, and with `SASL/PLAIN` also the username and password, travels in cleartext) and when `Skip verify` turns off the broker certificate check.  
 7. Optionally configure **Schema Registry** (URL + optional credentials/TLS).  
 8. Run **Test connection**, then **Save**.
 

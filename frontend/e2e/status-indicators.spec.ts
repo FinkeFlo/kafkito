@@ -185,6 +185,8 @@ test.describe("Status indicators never rely on colour alone", () => {
     const errorMask = await inkMask(page, errorIcon);
 
     // The fixture broker through a private host address is a real success.
+    // It listens without TLS, which is on for new clusters.
+    await dialog.getByLabel("Enabled", { exact: true }).uncheck();
     await brokers.fill(privateClusterBroker());
     await testButton.click();
     const ok = dialog.getByRole("status").filter({ hasText: /^OK — reachable/ });

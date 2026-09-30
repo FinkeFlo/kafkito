@@ -30,6 +30,7 @@ import {
 import { testCluster } from "@/lib/api";
 import { PrivateClustersNotice } from "@/features/clusters/PrivateClustersNotice";
 import { TestConnectionResult, type TestOutcome } from "@/features/clusters/TestConnectionResult";
+import { TransportSecurityWarning } from "@/features/clusters/TransportSecurityWarning";
 import { removePrivateClusterQueries } from "@/lib/queries/cluster-key";
 import { useCluster } from "@/lib/use-cluster";
 import { usePrivateClusterAccess } from "@/lib/use-private-cluster-access";
@@ -61,7 +62,7 @@ const emptyForm: FormState = {
   name: "",
   isProd: false,
   brokersCSV: "",
-  tlsEnabled: false,
+  tlsEnabled: true,
   tlsInsecure: false,
   authType: "none",
   username: "",
@@ -616,6 +617,12 @@ function ClusterForm({
             </div>
           </Field>
         </div>
+
+        <TransportSecurityWarning
+          authType={f.authType}
+          tlsEnabled={f.tlsEnabled}
+          tlsInsecure={f.tlsInsecure}
+        />
 
         {f.authType !== "none" && (
           <div className="grid gap-4 sm:grid-cols-2">
