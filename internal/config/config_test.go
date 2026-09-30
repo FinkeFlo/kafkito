@@ -194,7 +194,7 @@ func TestAuthModeEnvOverridesYAML(t *testing.T) {
 	t.Setenv("KAFKITO_CONFIG", "")
 	t.Setenv("KAFKITO_KAFKA_BROKERS", "")
 	t.Setenv("KAFKITO_AUTH_MODE", "mock")
-	p := writeYAML(t, "auth:\n  mode: off\n")
+	p := writeYAML(t, "auth:\n  mode: \"off\"\n")
 
 	cfg, err := Load(p)
 	require.NoError(t, err)

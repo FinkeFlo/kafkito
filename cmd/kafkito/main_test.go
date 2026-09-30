@@ -39,8 +39,8 @@ func TestRun_ReturnsExitCode2_WhenAuthModeOffIsRefused(t *testing.T) {
 	assert.Equal(t, 2, run(""))
 }
 
-// With no mode configured, config.Load defaults to "off", which is refused the
-// same way as an explicit "off".
+// Startup exits with 2 when no mode is configured. The "off" default itself is
+// pinned by the config tests.
 func TestRun_ReturnsExitCode2_WhenAuthModeIsUnset(t *testing.T) {
 	restoreDefaultLogger(t)
 	t.Setenv("KAFKITO_CONFIG", "")
