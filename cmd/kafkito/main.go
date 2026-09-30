@@ -84,7 +84,8 @@ func run(configPath string) int {
 		logger.Error("auth init failed", "mode", mode, "err", err)
 		return 2
 	}
-	// Not every auth mode has something to release; xsuaa returns no cleanup.
+	// BuildValidator never returns a nil cleanup on success; the check keeps
+	// shutdown from panicking if that contract ever regresses (v1.2.0 did).
 	if cleanup != nil {
 		defer cleanup()
 	}
