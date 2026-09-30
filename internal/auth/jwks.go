@@ -21,6 +21,12 @@ const (
 	// keyFetchTimeout bounds a single JWKS fetch. It is longer than
 	// keyWaitTimeout so a slow IdP still fills the cache for later requests.
 	keyFetchTimeout = 10 * time.Second
+	// keyRefreshInterval is the minimum time between two fetch attempts for
+	// one URL, whatever triggered them (first load, unknown kid, stale set).
+	keyRefreshInterval = time.Minute
+	// keyMaxAge is how long a loaded set is used before a background refresh
+	// starts. The old set stays in use until a refresh succeeds.
+	keyMaxAge = 15 * time.Minute
 )
 
 var (
@@ -32,23 +38,36 @@ var (
 	errEmptyKeySet = errors.New("jwks: empty key set")
 )
 
-// KeySource loads and caches the JSON Web Key Set served at one URL. All
-// callers share one fetch at a time; a caller waits at most keyWaitTimeout
-// (or until its context ends) and then fails instead of hanging. Close stops
-// a running fetch. The zero value is not usable; call NewKeySource.
+// KeySource loads and caches the JSON Web Key Set served at one URL.
+//
+// All callers share one fetch at a time, and a new fetch starts at most once
+// per keyRefreshInterval: to load the first set, when a token names a kid the
+// cached set lacks, or in the background once the set is older than
+// keyMaxAge. A caller waits at most keyWaitTimeout (or until its context
+// ends) and then fails instead of hanging. Close stops a running fetch. The
+// zero value is not usable; call NewKeySource.
 type KeySource struct {
-	url         string
-	client      jwk.HTTPClient
-	waitTimeout time.Duration
+	url    string
+	client jwk.HTTPClient
+
+	// The clock and the durations below are fixed by NewKeySource; internal
+	// tests may replace them, but only before the first Keys call, because
+	// they are read without holding mu.
+	now             func() time.Time
+	waitTimeout     time.Duration
+	refreshInterval time.Duration
+	maxAge          time.Duration
 
 	ctx    context.Context // lifetime of background fetches; Close cancels it
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 
-	mu       sync.Mutex
-	set      jwk.Set
-	inflight chan struct{} // non-nil while a fetch runs; closed when it ends
-	closed   bool
+	mu          sync.Mutex
+	set         jwk.Set
+	fetchedAt   time.Time     // when set was loaded
+	lastAttempt time.Time     // when the last fetch started; zero before the first
+	inflight    chan struct{} // non-nil while a fetch runs; closed when it ends
+	closed      bool
 }
 
 // NewKeySource returns a KeySource for the JWKS at url. It does no I/O; the
@@ -56,36 +75,49 @@ type KeySource struct {
 func NewKeySource(url string) *KeySource {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &KeySource{
-		url:         url,
-		client:      jwk.DefaultHTTPClient(),
-		waitTimeout: keyWaitTimeout,
-		ctx:         ctx,
-		cancel:      cancel,
+		url:             url,
+		client:          jwk.DefaultHTTPClient(),
+		now:             time.Now,
+		waitTimeout:     keyWaitTimeout,
+		refreshInterval: keyRefreshInterval,
+		maxAge:          keyMaxAge,
+		ctx:             ctx,
+		cancel:          cancel,
 	}
 }
 
-// Keys returns the cached key set. Without one it starts a fetch (or joins the
-// running one) and waits for it, bounded by ctx and keyWaitTimeout. kid, the
-// key id from the token header, is not used yet.
-func (s *KeySource) Keys(ctx context.Context, _ string) (jwk.Set, error) {
+// Keys returns the key set to verify a token whose header names kid.
+//
+// If the cached set holds kid (or kid is empty) it is returned at once; a
+// stale set additionally starts a background refresh. Otherwise Keys starts
+// a fetch, unless one is running or the refresh interval has not passed, and
+// waits for the running fetch, bounded by ctx and keyWaitTimeout. It then
+// returns the newest set even if that still lacks kid, so signature
+// verification decides. Without any set it returns ErrKeysUnavailable.
+func (s *KeySource) Keys(ctx context.Context, kid string) (jwk.Set, error) {
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
 		return nil, ErrKeySourceClosed
 	}
-	if s.set != nil {
+	if s.set != nil && (kid == "" || hasKeyID(s.set, kid)) {
 		set := s.set
+		if s.now().Sub(s.fetchedAt) >= s.maxAge {
+			s.startFetchLocked()
+		}
 		s.mu.Unlock()
 		return set, nil
 	}
 	done := s.startFetchLocked()
 	s.mu.Unlock()
 
-	waitCtx, cancel := context.WithTimeout(ctx, s.waitTimeout)
-	defer cancel()
-	select {
-	case <-done:
-	case <-waitCtx.Done():
+	if done != nil {
+		waitCtx, cancel := context.WithTimeout(ctx, s.waitTimeout)
+		defer cancel()
+		select {
+		case <-done:
+		case <-waitCtx.Done():
+		}
 	}
 
 	s.mu.Lock()
@@ -114,12 +146,18 @@ func (s *KeySource) Close() {
 	s.wg.Wait()
 }
 
-// startFetchLocked starts a background fetch unless one is running and
-// returns the channel that is closed when the fetch ends. s.mu must be held.
+// startFetchLocked returns the channel of the running fetch, or starts a new
+// fetch if the refresh interval allows it. It returns nil when no fetch runs
+// and none may start. s.mu must be held.
 func (s *KeySource) startFetchLocked() <-chan struct{} {
 	if s.inflight != nil {
 		return s.inflight
 	}
+	now := s.now()
+	if !s.lastAttempt.IsZero() && now.Sub(s.lastAttempt) < s.refreshInterval {
+		return nil
+	}
+	s.lastAttempt = now
 	done := make(chan struct{})
 	s.inflight = done
 	s.wg.Add(1)
@@ -128,7 +166,8 @@ func (s *KeySource) startFetchLocked() <-chan struct{} {
 }
 
 // fetch loads the set detached from any request context, so a canceled
-// request does not abort the fetch other callers wait for.
+// request does not abort the fetch other callers wait for. A failed fetch
+// keeps the previous set.
 func (s *KeySource) fetch(done chan struct{}) {
 	defer s.wg.Done()
 
@@ -145,8 +184,14 @@ func (s *KeySource) fetch(done chan struct{}) {
 	s.mu.Lock()
 	if err == nil {
 		s.set = set
+		s.fetchedAt = s.now()
 	}
 	s.inflight = nil
 	s.mu.Unlock()
 	close(done)
+}
+
+func hasKeyID(set jwk.Set, kid string) bool {
+	_, ok := set.LookupKeyID(kid)
+	return ok
 }
