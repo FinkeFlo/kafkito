@@ -319,7 +319,9 @@ func (o SearchOptions) withDefaults() SearchOptions {
 // the budget is spent, enough matches were found (StopOnLimit) or
 // opts.Timeout elapses. The budget holds per record: a call never reads
 // more than opts.Budget records. The limit is checked after every poll, and
-// StopOnLimit stops only once the page is settled (see settled).
+// StopOnLimit stops only once the page is settled (see settled). While it
+// waits, records of partitions that can no longer add to the page are
+// skipped and do not count against the budget.
 func (r *Messages) runSearch(ctx context.Context, s recordScan, opts SearchOptions, sc *searchScan) (budgetExhausted, timedOut bool, err error) {
 	pollCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
@@ -330,15 +332,17 @@ func (r *Messages) runSearch(ctx context.Context, s recordScan, opts SearchOptio
 		if err != nil {
 			return false, false, err
 		}
-		n := min(len(batch.records), opts.Budget-sc.read)
-		for _, rec := range batch.records[:n] {
-			sc.visit(ctx, rec)
+		n := 0
+		for ; n < len(batch.records) && sc.read < opts.Budget; n++ {
+			if rec := batch.records[n]; !sc.parked[rec.Partition] {
+				sc.visit(ctx, rec)
+			}
 		}
 		sc.finish(cutBatch(batch, n))
 		if sc.read >= opts.Budget {
 			return true, false, nil
 		}
-		if opts.StopOnLimit && sc.confirmed >= opts.Limit && sc.settled(opts.Limit) {
+		if opts.StopOnLimit && sc.settled(opts.Limit) {
 			break
 		}
 		if sc.pageFull(opts.Limit) {
@@ -428,6 +432,14 @@ type searchScan struct {
 	// drained marks the partitions this call reads no further, because their
 	// range ended or the reader gave up on it.
 	drained map[int32]bool
+	// parked marks the partitions settled found past the page's last match
+	// (stop-on-limit). Their further records cannot join the page, so the
+	// call skips them, and their cursor stays where the call parked them.
+	parked map[int32]bool
+	// lastAt is the confirmed count last was computed at (see pageLast).
+	lastAt int
+	last   Message
+	lastOK bool
 }
 
 func newSearchScan(mt matcher, dec recordDecoder, ranges map[int32]PartitionRange, dir SearchDirection) *searchScan {
@@ -449,6 +461,7 @@ func newSearchScan(mt matcher, dec recordDecoder, ranges map[int32]PartitionRang
 		frontierTS:  make(map[int32]int64, len(ranges)),
 		ended:       make(map[int32]bool, len(ranges)),
 		drained:     make(map[int32]bool, len(ranges)),
+		parked:      make(map[int32]bool),
 	}
 	for p, rng := range ranges {
 		sc.frontier[p] = rng.End
@@ -459,12 +472,13 @@ func newSearchScan(mt matcher, dec recordDecoder, ranges map[int32]PartitionRang
 func (sc *searchScan) visit(ctx context.Context, rec *kgo.Record) {
 	p := rec.Partition
 	ts := rec.Timestamp.UnixMilli()
-	if cur, ok := sc.highest[p]; !ok || rec.Offset > cur {
+	if sc.newestFirst {
+		if low, ok := sc.pendingLow[p]; !ok || rec.Offset < low.Offset {
+			sc.pendingLow[p] = Message{Offset: rec.Offset, Timestamp: ts}
+		}
+	} else if cur, ok := sc.highest[p]; !ok || rec.Offset > cur {
 		sc.highest[p] = rec.Offset
 		sc.highestTS[p] = ts
-	}
-	if low, ok := sc.pendingLow[p]; sc.newestFirst && (!ok || rec.Offset < low.Offset) {
-		sc.pendingLow[p] = Message{Offset: rec.Offset, Timestamp: ts}
 	}
 	sc.read++
 	sc.visited[p] = append(sc.visited[p], rec.Offset)
@@ -494,10 +508,13 @@ func (sc *searchScan) visit(ctx context.Context, rec *kgo.Record) {
 
 // finish applies what a poll finished: the partitions read to their end and,
 // newest-first, the chunks that move a partition's frontier down. A chunk
-// the reader gave up on stops the frontier above it for good.
+// the reader gave up on stops the frontier above it for good. A parked
+// partition's records were skipped, so its range and chunks stay unfinished.
 func (sc *searchScan) finish(batch recordBatch) {
 	for _, p := range batch.ended {
-		sc.ended[p] = true
+		if !sc.parked[p] {
+			sc.ended[p] = true
+		}
 	}
 	for _, p := range batch.drained {
 		sc.drained[p] = true
@@ -507,7 +524,7 @@ func (sc *searchScan) finish(batch recordBatch) {
 	}
 	for _, ch := range batch.chunks {
 		p := ch.partition
-		if sc.stuck[p] {
+		if sc.stuck[p] || sc.parked[p] {
 			continue
 		}
 		if ch.forced {
@@ -612,12 +629,24 @@ func (sc *searchScan) pageFull(limit int) bool {
 // frontier admits ranks at or after {timestamp of the lowest record read
 // above the frontier, p, frontier-1}; the matches of an unfinished chunk
 // are not on the page yet, so only the frontier counts.
+//
+// New matches can only move the page's last match to an earlier rank, so a
+// partition past it stays past it: settled parks it, and the call skips its
+// further records.
 func (sc *searchScan) settled(limit int) bool {
-	var last *Message
+	last, ok := sc.pageLast(limit)
+	if !ok {
+		return false
+	}
+	all := true
 	for p, rng := range sc.ranges {
-		if sc.drained[p] || sc.confirmedIn[p] >= limit {
-			// Done, or its own first limit matches already rank at or
-			// before the page's last one.
+		if sc.drained[p] || sc.parked[p] {
+			continue
+		}
+		if sc.confirmedIn[p] >= limit {
+			// Its own first limit matches rank at or before the page's
+			// last one, so its later records rank after it.
+			sc.parked[p] = true
 			continue
 		}
 		var next Message
@@ -627,28 +656,44 @@ func (sc *searchScan) settled(limit int) bool {
 			}
 			ts, ok := sc.frontierTS[p]
 			if !ok {
-				return false
+				all = false
+				continue
 			}
 			next = Message{Timestamp: ts, Partition: p, Offset: sc.frontier[p] - 1}
 		} else {
 			hi, ok := sc.highest[p]
 			if !ok {
-				return false
+				all = false
+				continue
 			}
 			next = Message{Timestamp: sc.highestTS[p], Partition: p, Offset: hi + 1}
 		}
-		if last == nil {
-			page := pageMerge(sc.confirmedMatches(), limit, sc.newestFirst)
-			if len(page) < limit {
-				return false
-			}
-			last = &page[len(page)-1]
+		if compareMessages(next, last, sc.newestFirst) < 0 {
+			all = false
+			continue
 		}
-		if compareMessages(next, *last, sc.newestFirst) < 0 {
-			return false
+		sc.parked[p] = true
+	}
+	return all
+}
+
+// pageLast returns the last match of the page the confirmed matches form,
+// or false while they are fewer than limit. It is the page's latest match
+// in the search direction; with timestamps out of order within a partition
+// this can rank later than the last match the merge picked. The result is
+// kept until more matches are confirmed.
+func (sc *searchScan) pageLast(limit int) (Message, bool) {
+	if sc.confirmed < limit {
+		return Message{}, false
+	}
+	if sc.lastAt != sc.confirmed {
+		page := pageMerge(sc.confirmedMatches(), limit, sc.newestFirst)
+		sc.lastAt, sc.lastOK = sc.confirmed, len(page) >= limit
+		if sc.lastOK {
+			sc.last = page[len(page)-1]
 		}
 	}
-	return true
+	return sc.last, sc.lastOK
 }
 
 // carryDoneCursors copies the cursors of partitions that an earlier call
