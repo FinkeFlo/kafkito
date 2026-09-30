@@ -150,6 +150,10 @@ func topicMessageCases(t *testing.T) []handlerCase {
 		{name: "raw binary", method: "GET", path: topic + "/messages/0/2/raw", wantStatus: 200, wantHeader: map[string]string{
 			"Content-Type": "application/octet-stream", "Content-Disposition": `attachment; filename="orders-p0-o2.bin"`, "Content-Length": "1",
 		}},
+		{name: "produce xml", method: "POST", path: topic + "/messages", contentType: jsonCT, body: `{"value":"<order id=\"7\"/>"}`, wantStatus: 200, wantBody: `"offset":6`},
+		{name: "raw xml", method: "GET", path: topic + "/messages/0/6/raw", wantStatus: 200, wantBody: `<order id="7"/>`, wantHeader: map[string]string{
+			"Content-Type": "application/xml", "Content-Disposition": `attachment; filename="orders-p0-o6.xml"`,
+		}},
 		{name: "raw offset -1", method: "GET", path: topic + "/messages/0/-1/raw", wantStatus: 400, wantBody: `parameter \"offset\" in path`},
 		{name: "raw partition not a number", method: "GET", path: topic + "/messages/x/0/raw", wantStatus: 400, wantBody: `parameter \"partition\" in path`},
 		{name: "raw partition int32 overflow", method: "GET", path: topic + "/messages/2147483648/0/raw", wantStatus: 400, wantBody: `parameter \"partition\" in path`},
