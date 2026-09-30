@@ -34,9 +34,9 @@ type ModeConfig struct {
 type ModeFactory func(cfg ModeConfig) (Validator, func(), error)
 
 // modes is the registry of mode-name -> factory. Generic modes register
-// themselves from init() in mode_default.go; IdP-specific subpackages register
-// themselves via init() behind their respective build tags. Look up via
-// BuildValidator.
+// themselves from init() in mode_default.go, mode_off.go and mode_devauth.go;
+// IdP-specific subpackages register themselves via init() behind their
+// respective build tags. Look up via BuildValidator.
 var modes = map[string]ModeFactory{}
 
 // modesMu guards modes, so Register and BuildValidator are safe to call
@@ -44,9 +44,9 @@ var modes = map[string]ModeFactory{}
 var modesMu sync.RWMutex
 
 // Register binds a ModeFactory to the given mode name. Intended for use from
-// init() in mode-specific files. Re-registering a name overwrites the previous
-// factory; this is how mode_devauth.go upgrades "off" from the default
-// (unavailable) to the synthetic-principal variant.
+// init() in mode-specific files; each build registers every name once, so the
+// result does not depend on init order. Re-registering a name overwrites the
+// previous factory.
 func Register(name string, factory ModeFactory) {
 	modesMu.Lock()
 	defer modesMu.Unlock()

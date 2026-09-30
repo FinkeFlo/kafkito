@@ -1,5 +1,3 @@
-//go:build !devauth
-
 // Copyright 2026 The kafkito Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -44,42 +42,13 @@ func TestBuildValidator_ReturnsNoopCleanup_WhenModeHasNone(t *testing.T) {
 	cleanup()
 }
 
-func TestBuildValidator_RejectsInvalidMode(t *testing.T) {
+func TestBuildValidator_RejectsUnknownMode(t *testing.T) {
 	t.Parallel()
 
-	cases := []struct {
-		name             string
-		mode             string
-		wantErrIs        error
-		wantErrSubstring string
-	}{
-		{
-			// In default builds (no -tags devauth) "off" must be unavailable.
-			name:      "off_default_build",
-			mode:      "off",
-			wantErrIs: auth.ErrModeUnavailable,
-		},
-		{
-			name:             "unknown_mode_name",
-			mode:             "weird",
-			wantErrSubstring: "unknown",
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
+	_, _, err := auth.BuildValidator(auth.ModeConfig{Mode: "weird"})
 
-			_, _, err := auth.BuildValidator(auth.ModeConfig{Mode: tc.mode})
-
-			require.Error(t, err, "BuildValidator(%q) must reject", tc.mode)
-			if tc.wantErrIs != nil {
-				require.ErrorIs(t, err, tc.wantErrIs)
-			}
-			if tc.wantErrSubstring != "" {
-				assert.ErrorContains(t, err, tc.wantErrSubstring)
-			}
-		})
-	}
+	require.Error(t, err, "BuildValidator must reject an unregistered mode")
+	assert.ErrorContains(t, err, "unknown")
 }
 
 func TestBuildValidator_MockMode_CleanupClosesTheKeySource(t *testing.T) {

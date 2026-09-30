@@ -9,9 +9,9 @@ package auth
 
 import "context"
 
-// init re-registers "off" with the synthetic-principal validator. It runs
-// after mode_default.go's init() (alphabetical filename order within the same
-// package) so the no-op default registration is overwritten.
+// init registers "off" with the synthetic-principal validator. mode_off.go,
+// which registers the unavailable "off", is excluded from devauth builds, so
+// this is the only "off" registration and does not depend on init order.
 func init() {
 	Register("off", newOffModeDevauth)
 }
