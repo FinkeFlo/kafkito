@@ -227,6 +227,11 @@ The YAML equivalents are `log.level` and `log.format`; `make dev` defaults to
 `info`, all other requests at `debug`; health probes and static assets are not
 logged, and query strings, headers and bodies never are.
 
+Warnings and errors can name the broker and Schema Registry addresses of the
+clusters involved, private clusters included (see
+[Private clusters](docs/architecture.md#private-clusters)); restrict who can
+read the logs accordingly.
+
 To see every request on SAP BTP Cloud Foundry temporarily:
 
 ```sh
