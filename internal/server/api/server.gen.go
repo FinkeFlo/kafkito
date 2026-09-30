@@ -811,7 +811,7 @@ type SearchRequest struct {
 	// Path JSONPath or XPath expression for modes `jsonpath` and `xpath`; unused otherwise.
 	Path *string `json:"path,omitempty"`
 
-	// StopOnLimit Return once the first `limit` matches in `direction` order are known: `limit` matches were found and every partition that is not done has read past the last of them. A lagging partition can keep the call waiting up to its timeout. Without it the call reads on until every partition holds `limit` matches or is done. Either way the budget or the timeout can end the call earlier; it returns at most `limit` matches and the cursors keep the rest reachable.
+	// StopOnLimit Return once the first `limit` matches in `direction` order are known: `limit` matches were found and every partition the call still reads has read past the last of them. A lagging partition can keep the call waiting up to its timeout. Without it the call reads on until every partition holds `limit` matches or is done. Either way the budget or the timeout can end the call earlier, and the page is then not guaranteed to be the first in order; it returns at most `limit` matches and the cursors keep the rest reachable.
 	StopOnLimit *bool  `json:"stop_on_limit,omitempty"`
 	ToTsMs      *int64 `json:"to_ts_ms,omitempty"`
 

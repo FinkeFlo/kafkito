@@ -296,11 +296,13 @@ those the next call reads again.
 
 With `stop_on_limit`, a call returns the first `limit` matches in `direction`
 order across all partitions, not the first ones to arrive: it waits until
-every partition that is not done has read past the last match of the page.
-A lagging partition can therefore keep the call waiting up to its timeout.
-When the budget or the timeout ends the call first, the page holds the
-matches found so far, `more_available` is `true`, and the chain still returns
-every match exactly once.
+every partition it still reads has read past the last match of the page.
+Records of partitions that are already past it are skipped and do not count
+against the budget. A lagging partition can therefore keep the call waiting
+up to its timeout. When the budget or the timeout ends the call first, or
+the reader gives up on a partition, the page holds at most `limit` of the
+matches found so far, `more_available` is `true`, and the chain still
+returns every match exactly once, but not necessarily in order across calls.
 
 Quick example — simple contains across message value:
 
