@@ -76,7 +76,17 @@ type Connections struct {
 
 	srMu       sync.Mutex
 	srDecoders map[string]*SRDecoder
+
+	// adhocDial, when non-nil, replaces netguard.GuardedDialContext as the
+	// guarded dial of ad-hoc clusters (TLS still wraps it). Tests set it,
+	// before the first client is built, to a netguard.GuardedDialWith whose
+	// resolver and dial redirect a test host to a local fake broker. It is a
+	// field rather than a package variable so parallel tests stay isolated.
+	adhocDial dialFunc
 }
+
+// dialFunc is the shape of kgo.Dialer and of netguard's guarded dialers.
+type dialFunc = func(ctx context.Context, network, addr string) (net.Conn, error)
 
 // Topics covers topic metadata, topic configs, records and the consumers
 // of a topic.
@@ -278,7 +288,7 @@ func (r *Connections) Client(name string) (*kgo.Client, error) {
 		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, name)
 	}
 
-	cl, err := kgo.NewClient(clientOpts(cfg, r.log.With("cluster", name))...)
+	cl, err := kgo.NewClient(clientOptsDial(cfg, r.log.With("cluster", name), r.adhocDial)...)
 	if err != nil {
 		return nil, fmt.Errorf("kgo.NewClient for %s: %w", name, err)
 	}
@@ -298,6 +308,12 @@ func (r *Connections) Client(name string) (*kgo.Client, error) {
 // configured clusters keep the default kgo dialer plus kgo.DialTLSConfig — no
 // behavior change for them.
 func clientOpts(cfg config.ClusterConfig, log *slog.Logger) []kgo.Opt {
+	return clientOptsDial(cfg, log, nil)
+}
+
+// clientOptsDial is clientOpts with the guarded dial of ad-hoc clusters
+// replaced by adhocDial when it is non-nil (see Connections.adhocDial).
+func clientOptsDial(cfg config.ClusterConfig, log *slog.Logger, adhocDial dialFunc) []kgo.Opt {
 	opts := []kgo.Opt{
 		kgo.SeedBrokers(cfg.Brokers...),
 		kgo.ClientID("kafkito"),
@@ -331,7 +347,7 @@ func clientOpts(cfg config.ClusterConfig, log *slog.Logger) []kgo.Opt {
 		// A single dialer covers both the SSRF guard and (when enabled) the
 		// TLS handshake. We must NOT also pass kgo.DialTLSConfig here, because
 		// franz-go errors out if Dialer and DialTLSConfig are both set.
-		opts = append(opts, kgo.Dialer(guardedTLSDialer(cfg.TLS)))
+		opts = append(opts, kgo.Dialer(guardedTLSDialer(cfg.TLS, adhocDial)))
 	} else if cfg.TLS.Enabled {
 		// Operator clusters: keep the original DialTLSConfig path unchanged.
 		// #nosec G402 -- InsecureSkipVerify is operator-controlled and
@@ -376,8 +392,11 @@ func clientOpts(cfg config.ClusterConfig, log *slog.Logger) []kgo.Opt {
 // the per-dial tls.Config.ServerName is set to the original hostname parsed
 // from the dialer's addr argument so certificate verification still works; the
 // shared base config is cloned per dial to avoid concurrent mutation.
-func guardedTLSDialer(tlsCfg config.TLSConfig) func(ctx context.Context, network, host string) (net.Conn, error) {
-	guarded := netguard.GuardedDialContext(&net.Dialer{Timeout: 10 * time.Second})
+// guarded replaces netguard.GuardedDialContext when non-nil (tests only).
+func guardedTLSDialer(tlsCfg config.TLSConfig, guarded dialFunc) dialFunc {
+	if guarded == nil {
+		guarded = netguard.GuardedDialContext(&net.Dialer{Timeout: 10 * time.Second})
+	}
 	if !tlsCfg.Enabled {
 		return guarded
 	}
@@ -421,16 +440,12 @@ func (r *Connections) Admin(name string) (*kadm.Client, error) {
 	return kadm.NewClient(cl), nil
 }
 
-// Ping probes every broker of the named cluster. Returns the first error.
-//
-// Note: franz-go's kgo.Client.Ping fans out an ApiVersions request to
-// every broker advertised by the cluster's metadata response. On a cold
-// kgo client each broker requires its own DNS + TCP + TLS + SASL
-// handshake, so callers must budget time × broker_count when probing
-// remote SaaS clusters (e.g. Confluent Cloud advertises N brokers via
-// `bN-pkc-…` hostnames). The user-facing Test connection handler in
-// internal/server/clusters_api.go uses a 15s default budget
-// (config.DefaultTestConnectionTimeout) for that reason.
+// Ping checks that the named cluster answers at all. It returns nil as soon
+// as ONE broker answers a metadata request: franz-go's kgo.Client.Ping tries
+// the already discovered brokers, then the seeds, one after another, and
+// stops at the first success (kgo client.go, Client.Ping). It therefore
+// says nothing about the other advertised brokers; ProbeBrokers checks
+// those. Returns the last error when no broker answers.
 func (r *Connections) Ping(ctx context.Context, name string) error {
 	cl, err := r.Client(name)
 	if err != nil {
