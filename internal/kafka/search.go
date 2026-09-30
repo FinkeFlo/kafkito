@@ -219,7 +219,8 @@ const (
 	// overhead; smaller values give tighter stop-on-limit responsiveness
 	// when matches are dense near the end. A call only advances its cursor
 	// over whole chunks, so the chunk also shrinks to the budget's share per
-	// partition (see searchChunk).
+	// partition (see searchChunk). A budget stop inside a chunk leaves that
+	// chunk to the next call.
 	searchChunkSize int64 = 4000
 )
 
@@ -336,6 +337,11 @@ func (r *Messages) runSearch(ctx context.Context, s recordScan, opts SearchOptio
 		if opts.StopOnLimit && sc.confirmed >= opts.Limit {
 			break
 		}
+		if sc.pageFull(opts.Limit) {
+			// Reading on could not change the page: every partition is done
+			// or holds a full page, and the cursors would move back anyway.
+			break
+		}
 	}
 	return false, false, nil
 }
@@ -391,6 +397,9 @@ type searchScan struct {
 	// confirmed counts the matches at or above their partition's frontier,
 	// i.e. the matches this call can return (before the limit).
 	confirmed int
+	// confirmedIn counts the confirmed matches per partition.
+	confirmedIn map[int32]int
+	ranges      map[int32]PartitionRange
 	// pending counts, per partition, the matches of the chunk being read
 	// (newest-first); they are confirmed once the chunk is read to its end.
 	pending map[int32]int
@@ -416,6 +425,8 @@ func newSearchScan(mt matcher, dec recordDecoder, ranges map[int32]PartitionRang
 		errored:     make(map[int32][]int64),
 		errDetails:  make(map[int32][]ParseErrorOffset),
 		pending:     make(map[int32]int, len(ranges)),
+		confirmedIn: make(map[int32]int, len(ranges)),
+		ranges:      ranges,
 		frontier:    make(map[int32]int64, len(ranges)),
 		stuck:       make(map[int32]bool),
 		highest:     make(map[int32]int64, len(ranges)),
@@ -453,6 +464,7 @@ func (sc *searchScan) visit(ctx context.Context, rec *kgo.Record) {
 			sc.pending[p]++
 		} else {
 			sc.confirmed++
+			sc.confirmedIn[p]++
 		}
 	}
 }
@@ -478,6 +490,7 @@ func (sc *searchScan) finish(batch recordBatch) {
 		}
 		sc.frontier[p] = ch.lower
 		sc.confirmed += sc.pending[p]
+		sc.confirmedIn[p] += sc.pending[p]
 		sc.pending[p] = 0
 	}
 }
@@ -515,9 +528,44 @@ func (sc *searchScan) parseError(ctx context.Context, rec *kgo.Record, err error
 		"error", msg)
 	p := rec.Partition
 	sc.errored[p] = append(sc.errored[p], rec.Offset)
+	pe := ParseErrorOffset{Partition: p, Offset: rec.Offset, Error: msg}
 	if len(sc.errDetails[p]) < parseErrorOffsetsCap {
-		sc.errDetails[p] = append(sc.errDetails[p], ParseErrorOffset{Partition: p, Offset: rec.Offset, Error: msg})
+		sc.errDetails[p] = append(sc.errDetails[p], pe)
+		return
 	}
+	if sc.newestFirst {
+		// The page reports the errors above the cursor, so newest-first
+		// keeps the highest offsets; reading goes up within a chunk.
+		ds := sc.errDetails[p]
+		lowest := 0
+		for i, d := range ds {
+			if d.Offset < ds[lowest].Offset {
+				lowest = i
+			}
+		}
+		if ds[lowest].Offset < pe.Offset {
+			ds[lowest] = pe
+		}
+	}
+}
+
+// pageFull reports whether reading on could not change this call's page:
+// every partition is done or holds limit confirmed matches, and page keeps
+// at most limit matches of a partition, the ones in front in offset order.
+func (sc *searchScan) pageFull(limit int) bool {
+	for p, rng := range sc.ranges {
+		if sc.confirmedIn[p] >= limit {
+			continue
+		}
+		if sc.newestFirst && (sc.stuck[p] || sc.frontier[p] <= rng.Start) {
+			continue
+		}
+		if !sc.newestFirst && sc.ended[p] {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 // carryDoneCursors copies the cursors of partitions that an earlier call
@@ -622,7 +670,9 @@ func (sc *searchScan) page(ranges map[int32]PartitionRange, limit int) searchPag
 				pg.parseErrors++
 			}
 		}
-		for _, pe := range sc.errDetails[p] {
+		details := slices.Clone(sc.errDetails[p])
+		slices.SortFunc(details, func(a, b ParseErrorOffset) int { return cmp.Compare(a.Offset, b.Offset) })
+		for _, pe := range details {
 			if behind(p, pe.Offset) && len(pg.parseErrorOffsets) < parseErrorOffsetsCap {
 				pg.parseErrorOffsets = append(pg.parseErrorOffsets, pe)
 			}
@@ -637,7 +687,7 @@ func (sc *searchScan) page(ranges map[int32]PartitionRange, limit int) searchPag
 // and merges them by time, so the matches a page keeps of a partition are
 // always the ones in front of its cut, even when timestamps within the
 // partition are out of order. With ordered timestamps these are the first
-// limit matches by time.
+// limit matches by time among the matches this call confirmed.
 func pageCut(matches []Message, limit int, newestFirst bool) map[int32]int64 {
 	byPart := make(map[int32][]Message)
 	for _, m := range matches {

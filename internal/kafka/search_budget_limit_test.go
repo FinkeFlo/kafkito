@@ -192,3 +192,60 @@ func TestCutBatch(t *testing.T) {
 	assert.Equal(t, []finishedChunk{{partition: 1, lower: 0}, {partition: 3, lower: 0, forced: true}}, cut.chunks)
 	assert.Equal(t, batch, cutBatch(batch, 4), "a fully visited poll is kept")
 }
+
+// Newest-first reads upward within a chunk, so the first parse errors read
+// can all lie below the cursor. The details keep the highest offsets.
+func TestSearchScan_NewestFirstKeepsTheParseErrorDetailsAboveTheCursor(t *testing.T) {
+	t.Parallel()
+	ranges := map[int32]PartitionRange{0: {Start: 0, End: 56}}
+	sc := newSearchScan(errOnMatcher{}, recordDecoder{}, ranges, DirNewestFirst)
+	var recs []*kgo.Record
+	for off := range int64(56) {
+		v := "bad"
+		switch off {
+		case 50:
+			v = "a"
+		case 55:
+			v = "b"
+		}
+		recs = append(recs, rec(0, off, off, v))
+	}
+	visitAll(sc, recordBatch{chunks: []finishedChunk{{partition: 0, lower: 0}}}, recs...)
+
+	pg := sc.page(ranges, 1)
+
+	assert.Equal(t, []int64{55}, messageOffsets(pg.messages))
+	assert.Equal(t, map[int32]int64{0: 51}, pg.next)
+	assert.Equal(t, 4, pg.parseErrors)
+	var offs []int64
+	for _, pe := range pg.parseErrorOffsets {
+		offs = append(offs, pe.Offset)
+	}
+	assert.Equal(t, []int64{51, 52, 53, 54}, offs)
+}
+
+// Once every partition is done or holds a full page, reading on cannot
+// change the page, so the call ends even without stop_on_limit.
+func TestSearchScan_PageFull(t *testing.T) {
+	t.Parallel()
+	ranges := map[int32]PartitionRange{0: {Start: 0, End: 10}, 1: {Start: 0, End: 10}}
+
+	t.Run(string(DirOldestFirst), func(t *testing.T) {
+		t.Parallel()
+		sc := newSearchScan(errOnMatcher{}, recordDecoder{}, ranges, DirOldestFirst)
+		visitAll(sc, recordBatch{}, rec(0, 0, 1, "a"), rec(0, 1, 2, "b"), rec(1, 0, 3, "c"))
+		assert.False(t, sc.pageFull(2), "partition 1 can still add a match")
+		visitAll(sc, recordBatch{drained: []int32{1}, ended: []int32{1}}, rec(1, 9, 4, "bad"))
+		assert.True(t, sc.pageFull(2))
+	})
+
+	t.Run(string(DirNewestFirst), func(t *testing.T) {
+		t.Parallel()
+		sc := newSearchScan(errOnMatcher{}, recordDecoder{}, ranges, DirNewestFirst)
+		visitAll(sc, recordBatch{chunks: []finishedChunk{{partition: 0, lower: 5}}}, rec(0, 8, 1, "a"), rec(0, 9, 2, "b"))
+		visitAll(sc, recordBatch{}, rec(1, 8, 1, "a"), rec(1, 9, 2, "b"))
+		assert.False(t, sc.pageFull(2), "the matches of partition 1 are not confirmed yet")
+		visitAll(sc, recordBatch{chunks: []finishedChunk{{partition: 1, lower: 5}}})
+		assert.True(t, sc.pageFull(2))
+	})
+}
