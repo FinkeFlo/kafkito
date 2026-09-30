@@ -69,13 +69,8 @@ func run(configPath string) int {
 	// it's cancelled on shutdown; registry.Close() also waits for it.
 	registry.StartMetrics(ctx, 0)
 
+	// config.Load already applied KAFKITO_AUTH_MODE and the "off" default.
 	mode := cfg.Auth.Mode
-	if mode == "" {
-		mode = os.Getenv("KAFKITO_AUTH_MODE")
-	}
-	if mode == "" {
-		mode = "off"
-	}
 
 	modeCfg := auth.ModeConfig{Mode: mode}
 	populateAuthConfigFromEnv(&modeCfg)
@@ -93,6 +88,8 @@ func run(configPath string) int {
 
 	// config.Load already applied $PORT and the default address.
 	addr := cfg.Server.Addr
+	// VCAP_APPLICATION and KAFKITO_INSECURE_AUTH_OFF are platform and guard
+	// variables, not config settings, so the guard reads them from the environment.
 	if err := guardAuthMode(mode, addr, os.Getenv); err != nil {
 		logger.Error("insecure auth configuration", "mode", mode, "addr", addr, "err", err)
 		return 2

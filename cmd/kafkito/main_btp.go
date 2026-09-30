@@ -21,12 +21,11 @@ import (
 	_ "github.com/FinkeFlo/kafkito/internal/auth/xsuaa"
 )
 
-// populateAuthConfigFromEnv is the btp-build hook: read the VCAP_SERVICES JSON
-// blob (Cloud Foundry XSUAA service binding) and tag the request with a local
-// XSAppName so non-xsuaa modes (mock) running in a btp-tagged binary still
-// receive a sensible audience label. xsuaa mode reads xsappname from the
-// VCAP_SERVICES payload, so the literal here is ignored when Mode == "xsuaa".
+// populateAuthConfigFromEnv is the btp-build hook: it passes the VCAP_SERVICES
+// JSON blob (Cloud Foundry XSUAA service binding) to the auth modes. xsuaa mode
+// reads its credentials, including xsappname, from that payload.
 func populateAuthConfigFromEnv(c *auth.ModeConfig) {
+	// VCAP_SERVICES is set by the platform, not a kafkito setting, so it is
+	// read from the environment instead of through config.Load.
 	c.VCAPServices = os.Getenv("VCAP_SERVICES")
-	c.XSAppName = "kafkito!t-local"
 }

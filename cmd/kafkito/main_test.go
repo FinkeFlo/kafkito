@@ -5,10 +5,12 @@ package main
 
 import (
 	"log/slog"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // run mutates the default slog logger; restore it for the rest of the package.
@@ -30,6 +32,20 @@ func TestRun_ReturnsExitCode2_WhenAuthModeOffIsRefused(t *testing.T) {
 	restoreDefaultLogger(t)
 	t.Setenv("KAFKITO_CONFIG", "")
 	t.Setenv("KAFKITO_AUTH_MODE", "off")
+	t.Setenv("KAFKITO_INSECURE_AUTH_OFF", "")
+	t.Setenv("VCAP_APPLICATION", "")
+	t.Setenv("PORT", "0")
+
+	assert.Equal(t, 2, run(""))
+}
+
+// With no mode configured, config.Load defaults to "off", which is refused the
+// same way as an explicit "off".
+func TestRun_ReturnsExitCode2_WhenAuthModeIsUnset(t *testing.T) {
+	restoreDefaultLogger(t)
+	t.Setenv("KAFKITO_CONFIG", "")
+	t.Setenv("KAFKITO_AUTH_MODE", "")
+	require.NoError(t, os.Unsetenv("KAFKITO_AUTH_MODE"))
 	t.Setenv("KAFKITO_INSECURE_AUTH_OFF", "")
 	t.Setenv("VCAP_APPLICATION", "")
 	t.Setenv("PORT", "0")
