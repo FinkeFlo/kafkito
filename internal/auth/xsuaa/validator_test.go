@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -297,6 +298,33 @@ func TestValidator_RejectsJKUOutsidePolicy(t *testing.T) {
 			wantErrSubstring: "jku is not an absolute URL",
 		},
 		{
+			// A zone literal suffix-matches the uaadomain but dials the IP.
+			name: "ipv6_zone_literal",
+			jku: func(m *auth.MockOIDC) string {
+				return "https://[::ffff:" + m.Host() + "%25x." + m.Host() + "]:" + mockPort(m) + "/token_keys"
+			},
+			wantErrSubstring: "DNS name",
+		},
+		{
+			name: "ipv6_zone_literal_double_escaped",
+			jku: func(m *auth.MockOIDC) string {
+				return "https://[::ffff:" + m.Host() + "%2525x." + m.Host() + "]:" + mockPort(m) + "/token_keys"
+			},
+			wantErrSubstring: "DNS name",
+		},
+		{
+			name: "ipv4_mapped_ipv6_literal",
+			jku: func(m *auth.MockOIDC) string {
+				return "https://[::ffff:" + m.Host() + "]:" + mockPort(m) + "/token_keys"
+			},
+			wantErrSubstring: "DNS name",
+		},
+		{
+			name:             "ipv4_literal_https",
+			jku:              func(m *auth.MockOIDC) string { return "https://" + m.Host() + ":" + mockPort(m) + "/token_keys" },
+			wantErrSubstring: "DNS name",
+		},
+		{
 			// Loopback http is the test exception; any other http host is not.
 			name:             "http_non_loopback",
 			jku:              func(*auth.MockOIDC) string { return "http://auth.example/token_keys" },
@@ -317,6 +345,12 @@ func TestValidator_RejectsJKUOutsidePolicy(t *testing.T) {
 			assert.Zero(t, mock.JWKSRequests(), "a rejected jku must not be fetched")
 		})
 	}
+}
+
+// mockPort returns the port the mock XSUAA listens on.
+func mockPort(m *auth.MockOIDC) string {
+	u, _ := url.Parse(m.Server.URL)
+	return u.Port()
 }
 
 func TestNewValidator_RejectsPlainHTTPJKU(t *testing.T) {
