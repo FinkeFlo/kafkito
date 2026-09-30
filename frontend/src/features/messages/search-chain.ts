@@ -75,8 +75,11 @@ export async function runSearchChain({
   // A newest-first call only moves its cursors over whole chunks, and the
   // server sizes chunks by the call budget. When a call times out before it
   // finishes one, the next call gets a smaller budget. "Search more" after a
-  // timeout starts from the last call's budget.
-  let callCap = prior?.stats.timed_out ? (prior.req.budget ?? Infinity) : Infinity;
+  // timeout without progress starts from the last call's budget.
+  let callCap =
+    prior?.stats.timed_out && !madeProgress(prior.stats)
+      ? (prior.req.budget ?? Infinity)
+      : Infinity;
 
   for (;;) {
     let callBudget: number;

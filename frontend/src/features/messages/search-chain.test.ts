@@ -212,7 +212,7 @@ describe("runSearchChain", () => {
     expect(searchMessages).toHaveBeenCalledTimes(2);
   });
 
-  it("continues after a timeout with the last call's budget", async () => {
+  it("continues after a timeout without progress with the last call's budget", async () => {
     searchMessages.mockResolvedValueOnce(page([], { scanned: 30 }));
     const prior: SearchResult = {
       messages: [],
@@ -220,6 +220,7 @@ describe("runSearchChain", () => {
         scanned: 100,
         timed_out: true,
         more_available: true,
+        resolved_range: { "0": { start: 0, end: 50 } },
         next_cursors: { "0": 50 },
       }),
       req: { ...baseReq, budget: 40 },
@@ -227,6 +228,24 @@ describe("runSearchChain", () => {
     const { done } = run({ prior, budget: 0 });
     await expect(done).resolves.toBe("complete");
     expect(searchMessages.mock.calls[0][2]).toMatchObject({ budget: 40, cursors: { "0": 50 } });
+  });
+
+  it("continues after a timed-out call that made progress with a fresh budget", async () => {
+    searchMessages.mockResolvedValueOnce(page([], { scanned: 30 }));
+    const prior: SearchResult = {
+      messages: [],
+      stats: stats({
+        scanned: 100,
+        timed_out: true,
+        more_available: true,
+        resolved_range: { "0": { start: 0, end: 50 } },
+        next_cursors: { "0": 20 },
+      }),
+      req: { ...baseReq, budget: 7 },
+    };
+    const { done } = run({ prior });
+    await expect(done).resolves.toBe("complete");
+    expect(searchMessages.mock.calls[0][2]).toMatchObject({ budget: 100 });
   });
 
   it("checks progress against the range start when oldest first", async () => {
