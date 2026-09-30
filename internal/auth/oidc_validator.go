@@ -12,8 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lestrrat-go/httprc/v3"
-	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v3/jws"
 	"github.com/lestrrat-go/jwx/v3/jwt"
 )
 
@@ -36,14 +35,16 @@ type OIDCConfig struct {
 // a JWKS endpoint. Use this as the default "mock" mode validator, and as a
 // drop-in for any OIDC IdP that publishes a JWKS URL.
 type OIDCValidator struct {
-	cfg   OIDCConfig
-	cache *jwk.Cache
+	cfg  OIDCConfig
+	keys *KeySource
 }
 
 var _ Validator = (*OIDCValidator)(nil)
 
-// NewOIDCValidator constructs a validator. The JWKS cache is started lazily on
-// first Validate call (per jwx semantics) and refreshes on unknown kid.
+// NewOIDCValidator constructs a validator. It does no I/O: the key set is
+// loaded by WarmUp or the first Validate call, refreshed at most once per
+// minute when a token names an unknown kid, and a request waits at most 5 s
+// for it (see KeySource). Call Close to release the validator.
 func NewOIDCValidator(cfg OIDCConfig) (*OIDCValidator, error) {
 	if cfg.IssuerURL == "" {
 		return nil, errors.New("OIDCValidator: IssuerURL required")
@@ -54,12 +55,20 @@ func NewOIDCValidator(cfg OIDCConfig) (*OIDCValidator, error) {
 	if cfg.JWKSEndpoint == "" {
 		return nil, errors.New("OIDCValidator: JWKSEndpoint required")
 	}
-	client := httprc.NewClient()
-	cache, err := jwk.NewCache(context.Background(), client)
-	if err != nil {
-		return nil, fmt.Errorf("jwk cache: %w", err)
-	}
-	return &OIDCValidator{cfg: cfg, cache: cache}, nil
+	return &OIDCValidator{cfg: cfg, keys: NewKeySource(cfg.JWKSEndpoint)}, nil
+}
+
+// WarmUp loads the key set once, bounded by ctx and the key wait timeout.
+// Mode factories call it at startup and only log a failure; Validate
+// retries the load once the refresh interval has passed.
+func (o *OIDCValidator) WarmUp(ctx context.Context) error {
+	_, err := o.keys.Keys(ctx, "")
+	return err
+}
+
+// Close releases the key source. Validate fails afterwards.
+func (o *OIDCValidator) Close() {
+	o.keys.Close()
 }
 
 // Validate parses and signature-verifies raw, then enforces iss/aud/exp/nbf.
@@ -68,12 +77,7 @@ func (o *OIDCValidator) Validate(ctx context.Context, raw string) (*Principal, e
 		return nil, errors.New("empty bearer token")
 	}
 
-	if !o.cache.IsRegistered(ctx, o.cfg.JWKSEndpoint) {
-		if err := o.cache.Register(ctx, o.cfg.JWKSEndpoint); err != nil {
-			return nil, fmt.Errorf("register jwks url: %w", err)
-		}
-	}
-	set, err := o.cache.Lookup(ctx, o.cfg.JWKSEndpoint)
+	set, err := o.keys.Keys(ctx, tokenKeyID(raw))
 	if err != nil {
 		return nil, fmt.Errorf("fetch jwks: %w", err)
 	}
@@ -101,6 +105,17 @@ func (o *OIDCValidator) Validate(ctx context.Context, raw string) (*Principal, e
 	}
 
 	return oidcPrincipalFromToken(tok), nil
+}
+
+// tokenKeyID returns the kid of raw's first signature, or "" when raw is not
+// a JWS or names no kid. It verifies nothing; it only picks the key to wait for.
+func tokenKeyID(raw string) string {
+	msg, err := jws.Parse([]byte(raw))
+	if err != nil || len(msg.Signatures()) == 0 {
+		return ""
+	}
+	kid, _ := msg.Signatures()[0].ProtectedHeaders().KeyID()
+	return kid
 }
 
 // oidcPrincipalFromToken builds a Principal without scope-prefix stripping.
