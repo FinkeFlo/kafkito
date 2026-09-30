@@ -48,14 +48,15 @@ const ProducerBatchMaxBytes = 10 << 20 // 10 MiB
 // cluster: ad-hoc (private) cluster registration, the Schema Registry
 // decoder and the masking policy.
 //
-// Locking: mu guards clusters, masking, clients, adhocLastUsed and caps,
-// which UseAdhoc and evictIdleAdhoc modify at runtime; srMu guards
-// srDecoders; janitorMu guards janitor and janitorClosed. ordered, now,
-// adhocSweepEvery, evictHooks and adhocDial are set before the first ad-hoc
-// registration and only read afterwards. The lock order is
-// janitorMu -> mu -> srMu: the janitor holds janitorMu for a whole run, so
-// no code may take janitorMu while holding another lock, and code holding
-// srMu must never take mu or call a method that does.
+// Locking: mu guards clusters, masking, clients, adhocLastUsed,
+// adhocDigests and caps, which UseAdhoc and evictIdleAdhoc modify at
+// runtime; srMu guards srDecoders; janitorMu guards janitor and
+// janitorClosed. ordered, now, adhocSweepEvery, evictHooks and adhocDial
+// are set before the first ad-hoc registration and only read afterwards.
+// The lock order is janitorMu -> mu -> srMu: the janitor holds janitorMu
+// for a whole run, so no code may take janitorMu while holding another
+// lock, and code holding srMu must never take mu or call a method that
+// does.
 type Connections struct {
 	log      *slog.Logger
 	ordered  []config.ClusterConfig
@@ -68,11 +69,14 @@ type Connections struct {
 	// entries so they can be idle-evicted. Nil for registries without any
 	// ad-hoc activity.
 	adhocLastUsed map[string]time.Time
+	// adhocDigests holds the full fingerprint digest (see adhocDigest) of
+	// every ad-hoc entry; UseAdhoc reuses an entry only if it matches.
+	adhocDigests map[string][]byte
 	// caps caches capability probe results per cluster name for
 	// capCacheTTL (see Clusters.Capabilities).
 	caps map[string]capCache
 	// adhocFPKeyOnce/adhocFPKeyVal hold the process-local secret used to key
-	// the ad-hoc cluster fingerprint HMAC (see adhoc.go Fingerprint). Lazily
+	// the ad-hoc cluster fingerprint HMAC (see adhocDigest). Lazily
 	// generated on first use so registries that never see a private-cluster
 	// request pay no cost.
 	adhocFPKeyOnce sync.Once

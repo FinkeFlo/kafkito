@@ -7,10 +7,11 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
-	"fmt"
-	"sort"
+	"hash"
+	"io"
 	"time"
 
 	"github.com/FinkeFlo/kafkito/internal/config"
@@ -48,34 +49,88 @@ func (r *Connections) adhocFPKey() []byte {
 	return r.adhocFPKeyVal
 }
 
-// Fingerprint returns a stable short digest identifying a cluster config's
-// connection parameters, keyed by a process-local secret. Two configs with
-// the same fingerprint reuse the same kgo.Client. The Name field is
-// intentionally NOT part of the fingerprint — two identical configs with
-// different display names still share a client.
+// adhocDigestDomain starts every fingerprint input. Change it whenever the
+// encoding in adhocDigest changes.
+const adhocDigestDomain = "kafkito/private-cluster-fingerprint/v2"
+
+// errAdhocNameInUse is returned by UseAdhoc when the internal name derived
+// from a definition is already registered for different settings.
+var errAdhocNameInUse = errors.New("adhoc cluster: internal name already registered for different settings")
+
+// adhocDigest returns the HMAC-SHA256, keyed with key, of every setting of
+// cfg that changes the connection or how kafkito treats the cluster: the
+// brokers in the given order, is_prod, SASL, TLS and the Schema Registry
+// connection. Every string carries its length and the broker list its
+// count, so no two different configs produce the same input.
 //
-// The digest is computed with HMAC-SHA256 rather than a bare hash: the
-// input includes SASL/Schema-Registry passwords, and hashing sensitive
-// credentials with an unkeyed fast hash is flagged as weak (CodeQL
+// Name and DataMasking are not part of it: UseAdhoc replaces the name with
+// the internal one and private clusters never mask. A new ClusterConfig
+// field fails TestAdhocDigest_CoversEveryClusterConfigField until it is
+// added here or to that test's ignored fields.
+//
+// The digest is an HMAC rather than a bare hash: the input includes
+// SASL/Schema-Registry passwords, and hashing sensitive credentials with an
+// unkeyed fast hash is flagged as weak (CodeQL
 // go/weak-sensitive-data-hashing) because the output could otherwise be
 // brute-forced offline if it ever leaked (e.g. via logs). Keying the digest
 // with a random, process-local secret (never persisted or transmitted)
 // removes that risk while preserving the property this cache key actually
 // needs: same input -> same output for the lifetime of the process.
+func adhocDigest(cfg config.ClusterConfig, key []byte) []byte {
+	e := digestEncoder{h: hmac.New(sha256.New, key)}
+	e.writeString(adhocDigestDomain)
+	e.writeStrings(cfg.Brokers)
+	e.writeBool(cfg.IsProd)
+	e.writeString(cfg.Auth.Type)
+	e.writeString(cfg.Auth.Username)
+	e.writeString(cfg.Auth.Password)
+	e.writeBool(cfg.TLS.Enabled)
+	e.writeBool(cfg.TLS.InsecureSkipVerify)
+	e.writeString(cfg.SchemaRegistry.URL)
+	e.writeString(cfg.SchemaRegistry.Username)
+	e.writeString(cfg.SchemaRegistry.Password)
+	e.writeBool(cfg.SchemaRegistry.InsecureSkipVerify)
+	return e.h.Sum(nil)
+}
+
+// digestEncoder writes the fingerprint input to an HMAC. Its writes never
+// fail (hash.Hash.Write never returns an error).
+type digestEncoder struct{ h hash.Hash }
+
+// writeLen writes n as a varint, which is self-delimiting, so a length
+// never runs into the value after it.
+func (e digestEncoder) writeLen(n int) {
+	_, _ = e.h.Write(binary.AppendVarint(nil, int64(n)))
+}
+
+func (e digestEncoder) writeString(s string) {
+	e.writeLen(len(s))
+	_, _ = io.WriteString(e.h, s)
+}
+
+func (e digestEncoder) writeStrings(list []string) {
+	e.writeLen(len(list))
+	for _, s := range list {
+		e.writeString(s)
+	}
+}
+
+func (e digestEncoder) writeBool(b bool) {
+	v := byte(0)
+	if b {
+		v = 1
+	}
+	_, _ = e.h.Write([]byte{v})
+}
+
+// Fingerprint returns the first 16 hex digits of the ad-hoc digest of cfg
+// (see adhocDigest), which UseAdhoc uses as the internal name of the cluster.
 func Fingerprint(cfg config.ClusterConfig, key []byte) string {
-	h := hmac.New(sha256.New, key)
-	brokers := append([]string{}, cfg.Brokers...)
-	sort.Strings(brokers)
-	// hmac.Hash.Write never errors; assign to _ to satisfy errcheck.
-	_, _ = fmt.Fprintf(h, "brokers=%v\n", brokers)
-	_, _ = fmt.Fprintf(h, "auth.type=%s\nauth.user=%s\nauth.pass=%s\n",
-		cfg.Auth.Type, cfg.Auth.Username, cfg.Auth.Password)
-	_, _ = fmt.Fprintf(h, "tls.enabled=%v\ntls.insecure=%v\n",
-		cfg.TLS.Enabled, cfg.TLS.InsecureSkipVerify)
-	_, _ = fmt.Fprintf(h, "sr.url=%s\nsr.user=%s\nsr.pass=%s\nsr.insecure=%v\n",
-		cfg.SchemaRegistry.URL, cfg.SchemaRegistry.Username,
-		cfg.SchemaRegistry.Password, cfg.SchemaRegistry.InsecureSkipVerify)
-	return hex.EncodeToString(h.Sum(nil))[:16]
+	return adhocFingerprint(adhocDigest(cfg, key))
+}
+
+func adhocFingerprint(digest []byte) string {
+	return hex.EncodeToString(digest[:8])
 }
 
 // UseAdhoc registers an ephemeral cluster configuration in the registry and
@@ -84,10 +139,14 @@ func Fingerprint(cfg config.ClusterConfig, key []byte) string {
 // repeatedly for the same config — the existing registration is reused.
 //
 // The caller is expected to have validated cfg (non-empty brokers).
-// The supplied cfg.Name is ignored; a fingerprint-derived internal name is
-// used instead so unrelated users with identical connection parameters share
-// the underlying kgo.Client (acceptable because they carry the same
-// credentials anyway).
+// The supplied cfg.Name is ignored; the internal name is derived from every
+// other setting (see adhocDigest), so unrelated users with identical
+// settings share the underlying kgo.Client (acceptable because they carry
+// the same credentials anyway), while any difference, is_prod included,
+// gets its own entry. A registration is reused only if its full digest
+// matches; a different definition whose short name is already registered
+// is refused with errAdhocNameInUse rather than given that entry or allowed
+// to replace it.
 func (r *Connections) UseAdhoc(cfg config.ClusterConfig) (string, error) {
 	if len(cfg.Brokers) == 0 {
 		return "", errors.New("adhoc cluster: at least one broker required")
@@ -97,11 +156,15 @@ func (r *Connections) UseAdhoc(cfg config.ClusterConfig) (string, error) {
 			return "", errors.New("adhoc cluster: empty broker address")
 		}
 	}
-	fp := Fingerprint(cfg, r.adhocFPKey())
-	name := config.AdhocClusterPrefix + fp
+	digest := adhocDigest(cfg, r.adhocFPKey())
+	name := config.AdhocClusterPrefix + adhocFingerprint(digest)
 
 	r.mu.Lock()
 	if _, exists := r.clusters[name]; exists {
+		if !hmac.Equal(r.adhocDigests[name], digest) {
+			r.mu.Unlock()
+			return "", errAdhocNameInUse
+		}
 		r.touchAdhocLocked(name)
 		r.mu.Unlock()
 		return name, nil
@@ -110,6 +173,7 @@ func (r *Connections) UseAdhoc(cfg config.ClusterConfig) (string, error) {
 	cfg.Name = name
 	// Ad-hoc clusters never carry masking: the user brings their own creds
 	// and sees raw data.
+	cfg.DataMasking = nil
 	empty, _ := masking.Compile(nil)
 
 	r.clusters[name] = cfg
@@ -117,7 +181,11 @@ func (r *Connections) UseAdhoc(cfg config.ClusterConfig) (string, error) {
 	if r.adhocLastUsed == nil {
 		r.adhocLastUsed = make(map[string]time.Time, 4)
 	}
+	if r.adhocDigests == nil {
+		r.adhocDigests = make(map[string][]byte, 4)
+	}
 	r.adhocLastUsed[name] = r.now()
+	r.adhocDigests[name] = digest
 	r.mu.Unlock()
 
 	r.startJanitor()
@@ -144,10 +212,10 @@ func (r *Connections) registered(name string) bool {
 
 // evictIdleAdhoc removes every ad-hoc cluster whose last use is adhocIdleTTL
 // or longer ago, together with everything kept for it: the client (closed),
-// the config, the masking policy, the cached capabilities and Schema
-// Registry decoder and, through evictHooks, the collected metrics and the
-// cached topic configs. It is the only place that removes ad-hoc entries and
-// returns how many are left.
+// the config and its digest, the masking policy, the cached capabilities
+// and Schema Registry decoder and, through evictHooks, the collected metrics
+// and the cached topic configs. It is the only place that removes ad-hoc
+// entries and returns how many are left.
 func (r *Connections) evictIdleAdhoc() (remaining int) {
 	cutoff := r.now().Add(-adhocIdleTTL)
 	var evicted []string
@@ -166,6 +234,7 @@ func (r *Connections) evictIdleAdhoc() (remaining int) {
 		delete(r.clusters, name)
 		delete(r.masking, name)
 		delete(r.adhocLastUsed, name)
+		delete(r.adhocDigests, name)
 		delete(r.caps, name)
 	}
 	remaining = len(r.adhocLastUsed)
