@@ -72,7 +72,7 @@ func run(configPath string) int {
 	// config.Load already applied KAFKITO_AUTH_MODE and the "off" default.
 	mode := cfg.Auth.Mode
 
-	modeCfg := auth.ModeConfig{Mode: mode}
+	modeCfg := authModeConfig(cfg.Auth)
 	populateAuthConfigFromEnv(&modeCfg)
 	validator, cleanup, err := auth.BuildValidator(modeCfg)
 	if err != nil {
@@ -84,7 +84,12 @@ func run(configPath string) int {
 	if cleanup != nil {
 		defer cleanup()
 	}
-	logger.Info("auth initialised", "mode", mode)
+	authAttrs := []any{"mode", mode}
+	if ov, ok := validator.(*auth.OIDCValidator); ok && mode == config.AuthModeOIDC {
+		oc := ov.Config()
+		authAttrs = append(authAttrs, "issuer", oc.IssuerURL, "audience", oc.Audience, "jwks_url", oc.JWKSEndpoint)
+	}
+	logger.Info("auth initialised", authAttrs...)
 
 	// config.Load already applied $PORT and the default address.
 	addr := cfg.Server.Addr
@@ -126,6 +131,22 @@ func run(configPath string) int {
 	}
 	logger.Info("kafkito stopped")
 	return 0
+}
+
+// authModeConfig maps the loaded auth settings onto the auth package's
+// ModeConfig. Build-specific settings (VCAP_SERVICES) are added by
+// populateAuthConfigFromEnv.
+func authModeConfig(a config.AppAuthConfig) auth.ModeConfig {
+	return auth.ModeConfig{
+		Mode: a.Mode,
+		OIDC: auth.OIDCConfig{
+			IssuerURL:    a.OIDC.IssuerURL,
+			Audience:     a.OIDC.Audience,
+			JWKSEndpoint: a.OIDC.JWKSURL,
+			RequiredTyp:  a.OIDC.RequiredTyp,
+			AllowedAZP:   a.OIDC.AllowedAZP,
+		},
+	}
 }
 
 // newLogger builds the process logger on stdout from the log config.

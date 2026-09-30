@@ -11,6 +11,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/FinkeFlo/kafkito/internal/auth"
+	"github.com/FinkeFlo/kafkito/internal/config"
 )
 
 // run mutates the default slog logger; restore it for the rest of the package.
@@ -51,4 +54,39 @@ func TestRun_ReturnsExitCode2_WhenAuthModeIsUnset(t *testing.T) {
 	t.Setenv("PORT", "0")
 
 	assert.Equal(t, 2, run(""))
+}
+
+// A failed OpenID Connect discovery fails startup before the server listens.
+func TestRun_ReturnsExitCode2_WhenOIDCDiscoveryFails(t *testing.T) {
+	restoreDefaultLogger(t)
+	t.Setenv("KAFKITO_CONFIG", "")
+	t.Setenv("KAFKITO_AUTH_MODE", "oidc")
+	t.Setenv("KAFKITO_AUTH_OIDC_ISSUER_URL", "http://127.0.0.1:1")
+	t.Setenv("KAFKITO_AUTH_OIDC_AUDIENCE", "kafkito-api")
+	t.Setenv("KAFKITO_AUTH_OIDC_JWKS_URL", "")
+	t.Setenv("PORT", "0")
+
+	assert.Equal(t, 2, run(""))
+}
+
+func TestAuthModeConfig_MapsTheOIDCSettings(t *testing.T) {
+	got := authModeConfig(config.AppAuthConfig{
+		Mode: "oidc",
+		OIDC: config.OIDCAuthConfig{
+			IssuerURL:   "https://idp.example.com",
+			Audience:    "kafkito-api",
+			JWKSURL:     "https://idp.example.com/certs",
+			RequiredTyp: "at+jwt",
+			AllowedAZP:  []string{"proxy"},
+		},
+	})
+
+	assert.Equal(t, "oidc", got.Mode)
+	assert.Equal(t, auth.OIDCConfig{
+		IssuerURL:    "https://idp.example.com",
+		Audience:     "kafkito-api",
+		JWKSEndpoint: "https://idp.example.com/certs",
+		RequiredTyp:  "at+jwt",
+		AllowedAZP:   []string{"proxy"},
+	}, got.OIDC)
 }
