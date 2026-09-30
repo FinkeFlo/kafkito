@@ -1904,8 +1904,9 @@ components:
           default: true
           description: >
             Return as soon as `limit` matches were found. Without it the call
-            reads its whole budget; either way it returns at most `limit`
-            matches and the cursors keep the rest reachable.
+            reads on until every partition holds `limit` matches or is done,
+            or the budget or timeout ends it; either way it returns at most
+            `limit` matches and the cursors keep the rest reachable.
         mode: { type: string, enum: [contains, jsonpath, xpath, js] }
         path: { type: string, maxLength: 2048, description: "JSONPath or XPath expression for modes `jsonpath` and `xpath`; unused otherwise." }
         op: { type: string, enum: [exists, eq, ne, contains, regex, gt, lt, gte, lte] }

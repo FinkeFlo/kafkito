@@ -1291,7 +1291,7 @@ export interface components {
             /** @enum {string} */
             direction?: "newest_first" | "oldest_first";
             /**
-             * @description Return as soon as `limit` matches were found. Without it the call reads its whole budget; either way it returns at most `limit` matches and the cursors keep the rest reachable.
+             * @description Return as soon as `limit` matches were found. Without it the call reads on until every partition holds `limit` matches or is done, or the budget or timeout ends it; either way it returns at most `limit` matches and the cursors keep the rest reachable.
              * @default true
              */
             stop_on_limit?: boolean;

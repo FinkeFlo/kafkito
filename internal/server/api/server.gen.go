@@ -811,7 +811,7 @@ type SearchRequest struct {
 	// Path JSONPath or XPath expression for modes `jsonpath` and `xpath`; unused otherwise.
 	Path *string `json:"path,omitempty"`
 
-	// StopOnLimit Return as soon as `limit` matches were found. Without it the call reads its whole budget; either way it returns at most `limit` matches and the cursors keep the rest reachable.
+	// StopOnLimit Return as soon as `limit` matches were found. Without it the call reads on until every partition holds `limit` matches or is done, or the budget or timeout ends it; either way it returns at most `limit` matches and the cursors keep the rest reachable.
 	StopOnLimit *bool  `json:"stop_on_limit,omitempty"`
 	ToTsMs      *int64 `json:"to_ts_ms,omitempty"`
 
