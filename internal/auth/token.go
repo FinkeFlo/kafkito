@@ -6,6 +6,7 @@
 package auth
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"time"
@@ -36,10 +37,13 @@ var (
 	errAlgNotAllowed    = errors.New("token alg not allowed")
 	errAlgKeyMismatch   = errors.New("token alg does not match the key alg")
 	errSubMissing       = errors.New("sub claim missing")
+	errKidMissing       = errors.New("token has no kid")
+	errNestedToken      = errors.New("token payload is not a JSON object")
 )
 
-// ParseToken verifies raw against set and validates its time claims. The
-// header alg must be one of the allowed asymmetric algorithms and, when the
+// ParseToken verifies raw against set and validates its time claims. raw
+// must be a compact JWS with one signature, a kid and a JSON claim set (no
+// nested token). The header alg must be one of the allowed asymmetric algorithms and, when the
 // key named by kid carries an alg, equal it; a key without alg is used with
 // the algorithm inferred from its type. exp is required, nbf and iat are
 // checked when present (60 s skew), and sub must be a non-empty string.
@@ -58,6 +62,11 @@ func ParseToken(raw string, set jwk.Set) (jwt.Token, error) {
 	}
 	if err := checkAlgorithm(set, msg.Signatures()[0].ProtectedHeaders()); err != nil {
 		return nil, err
+	}
+	// jwt.Parse would verify a nested JWS payload as well, and that inner
+	// signature would bypass checkAlgorithm; accept claim sets only.
+	if payload := bytes.TrimSpace(msg.Payload()); len(payload) == 0 || payload[0] != '{' {
+		return nil, errNestedToken
 	}
 
 	tok, err := jwt.Parse([]byte(raw),
@@ -88,8 +97,8 @@ func checkAlgorithm(set jwk.Set, hdr jws.Headers) error {
 		return errAlgNotAllowed
 	}
 	kid, ok := hdr.KeyID()
-	if !ok {
-		return nil // jwx rejects a token without kid (WithRequireKid defaults to true)
+	if !ok || kid == "" {
+		return errKidMissing
 	}
 	key, ok := set.LookupKeyID(kid)
 	if !ok {

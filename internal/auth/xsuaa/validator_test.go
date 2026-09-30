@@ -197,7 +197,7 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Issue")
 				return tok
 			},
-			wantErrSubstring: "iss",
+			wantErrSubstring: "not under",
 		},
 		{
 			// Upstream library wording for audience errors isn't part of our public
@@ -302,6 +302,34 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 			wantErrSubstring: "sub",
 		},
 		{
+			name: "missing_kid",
+			issueToken: func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string {
+				t.Helper()
+				tok, err := mock.Token("u", creds.ClientID, creds.URL).Scopes("Display").WithoutKeyID().Sign()
+				require.NoError(t, err, "Sign")
+				return tok
+			},
+			wantErrSubstring: "no kid",
+		},
+		{
+			// Unsigned token whose header names the mock's own jku and kid,
+			// so it reaches the algorithm check.
+			name: "alg_none",
+			issueToken: func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string {
+				t.Helper()
+				hdr, err := json.Marshal(map[string]string{"alg": "none", "kid": "test-key-1", "jku": mock.JKU()})
+				require.NoError(t, err)
+				payload, err := json.Marshal(map[string]any{
+					"sub": "u", "iss": creds.URL, "aud": []string{creds.ClientID},
+					"exp": time.Now().Add(time.Hour).Unix(), "zid": creds.IdentityZoneID,
+				})
+				require.NoError(t, err)
+				return base64.RawURLEncoding.EncodeToString(hdr) + "." +
+					base64.RawURLEncoding.EncodeToString(payload) + "."
+			},
+			wantErrSubstring: "token alg",
+		},
+		{
 			name: "nbf_in_the_future",
 			issueToken: func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string {
 				t.Helper()
@@ -348,7 +376,7 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Issue")
 				return tok
 			},
-			wantErrSubstring: "iss",
+			wantErrSubstring: "not under",
 		},
 	}
 	for _, tc := range cases {

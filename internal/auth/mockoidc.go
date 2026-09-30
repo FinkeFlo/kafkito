@@ -183,6 +183,7 @@ type TokenBuilder struct {
 	extra    map[string]any
 	without  []string
 	jku      string
+	noKid    bool
 	alg      jwa.SignatureAlgorithm
 }
 
@@ -228,6 +229,12 @@ func (b *TokenBuilder) JKU(jku string) *TokenBuilder {
 	return b
 }
 
+// WithoutKeyID leaves the kid header out.
+func (b *TokenBuilder) WithoutKeyID() *TokenBuilder {
+	b.noKid = true
+	return b
+}
+
 // Alg signs with alg instead of RS256 and names it in the header. RS* and
 // PS* use the mock's RSA key. HS* uses the DER encoding of the mock's
 // public RSA key as the HMAC secret, so tests can check that a verifier
@@ -245,7 +252,7 @@ func (b *TokenBuilder) Sign() (string, error) {
 			return "", err
 		}
 	}
-	return b.m.sign(b.jku, b.alg, tok)
+	return b.m.sign(b.jku, b.alg, !b.noKid, tok)
 }
 
 // claims builds the default claim set plus extra (which may override defaults).
@@ -268,8 +275,8 @@ func (m *MockOIDC) claims(sub, clientID, issuer string, scopes []string, extra m
 }
 
 // sign signs tok with the current key under alg. An empty jku leaves the
-// header out.
-func (m *MockOIDC) sign(jku string, alg jwa.SignatureAlgorithm, tok jwt.Token) (string, error) {
+// header out; withKid false leaves the kid out.
+func (m *MockOIDC) sign(jku string, alg jwa.SignatureAlgorithm, withKid bool, tok jwt.Token) (string, error) {
 	m.mu.RLock()
 	priv, keyID := m.priv, m.keyID
 	m.mu.RUnlock()
@@ -284,7 +291,9 @@ func (m *MockOIDC) sign(jku string, alg jwa.SignatureAlgorithm, tok jwt.Token) (
 	}
 
 	hdr := jws.NewHeaders()
-	_ = hdr.Set(jws.KeyIDKey, keyID)
+	if withKid {
+		_ = hdr.Set(jws.KeyIDKey, keyID)
+	}
 	if jku != "" {
 		_ = hdr.Set(jws.JWKSetURLKey, jku)
 	}

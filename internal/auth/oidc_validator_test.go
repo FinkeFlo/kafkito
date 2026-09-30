@@ -143,7 +143,7 @@ func TestOIDCValidator_RejectsIssuerThatIsNotAnExactMatch(t *testing.T) {
 
 			_, err = v.Validate(context.Background(), tok)
 
-			require.ErrorContains(t, err, "iss", "Validate must reject an iss that is not exactly IssuerURL")
+			require.ErrorContains(t, err, "iss does not match", "Validate must reject an iss that is not exactly IssuerURL")
 			assert.NotContains(t, err.Error(), mock.Server.URL, "the error must not echo the claim")
 		})
 	}
@@ -171,7 +171,7 @@ func TestOIDCValidator_TrailingSlashInIssuerURLMustMatchExactly(t *testing.T) {
 	_, err = v.Validate(context.Background(), withSlash)
 	require.NoError(t, err, "the configured issuer with its slash is accepted")
 	_, err = v.Validate(context.Background(), withoutSlash)
-	require.ErrorContains(t, err, "iss", "the issuer without the slash is a different issuer")
+	require.ErrorContains(t, err, "iss does not match", "the issuer without the slash is a different issuer")
 }
 
 // Keys published without "alg" are usable: the algorithm is inferred from the
@@ -233,9 +233,7 @@ func TestOIDCValidator_RejectsAlgorithmOutsidePolicy(t *testing.T) {
 			_, err := v.Validate(context.Background(), tok)
 
 			require.Error(t, err, "Validate must reject the algorithm")
-			if tc.rawToken == "" {
-				assert.ErrorContains(t, err, "token alg", "the algorithm policy must reject it")
-			}
+			assert.ErrorContains(t, err, "token alg", "the algorithm policy must reject it")
 		})
 	}
 }
@@ -272,7 +270,7 @@ func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Issue")
 				return tok
 			},
-			wantErrSubstring: "iss",
+			wantErrSubstring: "iss does not match",
 		},
 		{
 			// Distinct from wrong_audience: the aud claim is empty, not
@@ -333,6 +331,16 @@ func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
 				return tok
 			},
 			wantErrSubstring: "sub",
+		},
+		{
+			name: "missing_kid",
+			issue: func(t *testing.T, mock *auth.MockOIDC, aud string) string {
+				t.Helper()
+				tok, err := mock.Token("u", aud, mock.Server.URL).WithoutKeyID().Sign()
+				require.NoError(t, err, "Sign")
+				return tok
+			},
+			wantErrSubstring: "no kid",
 		},
 		{
 			name: "nbf_in_the_future",
