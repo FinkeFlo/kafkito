@@ -115,11 +115,16 @@ func (l LogConfig) validate() error {
 	return nil
 }
 
+// DefaultAuthMode is the auth mode used when auth.mode (KAFKITO_AUTH_MODE) is
+// empty. Only devauth builds can serve it; other builds refuse to start.
+const DefaultAuthMode = "off"
+
 // AppAuthConfig is the top-level authentication configuration for kafkito itself
-// (distinct from per-cluster SASL auth). Mode is populated from KAFKITO_AUTH_MODE.
-// Valid values: "off", "mock", "oidc". Tagged builds may register additional
-// IdP-specific modes — see internal/auth.Register and the build-tagged files
-// under internal/auth/.
+// (distinct from per-cluster SASL auth). Mode comes from auth.mode in the YAML
+// file or from KAFKITO_AUTH_MODE, and Load sets it to DefaultAuthMode when both
+// are empty. Every build registers "off" and "mock" ("off" can only be served
+// by devauth builds); tagged builds may register additional IdP-specific
+// modes, such as "xsuaa" in btp builds. See internal/auth.Register.
 type AppAuthConfig struct {
 	Mode string `koanf:"mode"`
 }
@@ -342,6 +347,7 @@ func Load(path string) (Config, error) {
 	}
 
 	applyServerDefaults(&out.Server)
+	applyAuthDefaults(&out.Auth)
 	applyShortcuts(&out, envK.String(kafkaBrokersKey))
 
 	if err := out.Validate(); err != nil {
@@ -468,6 +474,14 @@ func applyServerDefaults(s *ServerConfig) {
 		s.FrameAncestors = DefaultFrameAncestors
 	}
 	s.FrameAncestors = strings.Join(strings.Fields(s.FrameAncestors), " ")
+}
+
+// applyAuthDefaults sets the auth mode to DefaultAuthMode when neither the
+// YAML file nor KAFKITO_AUTH_MODE provides one (or provides an empty value).
+func applyAuthDefaults(a *AppAuthConfig) {
+	if a.Mode == "" {
+		a.Mode = DefaultAuthMode
+	}
 }
 
 // applyShortcuts synthesizes a default cluster from the KAFKITO_KAFKA_BROKERS

@@ -144,14 +144,61 @@ func TestAuthModeEnvBinding(t *testing.T) {
 	assert.Equal(t, "mock", cfg.Auth.Mode)
 }
 
-func TestAuthModeDefaultsEmpty(t *testing.T) {
+func TestAuthModeDefaultsToOff_WhenEnvIsEmpty(t *testing.T) {
 	t.Setenv("KAFKITO_CONFIG", "")
 	t.Setenv("KAFKITO_KAFKA_BROKERS", "")
 	t.Setenv("KAFKITO_AUTH_MODE", "")
 
 	cfg, err := Load("")
 	require.NoError(t, err)
-	assert.Empty(t, cfg.Auth.Mode)
+	assert.Equal(t, DefaultAuthMode, cfg.Auth.Mode)
+	assert.Equal(t, "off", cfg.Auth.Mode)
+}
+
+func TestAuthModeDefaultsToOff_WhenUnset(t *testing.T) {
+	t.Setenv("KAFKITO_CONFIG", "")
+	t.Setenv("KAFKITO_KAFKA_BROKERS", "")
+	t.Setenv("KAFKITO_AUTH_MODE", "")
+	require.NoError(t, os.Unsetenv("KAFKITO_AUTH_MODE"))
+
+	cfg, err := Load("")
+	require.NoError(t, err)
+	assert.Equal(t, "off", cfg.Auth.Mode)
+}
+
+func TestAuthModeYAMLBinding(t *testing.T) {
+	t.Setenv("KAFKITO_CONFIG", "")
+	t.Setenv("KAFKITO_KAFKA_BROKERS", "")
+	t.Setenv("KAFKITO_AUTH_MODE", "")
+	require.NoError(t, os.Unsetenv("KAFKITO_AUTH_MODE"))
+	p := writeYAML(t, "auth:\n  mode: mock\n")
+
+	cfg, err := Load(p)
+	require.NoError(t, err)
+	assert.Equal(t, "mock", cfg.Auth.Mode)
+}
+
+func TestAuthModeDefaultsToOff_WhenYAMLIsEmpty(t *testing.T) {
+	t.Setenv("KAFKITO_CONFIG", "")
+	t.Setenv("KAFKITO_KAFKA_BROKERS", "")
+	t.Setenv("KAFKITO_AUTH_MODE", "")
+	require.NoError(t, os.Unsetenv("KAFKITO_AUTH_MODE"))
+	p := writeYAML(t, "auth:\n  mode: \"\"\n")
+
+	cfg, err := Load(p)
+	require.NoError(t, err)
+	assert.Equal(t, "off", cfg.Auth.Mode)
+}
+
+func TestAuthModeEnvOverridesYAML(t *testing.T) {
+	t.Setenv("KAFKITO_CONFIG", "")
+	t.Setenv("KAFKITO_KAFKA_BROKERS", "")
+	t.Setenv("KAFKITO_AUTH_MODE", "mock")
+	p := writeYAML(t, "auth:\n  mode: off\n")
+
+	cfg, err := Load(p)
+	require.NoError(t, err)
+	assert.Equal(t, "mock", cfg.Auth.Mode)
 }
 
 // TestClusterConfigJSONRoundTrip guards the json tags on ClusterConfig and its
