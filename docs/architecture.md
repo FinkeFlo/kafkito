@@ -55,7 +55,9 @@ Handlers return errors; one `errorWriter` (`internal/server/apierror.go`)
 turns them into responses. Domain sentinel errors (`ErrUnknownCluster`,
 `ErrTopicNotFound`, `ErrValueMasked`, …) map to an `apiError` with a fixed
 status, code and message; everything else becomes an opaque `500`, and broker
-or Schema Registry failures a generic `502 kafka_upstream`. The body is always
+or Schema Registry failures a generic `502 kafka_upstream`, or
+`502 private_cluster_address_blocked` when the outbound guard refused a
+private cluster's address. The body is always
 `{"error": "...", "code": "..."}` (code optional). Only 5xx causes are logged,
 server-side. The log line names the cluster (`cluster`) when the route has
 one. Messages are static texts or name the failed rule, never the submitted

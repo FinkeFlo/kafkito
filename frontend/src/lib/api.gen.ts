@@ -885,7 +885,7 @@ export interface components {
         Error: {
             /** @description Human-readable message (`unauthorized`, `forbidden`, `not found`, ...). */
             error: string;
-            /** @description Machine-readable code where one exists, e.g. `kafka_upstream`, `production_confirmation_required`, `copy_concurrency_limit`, `kafka_message_too_large`, `kafka_not_authorized`, `rbac_denied`, `topic_consumers_timeout`, `value_masked`, `invalid_request` (the request does not match this document; `error` names the parameter or body field and the violated rule, never the submitted value). */
+            /** @description Machine-readable code where one exists, e.g. `kafka_upstream`, `private_cluster_address_blocked`, `production_confirmation_required`, `copy_concurrency_limit`, `kafka_message_too_large`, `kafka_not_authorized`, `rbac_denied`, `topic_consumers_timeout`, `value_masked`, `invalid_request` (the request does not match this document; `error` names the parameter or body field and the violated rule, never the submitted value). */
             code?: string;
             /** @description Detail for 401 responses from the auth middleware. */
             message?: string;
@@ -1730,7 +1730,7 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description Upstream Kafka / Schema Registry error. Details are logged server-side only (`code: kafka_upstream`). */
+        /** @description Upstream Kafka / Schema Registry error. Details are logged server-side only (`code: kafka_upstream`). When the outbound address guard refused the connection because a broker or Schema Registry address of a private cluster resolves to a blocked range (loopback, link-local, multicast, unspecified), the code is `private_cluster_address_blocked` and the message is static; it never names the address. Test connection reports the affected brokers. */
         BadGateway: {
             headers: {
                 "X-Request-Id": components["headers"]["RequestId"];

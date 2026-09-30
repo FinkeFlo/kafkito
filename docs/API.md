@@ -604,11 +604,14 @@ All error responses share the `Error` schema from the spec:
 
 `error` is always present. `code` is set where a machine-readable code
 exists; the spec's `Error` schema lists them (`kafka_upstream`,
-`invalid_request`, `value_masked`, `production_confirmation_required`,
+`private_cluster_address_blocked`, `invalid_request`, `value_masked`, `production_confirmation_required`,
 `copy_concurrency_limit`, …). RBAC denials add `resource` and `action`, and
 401s from the auth middleware add `message`. Upstream Kafka/Schema Registry
 details are only logged server-side; the response carries
-`"error": "upstream kafka error"`. Error bodies never contain credentials or
+`"error": "upstream kafka error"`. A private cluster whose broker or Schema
+Registry address the outbound guard refuses gets `502` with
+`"code": "private_cluster_address_blocked"` and a static message; Test
+connection names the broker. Error bodies never contain credentials or
 the raw `X-Kafkito-Cluster` header.
 
 Every request is validated against `api/openapi.yaml` (see

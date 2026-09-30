@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strings"
 	"testing"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
+	"github.com/FinkeFlo/kafkito/internal/netguard"
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
 )
 
@@ -195,4 +197,47 @@ func TestWriteError_ClusterAttr(t *testing.T) {
 	ew2 := errorWriter{log: slog.New(slog.NewJSONHandler(logs2, nil))}
 	ew2.writeError(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/v1/info", nil), errors.New("db exploded"))
 	assert.NotContains(t, logs2.String(), `"cluster"`)
+}
+
+// blockedDialErr is what franz-go returns when the guard refuses the dial to
+// an advertised broker (issue #126, e2e evidence).
+func blockedDialErr() error {
+	return fmt.Errorf("metadata: unable to dial: %w", &netguard.BlockedAddressError{
+		Addr: "localhost:39092", Host: "localhost", IP: netip.MustParseAddr("::1"),
+	})
+}
+
+func TestUpstreamError_BlockedAddress(t *testing.T) {
+	t.Parallel()
+
+	for name, err := range map[string]error{
+		"upstreamError": upstreamError("list topics", blockedDialErr()),
+		"clusterError":  clusterError("__adhoc_x", "list topics", blockedDialErr()),
+	} {
+		ae := toAPIError(err)
+		assert.Equal(t, http.StatusBadGateway, ae.Status, name)
+		assert.Equal(t, privateClusterAddressBlockedCode, ae.Code, name)
+		assert.Equal(t, privateClusterAddressBlockedMsg, ae.Message, name)
+		assert.NotContains(t, ae.Message, "localhost", name)
+		assert.NotContains(t, ae.Message, "::1", name)
+	}
+}
+
+func TestWriteError_BlockedAddress(t *testing.T) {
+	t.Parallel()
+
+	logs := &syncBuffer{}
+	ew := errorWriter{log: slog.New(slog.NewJSONHandler(logs, nil))}
+	rec := httptest.NewRecorder()
+
+	ew.writeError(rec, requestWithCluster("__adhoc_0123456789abcdef"), upstreamError("list topics", blockedDialErr()))
+
+	assert.Equal(t, http.StatusBadGateway, rec.Code)
+	assert.JSONEq(t,
+		`{"error":"`+privateClusterAddressBlockedMsg+`","code":"private_cluster_address_blocked"}`,
+		rec.Body.String())
+	assert.NotContains(t, rec.Body.String(), "localhost", "the response never names the refused host")
+	// #118: the operator log keeps the cause, host included, and the cluster.
+	assert.Contains(t, logs.String(), `"cluster":"__adhoc_0123456789abcdef"`)
+	assert.Contains(t, logs.String(), `host \"localhost\" -> ::1`)
 }
