@@ -8,7 +8,9 @@
 package xsuaa
 
 import (
+	"context"
 	"errors"
+	"log/slog"
 
 	"github.com/FinkeFlo/kafkito/internal/auth"
 )
@@ -25,7 +27,10 @@ func init() {
 }
 
 // NewMode is the auth.ModeFactory for the "xsuaa" mode. It parses the
-// VCAP_SERVICES JSON from cfg, builds an XSUAA Validator, and returns it.
+// VCAP_SERVICES JSON from cfg, builds an XSUAA Validator and loads the keys of
+// the bound tenant. A failed warm-up is logged and startup continues; Validate
+// retries the load once the refresh interval has passed. The cleanup closes
+// the validator.
 func NewMode(cfg auth.ModeConfig) (auth.Validator, func(), error) {
 	if cfg.VCAPServices == "" {
 		return nil, nil, errors.New("xsuaa mode requires VCAP_SERVICES")
@@ -38,5 +43,8 @@ func NewMode(cfg auth.ModeConfig) (auth.Validator, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return v, nil, nil
+	if err := v.WarmUp(context.Background()); err != nil {
+		slog.Warn("auth: JWKS warm-up failed; startup continues", "mode", "xsuaa", "err", err)
+	}
+	return v, v.Close, nil
 }

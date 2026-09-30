@@ -10,7 +10,9 @@ package xsuaa_test
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -21,12 +23,15 @@ import (
 	"github.com/FinkeFlo/kafkito/internal/auth/xsuaa"
 )
 
-func newValidator(t *testing.T) (*auth.MockOIDC, auth.Validator, xsuaa.Credentials) {
+// newValidator starts a mock XSUAA (key set at /token_keys) and a validator
+// that accepts the mock's plain-http loopback jku.
+func newValidator(t *testing.T) (*auth.MockOIDC, *xsuaa.Validator, xsuaa.Credentials) {
 	t.Helper()
 
 	mock, err := auth.NewMockOIDC(
 		auth.WithScopePrefix("kafkito!t12345"),
 		auth.WithZoneID("test-zone"),
+		auth.WithJWKSPath("/token_keys"),
 	)
 	require.NoError(t, err, "NewMockOIDC")
 	t.Cleanup(mock.Close)
@@ -38,8 +43,9 @@ func newValidator(t *testing.T) (*auth.MockOIDC, auth.Validator, xsuaa.Credentia
 		XSAppName:      "kafkito!t12345",
 		IdentityZoneID: "test-zone",
 	}
-	v, err := xsuaa.NewValidator(creds)
-	require.NoError(t, err, "NewValidator")
+	v, err := xsuaa.NewValidatorForTest(creds)
+	require.NoError(t, err, "NewValidatorForTest")
+	t.Cleanup(v.Close)
 
 	return mock, v, creds
 }
@@ -218,8 +224,9 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				mutated := creds
 				tc.mutateCreds(&mutated)
 				var err error
-				v, err = xsuaa.NewValidator(mutated)
-				require.NoError(t, err, "NewValidator(mutated)")
+				v, err = xsuaa.NewValidatorForTest(mutated)
+				require.NoError(t, err, "NewValidatorForTest(mutated)")
+				t.Cleanup(v.Close)
 			}
 			tok := tc.issueToken(t, mock, creds)
 
@@ -242,4 +249,168 @@ func TestNewValidator_RejectsUAADomainWithPort(t *testing.T) {
 
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "UAADomain")
+}
+
+func TestValidator_RejectsJKUOutsidePolicy(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name             string
+		jku              func(mock *auth.MockOIDC) string
+		wantErrSubstring string
+	}{
+		{
+			name:             "other_domain",
+			jku:              func(*auth.MockOIDC) string { return "https://evil.example/token_keys" },
+			wantErrSubstring: "uaadomain",
+		},
+		{
+			name:             "wrong_path",
+			jku:              func(m *auth.MockOIDC) string { return m.Server.URL + "/jwks" },
+			wantErrSubstring: "jku path",
+		},
+		{
+			name:             "path_prefix",
+			jku:              func(m *auth.MockOIDC) string { return m.Server.URL + "/token_keys/x" },
+			wantErrSubstring: "jku path",
+		},
+		{
+			name:             "query",
+			jku:              func(m *auth.MockOIDC) string { return m.JKU() + "?tenant=x" },
+			wantErrSubstring: "query",
+		},
+		{
+			name:             "fragment",
+			jku:              func(m *auth.MockOIDC) string { return m.JKU() + "#x" },
+			wantErrSubstring: "fragment",
+		},
+		{
+			name: "user_info",
+			jku: func(m *auth.MockOIDC) string {
+				return strings.Replace(m.JKU(), "http://", "http://user@", 1)
+			},
+			wantErrSubstring: "user info",
+		},
+		{
+			name:             "relative",
+			jku:              func(*auth.MockOIDC) string { return "/token_keys" },
+			wantErrSubstring: "jku is not an absolute URL",
+		},
+		{
+			// Loopback http is the test exception; any other http host is not.
+			name:             "http_non_loopback",
+			jku:              func(*auth.MockOIDC) string { return "http://auth.example/token_keys" },
+			wantErrSubstring: "https",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mock, v, creds := newValidator(t)
+			tok, err := mock.IssueWithJKU(tc.jku(mock), "u", creds.ClientID, creds.URL, []string{"Display"})
+			require.NoError(t, err, "IssueWithJKU")
+
+			_, err = v.Validate(context.Background(), tok)
+
+			require.ErrorContains(t, err, tc.wantErrSubstring, "Validate must reject the jku")
+			assert.Zero(t, mock.JWKSRequests(), "a rejected jku must not be fetched")
+		})
+	}
+}
+
+func TestNewValidator_RejectsPlainHTTPJKU(t *testing.T) {
+	t.Parallel()
+
+	mock, _, creds := newValidator(t)
+	v, err := xsuaa.NewValidator(creds) // production constructor: https only
+	require.NoError(t, err, "NewValidator")
+	t.Cleanup(v.Close)
+	tok, err := mock.Issue("u", creds.ClientID, creds.URL, []string{"Display"}, nil)
+	require.NoError(t, err, "Issue")
+
+	_, err = v.Validate(context.Background(), tok)
+
+	require.ErrorContains(t, err, "https")
+	assert.Zero(t, mock.JWKSRequests())
+}
+
+// Replicates the production race of #100 (2 of 4 parallel first requests got
+// a 401 after a restart): all first requests must pass, with one fetch.
+func TestValidator_ConcurrentFirstRequests_AllSucceed(t *testing.T) {
+	t.Parallel()
+
+	mock, v, creds := newValidator(t)
+	tok, err := mock.Issue("u-1", creds.ClientID, creds.URL, []string{"Display"}, nil)
+	require.NoError(t, err, "Issue")
+
+	const requests = 32
+	start := make(chan struct{})
+	errs := make(chan error, requests)
+	var wg sync.WaitGroup
+	for range requests {
+		wg.Go(func() {
+			<-start
+			_, err := v.Validate(context.Background(), tok)
+			errs <- err
+		})
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		require.NoError(t, err, "no first request may fail")
+	}
+	assert.Equal(t, int64(1), mock.JWKSRequests(), "concurrent first requests must share one JWKS fetch")
+}
+
+func TestValidator_WarmUp_LoadsTheOwnTenantKeys(t *testing.T) {
+	t.Parallel()
+
+	mock, v, creds := newValidator(t)
+	require.NoError(t, v.WarmUp(context.Background()), "WarmUp")
+	require.Equal(t, int64(1), mock.JWKSRequests())
+	tok, err := mock.Issue("u", creds.ClientID, creds.URL, []string{"Display"}, nil)
+	require.NoError(t, err, "Issue")
+
+	_, err = v.Validate(context.Background(), tok)
+
+	require.NoError(t, err, "Validate")
+	assert.Equal(t, int64(1), mock.JWKSRequests(), "the token's jku must hit the warmed-up source")
+}
+
+func TestValidator_Close_RejectsLaterTokens(t *testing.T) {
+	t.Parallel()
+
+	mock, v, creds := newValidator(t)
+	tok, err := mock.Issue("u", creds.ClientID, creds.URL, []string{"Display"}, nil)
+	require.NoError(t, err, "Issue")
+
+	v.Close()
+	_, err = v.Validate(context.Background(), tok)
+
+	require.ErrorIs(t, err, auth.ErrKeySourceClosed)
+}
+
+// NewMode keeps starting when the warm-up fails (here: the production
+// validator rejects the mock's http URL) and returns a real cleanup.
+func TestNewMode_WarmUpFailure_StillReturnsValidatorAndCleanup(t *testing.T) {
+	t.Parallel()
+
+	mock, _, creds := newValidator(t)
+	vcap, err := json.Marshal(map[string]any{
+		"xsuaa": []map[string]any{{"credentials": creds}},
+	})
+	require.NoError(t, err)
+
+	v, cleanup, err := xsuaa.NewMode(auth.ModeConfig{Mode: "xsuaa", VCAPServices: string(vcap)})
+
+	require.NoError(t, err, "a failed warm-up must not fail startup")
+	require.NotNil(t, v)
+	require.NotNil(t, cleanup, "xsuaa must return a real cleanup")
+	cleanup()
+	_, err = v.Validate(context.Background(), "not.a.jwt")
+	require.Error(t, err)
+	assert.Zero(t, mock.JWKSRequests(), "the http warm-up URL must be rejected before any fetch")
 }
