@@ -5,6 +5,11 @@
 
 package auth
 
+import (
+	"context"
+	"log/slog"
+)
+
 // init registers the modes that are always part of the default (no-tag) build:
 //   - "mock": generic OIDC validator + in-process JWKS fixture
 //   - "off":  unavailable in default builds; the devauth build tag re-registers
@@ -32,7 +37,9 @@ func newOffMode(_ ModeConfig) (Validator, func(), error) {
 
 // newMockMode constructs a generic OIDCValidator backed by an in-process
 // MockOIDC fixture. It is intentionally IdP-agnostic: tokens carry no scope
-// prefix and no zone claim. The cleanup function stops the embedded server.
+// prefix and no zone claim. The keys are loaded at startup; a failure is
+// logged and startup continues. The cleanup function closes the validator's
+// key source and stops the embedded server.
 func newMockMode(_ ModeConfig) (Validator, func(), error) {
 	mock, err := NewMockOIDC()
 	if err != nil {
@@ -47,5 +54,11 @@ func newMockMode(_ ModeConfig) (Validator, func(), error) {
 		mock.Close()
 		return nil, nil, err
 	}
-	return v, mock.Close, nil
+	if err := v.WarmUp(context.Background()); err != nil {
+		slog.Warn("auth: JWKS warm-up failed; startup continues", "mode", "mock", "err", err)
+	}
+	return v, func() {
+		v.Close()
+		mock.Close()
+	}, nil
 }

@@ -8,6 +8,7 @@
 package auth_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -62,4 +63,16 @@ func TestBuildValidator_RejectsInvalidMode(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBuildValidator_MockMode_CleanupClosesTheKeySource(t *testing.T) {
+	t.Parallel()
+
+	v, cleanup, err := auth.BuildValidator(auth.ModeConfig{Mode: "mock"})
+	require.NoError(t, err, "BuildValidator(mock)")
+
+	cleanup()
+	_, err = v.Validate(context.Background(), "not.a.jwt")
+
+	require.ErrorIs(t, err, auth.ErrKeySourceClosed, "cleanup must close the validator, not only the mock server")
 }
