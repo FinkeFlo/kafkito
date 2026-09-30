@@ -87,8 +87,11 @@ type SearchOptions struct {
 	// offsets resolved from FromTS/ToTS.
 	Cursors map[int32]int64
 
-	// StopOnLimit returns once Limit matches have been collected; otherwise we
-	// scan up to Budget records and return all matches found.
+	// StopOnLimit returns once the first Limit matches in the search
+	// direction are known: Limit matches were found and every partition that
+	// is not done has read past the last of them. A lagging partition can
+	// keep a call waiting up to Timeout. Otherwise we scan until the page
+	// cannot change any more (see pageFull) or the budget ends the call.
 	StopOnLimit bool
 
 	Timeout time.Duration
@@ -315,7 +318,8 @@ func (o SearchOptions) withDefaults() SearchOptions {
 // runSearch feeds the scanned records into sc until the ranges are drained,
 // the budget is spent, enough matches were found (StopOnLimit) or
 // opts.Timeout elapses. The budget holds per record: a call never reads
-// more than opts.Budget records. The limit is checked after every poll.
+// more than opts.Budget records. The limit is checked after every poll, and
+// StopOnLimit stops only once the page is settled (see settled).
 func (r *Messages) runSearch(ctx context.Context, s recordScan, opts SearchOptions, sc *searchScan) (budgetExhausted, timedOut bool, err error) {
 	pollCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
@@ -334,7 +338,7 @@ func (r *Messages) runSearch(ctx context.Context, s recordScan, opts SearchOptio
 		if sc.read >= opts.Budget {
 			return true, false, nil
 		}
-		if opts.StopOnLimit && sc.confirmed >= opts.Limit {
+		if opts.StopOnLimit && sc.confirmed >= opts.Limit && sc.settled(opts.Limit) {
 			break
 		}
 		if sc.pageFull(opts.Limit) {
@@ -412,8 +416,18 @@ type searchScan struct {
 	stuck map[int32]bool
 	// highest is the highest offset processed per partition (oldest-first).
 	highest map[int32]int64
+	// highestTS is the timestamp of the record at highest (oldest-first).
+	highestTS map[int32]int64
+	// pendingLow is, per partition, the lowest visited record of the chunk
+	// being read (newest-first); frontierTS is the timestamp of the lowest
+	// visited record at or above the frontier, set once such a record exists.
+	pendingLow map[int32]Message
+	frontierTS map[int32]int64
 	// ended marks the partitions whose range was read to its end.
 	ended map[int32]bool
+	// drained marks the partitions this call reads no further, because their
+	// range ended or the reader gave up on it.
+	drained map[int32]bool
 }
 
 func newSearchScan(mt matcher, dec recordDecoder, ranges map[int32]PartitionRange, dir SearchDirection) *searchScan {
@@ -430,7 +444,11 @@ func newSearchScan(mt matcher, dec recordDecoder, ranges map[int32]PartitionRang
 		frontier:    make(map[int32]int64, len(ranges)),
 		stuck:       make(map[int32]bool),
 		highest:     make(map[int32]int64, len(ranges)),
+		highestTS:   make(map[int32]int64, len(ranges)),
+		pendingLow:  make(map[int32]Message, len(ranges)),
+		frontierTS:  make(map[int32]int64, len(ranges)),
 		ended:       make(map[int32]bool, len(ranges)),
+		drained:     make(map[int32]bool, len(ranges)),
 	}
 	for p, rng := range ranges {
 		sc.frontier[p] = rng.End
@@ -440,8 +458,13 @@ func newSearchScan(mt matcher, dec recordDecoder, ranges map[int32]PartitionRang
 
 func (sc *searchScan) visit(ctx context.Context, rec *kgo.Record) {
 	p := rec.Partition
+	ts := rec.Timestamp.UnixMilli()
 	if cur, ok := sc.highest[p]; !ok || rec.Offset > cur {
 		sc.highest[p] = rec.Offset
+		sc.highestTS[p] = ts
+	}
+	if low, ok := sc.pendingLow[p]; sc.newestFirst && (!ok || rec.Offset < low.Offset) {
+		sc.pendingLow[p] = Message{Offset: rec.Offset, Timestamp: ts}
 	}
 	sc.read++
 	sc.visited[p] = append(sc.visited[p], rec.Offset)
@@ -476,6 +499,9 @@ func (sc *searchScan) finish(batch recordBatch) {
 	for _, p := range batch.ended {
 		sc.ended[p] = true
 	}
+	for _, p := range batch.drained {
+		sc.drained[p] = true
+	}
 	if !sc.newestFirst {
 		return
 	}
@@ -489,6 +515,10 @@ func (sc *searchScan) finish(batch recordBatch) {
 			continue
 		}
 		sc.frontier[p] = ch.lower
+		if low, ok := sc.pendingLow[p]; ok {
+			sc.frontierTS[p] = low.Timestamp
+			delete(sc.pendingLow, p)
+		}
 		sc.confirmed += sc.pending[p]
 		sc.confirmedIn[p] += sc.pending[p]
 		sc.pending[p] = 0
@@ -504,7 +534,8 @@ func (sc *searchScan) confirmedMatches() []Message {
 	if !sc.newestFirst {
 		return sc.matches
 	}
-	out := sc.matches[:0]
+	// A new slice: settled calls this while the scan still collects matches.
+	out := make([]Message, 0, len(sc.matches))
 	for _, m := range sc.matches {
 		if m.Offset >= sc.frontier[m.Partition] {
 			out = append(out, m)
@@ -564,6 +595,58 @@ func (sc *searchScan) pageFull(limit int) bool {
 			continue
 		}
 		return false
+	}
+	return true
+}
+
+// settled reports whether the first limit confirmed matches are the first
+// limit matches of the whole range in the search direction, so a
+// stop-on-limit call can end. Like forwardPageSettled in consume, polls may
+// return one partition's records long before another's: every partition
+// this call still reads must have read past the page's last match, so that
+// no unread record can rank inside the page.
+//
+// Timestamps are taken as non-decreasing within a partition. Oldest-first,
+// a partition's next unread record then ranks at or after {timestamp of the
+// highest record read, p, highest+1}. Newest-first, the next record the
+// frontier admits ranks at or after {timestamp of the lowest record read
+// above the frontier, p, frontier-1}; the matches of an unfinished chunk
+// are not on the page yet, so only the frontier counts.
+func (sc *searchScan) settled(limit int) bool {
+	var last *Message
+	for p, rng := range sc.ranges {
+		if sc.drained[p] || sc.confirmedIn[p] >= limit {
+			// Done, or its own first limit matches already rank at or
+			// before the page's last one.
+			continue
+		}
+		var next Message
+		if sc.newestFirst {
+			if sc.stuck[p] || sc.frontier[p] <= rng.Start {
+				continue
+			}
+			ts, ok := sc.frontierTS[p]
+			if !ok {
+				return false
+			}
+			next = Message{Timestamp: ts, Partition: p, Offset: sc.frontier[p] - 1}
+		} else {
+			hi, ok := sc.highest[p]
+			if !ok {
+				return false
+			}
+			next = Message{Timestamp: sc.highestTS[p], Partition: p, Offset: hi + 1}
+		}
+		if last == nil {
+			page := pageMerge(sc.confirmedMatches(), limit, sc.newestFirst)
+			if len(page) < limit {
+				return false
+			}
+			last = &page[len(page)-1]
+		}
+		if compareMessages(next, *last, sc.newestFirst) < 0 {
+			return false
+		}
 	}
 	return true
 }
@@ -689,7 +772,32 @@ func (sc *searchScan) page(ranges map[int32]PartitionRange, limit int) searchPag
 // partition are out of order. With ordered timestamps these are the first
 // limit matches by time among the matches this call confirmed.
 func pageCut(matches []Message, limit int, newestFirst bool) map[int32]int64 {
-	byPart := make(map[int32][]Message)
+	byPart, head := mergeByTime(matches, limit, newestFirst)
+	cuts := make(map[int32]int64)
+	for p, ms := range byPart {
+		if head[p] < len(ms) {
+			cuts[p] = ms[head[p]].Offset
+		}
+	}
+	return cuts
+}
+
+// pageMerge returns the matches pageCut keeps, in page order.
+func pageMerge(matches []Message, limit int, newestFirst bool) []Message {
+	byPart, head := mergeByTime(matches, limit, newestFirst)
+	page := make([]Message, 0, min(limit, len(matches)))
+	for p, ms := range byPart {
+		page = append(page, ms[:head[p]]...)
+	}
+	sortMessages(page, newestFirst)
+	return page
+}
+
+// mergeByTime groups matches by partition in offset order (descending
+// newest-first) and merges them by time. head[p] is how many of partition
+// p's matches are among the first limit.
+func mergeByTime(matches []Message, limit int, newestFirst bool) (byPart map[int32][]Message, head map[int32]int) {
+	byPart = make(map[int32][]Message)
 	for _, m := range matches {
 		byPart[m.Partition] = append(byPart[m.Partition], m)
 	}
@@ -704,7 +812,7 @@ func pageCut(matches []Message, limit int, newestFirst bool) map[int32]int64 {
 		})
 	}
 	slices.Sort(parts)
-	head := make(map[int32]int, len(byPart))
+	head = make(map[int32]int, len(byPart))
 	for range min(limit, len(matches)) {
 		best := int32(-1)
 		for _, p := range parts {
@@ -717,11 +825,5 @@ func pageCut(matches []Message, limit int, newestFirst bool) map[int32]int64 {
 		}
 		head[best]++
 	}
-	cuts := make(map[int32]int64)
-	for _, p := range parts {
-		if head[p] < len(byPart[p]) {
-			cuts[p] = byPart[p][head[p]].Offset
-		}
-	}
-	return cuts
+	return byPart, head
 }
