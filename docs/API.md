@@ -125,7 +125,8 @@ The query parameters (`partition`, `limit` capped at 500, `from` =
 `end` | `start` | `offset` | `timestamp`, `offset`, `partition_offsets`,
 `from_ts_ms`, `to_ts_ms`, `cursor`) and the `MessagesPage` response are
 described in the spec. Pass the returned `next_cursor` back as `cursor` to
-page.
+page. With `from=offset`, the time bounds still apply: the start offset is
+lifted to `from_ts_ms` and the page stops before `to_ts_ms`.
 
 Records are returned in per-partition offset order. `value` is populated when
 printable; a binary payload is rendered as a `0x…` hex preview with
