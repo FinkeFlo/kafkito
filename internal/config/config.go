@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -123,11 +124,109 @@ const DefaultAuthMode = "off"
 // (distinct from per-cluster SASL auth). Mode comes from auth.mode in the YAML
 // file or from KAFKITO_AUTH_MODE, and Load sets it to DefaultAuthMode when both
 // are empty. A set but empty KAFKITO_AUTH_MODE overrides the YAML value, so it
-// also yields DefaultAuthMode. Every build registers "off" and "mock" ("off"
-// can only be served by devauth builds); tagged builds may register additional
-// IdP-specific modes, such as "xsuaa" in btp builds. See internal/auth.Register.
+// also yields DefaultAuthMode. Every build registers "off", "mock" and "oidc"
+// ("off" can only be served by devauth builds); tagged builds may register
+// additional IdP-specific modes, such as "xsuaa" in btp builds. See
+// internal/auth.Register.
 type AppAuthConfig struct {
-	Mode string `koanf:"mode"`
+	Mode string         `koanf:"mode"`
+	OIDC OIDCAuthConfig `koanf:"oidc"`
+}
+
+// AuthModeOIDC is the Mode value selecting the generic OIDC validator.
+const AuthModeOIDC = "oidc"
+
+// OIDCAuthConfig configures the generic "oidc" auth mode. kafkito only
+// validates bearer JWTs; login is handled by an upstream auth proxy. The
+// settings are ignored in other modes.
+type OIDCAuthConfig struct {
+	// IssuerURL is the exact expected "iss" claim and the base for OpenID
+	// Connect discovery. Required in oidc mode.
+	// Env: KAFKITO_AUTH_OIDC_ISSUER_URL.
+	IssuerURL string `koanf:"issuer_url"`
+	// Audience is the value the token's "aud" claim must contain: the
+	// identifier of the kafkito API, not the client of the auth proxy.
+	// Required in oidc mode. Env: KAFKITO_AUTH_OIDC_AUDIENCE.
+	Audience string `koanf:"audience"`
+	// JWKSURL is the signing-key endpoint. When empty it is discovered from
+	// <IssuerURL>/.well-known/openid-configuration at startup.
+	// Env: KAFKITO_AUTH_OIDC_JWKS_URL.
+	JWKSURL string `koanf:"jwks_url"`
+	// RequiredTyp, when set, is the "typ" header every token must carry
+	// (for example "at+jwt"). Empty disables the check.
+	// Env: KAFKITO_AUTH_OIDC_REQUIRED_TYP.
+	RequiredTyp string `koanf:"required_typ"`
+	// AllowedAZP, when non-empty, lists the "azp" claim values a token may
+	// carry; tokens without azp are then rejected. Empty disables the check.
+	// Env: KAFKITO_AUTH_OIDC_ALLOWED_AZP (comma-separated).
+	AllowedAZP []string `koanf:"allowed_azp"`
+}
+
+func (a AppAuthConfig) validate() error {
+	if a.Mode != AuthModeOIDC {
+		return nil
+	}
+	o := a.OIDC
+	if strings.TrimSpace(o.IssuerURL) == "" {
+		return errors.New("auth.oidc.issuer_url is required when auth.mode is oidc")
+	}
+	if strings.TrimSpace(o.Audience) == "" {
+		return errors.New("auth.oidc.audience is required when auth.mode is oidc")
+	}
+	if err := validateOIDCURL("auth.oidc.issuer_url", o.IssuerURL); err != nil {
+		return err
+	}
+	if u, _ := url.Parse(o.IssuerURL); u.RawQuery != "" || u.Fragment != "" || u.ForceQuery {
+		return errors.New("auth.oidc.issuer_url must not contain a query or fragment")
+	}
+	if o.JWKSURL != "" {
+		if err := validateOIDCURL("auth.oidc.jwks_url", o.JWKSURL); err != nil {
+			return err
+		}
+	}
+	for i, azp := range o.AllowedAZP {
+		if strings.TrimSpace(azp) == "" {
+			return fmt.Errorf("auth.oidc.allowed_azp[%d] must not be empty", i)
+		}
+	}
+	return nil
+}
+
+// validateOIDCURL requires an absolute https URL without user info; plain
+// http is accepted only for loopback hosts, for local testing. The values
+// come from configuration, so the error may quote them.
+func validateOIDCURL(key, raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		// raw is not quoted: it may carry user info url.Parse could not split off.
+		return fmt.Errorf("%s must be an absolute URL", key)
+	}
+	if !u.IsAbs() || u.Host == "" {
+		return fmt.Errorf("%s %q must be an absolute URL", key, u.Redacted())
+	}
+	if u.User != nil {
+		return fmt.Errorf("%s must not contain user info", key)
+	}
+	switch u.Scheme {
+	case "https":
+		return nil
+	case "http":
+		if isLoopbackHost(u.Hostname()) {
+			return nil
+		}
+		return fmt.Errorf("%s %q must use https (http is allowed only for loopback hosts)", key, u.Redacted())
+	default:
+		return fmt.Errorf("%s %q must use https", key, u.Redacted())
+	}
+}
+
+// isLoopbackHost reports whether host is "localhost" or a loopback IP.
+func isLoopbackHost(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // RBACConfig is the top-level RBAC configuration block.
@@ -367,6 +466,9 @@ func (c Config) Validate() error {
 	if err := c.Log.validate(); err != nil {
 		return err
 	}
+	if err := c.Auth.validate(); err != nil {
+		return err
+	}
 	seen := make(map[string]struct{}, len(c.Clusters))
 	for i, cl := range c.Clusters {
 		if strings.TrimSpace(cl.Name) == "" {
@@ -429,17 +531,34 @@ const kafkaBrokersKey = "kafka.brokers"
 var envKeyAliases = map[string]string{
 	"KAFKITO_TEST_CONNECTION_TIMEOUT": "server.test_connection_timeout",
 	"KAFKITO_SERVER_FRAME_ANCESTORS":  "server.frame_ancestors",
+	"KAFKITO_AUTH_OIDC_ISSUER_URL":    "auth.oidc.issuer_url",
+	"KAFKITO_AUTH_OIDC_AUDIENCE":      "auth.oidc.audience",
+	"KAFKITO_AUTH_OIDC_JWKS_URL":      "auth.oidc.jwks_url",
+	"KAFKITO_AUTH_OIDC_REQUIRED_TYP":  "auth.oidc.required_typ",
+	"KAFKITO_AUTH_OIDC_ALLOWED_AZP":   "auth.oidc.allowed_azp",
+}
+
+// envListKeys are aliased keys whose value is a comma-separated list.
+var envListKeys = map[string]bool{
+	"auth.oidc.allowed_azp": true,
 }
 
 // envKeyValue maps KAFKITO_* env vars to koanf keys: aliases first, then
 // e.g. KAFKITO_SERVER_ADDR -> server.addr and KAFKITO_LOG_LEVEL -> log.level.
 // Aliased values are trimmed and dropped when empty so that an empty
-// variable keeps the built-in default.
+// variable keeps the built-in default; list aliases are split on commas.
 func envKeyValue(key, value string) (string, any) {
 	if alias, ok := envKeyAliases[key]; ok {
 		value = strings.TrimSpace(value)
 		if value == "" {
 			return "", nil
+		}
+		if envListKeys[alias] {
+			list := splitCSV(value)
+			if len(list) == 0 {
+				return "", nil
+			}
+			return alias, list
 		}
 		return alias, value
 	}
@@ -478,10 +597,19 @@ func applyServerDefaults(s *ServerConfig) {
 }
 
 // applyAuthDefaults sets the auth mode to DefaultAuthMode when neither the
-// YAML file nor KAFKITO_AUTH_MODE provides one (or provides an empty value).
+// YAML file nor KAFKITO_AUTH_MODE provides one (or provides an empty value),
+// and trims the auth.oidc values, which are compared exactly.
 func applyAuthDefaults(a *AppAuthConfig) {
 	if a.Mode == "" {
 		a.Mode = DefaultAuthMode
+	}
+	o := &a.OIDC
+	o.IssuerURL = strings.TrimSpace(o.IssuerURL)
+	o.Audience = strings.TrimSpace(o.Audience)
+	o.JWKSURL = strings.TrimSpace(o.JWKSURL)
+	o.RequiredTyp = strings.TrimSpace(o.RequiredTyp)
+	for i := range o.AllowedAZP {
+		o.AllowedAZP[i] = strings.TrimSpace(o.AllowedAZP[i])
 	}
 }
 

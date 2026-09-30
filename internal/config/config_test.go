@@ -351,6 +351,8 @@ func isolateEnv(t *testing.T) {
 	for _, k := range []string{
 		"KAFKITO_CONFIG", "KAFKITO_KAFKA_BROKERS", "PORT", "KAFKITO_SERVER_ADDR",
 		"KAFKITO_TEST_CONNECTION_TIMEOUT", "KAFKITO_SERVER_FRAME_ANCESTORS",
+		"KAFKITO_AUTH_MODE", "KAFKITO_AUTH_OIDC_ISSUER_URL", "KAFKITO_AUTH_OIDC_AUDIENCE",
+		"KAFKITO_AUTH_OIDC_JWKS_URL", "KAFKITO_AUTH_OIDC_REQUIRED_TYP", "KAFKITO_AUTH_OIDC_ALLOWED_AZP",
 	} {
 		t.Setenv(k, "") // registers the restore
 		require.NoError(t, os.Unsetenv(k))
@@ -587,3 +589,149 @@ func TestBrokersShortcutTrimsAndDropsEmpty(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, cfg.Clusters)
 }
+
+func TestAuthOIDCEnvBinding(t *testing.T) {
+	isolateEnv(t)
+	t.Setenv("KAFKITO_AUTH_MODE", "oidc")
+	t.Setenv("KAFKITO_AUTH_OIDC_ISSUER_URL", "https://idp.example.com/realms/kafkito")
+	t.Setenv("KAFKITO_AUTH_OIDC_AUDIENCE", "kafkito-api")
+	t.Setenv("KAFKITO_AUTH_OIDC_JWKS_URL", " https://idp.example.com/realms/kafkito/certs ")
+	t.Setenv("KAFKITO_AUTH_OIDC_REQUIRED_TYP", "at+jwt")
+	t.Setenv("KAFKITO_AUTH_OIDC_ALLOWED_AZP", "proxy, cli ,,")
+
+	cfg, err := Load("")
+
+	require.NoError(t, err)
+	assert.Equal(t, "oidc", cfg.Auth.Mode)
+	assert.Equal(t, OIDCAuthConfig{
+		IssuerURL:   "https://idp.example.com/realms/kafkito",
+		Audience:    "kafkito-api",
+		JWKSURL:     "https://idp.example.com/realms/kafkito/certs",
+		RequiredTyp: "at+jwt",
+		AllowedAZP:  []string{"proxy", "cli"},
+	}, cfg.Auth.OIDC)
+}
+
+func TestAuthOIDCYAMLBindingAndEnvOverride(t *testing.T) {
+	isolateEnv(t)
+	p := writeYAML(t, `
+auth:
+  mode: oidc
+  oidc:
+    issuer_url: https://yaml.example.com
+    audience: yaml-aud
+    required_typ: at+jwt
+    allowed_azp: [proxy]
+`)
+	t.Setenv("KAFKITO_AUTH_OIDC_ISSUER_URL", "https://env.example.com")
+	t.Setenv("KAFKITO_AUTH_OIDC_JWKS_URL", "") // empty: keeps the YAML value (none)
+
+	cfg, err := Load(p)
+
+	require.NoError(t, err)
+	assert.Equal(t, OIDCAuthConfig{
+		IssuerURL:   "https://env.example.com",
+		Audience:    "yaml-aud",
+		RequiredTyp: "at+jwt",
+		AllowedAZP:  []string{"proxy"},
+	}, cfg.Auth.OIDC)
+}
+
+func TestAuthOIDCMissingIssuerRejectedOnLoad(t *testing.T) {
+	isolateEnv(t)
+	t.Setenv("KAFKITO_AUTH_MODE", "oidc")
+	t.Setenv("KAFKITO_AUTH_OIDC_AUDIENCE", "kafkito-api")
+
+	_, err := Load("")
+
+	require.ErrorContains(t, err, "auth.oidc.issuer_url is required")
+}
+
+func TestAuthOIDCValidation(t *testing.T) {
+	ok := OIDCAuthConfig{IssuerURL: "https://idp.example.com", Audience: "aud"}
+	with := func(f func(*OIDCAuthConfig)) OIDCAuthConfig {
+		c := ok
+		f(&c)
+		return c
+	}
+	cases := []struct {
+		name    string
+		mode    string
+		oidc    OIDCAuthConfig
+		wantErr string
+	}{
+		{"valid", "oidc", ok, ""},
+		{"valid_with_jwks", "oidc", with(func(c *OIDCAuthConfig) { c.JWKSURL = "https://idp.example.com/certs" }), ""},
+		{"http_localhost_ok", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "http://localhost:8080/realms/k" }), ""},
+		{"http_loopback_ok", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "http://127.0.0.1:8080" }), ""},
+		{"http_ipv6_loopback_ok", "oidc", with(func(c *OIDCAuthConfig) { c.JWKSURL = "http://[::1]:8080/certs" }), ""},
+		{"other_mode_ignores_oidc", "mock", OIDCAuthConfig{IssuerURL: "not a url"}, ""},
+		{"missing_issuer", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "" }), "auth.oidc.issuer_url is required"},
+		{"missing_audience", "oidc", with(func(c *OIDCAuthConfig) { c.Audience = " " }), "auth.oidc.audience is required"},
+		{"relative_issuer", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "idp.example.com" }), "absolute"},
+		{"http_remote_issuer", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "http://idp.example.com" }), "https"},
+		{"ftp_issuer", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "ftp://idp.example.com" }), "https"},
+		{"userinfo_issuer", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "https://" + testUserInfo + "@idp.example.com" }), "user info"},
+		{"http_remote_jwks", "oidc", with(func(c *OIDCAuthConfig) { c.JWKSURL = "http://idp.example.com/certs" }), "auth.oidc.jwks_url"},
+		{"issuer_query", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "https://idp.example.com/?x=1" }), "query or fragment"},
+		{"issuer_fragment", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "https://idp.example.com/#f" }), "query or fragment"},
+		{"unparsable_userinfo", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "https://" + testUserInfoSecret + "@idp.example.com:bad" }), "absolute URL"},
+		{"userinfo_redacted", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "http://" + testUserInfoSecret + "@idp.example.com" }), "user info"},
+		{"localhost_dot", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "http://localhost./x" }), "https"},
+		{"ipv6_zone", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "http://[::1%25lo0]/x" }), "https"},
+		{"short_ipv4", "oidc", with(func(c *OIDCAuthConfig) { c.IssuerURL = "http://127.1/x" }), "https"},
+		{"empty_azp_entry", "oidc", with(func(c *OIDCAuthConfig) { c.AllowedAZP = []string{"a", " "} }), "auth.oidc.allowed_azp"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := Config{Auth: AppAuthConfig{Mode: tc.mode, OIDC: tc.oidc}}.Validate()
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorContains(t, err, tc.wantErr)
+			assert.NotContains(t, err.Error(), "secret", "error must not echo user info")
+		})
+	}
+}
+
+func TestAuthOIDCValuesAreTrimmed(t *testing.T) {
+	isolateEnv(t)
+	p := writeYAML(t, `
+auth:
+  mode: oidc
+  oidc:
+    issuer_url: " https://idp.example.com "
+    audience: " kafkito-api "
+    required_typ: " at+jwt "
+    allowed_azp: [" proxy "]
+`)
+
+	cfg, err := Load(p)
+
+	require.NoError(t, err)
+	assert.Equal(t, OIDCAuthConfig{
+		IssuerURL:   "https://idp.example.com",
+		Audience:    "kafkito-api",
+		RequiredTyp: "at+jwt",
+		AllowedAZP:  []string{"proxy"},
+	}, cfg.Auth.OIDC)
+}
+
+func TestAuthOIDCEmptyAudienceEnvKeepsYAMLValue(t *testing.T) {
+	isolateEnv(t)
+	p := writeYAML(t, "auth:\n  mode: oidc\n  oidc:\n    issuer_url: https://idp.example.com\n    audience: yaml-aud\n")
+	t.Setenv("KAFKITO_AUTH_OIDC_AUDIENCE", " ")
+
+	cfg, err := Load(p)
+
+	require.NoError(t, err)
+	assert.Equal(t, "yaml-aud", cfg.Auth.OIDC.Audience)
+}
+
+// Test user info for URLs, kept out of URL literals so secret scanners do not
+// flag the fixtures.
+const (
+	testUserInfo       = "u" + ":p"
+	testUserInfoSecret = "u" + ":secret"
+)
