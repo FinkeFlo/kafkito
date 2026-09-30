@@ -2,6 +2,10 @@
 
 This page shows how to add a **Private cluster** in the UI. API-level details are documented separately in the [API reference](../API.md).
 
+## Availability
+
+Operators can disable private clusters or restrict them to a role (`private_clusters.mode`, see [Configuration](https://github.com/FinkeFlo/kafkito/blob/main/README.md#configuration)). When your account may not use them, **Settings → Private clusters** shows a notice ("Private clusters are disabled on this server." or "Your role does not allow private clusters."), **Add cluster**, **Import JSON** and **Test connection** are disabled, and private clusters are hidden from the cluster selector and Fleet overview. Entries saved in your browser are kept; you can still edit, export or delete them.
+
 ## Flow: create a cluster connection
 
 **What do I see?**  
