@@ -198,6 +198,15 @@ network path can read them. Run kafkito only behind TLS:
   the header is ignored on their other requests. `GET /api/v1/me` reports
   the mode and whether the caller may use private clusters.
   `private_cluster_access_test.go` pins this.
+- Records produced or copied through kafkito carry the caller's identity in
+  the `X-Kafkito-User` record header, on private clusters too (see
+  [Produce](API.md#produce)). The value is the RBAC subject, usually the
+  token's user name, which is often an e-mail address. A private cluster is
+  outside the kafkito operator's control: its owner decides who can read
+  the topic and how long the record is kept, and a compacted topic can keep
+  it indefinitely. kafkito sets the header on purpose, for traceability:
+  when several people share a technical SASL user, it is the only link from
+  a record to the person who wrote it.
 - Once the mode allows a request, RBAC does not apply, lists included; the
   broker's own ACLs do.
 - Anyone who can run script in the page can read them, which is why the CSP

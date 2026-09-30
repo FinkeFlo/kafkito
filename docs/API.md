@@ -92,6 +92,8 @@ The server keeps nothing between requests.
   selects it; no other `{cluster}` value does.
 - Once the mode allows a request, RBAC does not apply to the private
   cluster, and its lists are not filtered; only the broker's own ACLs apply.
+- Produce and copy write the caller's identity into the `X-Kafkito-User`
+  record header on private clusters too; see [Produce](#produce).
 - `POST /api/v1/clusters/_test` probes a cluster definition sent in the body
   (the "Test connection" button). It checks the seed and then every broker
   the cluster advertises; a broker that is blocked for private clusters or
@@ -428,6 +430,14 @@ sets `X-Kafkito-Source: true` and, only when an identity is available,
 `X-Kafkito-User: <subject>` (the same subject RBAC resolves). Without an
 identity the record carries no `X-Kafkito-User` at all.
 
+The subject is usually the token's user name, which is often an e-mail
+address. kafkito writes it on every cluster, private clusters included,
+which the kafkito operator does not control: the cluster's owner decides who
+can read the topic and how long the record is kept, and a compacted topic
+can keep it indefinitely. This is intentional, for traceability: when
+several people share a technical SASL user, the header is the only link from
+a record to the person who produced it.
+
 The body may be gzip-compressed with `Content-Encoding: gzip`. The body is
 capped at 15 MiB of JSON either way (after decompression); a larger body
 returns `413` `request body exceeds the 15 MB produce limit`. A record the
@@ -519,7 +529,8 @@ Copied records carry the same provenance headers the produce endpoint injects â€
 `X-Kafkito-Source: true` and, when an identity is available,
 `X-Kafkito-User: <subject>` of the caller. Every source header whose key starts
 with `X-Kafkito-` (case-insensitive) is dropped, so the original producer's
-provenance is never carried over.
+provenance is never carried over. This applies to private clusters too; see
+[Produce](#produce) for what the identity contains.
 
 Status codes returned **before** the stream starts:
 
