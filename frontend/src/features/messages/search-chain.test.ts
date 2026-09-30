@@ -88,6 +88,7 @@ describe("runSearchChain", () => {
     expect(searchMessages).toHaveBeenCalledTimes(2);
     expect(searchMessages.mock.calls[1][2]).toEqual({
       ...baseReq,
+      limit: 9,
       budget: 40,
       cursors: { "0": 7 },
     });
@@ -97,22 +98,42 @@ describe("runSearchChain", () => {
     expect(last.req.budget).toBe(40);
   });
 
-  it("stops at the limit when stop-on-limit is set", async () => {
-    searchMessages.mockResolvedValue(
-      page([1, 2, 3], { scanned: 5, matched: 3, more_available: true }),
-    );
-    const { done } = run({ limit: 5, budget: 1000 });
-    await expect(done).resolves.toBe("limit");
-    expect(searchMessages).toHaveBeenCalledTimes(2);
-  });
-
-  it("ignores the limit without stop-on-limit", async () => {
+  it("stops at the limit when stop-on-limit is set, asking each call for the rest", async () => {
     searchMessages
       .mockResolvedValueOnce(page([1, 2, 3], { scanned: 5, matched: 3, more_available: true }))
-      .mockResolvedValueOnce(page([4, 5, 6], { scanned: 5, matched: 3 }));
-    const { done } = run({ limit: 2, stopOnLimit: false, budget: 1000 });
+      .mockResolvedValueOnce(page([4, 5], { scanned: 4, matched: 2, more_available: true }));
+    const { done, progress } = run({ limit: 5, budget: 1000 });
+    await expect(done).resolves.toBe("limit");
+    expect(searchMessages.mock.calls.map((c) => c[2].limit)).toEqual([5, 2]);
+    expect(progress[1].stats).toMatchObject({ scanned: 9, matched: 5 });
+    expect(progress[1].messages).toHaveLength(5);
+  });
+
+  it("returns a full page again on Search more after the limit", async () => {
+    searchMessages.mockResolvedValueOnce(
+      page([6, 7, 8, 9, 10], { scanned: 6, matched: 5, more_available: true }),
+    );
+    const prior: SearchResult = {
+      messages: page([1, 2, 3, 4, 5], {}).messages ?? [],
+      stats: stats({ scanned: 9, matched: 5, more_available: true, next_cursors: { "0": 6 } }),
+      req: baseReq,
+    };
+    const { done, progress } = run({ prior, limit: 5, budget: 1000 });
+    await expect(done).resolves.toBe("limit");
+    expect(searchMessages.mock.calls[0][2]).toMatchObject({ limit: 5, cursors: { "0": 6 } });
+    expect(progress[0].stats).toMatchObject({ scanned: 15, matched: 10 });
+  });
+
+  it("collects every page without stop-on-limit", async () => {
+    searchMessages
+      .mockResolvedValueOnce(page([1, 2], { scanned: 3, matched: 2, more_available: true }))
+      .mockResolvedValueOnce(page([3, 4], { scanned: 5, matched: 2, more_available: true }))
+      .mockResolvedValueOnce(page([5], { scanned: 2, matched: 1 }));
+    const { done, progress } = run({ limit: 2, stopOnLimit: false, budget: 1000 });
     await expect(done).resolves.toBe("complete");
-    expect(searchMessages).toHaveBeenCalledTimes(2);
+    expect(searchMessages.mock.calls.map((c) => c[2].limit)).toEqual([10, 10, 10]);
+    expect(progress[2].messages.map((m) => m.offset)).toEqual([1, 2, 3, 4, 5]);
+    expect(progress[2].stats).toMatchObject({ scanned: 10, matched: 5 });
   });
 
   it("stops between calls when asked to", async () => {
@@ -151,6 +172,22 @@ describe("runSearchChain", () => {
     await expect(done).resolves.toBe("timeout");
     // Each retry halves the budget (capped by what the call scanned) until
     // nothing is left to shrink.
+    expect(searchMessages.mock.calls.map((c) => c[2].budget)).toEqual([1_000_000, 3, 1]);
+  });
+
+  it("sizes the retry by the records a call read, not by the ones behind its cursor", async () => {
+    searchMessages.mockResolvedValue(
+      page([], {
+        scanned: 0,
+        read: 7,
+        timed_out: true,
+        more_available: true,
+        resolved_range: { "0": { start: 0, end: 50 } },
+        next_cursors: { "0": 50 },
+      }),
+    );
+    const { done } = run({ budget: 0 });
+    await expect(done).resolves.toBe("timeout");
     expect(searchMessages.mock.calls.map((c) => c[2].budget)).toEqual([1_000_000, 3, 1]);
   });
 

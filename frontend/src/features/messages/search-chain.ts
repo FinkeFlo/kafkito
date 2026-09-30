@@ -61,8 +61,11 @@ export async function runSearchChain({
   onProgress,
 }: ChainOptions): Promise<SearchStopReason> {
   // Seed the accumulator from the existing result when continuing ("Search
-  // more"), otherwise start fresh. The Budget applies per invocation: a fresh
-  // search scans up to `budget` records; "Search more" grants another budget.
+  // more"), otherwise start fresh. Budget and limit apply per invocation: a
+  // fresh search scans up to `budget` records and, with stop-on-limit, returns
+  // up to `limit` matches; "Search more" grants another budget and page.
+  // scanned and matched count only what a call's cursors moved past, so they
+  // add up across calls without counting anything twice.
   let accMessages: Message[] = prior ? [...prior.messages] : [];
   let accScanned = prior ? prior.stats.scanned : 0;
   let accMatched = prior ? prior.stats.matched : 0;
@@ -72,6 +75,7 @@ export async function runSearchChain({
   // range is exhausted (more_available=false), the limit is hit, or Stop.
   const unlimited = budget <= 0;
   let scannedThisRun = 0;
+  let matchedThisRun = 0;
   // A newest-first call only moves its cursors over whole chunks, and the
   // server sizes chunks by the call budget. When a call times out before it
   // finishes one, the next call gets a smaller budget. "Search more" after a
@@ -92,12 +96,17 @@ export async function runSearchChain({
     }
     callBudget = Math.min(callBudget, callCap);
     const req: SearchRequest = { ...baseReq, budget: callBudget, cursors };
+    // A call returns at most `limit` matches and keeps the rest reachable
+    // through its cursors, so asking only for the rest of the page makes a
+    // stop-on-limit run return exactly `limit` matches.
+    if (stopOnLimit) req.limit = limit - matchedThisRun;
     const r = await searchMessages(cluster, topic, req);
     const s = r.search;
     accMessages = [...accMessages, ...(r.messages ?? [])];
     accScanned += s.scanned;
     accMatched += s.matched;
     scannedThisRun += s.scanned;
+    matchedThisRun += s.matched;
     cursors = s.next_cursors;
 
     // Publish cumulative progress so the banner updates between calls.
@@ -108,10 +117,13 @@ export async function runSearchChain({
     });
 
     if (!s.more_available) return "complete";
-    if (stopOnLimit && accMatched >= limit) return "limit";
+    if (stopOnLimit && matchedThisRun >= limit) return "limit";
     if (shouldStop()) return "stopped";
     if (!madeProgress(s)) {
-      const smaller = Math.min(Math.floor(callBudget / 2), Math.floor(s.scanned / 2));
+      // Without progress nothing is behind the cursors, so scanned is 0;
+      // read tells how far the call got before it timed out.
+      const read = s.read ?? s.scanned;
+      const smaller = Math.min(Math.floor(callBudget / 2), Math.floor(read / 2));
       if (!s.timed_out || smaller < 1) return "timeout";
       callCap = smaller;
     }

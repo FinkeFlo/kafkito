@@ -658,18 +658,21 @@ test.describe("Messages panel — search run lifecycle", () => {
     await page.route(
       (url) => url.pathname === searchPath(SOURCE),
       async (route: Route) => {
-        bodies.push(route.request().postDataJSON() as Record<string, unknown>);
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        bodies.push(body);
         const offset = bodies.length * 10;
+        // Like the server, return at most `limit` matches per call.
+        const hits = [0, 1, 2].slice(0, Number(body.limit));
         await route.fulfill({
           status: 200,
           contentType: "application/json",
           body: JSON.stringify({
             cluster: CLUSTER,
             topic: SOURCE,
-            messages: [0, 1, 2].map((i) => msg(0, offset + i, `e2e-limit-${offset + i}`)),
+            messages: hits.map((i) => msg(0, offset + i, `e2e-limit-${offset + i}`)),
             search: stats({
               scanned: 10,
-              matched: 3,
+              matched: hits.length,
               more_available: true,
               next_cursors: { "0": offset },
             }),
@@ -682,12 +685,13 @@ test.describe("Messages panel — search run lifecycle", () => {
     await page.getByLabel("Value", { exact: true }).fill("e2e-limit");
     await runSearch(page);
     await expect(page.getByText("Limit reached", { exact: true })).toBeVisible();
-    await expect(page.getByText("6 matches", { exact: true })).toBeVisible();
+    await expect(page.getByText("5 matches", { exact: true })).toBeVisible();
     await expect(page.getByText("· 20 scanned", { exact: true })).toBeVisible();
-    await expect(rows(page)).toHaveCount(6);
+    await expect(rows(page)).toHaveCount(5);
     await expect(page.getByRole("button", { name: "Search more →" })).toBeVisible();
     expect(bodies).toHaveLength(2);
     expect(bodies[0].limit).toBe(5);
+    expect(bodies[1].limit).toBe(2);
     expect(bodies[1].cursors).toEqual({ "0": 10 });
   });
 
