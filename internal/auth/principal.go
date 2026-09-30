@@ -27,7 +27,11 @@ type Principal struct {
 }
 
 // HasScope reports whether the principal carries the given local scope name.
+// A nil principal has no scopes.
 func (p *Principal) HasScope(name string) bool {
+	if p == nil {
+		return false
+	}
 	for _, s := range p.Scopes {
 		if s == name {
 			return true

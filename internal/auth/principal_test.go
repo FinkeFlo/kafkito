@@ -41,3 +41,12 @@ func TestPrincipal_FromContextReportsAbsenceWhenEmpty(t *testing.T) {
 
 	assert.False(t, ok, "PrincipalFromContext on empty ctx must report ok=false")
 }
+
+func TestPrincipal_HasScope_IsFalseOnNil(t *testing.T) {
+	t.Parallel()
+
+	var p *auth.Principal
+
+	assert.NotPanics(t, func() { _ = p.HasScope("Display") })
+	assert.False(t, p.HasScope("Display"))
+}
