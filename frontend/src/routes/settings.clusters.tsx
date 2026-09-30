@@ -28,6 +28,7 @@ import {
   type PrivateClusterAuth,
 } from "@/lib/private-clusters";
 import { testCluster } from "@/lib/api";
+import { TestConnectionResult, type TestOutcome } from "@/features/clusters/TestConnectionResult";
 import { removePrivateClusterQueries } from "@/lib/queries/cluster-key";
 import { useCluster } from "@/lib/use-cluster";
 
@@ -68,14 +69,6 @@ const emptyForm: FormState = {
   srPassword: "",
   srInsecure: false,
 };
-
-function coldDNSHint(msg: string): string {
-  const m = msg.toLowerCase();
-  if (m.includes("i/o timeout") || m.includes("dial")) {
-    return " — first probe is slow on cold broker DNS; cluster connections cache for ~15min after first contact, so a retry usually succeeds in <1s.";
-  }
-  return "";
-}
 
 function toPrivateCluster(
   f: FormState,
@@ -452,7 +445,7 @@ function ClusterForm({
 }) {
   const [f, setF] = useState<FormState>(initial);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<string | null>(null);
+  const [testOutcome, setTestOutcome] = useState<TestOutcome | null>(null);
   const [testElapsed, setTestElapsed] = useState(0);
 
   useEffect(() => {
@@ -483,7 +476,7 @@ function ClusterForm({
 
   const onTest = async () => {
     setTesting(true);
-    setTestResult(null);
+    setTestOutcome(null);
     try {
       const draft = {
         ...toPrivateCluster(f),
@@ -491,16 +484,9 @@ function ClusterForm({
         created_at: 0,
         updated_at: 0,
       } as PrivateCluster;
-      const info = await testCluster(draft);
-      if (info.reachable) {
-        setTestResult(`OK — reachable (${info.auth_type}, TLS: ${info.tls ? "yes" : "no"})`);
-      } else {
-        const err = info.error ?? "unknown error";
-        setTestResult(`Unreachable: ${err}${coldDNSHint(err)}`);
-      }
+      setTestOutcome({ kind: "probed", info: await testCluster(draft) });
     } catch (e) {
-      const msg = (e as Error).message;
-      setTestResult(`Error: ${msg}${coldDNSHint(msg)}`);
+      setTestOutcome({ kind: "error", message: (e as Error).message });
     } finally {
       setTesting(false);
     }
@@ -676,11 +662,7 @@ function ClusterForm({
           Probing brokers… ~{testElapsed}s
         </Notice>
       )}
-      {!testing && testResult && (
-        <Notice intent={testResult.startsWith("OK") ? "success" : "danger"} className="mt-4">
-          {testResult}
-        </Notice>
-      )}
+      {!testing && testOutcome && <TestConnectionResult outcome={testOutcome} className="mt-4" />}
     </Modal>
   );
 }
