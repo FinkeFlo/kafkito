@@ -168,10 +168,10 @@ compose-up:
 	KAFKITO_E2E_HOST_IP=$(KAFKITO_E2E_HOST_IP) docker compose up -d
 
 compose-app:
-	docker compose --profile app up -d --build
+	KAFKITO_E2E_HOST_IP=$(KAFKITO_E2E_HOST_IP) docker compose --profile app up -d --build
 
 compose-auth:
-	docker compose --profile auth up -d
+	KAFKITO_E2E_HOST_IP=$(KAFKITO_E2E_HOST_IP) docker compose --profile auth up -d
 
 compose-logs:
 	docker compose logs -f --tail=100
