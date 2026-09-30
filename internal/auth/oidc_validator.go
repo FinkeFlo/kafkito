@@ -9,6 +9,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/lestrrat-go/jwx/v3/jws"
 	"github.com/lestrrat-go/jwx/v3/jwt"
@@ -24,14 +26,31 @@ type OIDCConfig struct {
 	// contain this value are rejected.
 	Audience string
 	// JWKSEndpoint is the URL serving the issuer's JSON Web Key Set used to
-	// verify token signatures. Required: this generic validator does not
-	// auto-discover via /.well-known/openid-configuration.
+	// verify token signatures. Required by NewOIDCValidator, which does not
+	// auto-discover; the "oidc" mode factory resolves it via OpenID Connect
+	// discovery when unset.
 	JWKSEndpoint string
+	// RequiredTyp, when set, is the "typ" header every token must carry, for
+	// example "at+jwt" (RFC 9068). It is compared case-insensitively and an
+	// "application/" prefix is ignored on either side (RFC 7515 section
+	// 4.1.9). Empty disables the check.
+	RequiredTyp string
+	// AllowedAZP, when non-empty, lists the "azp" (authorized party) values a
+	// token may carry, compared exactly; a token without azp is rejected.
+	// Empty disables the check.
+	AllowedAZP []string
 }
 
-// OIDCValidator validates asymmetrically signed JWTs against a fixed issuer/audience and
-// a JWKS endpoint. Use this as the default "mock" mode validator, and as a
-// drop-in for any OIDC IdP that publishes a JWKS URL.
+var (
+	// ErrTypMismatch rejects a token whose typ header is not the required one.
+	ErrTypMismatch = errors.New("token typ does not match the required typ")
+	// ErrAZPNotAllowed rejects a token whose azp claim is missing or not listed.
+	ErrAZPNotAllowed = errors.New("azp is not an allowed authorized party")
+)
+
+// OIDCValidator validates asymmetrically signed JWTs against a fixed
+// issuer/audience and a JWKS endpoint. It backs both the "mock" and the
+// generic "oidc" modes and works with any OIDC IdP that publishes a JWKS URL.
 type OIDCValidator struct {
 	cfg  OIDCConfig
 	keys *KeySource
@@ -69,14 +88,19 @@ func (o *OIDCValidator) Close() {
 	o.keys.Close()
 }
 
+// Config returns the settings the validator enforces.
+func (o *OIDCValidator) Config() OIDCConfig { return o.cfg }
+
 // Validate parses and signature-verifies raw (see ParseToken for the
-// algorithm and exp/nbf/sub rules), then enforces iss and aud.
+// algorithm and exp/nbf/sub rules), then enforces iss, aud and, when
+// configured, typ and azp.
 func (o *OIDCValidator) Validate(ctx context.Context, raw string) (*Principal, error) {
 	if raw == "" {
 		return nil, ErrTokenEmpty
 	}
 
-	set, err := o.keys.Keys(ctx, tokenKeyID(raw))
+	kid, typ := tokenHeader(raw)
+	set, err := o.keys.Keys(ctx, kid)
 	if err != nil {
 		return nil, fmt.Errorf("fetch jwks: %w", err)
 	}
@@ -97,18 +121,41 @@ func (o *OIDCValidator) Validate(ctx context.Context, raw string) (*Principal, e
 		return nil, ErrAudienceMismatch
 	}
 
+	// ParseToken verified the signature over the protected header, so typ
+	// (read from the same raw token) is authentic here.
+	if o.cfg.RequiredTyp != "" && normalizeTyp(typ) != normalizeTyp(o.cfg.RequiredTyp) {
+		return nil, ErrTypMismatch
+	}
+	if len(o.cfg.AllowedAZP) > 0 {
+		azp, ok := TokString(tok, "azp")
+		if !ok || !slices.Contains(o.cfg.AllowedAZP, azp) {
+			return nil, ErrAZPNotAllowed
+		}
+	}
+
 	return oidcPrincipalFromToken(tok), nil
 }
 
-// tokenKeyID returns the kid of raw's first signature, or "" when raw is not
-// a JWS or names no kid. It verifies nothing; it only picks the key to wait for.
-func tokenKeyID(raw string) string {
+// tokenHeader returns the kid and typ of raw's first signature's protected
+// header, or "" for each when raw is not a JWS or lacks the header. It
+// verifies nothing: the kid only picks the key to wait for, and Validate
+// checks typ after the signature has been verified.
+func tokenHeader(raw string) (kid, typ string) {
 	msg, err := jws.Parse([]byte(raw))
 	if err != nil || len(msg.Signatures()) == 0 {
-		return ""
+		return "", ""
 	}
-	kid, _ := msg.Signatures()[0].ProtectedHeaders().KeyID()
-	return kid
+	hdr := msg.Signatures()[0].ProtectedHeaders()
+	kid, _ = hdr.KeyID()
+	typ, _ = hdr.Type()
+	return kid, typ
+}
+
+// normalizeTyp lower-cases a typ value and drops an "application/" prefix,
+// the comparison RFC 7515 section 4.1.9 recommends.
+func normalizeTyp(typ string) string {
+	typ = strings.ToLower(strings.TrimSpace(typ))
+	return strings.TrimPrefix(typ, "application/")
 }
 
 // oidcPrincipalFromToken builds a Principal without scope-prefix stripping.

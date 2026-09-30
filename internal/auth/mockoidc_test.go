@@ -7,6 +7,8 @@ package auth_test
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -125,4 +127,46 @@ func TestMockOIDC_WithoutJWKAlg_ServesTheKeyWithoutAlg(t *testing.T) {
 	require.True(t, ok)
 	_, hasAlg := key.Algorithm()
 	assert.False(t, hasAlg, "the served key must not carry alg")
+}
+
+func TestMockOIDC_ServesDiscoveryMetadata(t *testing.T) {
+	t.Parallel()
+
+	mock, err := auth.NewMockOIDC()
+	require.NoError(t, err)
+	t.Cleanup(mock.Close)
+
+	resp, err := http.Get(mock.Server.URL + "/.well-known/openid-configuration")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = resp.Body.Close() })
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var meta map[string]string
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&meta))
+
+	assert.Equal(t, mock.Server.URL, meta["issuer"])
+	assert.Equal(t, mock.JKU(), meta["jwks_uri"])
+}
+
+func TestTokenBuilder_Type_SetsTheTypHeader(t *testing.T) {
+	t.Parallel()
+
+	mock, err := auth.NewMockOIDC()
+	require.NoError(t, err)
+	t.Cleanup(mock.Close)
+
+	withTyp, err := mock.Token("u", "a", "i").Type("at+jwt").Sign()
+	require.NoError(t, err)
+	withoutTyp, err := mock.Token("u", "a", "i").Type("").Sign()
+	require.NoError(t, err)
+
+	assert.Equal(t, "at+jwt", headerTyp(t, withTyp))
+	assert.Empty(t, headerTyp(t, withoutTyp))
+}
+
+func headerTyp(t *testing.T, raw string) string {
+	t.Helper()
+	msg, err := jws.Parse([]byte(raw))
+	require.NoError(t, err)
+	typ, _ := msg.Signatures()[0].ProtectedHeaders().Type()
+	return typ
 }

@@ -522,3 +522,96 @@ func assertNoClaimValues(t *testing.T, err error, values ...string) {
 		assert.NotContains(t, err.Error(), v, "the error must name the rule, not a claim or header value")
 	}
 }
+
+// newOIDCValidatorWith is newOIDCValidator with extra settings applied to
+// the OIDCConfig before the validator is built.
+func newOIDCValidatorWith(t *testing.T, edit func(*auth.OIDCConfig)) (*auth.MockOIDC, *auth.OIDCValidator, string) {
+	t.Helper()
+
+	mock, err := auth.NewMockOIDC()
+	require.NoError(t, err, "NewMockOIDC")
+	t.Cleanup(mock.Close)
+
+	cfg := auth.OIDCConfig{IssuerURL: mock.Server.URL, Audience: "test-audience", JWKSEndpoint: mock.JKU()}
+	edit(&cfg)
+	v, err := auth.NewOIDCValidator(cfg)
+	require.NoError(t, err, "NewOIDCValidator")
+	t.Cleanup(v.Close)
+
+	return mock, v, cfg.Audience
+}
+
+func TestOIDCValidator_RequiredTyp(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		required string
+		typ      string // "" leaves the header out
+		wantErr  error
+	}{
+		{"disabled_accepts_any", "", "JWT", nil},
+		{"disabled_accepts_missing", "", "", nil},
+		{"exact", "at+jwt", "at+jwt", nil},
+		{"case_insensitive", "at+jwt", "AT+JWT", nil},
+		{"media_type_prefix_in_token", "at+jwt", "application/at+jwt", nil},
+		{"media_type_prefix_in_config", "application/at+jwt", "at+jwt", nil},
+		{"other_typ", "at+jwt", "JWT", auth.ErrTypMismatch},
+		{"missing_typ", "at+jwt", "", auth.ErrTypMismatch},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			mock, v, aud := newOIDCValidatorWith(t, func(c *auth.OIDCConfig) { c.RequiredTyp = tc.required })
+			tok, err := mock.Token("user-1", aud, mock.Server.URL).Type(tc.typ).Sign()
+			require.NoError(t, err)
+
+			_, err = v.Validate(context.Background(), tok)
+
+			if tc.wantErr == nil {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorIs(t, err, tc.wantErr)
+		})
+	}
+}
+
+func TestOIDCValidator_AllowedAZP(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		allowed []string
+		azp     any // nil leaves the claim out
+		wantErr error
+	}{
+		{"disabled_accepts_any", nil, "someone", nil},
+		{"disabled_accepts_missing", nil, nil, nil},
+		{"listed", []string{"proxy", "cli"}, "cli", nil},
+		{"not_listed", []string{"proxy"}, "other", auth.ErrAZPNotAllowed},
+		{"case_sensitive", []string{"proxy"}, "Proxy", auth.ErrAZPNotAllowed},
+		{"missing", []string{"proxy"}, nil, auth.ErrAZPNotAllowed},
+		{"not_a_string", []string{"proxy"}, []string{"proxy"}, auth.ErrAZPNotAllowed},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			mock, v, aud := newOIDCValidatorWith(t, func(c *auth.OIDCConfig) { c.AllowedAZP = tc.allowed })
+			b := mock.Token("user-1", aud, mock.Server.URL)
+			if tc.azp != nil {
+				b = b.Claim("azp", tc.azp)
+			}
+			tok, err := b.Sign()
+			require.NoError(t, err)
+
+			_, err = v.Validate(context.Background(), tok)
+
+			if tc.wantErr == nil {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorIs(t, err, tc.wantErr)
+		})
+	}
+}

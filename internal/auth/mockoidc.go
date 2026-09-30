@@ -26,8 +26,9 @@ import (
 )
 
 // MockOIDC is an in-process JWKS+token issuer used in tests. It signs RS256
-// tokens with a freshly generated key, exposes the public key at /jwks, and
-// lets callers mint tokens with arbitrary claims via Issue() or the Token
+// tokens with a freshly generated key, exposes the public key at /jwks and
+// OpenID Provider metadata at /.well-known/openid-configuration (issuer =
+// Server.URL), and lets callers mint tokens with arbitrary claims via Issue() or the Token
 // builder.
 //
 // By default the mock emits a generic OIDC token: scopes are written to the
@@ -96,6 +97,13 @@ func NewMockOIDC(opts ...MockOIDCOption) (*MockOIDC, error) {
 		m.mu.RUnlock()
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(set)
+	})
+	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"issuer":   m.Server.URL,
+			"jwks_uri": m.JKU(),
+		})
 	})
 	m.Server = httptest.NewServer(mux)
 	return m, nil
@@ -185,15 +193,17 @@ type TokenBuilder struct {
 	jku      string
 	noKid    bool
 	alg      jwa.SignatureAlgorithm
+	typ      string
 }
 
 // Token starts a token with the default claims: sub, iss, aud = [clientID],
 // iat, exp (now + 30 min), cid, scope, and zid when the mock has a zone. The
-// token is signed RS256 with the current key and carries the mock's jku.
+// token is signed RS256 with the current key, has typ "JWT" and carries the
+// mock's jku.
 func (m *MockOIDC) Token(sub, clientID, issuer string) *TokenBuilder {
 	return &TokenBuilder{
 		m: m, sub: sub, clientID: clientID, issuer: issuer,
-		extra: map[string]any{}, jku: m.JKU(), alg: jwa.RS256(),
+		extra: map[string]any{}, jku: m.JKU(), alg: jwa.RS256(), typ: "JWT",
 	}
 }
 
@@ -229,6 +239,12 @@ func (b *TokenBuilder) JKU(jku string) *TokenBuilder {
 	return b
 }
 
+// Type sets the typ header; "" leaves the header out.
+func (b *TokenBuilder) Type(typ string) *TokenBuilder {
+	b.typ = typ
+	return b
+}
+
 // WithoutKeyID leaves the kid header out.
 func (b *TokenBuilder) WithoutKeyID() *TokenBuilder {
 	b.noKid = true
@@ -252,7 +268,7 @@ func (b *TokenBuilder) Sign() (string, error) {
 			return "", err
 		}
 	}
-	return b.m.sign(b.jku, b.alg, !b.noKid, tok)
+	return b.m.sign(b.jku, b.alg, b.typ, !b.noKid, tok)
 }
 
 // claims builds the default claim set plus extra (which may override defaults).
@@ -274,9 +290,9 @@ func (m *MockOIDC) claims(sub, clientID, issuer string, scopes []string, extra m
 	return tok
 }
 
-// sign signs tok with the current key under alg. An empty jku leaves the
-// header out; withKid false leaves the kid out.
-func (m *MockOIDC) sign(jku string, alg jwa.SignatureAlgorithm, withKid bool, tok jwt.Token) (string, error) {
+// sign signs tok with the current key under alg. An empty jku or typ leaves
+// that header out; withKid false leaves the kid out.
+func (m *MockOIDC) sign(jku string, alg jwa.SignatureAlgorithm, typ string, withKid bool, tok jwt.Token) (string, error) {
 	m.mu.RLock()
 	priv, keyID := m.priv, m.keyID
 	m.mu.RUnlock()
@@ -297,6 +313,19 @@ func (m *MockOIDC) sign(jku string, alg jwa.SignatureAlgorithm, withKid bool, to
 	if jku != "" {
 		_ = hdr.Set(jws.JWKSetURLKey, jku)
 	}
+	if typ == "" {
+		// jwt.Sign always adds typ "JWT", so sign the claim set as plain JWS.
+		payload, err := json.Marshal(tok)
+		if err != nil {
+			return "", err
+		}
+		signed, err := jws.Sign(payload, jws.WithKey(alg, key, jws.WithProtectedHeaders(hdr)))
+		if err != nil {
+			return "", err
+		}
+		return string(signed), nil
+	}
+	_ = hdr.Set(jws.TypeKey, typ)
 	signed, err := jwt.Sign(tok, jwt.WithKey(alg, key, jws.WithProtectedHeaders(hdr)))
 	if err != nil {
 		return "", err
