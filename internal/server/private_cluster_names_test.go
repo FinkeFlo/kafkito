@@ -4,9 +4,13 @@
 package server
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -170,5 +174,195 @@ func TestCopyMessages_InternalDestClusterIsUnknown(t *testing.T) {
 		rec := sendCluster(h, http.MethodPost, "/api/v1/clusters/"+tc.source+"/topics/orders/copy", body, tc.header)
 		require.Equal(t, http.StatusBadRequest, rec.Code, "%s: %s", tc.name, rec.Body.String())
 		assert.JSONEq(t, `{"error":"unknown dest_cluster: `+strings.TrimSpace(tc.dest)+`"}`, rec.Body.String(), tc.name)
+	}
+}
+
+// publicNameClusters is fakeAdhocClusters with a capability probe.
+type publicNameClusters struct{ fakeAdhocClusters }
+
+func (publicNameClusters) Capabilities(context.Context, string) (*kafkapkg.Capabilities, error) {
+	return &kafkapkg.Capabilities{ListTopics: true}, nil
+}
+
+func (publicNameClusters) RefreshCapabilities(string) {}
+
+// publicNameTopics is fakeTopics that also describes any topic.
+type publicNameTopics struct{ fakeTopics }
+
+func (publicNameTopics) DescribeTopic(_ context.Context, _, topic string) (*kafkapkg.TopicDetail, error) {
+	return &kafkapkg.TopicDetail{Name: topic, Partitions: []kafkapkg.PartitionInfo{}, Configs: []kafkapkg.TopicConfigEntry{}}, nil
+}
+
+// publicNameACLs is fakeACLs that lists no ACLs.
+type publicNameACLs struct{ fakeACLs }
+
+func (publicNameACLs) ListACLs(context.Context, string) ([]kafkapkg.ACLEntry, error) {
+	return []kafkapkg.ACLEntry{}, nil
+}
+
+// recordClusterAndServe is a strict middleware that records the bound
+// {cluster} value and then runs the handler.
+func recordClusterAndServe(got *string) gen.StrictMiddlewareFunc {
+	return func(next gen.StrictHandlerFunc, _ string) gen.StrictHandlerFunc {
+		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, req any) (any, error) {
+			*got = reflect.ValueOf(req).FieldByName("Cluster").String()
+			return next(ctx, w, r, req)
+		}
+	}
+}
+
+// apiOpByID returns the apiOps entry of operationId id.
+func apiOpByID(t *testing.T, id string) apiOp {
+	t.Helper()
+	for _, op := range apiOps {
+		if op.id == id {
+			return op
+		}
+	}
+	t.Fatalf("operation %s is not in apiOps", id)
+	return apiOp{}
+}
+
+// clusterNamingOps returns the operationIds whose 200 JSON response has a
+// top-level cluster property.
+func clusterNamingOps(t *testing.T) []string {
+	t.Helper()
+	doc, err := loadSpec()
+	require.NoError(t, err)
+	var ids []string
+	for _, item := range doc.Paths.Map() {
+		for _, op := range item.Operations() {
+			resp := op.Responses.Status(http.StatusOK)
+			if resp == nil || resp.Value == nil {
+				continue
+			}
+			mt := resp.Value.Content.Get("application/json")
+			if mt == nil || mt.Schema == nil || mt.Schema.Value == nil {
+				continue
+			}
+			if _, ok := mt.Schema.Value.Properties["cluster"]; ok {
+				ids = append(ids, op.OperationID)
+			}
+		}
+	}
+	slices.Sort(ids)
+	return ids
+}
+
+// Every response that names its cluster names a private cluster
+// __private__, the name the client sent, while the handler works with the
+// registry name. A configured cluster keeps its own name.
+func TestPrivateClusterResponses_NameThePrivateSentinel(t *testing.T) {
+	t.Parallel()
+
+	var handled string
+	st := stores{
+		configs:  fakeConfigs{},
+		clusters: publicNameClusters{},
+		topics:   publicNameTopics{fakeTopics{topics: []kafkapkg.TopicInfo{}, consumers: []kafkapkg.TopicConsumer{}}},
+		groups:   fakeGroups{groups: []kafkapkg.GroupInfo{}},
+		messages: fakeMessages{
+			consume: func(kafkapkg.ConsumeOptions) (*kafkapkg.ConsumeResult, error) {
+				return &kafkapkg.ConsumeResult{Messages: []kafkapkg.Message{}}, nil
+			},
+			count: func(kafkapkg.CountMessagesOptions) (*kafkapkg.MessageCountResult, error) {
+				return &kafkapkg.MessageCountResult{Partitions: []kafkapkg.PartitionMessageCount{}}, nil
+			},
+			timeline: func(kafkapkg.MessageTimelineOptions) (*kafkapkg.MessageTimelineResult, error) {
+				return &kafkapkg.MessageTimelineResult{Slots: []kafkapkg.TimelineSlot{}}, nil
+			},
+			search: func(kafkapkg.SearchOptions) (*kafkapkg.SearchResult, error) {
+				return &kafkapkg.SearchResult{Messages: []kafkapkg.Message{}, Stats: kafkapkg.SearchStats{Direction: kafkapkg.DirNewestFirst}}, nil
+			},
+		},
+		schemas: fakeSchemas{client: fakeSchemaClient{subjects: []kafkapkg.Subject{}}},
+		acls:    publicNameACLs{},
+		scram:   fakeSCRAM{users: []kafkapkg.SCRAMUser{}},
+	}
+	h := New(Options{
+		Version:           "test",
+		Logger:            slog.New(slog.DiscardHandler),
+		Config:            config.Defaults(),
+		stores:            &st,
+		strictMiddlewares: []gen.StrictMiddlewareFunc{recordClusterAndServe(&handled)},
+	})
+	internal, err := fakeAdhocClusters{}.UseAdhoc(config.ClusterConfig{})
+	require.NoError(t, err)
+	header := encodeHeader(t, config.ClusterConfig{Brokers: []string{unreachableBroker}})
+	router := contractRouter(t)
+
+	ops := clusterNamingOps(t)
+	require.NotEmpty(t, ops)
+	for _, id := range ops {
+		op := apiOpByID(t, id)
+		for _, tc := range []struct{ name, cluster, header, want string }{
+			{"private cluster", config.PrivateClusterSentinel, header, config.PrivateClusterSentinel},
+			{"configured cluster", "static", "", "static"},
+		} {
+			handled = ""
+			req := httptest.NewRequest(op.method, op.path(tc.cluster)+validQuery(id), strings.NewReader(validBody(id)))
+			req.Header.Set("Content-Type", "application/json")
+			if tc.header != "" {
+				req.Header.Set(PrivateClusterHeader, tc.header)
+			}
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusOK, rec.Code, "%s %s: %s", id, tc.name, rec.Body.String())
+			var body struct {
+				Cluster *string `json:"cluster"`
+			}
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body), "%s %s", id, tc.name)
+			require.NotNil(t, body.Cluster, "%s %s: no cluster field", id, tc.name)
+			assert.Equal(t, tc.want, *body.Cluster, "%s %s", id, tc.name)
+			assert.NotContains(t, rec.Body.String(), config.AdhocClusterPrefix, "%s %s", id, tc.name)
+			assertResponseMatchesSpec(t, router, req, rec)
+			if tc.header != "" {
+				assert.Equal(t, internal, handled, "%s: the handler works with the registry name", id)
+			}
+		}
+	}
+}
+
+// destCopyRegistry registers every dest_cluster_config under
+// unregisteredAdhocName and fails every DescribeTopic with err.
+type destCopyRegistry struct {
+	copyRegistry
+	err error
+}
+
+func (destCopyRegistry) ConfigFor(string) (config.ClusterConfig, bool) {
+	return config.ClusterConfig{}, false
+}
+
+func (destCopyRegistry) UseAdhoc(config.ClusterConfig) (string, error) {
+	return unregisteredAdhocName, nil
+}
+
+func (f destCopyRegistry) DescribeTopic(context.Context, string, string) (*kafkapkg.TopicDetail, error) {
+	return nil, f.err
+}
+
+// A copy into a private cluster (dest_cluster_config) that fails the
+// destination check names that cluster __private__.
+func TestCopyMessages_PrivateDestErrorsNameThePrivateSentinel(t *testing.T) {
+	t.Parallel()
+
+	logger := slog.New(slog.DiscardHandler)
+	reg := kafkapkg.NewRegistry([]config.ClusterConfig{{Name: "static", Brokers: []string{unreachableBroker}}}, logger)
+	t.Cleanup(reg.Close)
+	body := `{"dest_topic":"orders2","dest_cluster_config":{"brokers":["` + unreachableBroker + `"]}}`
+	for _, tc := range []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"unknown cluster", fmt.Errorf("%w: %s", kafkapkg.ErrUnknownCluster, config.PrivateClusterSentinel), `{"error":"unknown dest_cluster: __private__"}`},
+		{"missing topic", kafkapkg.ErrTopicNotFound, `{"error":"dest_topic \"orders2\" does not exist on cluster \"__private__\": create it first (kafkito does not auto-create the destination)"}`},
+	} {
+		h := New(Options{Version: "test", Logger: logger, Registry: reg, Config: config.Defaults(), copyRegistry: destCopyRegistry{err: tc.err}})
+		rec := sendCluster(h, http.MethodPost, "/api/v1/clusters/static/topics/orders/copy", body, "")
+		require.Equal(t, http.StatusBadRequest, rec.Code, "%s: %s", tc.name, rec.Body.String())
+		assert.JSONEq(t, tc.want, rec.Body.String(), tc.name)
 	}
 }

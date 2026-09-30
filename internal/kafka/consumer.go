@@ -12,6 +12,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/FinkeFlo/kafkito/internal/config"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
@@ -182,7 +183,7 @@ type pageWindow struct {
 func (r *Messages) ConsumeMessages(ctx context.Context, cluster, topic string, opts ConsumeOptions) (*ConsumeResult, error) {
 	cfg, ok := r.ConfigFor(cluster)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, cluster)
+		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, config.PublicClusterName(cluster))
 	}
 	opts = opts.withDefaults()
 
@@ -654,7 +655,7 @@ type RawValueOptions struct {
 func (r *Messages) FetchRawMessageValue(ctx context.Context, cluster, topic string, partition int32, offset int64, opts RawValueOptions) (*RawMessageValue, error) {
 	cfg, ok := r.ConfigFor(cluster)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, cluster)
+		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, config.PublicClusterName(cluster))
 	}
 
 	var rec *kgo.Record

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/FinkeFlo/kafkito/internal/rbac"
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
@@ -38,7 +39,7 @@ func (s *apiServer) ListTopics(ctx context.Context, req gen.ListTopicsRequestObj
 	if user, ok := s.rbacListSubject(ctx, req.Cluster); ok {
 		topics = filterTopicsByRBAC(topics, s.policy, user, req.Cluster)
 	}
-	return gen.ListTopics200JSONResponse{Cluster: req.Cluster, Topics: topics}, nil
+	return gen.ListTopics200JSONResponse{Cluster: config.PublicClusterName(req.Cluster), Topics: topics}, nil
 }
 
 // CreateTopic creates a topic on the cluster.
@@ -72,7 +73,7 @@ func (s *apiServer) DescribeTopic(ctx context.Context, req gen.DescribeTopicRequ
 	sort.Slice(detail.Configs, func(i, j int) bool {
 		return detail.Configs[i].Name < detail.Configs[j].Name
 	})
-	return gen.DescribeTopic200JSONResponse{Cluster: req.Cluster, Topic: *detail}, nil
+	return gen.DescribeTopic200JSONResponse{Cluster: config.PublicClusterName(req.Cluster), Topic: *detail}, nil
 }
 
 // DeleteTopic removes a topic.
@@ -114,7 +115,7 @@ func (s *apiServer) ListTopicConsumers(ctx context.Context, req gen.ListTopicCon
 	if user, ok := s.rbacListSubject(ctx, req.Cluster); ok {
 		consumers = filterTopicConsumersByRBAC(consumers, s.policy, user, req.Cluster)
 	}
-	return gen.ListTopicConsumers200JSONResponse{Cluster: req.Cluster, Topic: req.Topic, Consumers: consumers}, nil
+	return gen.ListTopicConsumers200JSONResponse{Cluster: config.PublicClusterName(req.Cluster), Topic: req.Topic, Consumers: consumers}, nil
 }
 
 // AlterTopicConfigs applies incremental config changes to a topic.

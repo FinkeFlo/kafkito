@@ -10,6 +10,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/FinkeFlo/kafkito/internal/config"
 	"github.com/twmb/franz-go/pkg/kadm"
 	"golang.org/x/sync/errgroup"
 )
@@ -72,7 +73,7 @@ func (r *Topics) ListTopicConsumers(ctx context.Context, cluster, topic string) 
 
 	md, err := adm.Metadata(ctx, topic)
 	if err != nil {
-		return nil, fmt.Errorf("metadata for topic %q on cluster %q: %w", topic, cluster, err)
+		return nil, fmt.Errorf("metadata for topic %q on cluster %q: %w", topic, config.PublicClusterName(cluster), err)
 	}
 	t, ok := md.Topics[topic]
 	if !ok || t.Err != nil {
@@ -81,7 +82,7 @@ func (r *Topics) ListTopicConsumers(ctx context.Context, cluster, topic string) 
 
 	listed, err := adm.ListGroups(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list groups for topic %q on cluster %q: %w", topic, cluster, err)
+		return nil, fmt.Errorf("list groups for topic %q on cluster %q: %w", topic, config.PublicClusterName(cluster), err)
 	}
 	names := listed.Groups()
 	if len(names) == 0 {
@@ -90,7 +91,7 @@ func (r *Topics) ListTopicConsumers(ctx context.Context, cluster, topic string) 
 
 	described, err := adm.DescribeGroups(ctx, names...)
 	if err != nil {
-		return nil, fmt.Errorf("describe groups for topic %q on cluster %q: %w", topic, cluster, err)
+		return nil, fmt.Errorf("describe groups for topic %q on cluster %q: %w", topic, config.PublicClusterName(cluster), err)
 	}
 
 	candidates := candidatesFromKadm(topic, listed, described)

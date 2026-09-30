@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/FinkeFlo/kafkito/internal/config"
 	"github.com/twmb/franz-go/pkg/kadm"
 )
 
@@ -296,7 +297,7 @@ func (r *Groups) CreateGroup(ctx context.Context, cluster string, req CreateGrou
 	// ListGroups reports it (active members or committed offsets).
 	listed, err := adm.ListGroups(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list groups on cluster %q: %w", cluster, err)
+		return nil, fmt.Errorf("list groups on cluster %q: %w", config.PublicClusterName(cluster), err)
 	}
 	for _, name := range listed.Groups() {
 		if name == group {

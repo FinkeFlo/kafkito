@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
 )
@@ -24,7 +25,7 @@ func (s *apiServer) ListAcls(ctx context.Context, req gen.ListAclsRequestObject)
 	if err != nil {
 		return nil, clusterError(req.Cluster, "list ACLs", err)
 	}
-	return gen.ListAcls200JSONResponse{Cluster: req.Cluster, Acls: acls}, nil
+	return gen.ListAcls200JSONResponse{Cluster: config.PublicClusterName(req.Cluster), Acls: acls}, nil
 }
 
 // CreateAcl creates a single ACL binding on the cluster.

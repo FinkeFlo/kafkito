@@ -287,12 +287,12 @@ func (r *Connections) Client(name string) (*kgo.Client, error) {
 	}
 	cfg, ok := r.clusters[name]
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, name)
+		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, config.PublicClusterName(name))
 	}
 
 	cl, err := kgo.NewClient(clientOptsDial(cfg, r.log.With("cluster", name), r.adhocDial)...)
 	if err != nil {
-		return nil, fmt.Errorf("kgo.NewClient for %s: %w", name, err)
+		return nil, fmt.Errorf("kgo.NewClient for %s: %w", config.PublicClusterName(name), err)
 	}
 	r.clients[name] = cl
 	return cl, nil

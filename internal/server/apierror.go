@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/FinkeFlo/kafkito/internal/netguard"
 )
@@ -85,10 +86,11 @@ func blockedAddressError(op string, err error) error {
 }
 
 // clusterError classifies an error from a Registry call against cluster:
-// an unknown cluster is a 404 naming it, anything else an upstream error.
+// an unknown cluster is a 404 naming it as the client knows it
+// (config.PublicClusterName), anything else an upstream error.
 func clusterError(cluster, op string, err error) error {
 	if errors.Is(err, kafkapkg.ErrUnknownCluster) {
-		return unknownClusterError(cluster, err)
+		return unknownClusterError(config.PublicClusterName(cluster), err)
 	}
 	return upstreamError(op, err)
 }

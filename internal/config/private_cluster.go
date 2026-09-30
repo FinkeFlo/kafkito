@@ -17,3 +17,13 @@ const AdhocClusterPrefix = "__adhoc_"
 func IsAdhocClusterName(name string) bool {
 	return strings.HasPrefix(name, AdhocClusterPrefix)
 }
+
+// PublicClusterName returns the cluster name a client uses for the registry
+// name name: PrivateClusterSentinel for a private cluster, name itself
+// otherwise. Responses and error messages name clusters with it.
+func PublicClusterName(name string) string {
+	if IsAdhocClusterName(name) {
+		return PrivateClusterSentinel
+	}
+	return name
+}

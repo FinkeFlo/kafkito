@@ -9,6 +9,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/FinkeFlo/kafkito/internal/config"
 	"github.com/twmb/franz-go/pkg/kadm"
 )
 
@@ -61,11 +62,11 @@ func loadTopicOffsets(ctx context.Context, adm topicOffsetsAdmin, cluster, topic
 	}
 	starts, err := adm.ListStartOffsets(ctx, topic)
 	if err != nil {
-		return nil, fmt.Errorf("list start offsets for topic %q on cluster %q: %w", topic, cluster, err)
+		return nil, fmt.Errorf("list start offsets for topic %q on cluster %q: %w", topic, config.PublicClusterName(cluster), err)
 	}
 	ends, err := adm.ListEndOffsets(ctx, topic)
 	if err != nil {
-		return nil, fmt.Errorf("list end offsets for topic %q on cluster %q: %w", topic, cluster, err)
+		return nil, fmt.Errorf("list end offsets for topic %q on cluster %q: %w", topic, config.PublicClusterName(cluster), err)
 	}
 	out := &topicOffsets{
 		parts: parts,
@@ -74,7 +75,7 @@ func loadTopicOffsets(ctx context.Context, adm topicOffsetsAdmin, cluster, topic
 	}
 	out.fromTS, out.toTS, err = resolveTimestampOffsets(ctx, adm, topic, parts, q.fromTSMs, q.toTSMs)
 	if err != nil {
-		return nil, fmt.Errorf("resolve time range for topic %q on cluster %q: %w", topic, cluster, err)
+		return nil, fmt.Errorf("resolve time range for topic %q on cluster %q: %w", topic, config.PublicClusterName(cluster), err)
 	}
 	return out, nil
 }
@@ -87,11 +88,11 @@ func (o *topicOffsets) bounds(p int32) (int64, int64) {
 func selectPartitions(ctx context.Context, adm topicOffsetsAdmin, cluster, topic string, q offsetsQuery) ([]int32, error) {
 	md, err := adm.Metadata(ctx, topic)
 	if err != nil {
-		return nil, fmt.Errorf("fetch metadata for topic %q on cluster %q: %w", topic, cluster, err)
+		return nil, fmt.Errorf("fetch metadata for topic %q on cluster %q: %w", topic, config.PublicClusterName(cluster), err)
 	}
 	t, ok := md.Topics[topic]
 	if !ok || t.Err != nil {
-		return nil, fmt.Errorf("topic %q not found on cluster %q", topic, cluster)
+		return nil, fmt.Errorf("topic %q not found on cluster %q", topic, config.PublicClusterName(cluster))
 	}
 	all := make([]int32, 0, len(t.Partitions))
 	for _, p := range t.Partitions {
@@ -102,7 +103,7 @@ func selectPartitions(ctx context.Context, adm topicOffsetsAdmin, cluster, topic
 		return all, nil
 	}
 	if !q.unchecked && !slices.Contains(all, q.partition) {
-		return nil, fmt.Errorf("partition %d not found in topic %q on cluster %q", q.partition, topic, cluster)
+		return nil, fmt.Errorf("partition %d not found in topic %q on cluster %q", q.partition, topic, config.PublicClusterName(cluster))
 	}
 	return []int32{q.partition}, nil
 }

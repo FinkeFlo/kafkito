@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/FinkeFlo/kafkito/internal/config"
 	"github.com/twmb/franz-go/pkg/kadm"
 )
 
@@ -67,7 +68,7 @@ func (r *Groups) ListGroups(ctx context.Context, cluster string) ([]GroupInfo, e
 	}
 	listed, err := adm.ListGroups(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list groups on cluster %q: %w", cluster, err)
+		return nil, fmt.Errorf("list groups on cluster %q: %w", config.PublicClusterName(cluster), err)
 	}
 	names := listed.Groups()
 	out := make([]GroupInfo, 0, len(names))
@@ -77,7 +78,7 @@ func (r *Groups) ListGroups(ctx context.Context, cluster string) ([]GroupInfo, e
 
 	described, err := adm.DescribeGroups(ctx, names...)
 	if err != nil {
-		return nil, fmt.Errorf("describe %d groups on cluster %q: %w", len(names), cluster, err)
+		return nil, fmt.Errorf("describe %d groups on cluster %q: %w", len(names), config.PublicClusterName(cluster), err)
 	}
 
 	for _, name := range names {
@@ -150,14 +151,14 @@ func (r *Groups) DescribeGroup(ctx context.Context, cluster, group string) (*Gro
 
 	described, err := adm.DescribeGroups(ctx, group)
 	if err != nil {
-		return nil, fmt.Errorf("describe group %q on cluster %q: %w", group, cluster, err)
+		return nil, fmt.Errorf("describe group %q on cluster %q: %w", group, config.PublicClusterName(cluster), err)
 	}
 	d, ok := described[group]
 	if !ok {
-		return nil, fmt.Errorf("describe group %q on cluster %q: group not returned by broker", group, cluster)
+		return nil, fmt.Errorf("describe group %q on cluster %q: group not returned by broker", group, config.PublicClusterName(cluster))
 	}
 	if d.Err != nil {
-		return nil, fmt.Errorf("describe group %q on cluster %q: %w", group, cluster, d.Err)
+		return nil, fmt.Errorf("describe group %q on cluster %q: %w", group, config.PublicClusterName(cluster), d.Err)
 	}
 
 	info := GroupInfo{

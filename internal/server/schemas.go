@@ -10,6 +10,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/FinkeFlo/kafkito/internal/rbac"
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
@@ -27,7 +28,7 @@ func (s *apiServer) schemaRegistry(cluster string) (schemaClient, error) {
 	case err == nil:
 		return sr, nil
 	case errors.Is(err, kafkapkg.ErrNoSchemaRegistry):
-		return nil, &apiError{Status: http.StatusNotFound, Message: "schema registry not configured for cluster: " + cluster, Err: err}
+		return nil, &apiError{Status: http.StatusNotFound, Message: "schema registry not configured for cluster: " + config.PublicClusterName(cluster), Err: err}
 	}
 	return nil, clusterError(cluster, "schema registry client", err)
 }
@@ -50,7 +51,7 @@ func (s *apiServer) ListSubjects(ctx context.Context, req gen.ListSubjectsReques
 	if user, ok := s.rbacListSubject(ctx, req.Cluster); ok {
 		subs = filterSubjectsByRBAC(subs, s.policy, user, req.Cluster)
 	}
-	return gen.ListSubjects200JSONResponse{Cluster: req.Cluster, Subjects: subs}, nil
+	return gen.ListSubjects200JSONResponse{Cluster: config.PublicClusterName(req.Cluster), Subjects: subs}, nil
 }
 
 // ListSchemaVersions lists the versions of a subject.

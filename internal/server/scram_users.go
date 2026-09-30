@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/FinkeFlo/kafkito/internal/rbac"
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
@@ -35,7 +36,7 @@ func (s *apiServer) ListScramUsers(ctx context.Context, req gen.ListScramUsersRe
 	if user, ok := s.rbacListSubject(ctx, req.Cluster); ok {
 		users = filterSCRAMUsersByRBAC(users, s.policy, user, req.Cluster)
 	}
-	return gen.ListScramUsers200JSONResponse{Cluster: req.Cluster, Users: users}, nil
+	return gen.ListScramUsers200JSONResponse{Cluster: config.PublicClusterName(req.Cluster), Users: users}, nil
 }
 
 // UpsertScramUser creates or updates a SCRAM credential. The password is
