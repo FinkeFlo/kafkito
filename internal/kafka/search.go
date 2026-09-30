@@ -632,7 +632,9 @@ func (sc *searchScan) pageFull(limit int) bool {
 //
 // New matches can only move the page's last match to an earlier rank, so a
 // partition past it stays past it: settled parks it, and the call skips its
-// further records.
+// further records. With timestamps out of order a skipped record could have
+// ranked inside the page; the cursor stays in front of it, so the chain
+// still returns it once.
 func (sc *searchScan) settled(limit int) bool {
 	last, ok := sc.pageLast(limit)
 	if !ok {
