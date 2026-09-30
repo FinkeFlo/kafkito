@@ -1903,10 +1903,13 @@ components:
           type: boolean
           default: true
           description: >
-            Return as soon as `limit` matches were found. Without it the call
-            reads on until every partition holds `limit` matches or is done,
-            or the budget or timeout ends it; either way it returns at most
-            `limit` matches and the cursors keep the rest reachable.
+            Return once the first `limit` matches in `direction` order are
+            known: `limit` matches were found and every partition that is not
+            done has read past the last of them. A lagging partition can keep
+            the call waiting up to its timeout. Without it the call reads on
+            until every partition holds `limit` matches or is done. Either way
+            the budget or the timeout can end the call earlier; it returns at
+            most `limit` matches and the cursors keep the rest reachable.
         mode: { type: string, enum: [contains, jsonpath, xpath, js] }
         path: { type: string, maxLength: 2048, description: "JSONPath or XPath expression for modes `jsonpath` and `xpath`; unused otherwise." }
         op: { type: string, enum: [exists, eq, ne, contains, regex, gt, lt, gte, lte] }

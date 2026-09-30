@@ -1291,7 +1291,7 @@ export interface components {
             /** @enum {string} */
             direction?: "newest_first" | "oldest_first";
             /**
-             * @description Return as soon as `limit` matches were found. Without it the call reads on until every partition holds `limit` matches or is done, or the budget or timeout ends it; either way it returns at most `limit` matches and the cursors keep the rest reachable.
+             * @description Return once the first `limit` matches in `direction` order are known: `limit` matches were found and every partition that is not done has read past the last of them. A lagging partition can keep the call waiting up to its timeout. Without it the call reads on until every partition holds `limit` matches or is done. Either way the budget or the timeout can end the call earlier; it returns at most `limit` matches and the cursors keep the rest reachable.
              * @default true
              */
             stop_on_limit?: boolean;

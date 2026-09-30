@@ -294,6 +294,14 @@ only what lies behind `next_cursors`, so summed across a chain of calls they
 are exact totals; `search.read` counts every record the call read, including
 those the next call reads again.
 
+With `stop_on_limit`, a call returns the first `limit` matches in `direction`
+order across all partitions, not the first ones to arrive: it waits until
+every partition that is not done has read past the last match of the page.
+A lagging partition can therefore keep the call waiting up to its timeout.
+When the budget or the timeout ends the call first, the page holds the
+matches found so far, `more_available` is `true`, and the chain still returns
+every match exactly once.
+
 Quick example — simple contains across message value:
 
 ```bash
