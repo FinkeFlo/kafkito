@@ -123,9 +123,9 @@ const DefaultAuthMode = "off"
 // (distinct from per-cluster SASL auth). Mode comes from auth.mode in the YAML
 // file or from KAFKITO_AUTH_MODE, and Load sets it to DefaultAuthMode when both
 // are empty. A set but empty KAFKITO_AUTH_MODE overrides the YAML value, so it
-// also yields DefaultAuthMode. Every build registers "off" and "mock" ("off" can only be served
-// by devauth builds); tagged builds may register additional IdP-specific
-// modes, such as "xsuaa" in btp builds. See internal/auth.Register.
+// also yields DefaultAuthMode. Every build registers "off" and "mock" ("off"
+// can only be served by devauth builds); tagged builds may register additional
+// IdP-specific modes, such as "xsuaa" in btp builds. See internal/auth.Register.
 type AppAuthConfig struct {
 	Mode string `koanf:"mode"`
 }
