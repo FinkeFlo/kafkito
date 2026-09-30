@@ -1,5 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
-import { hostAddress } from "./fixtures/host-address";
+import {
+  LOOPBACK_ADVERTISED_PORT,
+  hostAddress,
+  privateClusterBroker,
+} from "./fixtures/host-address";
 
 const CLUSTER = process.env.KAFKITO_E2E_CLUSTER ?? "local";
 const KAFKA_HOST_PORT = 39092;
@@ -66,9 +70,38 @@ test.describe("Clusters", () => {
   });
 
   test("test connection reports a reachable cluster", async ({ page }) => {
-    const { dialog, response } = await testConnection(page, `${hostAddress()}:${KAFKA_HOST_PORT}`);
+    const { dialog, response } = await testConnection(page, privateClusterBroker());
     expect(response.status()).toBe(200);
     await expect(dialog.getByText("OK — reachable (none, TLS: no)")).toBeVisible();
+  });
+
+  // Issue #126: the seed answers on the host address, but on this listener
+  // the broker advertises localhost:39092, which the backend refuses for
+  // private clusters. Test connection must name that broker instead of
+  // reporting the cluster as reachable.
+  test("test connection reports a broker that advertises a blocked address", async ({ page }) => {
+    const { dialog, response } = await testConnection(
+      page,
+      `${hostAddress()}:${LOOPBACK_ADVERTISED_PORT}`,
+    );
+    expect(response.status()).toBe(200);
+    const info = await response.json();
+    expect(info.reachable).toBe(false);
+    expect(info.broker_issues).toEqual([
+      expect.objectContaining({
+        node_id: 1,
+        host: "localhost",
+        port: LOOPBACK_ADVERTISED_PORT,
+        reason: "blocked",
+      }),
+    ]);
+    const issues = dialog
+      .getByRole("alert")
+      .getByRole("list", { name: "Broker issues" })
+      .getByRole("listitem");
+    await expect(issues).toHaveText([
+      /^Broker 1 advertises localhost:39092, which is not allowed for private clusters/,
+    ]);
   });
 
   test("test connection reports an unreachable cluster", async ({ page }) => {

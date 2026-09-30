@@ -14,3 +14,16 @@ export function hostAddress(): string {
   }
   throw new Error("no private IPv4 host address found; set KAFKITO_E2E_HOST_IP");
 }
+
+// Host ports of the fixture broker (docker-compose.yml). Both reach the same
+// broker; they differ in the address the broker advertises in its metadata.
+// 39092 advertises localhost:39092, which the backend refuses for private
+// clusters, so Test connection reports that broker (issue #126). 39093
+// advertises this host address, which private clusters may use.
+export const LOOPBACK_ADVERTISED_PORT = 39092;
+const HOST_ADVERTISED_PORT = 39093;
+
+/** Seed broker for a private cluster that works end to end. */
+export function privateClusterBroker(): string {
+  return `${hostAddress()}:${HOST_ADVERTISED_PORT}`;
+}

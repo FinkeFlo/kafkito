@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { hostAddress } from "./fixtures/host-address";
+import { privateClusterBroker } from "./fixtures/host-address";
 
 /**
  * A private (browser-stored) cluster must not carry the name of a shared
@@ -45,10 +45,9 @@ async function openTopics(page: Page, cluster: string) {
   await expect(page).toHaveURL(new RegExp(`/clusters/${encodeURIComponent(cluster)}/topics$`));
 }
 
-// The private cluster's topic list is answered here, not by the backend: the
-// fixture broker advertises localhost:39092, and the backend refuses loopback
-// addresses for private clusters, so a request that kafka routes to the
-// advertised address fails with 502 at random.
+// The private cluster's topic list is answered here, not by the backend: both
+// clusters point at the same fixture broker, so only a distinct topic tells
+// them apart on screen.
 async function answerPrivateTopics(page: Page) {
   await page.route(
     (url) => url.pathname === "/api/v1/clusters/__private__/topics",
@@ -70,7 +69,7 @@ test.describe("Private cluster named like a server cluster", () => {
     await page.getByRole("button", { name: "Add cluster" }).click();
     const form = page.getByRole("dialog", { name: "Add private cluster" });
     const name = form.getByPlaceholder("my-dev-cluster");
-    await form.getByPlaceholder("host1:9092, host2:9092").fill(`${hostAddress()}:39092`);
+    await form.getByPlaceholder("host1:9092, host2:9092").fill(privateClusterBroker());
     await name.fill(PRIMARY);
 
     const error = form.getByText(
@@ -93,7 +92,7 @@ test.describe("Private cluster named like a server cluster", () => {
       {
         id: "7d0c9a52-4e1b-4f3a-8c6d-2b5e9f1a0c3d",
         name: PRIMARY,
-        brokers: [`${hostAddress()}:39092`],
+        brokers: [privateClusterBroker()],
         auth: { type: "none" },
         tls: { enabled: false },
         created_at: 1767261600000,

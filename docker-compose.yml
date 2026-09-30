@@ -4,6 +4,8 @@
 # Always prefer these:
 #   - kafkito:         http://localhost:37421
 #   - Kafka broker:    localhost:39092   (external PLAINTEXT)
+#   - Kafka broker:    <host-ip>:39093   (advertises the host's private IPv4;
+#                                         for private clusters, see Makefile)
 #   - Schema Registry: http://localhost:38081
 #   - Keycloak (auth): http://localhost:38080 (profile: auth)
 #
@@ -22,14 +24,19 @@ services:
     hostname: kafka
     ports:
       - "39092:39092"
+      - "39093:39093"
     environment:
       # KRaft mode (no Zookeeper)
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:39092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:39092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:39092,PLAINTEXT_PRIVATE://0.0.0.0:39093
+      # PLAINTEXT_HOST advertises localhost, which kafkito refuses for private
+      # clusters (SSRF guard); Test connection reports it (issue #126).
+      # PLAINTEXT_PRIVATE advertises the host's private IPv4, which private
+      # clusters may use. make passes KAFKITO_E2E_HOST_IP (see Makefile).
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:39092,PLAINTEXT_PRIVATE://${KAFKITO_E2E_HOST_IP:-127.0.0.1}:39093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,PLAINTEXT_PRIVATE:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1

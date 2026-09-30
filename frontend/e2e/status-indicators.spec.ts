@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
-import { hostAddress } from "./fixtures/host-address";
+import { privateClusterBroker } from "./fixtures/host-address";
 import {
   UNREACHABLE_CLUSTER as DOWN,
   withUnreachableCluster,
@@ -185,7 +185,7 @@ test.describe("Status indicators never rely on colour alone", () => {
     const errorMask = await inkMask(page, errorIcon);
 
     // The fixture broker through a private host address is a real success.
-    await brokers.fill(`${hostAddress()}:39092`);
+    await brokers.fill(privateClusterBroker());
     await testButton.click();
     const ok = dialog.getByRole("status").filter({ hasText: /^OK — reachable/ });
     await expect(ok).toBeVisible({ timeout: 20_000 });
