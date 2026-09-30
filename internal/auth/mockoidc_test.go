@@ -10,8 +10,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/lestrrat-go/jwx/v3/jws"
+	"github.com/lestrrat-go/jwx/v3/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -82,4 +84,45 @@ func TestMockOIDC_IssueWithJKU_SetsTheGivenHeader(t *testing.T) {
 
 	_, jku := tokenHeader(t, tok)
 	assert.Equal(t, "https://elsewhere.example/token_keys", jku)
+}
+
+func TestMockOIDC_TokenBuilder_OmitsClaimsAndSetsTheAlgorithm(t *testing.T) {
+	t.Parallel()
+
+	mock, err := auth.NewMockOIDC()
+	require.NoError(t, err)
+	t.Cleanup(mock.Close)
+
+	raw, err := mock.Token("u", "aud", mock.Server.URL).
+		Without(jwt.ExpirationKey, jwt.SubjectKey).
+		Claim("extra", "x").
+		Alg(jwa.PS256()).
+		Sign()
+	require.NoError(t, err)
+
+	msg, err := jws.Parse([]byte(raw))
+	require.NoError(t, err)
+	alg, _ := msg.Signatures()[0].ProtectedHeaders().Algorithm()
+	assert.Equal(t, jwa.PS256(), alg)
+	tok, err := jwt.ParseInsecure([]byte(raw))
+	require.NoError(t, err)
+	assert.False(t, tok.Has(jwt.ExpirationKey), "exp must be omitted")
+	assert.False(t, tok.Has(jwt.SubjectKey), "sub must be omitted")
+	assert.True(t, tok.Has("extra"))
+	assert.True(t, tok.Has(jwt.IssuedAtKey), "other defaults stay")
+}
+
+func TestMockOIDC_WithoutJWKAlg_ServesTheKeyWithoutAlg(t *testing.T) {
+	t.Parallel()
+
+	mock, err := auth.NewMockOIDC(auth.WithoutJWKAlg())
+	require.NoError(t, err)
+	t.Cleanup(mock.Close)
+
+	set, err := jwk.Fetch(context.Background(), mock.JKU())
+	require.NoError(t, err)
+	key, ok := set.Key(0)
+	require.True(t, ok)
+	_, hasAlg := key.Algorithm()
+	assert.False(t, hasAlg, "the served key must not carry alg")
 }

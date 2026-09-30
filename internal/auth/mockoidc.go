@@ -8,11 +8,13 @@ package auth
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -25,7 +27,8 @@ import (
 
 // MockOIDC is an in-process JWKS+token issuer used in tests. It signs RS256
 // tokens with a freshly generated key, exposes the public key at /jwks, and
-// lets callers mint tokens with arbitrary claims via Issue().
+// lets callers mint tokens with arbitrary claims via Issue() or the Token
+// builder.
 //
 // By default the mock emits a generic OIDC token: scopes are written to the
 // "scope" claim verbatim, and no tenant/zone claim is added. Callers that need
@@ -37,6 +40,7 @@ type MockOIDC struct {
 	zoneID      string
 	jwksPath    string
 	jwksHits    atomic.Int64
+	noKeyAlg    bool
 
 	mu     sync.RWMutex // guards the signing key, which RotateKey replaces
 	priv   *rsa.PrivateKey
@@ -64,6 +68,12 @@ func WithZoneID(zoneID string) MockOIDCOption {
 // "/token_keys", the only path the xsuaa validator accepts in a jku.
 func WithJWKSPath(path string) MockOIDCOption {
 	return func(m *MockOIDC) { m.jwksPath = path }
+}
+
+// WithoutJWKAlg serves the public key without an "alg" member, like IdPs
+// (Microsoft Entra ID, for example) that publish keys by type only.
+func WithoutJWKAlg() MockOIDCOption {
+	return func(m *MockOIDC) { m.noKeyAlg = true }
 }
 
 // NewMockOIDC starts the mock and returns it. By default tokens carry no zone
@@ -120,8 +130,10 @@ func (m *MockOIDC) RotateKey() error {
 	if err := pub.Set(jwk.KeyIDKey, keyID); err != nil {
 		return err
 	}
-	if err := pub.Set(jwk.AlgorithmKey, jwa.RS256()); err != nil {
-		return err
+	if !m.noKeyAlg {
+		if err := pub.Set(jwk.AlgorithmKey, jwa.RS256()); err != nil {
+			return err
+		}
 	}
 	set := jwk.NewSet()
 	if err := set.AddKey(pub); err != nil {
@@ -141,21 +153,99 @@ func (m *MockOIDC) Host() string {
 
 // Issue mints a signed RS256 JWT with sensible defaults plus caller-supplied claims.
 // Pass scopes as local names; if the mock was constructed with WithScopePrefix,
-// each scope is namespaced as prefix + "." + scope.
+// each scope is namespaced as prefix + "." + scope. It is shorthand for
+// Token(sub, clientID, issuer).Scopes(scopes...).Claims(extra).Sign().
 func (m *MockOIDC) Issue(sub, clientID, issuer string, scopes []string, extra map[string]any) (string, error) {
-	return m.sign(m.JKU(), m.claims(sub, clientID, issuer, scopes, extra))
+	return m.Token(sub, clientID, issuer).Scopes(scopes...).Claims(extra).Sign()
 }
 
 // IssueWithJKU mints a token like Issue (without extra claims) but puts jku
 // into the jku header, for testing the validator's jku policy.
 func (m *MockOIDC) IssueWithJKU(jku, sub, clientID, issuer string, scopes []string) (string, error) {
-	return m.sign(jku, m.claims(sub, clientID, issuer, scopes, nil))
+	return m.Token(sub, clientID, issuer).Scopes(scopes...).JKU(jku).Sign()
 }
 
 // IssueWithoutJKU mints a token like Issue but deliberately omits the jku header,
 // for testing the validator's "missing jku" rejection branch.
 func (m *MockOIDC) IssueWithoutJKU(sub, clientID, issuer string, scopes []string) (string, error) {
-	return m.sign("", m.claims(sub, clientID, issuer, scopes, nil))
+	return m.Token(sub, clientID, issuer).Scopes(scopes...).JKU("").Sign()
+}
+
+// TokenBuilder mints one token. Start it with MockOIDC.Token, chain the
+// setters, and finish with Sign. Setters return the builder; a builder is
+// not safe for concurrent use.
+type TokenBuilder struct {
+	m        *MockOIDC
+	sub      string
+	clientID string
+	issuer   string
+	scopes   []string
+	extra    map[string]any
+	without  []string
+	jku      string
+	alg      jwa.SignatureAlgorithm
+}
+
+// Token starts a token with the default claims: sub, iss, aud = [clientID],
+// iat, exp (now + 30 min), cid, scope, and zid when the mock has a zone. The
+// token is signed RS256 with the current key and carries the mock's jku.
+func (m *MockOIDC) Token(sub, clientID, issuer string) *TokenBuilder {
+	return &TokenBuilder{
+		m: m, sub: sub, clientID: clientID, issuer: issuer,
+		extra: map[string]any{}, jku: m.JKU(), alg: jwa.RS256(),
+	}
+}
+
+// Scopes sets the scope claim (namespaced like Issue).
+func (b *TokenBuilder) Scopes(scopes ...string) *TokenBuilder {
+	b.scopes = scopes
+	return b
+}
+
+// Claim sets or overrides one claim.
+func (b *TokenBuilder) Claim(name string, value any) *TokenBuilder {
+	b.extra[name] = value
+	return b
+}
+
+// Claims sets or overrides every claim in claims.
+func (b *TokenBuilder) Claims(claims map[string]any) *TokenBuilder {
+	for k, v := range claims {
+		b.extra[k] = v
+	}
+	return b
+}
+
+// Without removes the named claims, defaults included, from the token.
+func (b *TokenBuilder) Without(names ...string) *TokenBuilder {
+	b.without = append(b.without, names...)
+	return b
+}
+
+// JKU sets the jku header; "" leaves the header out.
+func (b *TokenBuilder) JKU(jku string) *TokenBuilder {
+	b.jku = jku
+	return b
+}
+
+// Alg signs with alg instead of RS256 and names it in the header. RS* and
+// PS* use the mock's RSA key. HS* uses the DER encoding of the mock's
+// public RSA key as the HMAC secret, so tests can check that a verifier
+// does not treat the public key as a shared secret.
+func (b *TokenBuilder) Alg(alg jwa.SignatureAlgorithm) *TokenBuilder {
+	b.alg = alg
+	return b
+}
+
+// Sign builds and signs the token.
+func (b *TokenBuilder) Sign() (string, error) {
+	tok := b.m.claims(b.sub, b.clientID, b.issuer, b.scopes, b.extra)
+	for _, name := range b.without {
+		if err := tok.Remove(name); err != nil {
+			return "", err
+		}
+	}
+	return b.m.sign(b.jku, b.alg, tok)
 }
 
 // claims builds the default claim set plus extra (which may override defaults).
@@ -177,19 +267,28 @@ func (m *MockOIDC) claims(sub, clientID, issuer string, scopes []string, extra m
 	return tok
 }
 
-// sign signs tok with the current key. An empty jku leaves the header out.
-func (m *MockOIDC) sign(jku string, tok jwt.Token) (string, error) {
+// sign signs tok with the current key under alg. An empty jku leaves the
+// header out.
+func (m *MockOIDC) sign(jku string, alg jwa.SignatureAlgorithm, tok jwt.Token) (string, error) {
 	m.mu.RLock()
 	priv, keyID := m.priv, m.keyID
 	m.mu.RUnlock()
 
+	var key any = priv
+	if strings.HasPrefix(alg.String(), "HS") {
+		der, err := x509.MarshalPKIXPublicKey(&priv.PublicKey)
+		if err != nil {
+			return "", err
+		}
+		key = der
+	}
+
 	hdr := jws.NewHeaders()
 	_ = hdr.Set(jws.KeyIDKey, keyID)
-	_ = hdr.Set(jws.AlgorithmKey, jwa.RS256())
 	if jku != "" {
 		_ = hdr.Set(jws.JWKSetURLKey, jku)
 	}
-	signed, err := jwt.Sign(tok, jwt.WithKey(jwa.RS256(), priv, jws.WithProtectedHeaders(hdr)))
+	signed, err := jwt.Sign(tok, jwt.WithKey(alg, key, jws.WithProtectedHeaders(hdr)))
 	if err != nil {
 		return "", err
 	}
