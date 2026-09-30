@@ -57,6 +57,7 @@ func run(configPath string) int {
 		"clusters", len(cfg.Clusters),
 		"log_level", strings.ToLower(cfg.Log.SlogLevel().String()),
 		"log_format", cfg.Log.FormatName(),
+		"private_clusters", string(cfg.PrivateClusters.EffectiveMode()),
 	)
 
 	registry := kafkapkg.NewRegistry(cfg.Clusters, logger)

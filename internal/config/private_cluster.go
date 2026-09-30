@@ -6,8 +6,69 @@ package config
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"strings"
 )
+
+// PrivateClusterMode says who may use private clusters, the clusters a user
+// defines in the browser and sends per request (see PrivateClusterSentinel).
+type PrivateClusterMode string
+
+// The values of PrivateClustersConfig.Mode.
+const (
+	// PrivateClustersOn lets every user use private clusters. It is the
+	// default.
+	PrivateClustersOn PrivateClusterMode = "on"
+	// PrivateClustersOff disables private clusters.
+	PrivateClustersOff PrivateClusterMode = "off"
+	// PrivateClustersRole limits private clusters to RBAC subjects with the
+	// permission private_cluster:use. It requires rbac.enabled.
+	PrivateClustersRole PrivateClusterMode = "role"
+)
+
+// privateClustersModeKey is the koanf key of PrivateClustersConfig.Mode.
+const privateClustersModeKey = "private_clusters.mode"
+
+// PrivateClustersConfig is the private_clusters block. Settings for private
+// clusters are fields of this block next to Mode.
+type PrivateClustersConfig struct {
+	// Mode is on, off or role, case-insensitive; empty means on. Load also
+	// accepts a YAML boolean: true is on, false is off.
+	Mode PrivateClusterMode `koanf:"mode"`
+}
+
+// EffectiveMode returns Mode trimmed and lowercased, PrivateClustersOn when
+// Mode is empty.
+func (p PrivateClustersConfig) EffectiveMode() PrivateClusterMode {
+	m := PrivateClusterMode(strings.ToLower(strings.TrimSpace(string(p.Mode))))
+	if m == "" {
+		return PrivateClustersOn
+	}
+	return m
+}
+
+func (p PrivateClustersConfig) validate(rbacEnabled bool) error {
+	switch p.EffectiveMode() {
+	case PrivateClustersOn, PrivateClustersOff:
+		return nil
+	case PrivateClustersRole:
+		if !rbacEnabled {
+			return errors.New(`private_clusters.mode "role" requires rbac.enabled: true`)
+		}
+		return nil
+	default:
+		return fmt.Errorf("private_clusters.mode %q not supported (use on|off|role)", p.Mode)
+	}
+}
+
+// privateClusterModeOf maps a YAML boolean mode to on (true) or off (false).
+func privateClusterModeOf(b bool) PrivateClusterMode {
+	if b {
+		return PrivateClustersOn
+	}
+	return PrivateClustersOff
+}
 
 // AdhocClusterPrefix starts the internal registry name of every private
 // cluster: the kafka package registers a header-provided configuration
