@@ -472,13 +472,14 @@ export interface paths {
          * Download the raw value bytes of a single record.
          * @description Streams the untouched value bytes as an attachment
          *     (`<topic>-p<partition>-o<offset>.<ext>`). The content type is sniffed:
-         *     `application/json` for valid JSON, `text/plain` for other UTF-8 and
-         *     `application/octet-stream` otherwise. Values above 15 MB are rejected
-         *     with 413. A value the cluster's `data_masking` rules change is refused
-         *     with 403 `value_masked`: the raw bytes would bypass the masking. The
-         *     body never contains the key or headers, so masking rules that target
-         *     only those do not block the download. With RBAC enabled, requires
-         *     `consume` on `topic:<topic>`.
+         *     `application/json` for valid JSON, `application/xml` for well-formed
+         *     XML, `text/plain` for other UTF-8 and `application/octet-stream`
+         *     otherwise. Values above 15 MB are rejected with 413. A value the
+         *     cluster's `data_masking` rules change is refused with 403
+         *     `value_masked`: the raw bytes would bypass the masking. The body never
+         *     contains the key or headers, so masking rules that target only those
+         *     do not block the download. With RBAC enabled, requires `consume` on
+         *     `topic:<topic>`.
          */
         get: operations["downloadMessageRaw"];
         put?: never;
@@ -2491,6 +2492,7 @@ export interface operations {
                 content: {
                     "application/octet-stream": string;
                     "application/json": string;
+                    "application/xml": string;
                     "text/plain": string;
                 };
             };

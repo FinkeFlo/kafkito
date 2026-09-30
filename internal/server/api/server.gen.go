@@ -7308,6 +7308,30 @@ func (response DownloadMessageRaw200ApplicationoctetStreamResponse) VisitDownloa
 	return err
 }
 
+type DownloadMessageRaw200ApplicationxmlResponse struct {
+	Body          io.Reader
+	Headers       DownloadMessageRaw200ResponseHeaders
+	ContentLength int64
+}
+
+func (response DownloadMessageRaw200ApplicationxmlResponse) VisitDownloadMessageRawResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "application/xml")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	if response.Headers.ContentDisposition != nil {
+		w.Header().Set("Content-Disposition", fmt.Sprint(*response.Headers.ContentDisposition))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
 type DownloadMessageRaw200TextResponse struct {
 	Body    openapi_types.File
 	Headers DownloadMessageRaw200ResponseHeaders
