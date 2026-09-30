@@ -4,10 +4,12 @@
 package kafka
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -106,8 +108,17 @@ type ParseErrorOffset struct {
 const parseErrorOffsetsCap = 50
 
 // SearchStats is the per-response summary.
+//
+// Scanned, Matched and ParseErrors count only what lies behind NextCursors,
+// i.e. what a follow-up call does not read again, so their sums across a
+// chain of calls are exact totals.
 type SearchStats struct {
-	Scanned         int  `json:"scanned"`
+	// Scanned counts the records this call read that the cursor moved past.
+	Scanned int `json:"scanned"`
+	// Read counts every record this call read, including the ones a
+	// follow-up call reads again. Scanned <= Read <= budget.
+	Read int `json:"read"`
+	// Matched counts the returned matches: every match the cursor moved past.
 	Matched         int  `json:"matched"`
 	BudgetExhausted bool `json:"budget_exhausted"`
 	// TimedOut is true when the scan stopped because the per-call timeout
@@ -256,26 +267,21 @@ func (r *Messages) SearchMessages(ctx context.Context, cluster, topic string, op
 		return nil, err
 	}
 
-	matches := sc.confirmedMatches()
-	sortMessages(matches, opts.Direction == DirNewestFirst)
-	matched := len(matches)
-	if matched > opts.Limit {
-		matches = matches[:opts.Limit]
-	}
-	nextCursors, moreAvailable := sc.continuation(ranges)
-	carryDoneCursors(nextCursors, opts.Cursors, offs.parts)
+	pg := sc.page(ranges, opts.Limit)
+	carryDoneCursors(pg.next, opts.Cursors, offs.parts)
 
-	return &SearchResult{Messages: matches, Stats: SearchStats{
-		Scanned:           sc.scanned,
-		Matched:           matched,
+	return &SearchResult{Messages: pg.messages, Stats: SearchStats{
+		Scanned:           pg.scanned,
+		Read:              sc.read,
+		Matched:           pg.matched,
 		BudgetExhausted:   budgetExhausted,
 		TimedOut:          timedOut,
-		MoreAvailable:     moreAvailable,
+		MoreAvailable:     pg.more,
 		Direction:         opts.Direction,
-		NextCursors:       nextCursors,
+		NextCursors:       pg.next,
 		ResolvedRange:     ranges,
-		ParseErrors:       sc.parseErrors,
-		ParseErrorOffsets: sc.parseErrorOffsets,
+		ParseErrors:       pg.parseErrors,
+		ParseErrorOffsets: pg.parseErrorOffsets,
 		Durations:         map[string]int64{"total": time.Since(started).Milliseconds()},
 	}}, nil
 }
@@ -307,7 +313,8 @@ func (o SearchOptions) withDefaults() SearchOptions {
 
 // runSearch feeds the scanned records into sc until the ranges are drained,
 // the budget is spent, enough matches were found (StopOnLimit) or
-// opts.Timeout elapses. Budget and limit are checked after every poll.
+// opts.Timeout elapses. The budget holds per record: a call never reads
+// more than opts.Budget records. The limit is checked after every poll.
 func (r *Messages) runSearch(ctx context.Context, s recordScan, opts SearchOptions, sc *searchScan) (budgetExhausted, timedOut bool, err error) {
 	pollCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
@@ -318,11 +325,12 @@ func (r *Messages) runSearch(ctx context.Context, s recordScan, opts SearchOptio
 		if err != nil {
 			return false, false, err
 		}
-		for _, rec := range batch.records {
+		n := min(len(batch.records), opts.Budget-sc.read)
+		for _, rec := range batch.records[:n] {
 			sc.visit(ctx, rec)
 		}
-		sc.finish(batch)
-		if sc.scanned >= opts.Budget {
+		sc.finish(cutBatch(batch, n))
+		if sc.read >= opts.Budget {
 			return true, false, nil
 		}
 		if opts.StopOnLimit && sc.confirmed >= opts.Limit {
@@ -332,29 +340,60 @@ func (r *Messages) runSearch(ctx context.Context, s recordScan, opts SearchOptio
 	return false, false, nil
 }
 
+// cutBatch returns batch as far as its first n records were visited: a
+// partition with a record past n neither finished its chunk nor its range
+// in this poll.
+func cutBatch(batch recordBatch, n int) recordBatch {
+	if n >= len(batch.records) {
+		return batch
+	}
+	open := make(map[int32]bool)
+	for _, rec := range batch.records[n:] {
+		open[rec.Partition] = true
+	}
+	notOpen := func(p int32) bool { return !open[p] }
+	out := recordBatch{records: batch.records[:n]}
+	for _, p := range batch.drained {
+		if notOpen(p) {
+			out.drained = append(out.drained, p)
+		}
+	}
+	for _, p := range batch.ended {
+		if notOpen(p) {
+			out.ended = append(out.ended, p)
+		}
+	}
+	for _, ch := range batch.chunks {
+		if notOpen(ch.partition) {
+			out.chunks = append(out.chunks, ch)
+		}
+	}
+	return out
+}
+
 // searchScan accumulates the matches and stats of one SearchMessages call
 // and tracks, per partition, how far the range was read without a gap.
 type searchScan struct {
-	match             matcher
-	dec               recordDecoder
-	newestFirst       bool
-	matches           []Message
-	scanned           int
-	parseErrors       int
-	parseErrorOffsets []ParseErrorOffset
+	match       matcher
+	dec         recordDecoder
+	newestFirst bool
+	matches     []Message
+	// read counts every visited record.
+	read int
+	// visited and errored hold, per partition, the offsets of the visited
+	// records and of those that failed to parse. page counts the ones
+	// behind the cursor.
+	visited map[int32][]int64
+	errored map[int32][]int64
+	// errDetails keeps up to parseErrorOffsetsCap parse errors per
+	// partition, in the order they were read.
+	errDetails map[int32][]ParseErrorOffset
 	// confirmed counts the matches at or above their partition's frontier,
-	// i.e. the matches this call returns (before the limit).
+	// i.e. the matches this call can return (before the limit).
 	confirmed int
 	// pending counts, per partition, the matches of the chunk being read
 	// (newest-first); they are confirmed once the chunk is read to its end.
 	pending map[int32]int
-	// pendingErrs holds, per partition, the parse errors of the chunk being
-	// read (newest-first). Like matches, they count only once the chunk is
-	// read to its end; otherwise the next call reads and reports them again.
-	// pendingErrs keeps at most parseErrorOffsetsCap locations; pendingErrN
-	// counts them all.
-	pendingErrs map[int32][]ParseErrorOffset
-	pendingErrN map[int32]int
 	// frontier is, per partition, the lower offset of the lowest chunk read
 	// to its end without a gap from the top of the range (newest-first). It
 	// starts at the range end.
@@ -373,9 +412,10 @@ func newSearchScan(mt matcher, dec recordDecoder, ranges map[int32]PartitionRang
 		match:       mt,
 		dec:         dec,
 		newestFirst: dir == DirNewestFirst,
+		visited:     make(map[int32][]int64, len(ranges)),
+		errored:     make(map[int32][]int64),
+		errDetails:  make(map[int32][]ParseErrorOffset),
 		pending:     make(map[int32]int, len(ranges)),
-		pendingErrs: make(map[int32][]ParseErrorOffset),
-		pendingErrN: make(map[int32]int),
 		frontier:    make(map[int32]int64, len(ranges)),
 		stuck:       make(map[int32]bool),
 		highest:     make(map[int32]int64, len(ranges)),
@@ -392,7 +432,8 @@ func (sc *searchScan) visit(ctx context.Context, rec *kgo.Record) {
 	if cur, ok := sc.highest[p]; !ok || rec.Offset > cur {
 		sc.highest[p] = rec.Offset
 	}
-	sc.scanned++
+	sc.read++
+	sc.visited[p] = append(sc.visited[p], rec.Offset)
 	// Match against the full, untruncated record: truncating first would
 	// hide contains-matches past maxMessageValueBytes and corrupt
 	// JSONPath/XPath/JS parsing of any larger record. Where a masking rule
@@ -438,15 +479,11 @@ func (sc *searchScan) finish(batch recordBatch) {
 		sc.frontier[p] = ch.lower
 		sc.confirmed += sc.pending[p]
 		sc.pending[p] = 0
-		sc.parseErrors += sc.pendingErrN[p]
-		sc.addParseErrorOffsets(sc.pendingErrs[p]...)
-		delete(sc.pendingErrs, p)
-		delete(sc.pendingErrN, p)
 	}
 }
 
-// confirmedMatches returns the matches this call reports. Newest-first, it
-// drops the matches below their partition's frontier: they come from a
+// confirmedMatches returns the matches this call can report. Newest-first,
+// it drops the matches below their partition's frontier: they come from a
 // chunk that was not read to its end, so the next call, which continues at
 // the frontier, reads them again, and keeping them would also break the
 // newest-first order across calls.
@@ -476,25 +513,10 @@ func (sc *searchScan) parseError(ctx context.Context, rec *kgo.Record, err error
 		"partition", rec.Partition,
 		"offset", rec.Offset,
 		"error", msg)
-	pe := ParseErrorOffset{Partition: rec.Partition, Offset: rec.Offset, Error: msg}
-	if sc.newestFirst {
-		sc.pendingErrN[rec.Partition]++
-		if len(sc.pendingErrs[rec.Partition]) < parseErrorOffsetsCap {
-			sc.pendingErrs[rec.Partition] = append(sc.pendingErrs[rec.Partition], pe)
-		}
-		return
-	}
-	sc.parseErrors++
-	sc.addParseErrorOffsets(pe)
-}
-
-// addParseErrorOffsets keeps parse error locations up to parseErrorOffsetsCap.
-func (sc *searchScan) addParseErrorOffsets(pes ...ParseErrorOffset) {
-	for _, pe := range pes {
-		if len(sc.parseErrorOffsets) >= parseErrorOffsetsCap {
-			return
-		}
-		sc.parseErrorOffsets = append(sc.parseErrorOffsets, pe)
+	p := rec.Partition
+	sc.errored[p] = append(sc.errored[p], rec.Offset)
+	if len(sc.errDetails[p]) < parseErrorOffsetsCap {
+		sc.errDetails[p] = append(sc.errDetails[p], ParseErrorOffset{Partition: p, Offset: rec.Offset, Error: msg})
 	}
 }
 
@@ -538,4 +560,118 @@ func (sc *searchScan) continuation(ranges map[int32]PartitionRange) (map[int32]i
 		more = more || next[p] < rng.End
 	}
 	return next, more
+}
+
+// searchPage is what one SearchMessages call returns: the matches and
+// counts behind the cursors in next.
+type searchPage struct {
+	messages          []Message
+	next              map[int32]int64
+	more              bool
+	scanned, matched  int
+	parseErrors       int
+	parseErrorOffsets []ParseErrorOffset
+}
+
+// page cuts the confirmed matches to limit and moves every cursor back to
+// the first match that did not fit, so the next call returns it. It then
+// reports only what lies behind the cursors: the matches, the records and
+// the parse errors a follow-up call does not read again.
+func (sc *searchScan) page(ranges map[int32]PartitionRange, limit int) searchPage {
+	next, more := sc.continuation(ranges)
+	matches := sc.confirmedMatches()
+	for p, cut := range pageCut(matches, limit, sc.newestFirst) {
+		more = true
+		if sc.newestFirst {
+			next[p] = max(next[p], cut+1)
+		} else {
+			next[p] = min(next[p], cut)
+		}
+	}
+	behind := func(p int32, off int64) bool {
+		c, ok := next[p]
+		if !ok {
+			return false
+		}
+		if sc.newestFirst {
+			return off >= c
+		}
+		return off < c
+	}
+	pg := searchPage{messages: []Message{}, next: next, more: more}
+	for _, m := range matches {
+		if behind(m.Partition, m.Offset) {
+			pg.messages = append(pg.messages, m)
+		}
+	}
+	sortMessages(pg.messages, sc.newestFirst)
+	pg.matched = len(pg.messages)
+	parts := make([]int32, 0, len(sc.visited))
+	for p, offs := range sc.visited {
+		parts = append(parts, p)
+		for _, off := range offs {
+			if behind(p, off) {
+				pg.scanned++
+			}
+		}
+	}
+	slices.Sort(parts)
+	for _, p := range parts {
+		for _, off := range sc.errored[p] {
+			if behind(p, off) {
+				pg.parseErrors++
+			}
+		}
+		for _, pe := range sc.errDetails[p] {
+			if behind(p, pe.Offset) && len(pg.parseErrorOffsets) < parseErrorOffsetsCap {
+				pg.parseErrorOffsets = append(pg.parseErrorOffsets, pe)
+			}
+		}
+	}
+	return pg
+}
+
+// pageCut picks the first limit matches and returns, per partition, the
+// offset of the first match that did not fit: the lowest oldest-first, the
+// highest newest-first. It takes every partition's matches in offset order
+// and merges them by time, so the matches a page keeps of a partition are
+// always the ones in front of its cut, even when timestamps within the
+// partition are out of order. With ordered timestamps these are the first
+// limit matches by time.
+func pageCut(matches []Message, limit int, newestFirst bool) map[int32]int64 {
+	byPart := make(map[int32][]Message)
+	for _, m := range matches {
+		byPart[m.Partition] = append(byPart[m.Partition], m)
+	}
+	parts := make([]int32, 0, len(byPart))
+	for p, ms := range byPart {
+		parts = append(parts, p)
+		slices.SortFunc(ms, func(a, b Message) int {
+			if newestFirst {
+				return cmp.Compare(b.Offset, a.Offset)
+			}
+			return cmp.Compare(a.Offset, b.Offset)
+		})
+	}
+	slices.Sort(parts)
+	head := make(map[int32]int, len(byPart))
+	for range min(limit, len(matches)) {
+		best := int32(-1)
+		for _, p := range parts {
+			if head[p] == len(byPart[p]) {
+				continue
+			}
+			if best < 0 || compareMessages(byPart[p][head[p]], byPart[best][head[best]], newestFirst) < 0 {
+				best = p
+			}
+		}
+		head[best]++
+	}
+	cuts := make(map[int32]int64)
+	for _, p := range parts {
+		if head[p] < len(byPart[p]) {
+			cuts[p] = byPart[p][head[p]].Offset
+		}
+	}
+	return cuts
 }

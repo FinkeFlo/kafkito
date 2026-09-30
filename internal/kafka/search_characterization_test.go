@@ -53,6 +53,7 @@ func TestSearchCharacterization_ContainsValueBothDirections(t *testing.T) {
 	assert.Equal(t, append(seqRange(19, 10), 1), seqs(t, newest.Messages))
 	assert.Equal(t, SearchStats{
 		Scanned:       24,
+		Read:          24,
 		Matched:       11,
 		Direction:     DirNewestFirst,
 		NextCursors:   map[int32]int64{0: 0, 1: 0, 2: 0},
@@ -63,6 +64,7 @@ func TestSearchCharacterization_ContainsValueBothDirections(t *testing.T) {
 	assert.Equal(t, append([]int{1}, seqRange(10, 19)...), seqs(t, oldest.Messages))
 	assert.Equal(t, SearchStats{
 		Scanned:       24,
+		Read:          24,
 		Matched:       11,
 		Direction:     DirOldestFirst,
 		NextCursors:   map[int32]int64{0: 12, 1: 8, 2: 4},
@@ -89,7 +91,10 @@ func TestSearchCharacterization_ContainsZones(t *testing.T) {
 	assert.Len(t, oldest(""), 24, "an empty needle matches everything")
 }
 
-func TestSearchCharacterization_LimitTruncatesButCountsAllMatches(t *testing.T) {
+// The limit is the page size: the cursors stop at the first match that did
+// not fit, and scanned and matched count only what lies behind them. seqs
+// 23, 22 and 21 are p1 offset 7, p0 offset 11 and p2 offset 3.
+func TestSearchCharacterization_LimitReturnsAPageAndKeepsTheRestReachable(t *testing.T) {
 	t.Parallel()
 	env, _ := newOrdersEnv(t)
 
@@ -97,10 +102,12 @@ func TestSearchCharacterization_LimitTruncatesButCountsAllMatches(t *testing.T) 
 
 	assert.Equal(t, []int{23, 22, 21}, seqs(t, res.Messages))
 	assert.Equal(t, SearchStats{
-		Scanned:       24,
-		Matched:       24,
+		Scanned:       3,
+		Read:          24,
+		Matched:       3,
+		MoreAvailable: true,
 		Direction:     DirNewestFirst,
-		NextCursors:   map[int32]int64{0: 0, 1: 0, 2: 0},
+		NextCursors:   map[int32]int64{0: 11, 1: 7, 2: 3},
 		ResolvedRange: allOrdersRange,
 	}, withoutDurations(t, res.Stats))
 }
@@ -258,6 +265,7 @@ func TestSearchCharacterization_TimeRange(t *testing.T) {
 	assert.Equal(t, seqRange(5, 14), seqs(t, res.Messages))
 	assert.Equal(t, SearchStats{
 		Scanned:       10,
+		Read:          10,
 		Matched:       10,
 		Direction:     DirOldestFirst,
 		NextCursors:   map[int32]int64{0: 8, 1: 5, 2: 2},
@@ -313,9 +321,10 @@ func TestSearchCharacterization_BudgetChainCoversEveryRecordOnce(t *testing.T) {
 
 		assert.ElementsMatch(t, seqRange(0, 23), seqs(t, msgs), "direction %s", dir)
 		assert.True(t, calls[0].BudgetExhausted, "direction %s", dir)
-		assert.GreaterOrEqual(t, calls[0].Scanned, 5)
+		assert.Equal(t, 5, calls[0].Scanned, "direction %s", dir)
 		total := 0
 		for _, c := range calls {
+			assert.LessOrEqual(t, c.Read, 5, "direction %s", dir)
 			total += c.Scanned
 		}
 		assert.Equal(t, 24, total, "every record is scanned exactly once across the chain (%s)", dir)
@@ -353,6 +362,7 @@ func TestSearchCharacterization_NewestFirstChunksLargePartition(t *testing.T) {
 	assert.Equal(t, []int64{8000, 7000, 6000, 5000, 4000, 3000, 2000, 1000, 0}, offsets(newest.Messages))
 	assert.Equal(t, SearchStats{
 		Scanned:       n,
+		Read:          n,
 		Matched:       9,
 		Direction:     DirNewestFirst,
 		NextCursors:   map[int32]int64{0: 0},

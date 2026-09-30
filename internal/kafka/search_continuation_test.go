@@ -176,12 +176,13 @@ func TestSearchScan_NewestFirstConfirmsOnlyFinishedChunks(t *testing.T) {
 		feed(t, sc, recordBatch{}, map[int64]string{4: "d", 5: "bad"}) // the stop comes here
 
 		assert.Equal(t, 3, sc.confirmed)
-		assert.Equal(t, []int64{8, 10, 11}, sortedOffsets(sc.confirmedMatches()))
-		assert.Equal(t, 1, sc.parseErrors, "the parse error of the unfinished chunk is reported by the call that finishes it")
-		assert.Equal(t, []ParseErrorOffset{{Partition: 0, Offset: 9, Error: "bad value"}}, sc.parseErrorOffsets)
-		next, more := sc.continuation(ranges)
-		assert.Equal(t, map[int32]int64{0: 8}, next)
-		assert.True(t, more)
+		pg := sc.page(ranges, 500)
+		assert.Equal(t, []int64{8, 10, 11}, sortedOffsets(pg.messages))
+		assert.Equal(t, 4, pg.scanned, "the records of the unfinished chunk are scanned by the call that finishes it")
+		assert.Equal(t, 1, pg.parseErrors, "the parse error of the unfinished chunk is reported by the call that finishes it")
+		assert.Equal(t, []ParseErrorOffset{{Partition: 0, Offset: 9, Error: "bad value"}}, pg.parseErrorOffsets)
+		assert.Equal(t, map[int32]int64{0: 8}, pg.next)
+		assert.True(t, pg.more)
 	})
 
 	t.Run("a forced chunk is a hole the frontier never passes", func(t *testing.T) {
@@ -217,7 +218,7 @@ func TestSearchScan_OldestFirstContinuesAfterTheHighestRecord(t *testing.T) {
 
 	feed(t, sc, recordBatch{}, map[int64]string{2: "a", 3: "bad", 4: "b"})
 	assert.Equal(t, 2, sc.confirmed)
-	assert.Equal(t, 1, sc.parseErrors)
+	assert.Equal(t, 1, sc.page(ranges, 500).parseErrors)
 	next, more = sc.continuation(ranges)
 	assert.Equal(t, map[int32]int64{0: 5}, next)
 	assert.True(t, more)
@@ -236,8 +237,7 @@ func sortedOffsets(msgs []Message) []int64 {
 
 // A newest-first stop-on-limit search stops only after a chunk is read to
 // its end, so its cursor never skips the rest of a chunk and the chain
-// returns every hit once, newest first. Every chunk holds exactly Limit
-// hits here: hits cut off by the limit are #110 item 1, not pinned here.
+// returns every hit once, newest first.
 func TestSearch_NewestFirstStopOnLimitDoesNotSkipTheRestOfAChunk(t *testing.T) {
 	t.Parallel()
 	env := newKfakeEnv(t, "newest-limit-chunk", 1, nil)
