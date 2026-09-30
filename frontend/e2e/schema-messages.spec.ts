@@ -47,9 +47,11 @@ test.describe("Messages of a Schema Registry topic", () => {
 
     await first.getByRole("button").first().click();
     await expect(first.getByText(`value · avro · sr id ${v1Id}`)).toBeVisible();
-    await expect(first.locator("pre").last()).toHaveText(
-      '{"amount_cents":1999,"order_id":"E2E-AVRO-1"}',
-    );
+    // The decoded JSON is JSON like any other: the interactive tree, with
+    // click-to-filter, not a plain text block.
+    await expect(first.getByText("click to filter", { exact: true })).toBeVisible();
+    await expect(first.getByRole("button", { name: '"E2E-AVRO-1"', exact: true })).toBeVisible();
+    await expect(first.getByRole("button", { name: "1999", exact: true })).toBeVisible();
     // A small decoded record needs no full-value actions.
     await expect(first.getByRole("button", { name: /Load full value/ })).toHaveCount(0);
     await expect(first.getByRole("button", { name: "Download full value" })).toHaveCount(0);
@@ -79,7 +81,7 @@ test.describe("Messages of a Schema Registry topic", () => {
     });
     await expect(loadButton).toBeVisible();
     await loadButton.click();
-    await expect(large.getByText("click to filter")).toBeVisible();
+    await expect(large.getByText("click to filter", { exact: true })).toBeVisible();
     await expect(large.getByRole("button", { name: '"E2E-AVRO-3"', exact: true })).toBeVisible();
 
     const downloadPromise = page.waitForEvent("download");
