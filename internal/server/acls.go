@@ -51,6 +51,9 @@ func (s *apiServer) DeleteAcl(ctx context.Context, req gen.DeleteAclRequestObjec
 // aclError maps a failed ACL write: input the broker or franz-go rejected
 // is a 400 naming the reason, anything else an upstream error.
 func aclError(cluster, op string, err error) error {
+	if blocked := blockedAddressError(op, err); blocked != nil {
+		return blocked
+	}
 	if msg := err.Error(); !errors.Is(err, kafkapkg.ErrUnknownCluster) && isACLClientErr(msg) {
 		return badRequest("kafka: " + msg)
 	}

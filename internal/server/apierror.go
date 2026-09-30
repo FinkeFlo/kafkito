@@ -72,6 +72,18 @@ func upstreamError(op string, err error) *apiError {
 	}
 }
 
+// blockedAddressError returns the static 502 for err when the outbound guard
+// refused a dial, and nil otherwise. Handlers that classify store errors by
+// their text call it first: that text names the refused host and IP, and a
+// host may contain a classifier keyword, which would turn the refusal into a
+// 400 echoing it.
+func blockedAddressError(op string, err error) error {
+	if errors.Is(err, netguard.ErrBlockedAddress) {
+		return upstreamError(op, err)
+	}
+	return nil
+}
+
 // clusterError classifies an error from a Registry call against cluster:
 // an unknown cluster is a 404 naming it, anything else an upstream error.
 func clusterError(cluster, op string, err error) error {

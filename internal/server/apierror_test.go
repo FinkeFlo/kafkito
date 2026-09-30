@@ -241,3 +241,95 @@ func TestWriteError_BlockedAddress(t *testing.T) {
 	assert.Contains(t, logs.String(), `"cluster":"__adhoc_0123456789abcdef"`)
 	assert.Contains(t, logs.String(), `host \"localhost\" -> ::1`)
 }
+
+// blockedDialErrFor wraps a refused dial to host in prefix, the way a store
+// error reaches a handler. The refused host is part of the error text.
+func blockedDialErrFor(prefix, host string) error {
+	return fmt.Errorf("%s: %w", prefix, &netguard.BlockedAddressError{
+		Addr: host + ":9092", Host: host, IP: netip.MustParseAddr("::1"),
+	})
+}
+
+// TestClientErrClassifiers_BlockedAddress pins that the handlers which
+// classify store errors by their text never turn a refused dial into a 400:
+// the error text names the refused host and IP, and a host may well contain
+// a classifier keyword ("operation", "mechanism", "regex", ...). A blocked
+// address is always the static 502 (issue #126).
+func TestClientErrClassifiers_BlockedAddress(t *testing.T) {
+	t.Parallel()
+
+	const aclBody = `{"principal":"User:alice","host":"*","resource_type":"TOPIC","resource_name":"orders","pattern_type":"LITERAL","operation":"READ","permission_type":"ALLOW"}`
+	const topic = "/api/v1/clusters/kf/topics/orders"
+	configs := fakeConfigs{"kf": {Name: "kf"}}
+
+	for _, tc := range []struct {
+		name, method, path, body string
+		host                     string
+		st                       func(err error) stores
+	}{
+		{"createAcl", http.MethodPost, "/api/v1/clusters/kf/acls", aclBody, "operation.broker.example", func(err error) stores {
+			return stores{acls: fakeACLs{createACL: func(kafkapkg.ACLSpec) error { return err }}}
+		}},
+		{"deleteAcl", http.MethodDelete, "/api/v1/clusters/kf/acls", aclBody, "validate.broker.example", func(err error) stores {
+			return stores{acls: fakeACLs{deleteACL: func(kafkapkg.ACLSpec) (int, error) { return 0, err }}}
+		}},
+		{"upsertScramUser", http.MethodPost, "/api/v1/clusters/kf/users", `{"user":"alice","mechanism":"SCRAM-SHA-256","password":"pw-secret"}`, "mechanism.broker.example", func(err error) stores {
+			return stores{scram: fakeSCRAM{upsert: func(string, string, string, int32) error { return err }}}
+		}},
+		{"createGroup", http.MethodPost, "/api/v1/clusters/kf/groups", `{"group_id":"g1","topic":"orders","strategy":"latest"}`, "shift-by.broker.example", func(err error) stores {
+			return stores{groups: fakeGroups{createGroup: func(kafkapkg.CreateGroupRequest) (*kafkapkg.ResetOffsetsResult, error) { return nil, err }}}
+		}},
+		{"resetGroupOffsets", http.MethodPost, "/api/v1/clusters/kf/groups/g1/reset-offsets", `{"topic":"orders","strategy":"latest"}`, "required.broker.example", func(err error) stores {
+			return stores{configs: configs, groups: fakeGroups{resetOffsets: func(string, kafkapkg.ResetOffsetsRequest) (*kafkapkg.ResetOffsetsResult, error) { return nil, err }}}
+		}},
+		{"searchMessages", http.MethodPost, topic + "/messages/search", `{"limit":1,"budget":1}`, "regex.broker.example", func(err error) stores {
+			return stores{messages: fakeMessages{search: func(kafkapkg.SearchOptions) (*kafkapkg.SearchResult, error) { return nil, err }}}
+		}},
+		{"alterTopicConfigs", http.MethodPatch, topic + "/configs", `{"set":{"retention.ms":"1000"}}`, "required.broker.example", func(err error) stores {
+			return stores{topics: fakeTopics{writeErr: err}}
+		}},
+		{"deleteRecords", http.MethodDelete, topic + "/records", `{"partitions":{"0":0}}`, "required.broker.example", func(err error) stores {
+			return stores{configs: configs, topics: fakeTopics{writeErr: err}}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			h := fakeServer(t, tc.st(blockedDialErrFor("unable to dial", tc.host)))
+			req, rec := requestCase{method: tc.method, path: tc.path, contentType: "application/json", body: tc.body}.do(t, h)
+			assert.Equal(t, http.StatusBadGateway, rec.Code, rec.Body.String())
+			assert.JSONEq(t,
+				`{"error":"`+privateClusterAddressBlockedMsg+`","code":"private_cluster_address_blocked"}`,
+				rec.Body.String())
+			assert.NotContains(t, rec.Body.String(), tc.host)
+			assertResponseMatchesSpec(t, contractRouter(t), req, rec)
+		})
+	}
+
+	// createTopic's only text rule is "topic name required", which no host
+	// name can carry; the prefix does, to pin that the guard runs first.
+	t.Run("createTopic", func(t *testing.T) {
+		t.Parallel()
+		h := fakeServer(t, stores{topics: fakeTopics{writeErr: blockedDialErrFor("topic name required", "broker.example")}})
+		_, rec := requestCase{method: http.MethodPost, path: "/api/v1/clusters/kf/topics", contentType: "application/json", body: `{"name":"t1"}`}.do(t, h)
+		assert.Equal(t, http.StatusBadGateway, rec.Code, rec.Body.String())
+		assert.NotContains(t, rec.Body.String(), "broker.example")
+	})
+}
+
+// TestProduceError_BlockedAddress pins the produce classifier: a refused
+// dial is the static 502 even when its text matches a produce input rule.
+func TestProduceError_BlockedAddress(t *testing.T) {
+	t.Parallel()
+
+	partition := int32(3)
+	for name, err := range map[string]error{
+		"invalid partition": blockedDialErrFor("invalid record partitioning choice", "broker.example"),
+		"client input":      blockedDialErrFor("produce", "unsupported encoding.example"),
+		"not authorized":    blockedDialErrFor("TOPIC_AUTHORIZATION_FAILED", "broker.example"),
+	} {
+		ae := toAPIError(produceError("kf", "orders", &partition, err))
+		assert.Equal(t, http.StatusBadGateway, ae.Status, name)
+		assert.Equal(t, privateClusterAddressBlockedCode, ae.Code, name)
+		assert.Equal(t, privateClusterAddressBlockedMsg, ae.Message, name)
+	}
+}

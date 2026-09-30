@@ -46,6 +46,9 @@ func (s *apiServer) CreateTopic(ctx context.Context, req gen.CreateTopicRequestO
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	if err := s.topics.CreateTopic(ctx, req.Cluster, *req.Body); err != nil {
+		if blocked := blockedAddressError("create topic", err); blocked != nil {
+			return nil, blocked
+		}
 		if msg := err.Error(); !errors.Is(err, kafkapkg.ErrUnknownCluster) && strings.Contains(msg, "topic name required") {
 			return nil, badRequest("kafka: " + msg)
 		}
@@ -120,6 +123,9 @@ func (s *apiServer) AlterTopicConfigs(ctx context.Context, req gen.AlterTopicCon
 	defer cancel()
 	res, err := s.topics.AlterTopicConfigs(ctx, req.Cluster, req.Topic, *req.Body)
 	if err != nil {
+		if blocked := blockedAddressError("alter topic configs", err); blocked != nil {
+			return nil, blocked
+		}
 		if msg := err.Error(); !errors.Is(err, kafkapkg.ErrUnknownCluster) && (strings.Contains(msg, "required") || strings.Contains(msg, "no changes")) {
 			return nil, badRequest("kafka: " + msg)
 		}
@@ -137,6 +143,9 @@ func (s *apiServer) DeleteRecords(ctx context.Context, req gen.DeleteRecordsRequ
 	defer cancel()
 	res, err := s.topics.DeleteRecords(ctx, req.Cluster, req.Topic, *req.Body)
 	if err != nil {
+		if blocked := blockedAddressError("delete records", err); blocked != nil {
+			return nil, blocked
+		}
 		if msg := err.Error(); !errors.Is(err, kafkapkg.ErrUnknownCluster) && (strings.Contains(msg, "required") || strings.Contains(msg, "no resolvable")) {
 			return nil, badRequest("kafka: " + msg)
 		}

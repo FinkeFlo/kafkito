@@ -173,6 +173,9 @@ func (s *apiServer) SearchMessages(ctx context.Context, req gen.SearchMessagesRe
 	defer cancel()
 	res, err := s.messages.SearchMessages(ctx, req.Cluster, req.Topic, opts)
 	if err != nil {
+		if blocked := blockedAddressError("search messages", err); blocked != nil {
+			return nil, blocked
+		}
 		if msg := err.Error(); !errors.Is(err, kafkapkg.ErrUnknownCluster) && isSearchClientErr(msg) {
 			// The 400 body uses the raw message without the "kafka: " prefix
 			// the sibling handlers add.
@@ -299,6 +302,9 @@ func (s *apiServer) ProduceMessage(ctx context.Context, req gen.ProduceMessageRe
 func produceError(cluster, topic string, partition *int32, err error) error {
 	if errors.Is(err, kafkapkg.ErrUnknownCluster) {
 		return clusterError(cluster, "produce message", err)
+	}
+	if blocked := blockedAddressError("produce message", err); blocked != nil {
+		return blocked
 	}
 	msg := err.Error()
 	// kgo phrases a rejected partition choice in terms of the index the
