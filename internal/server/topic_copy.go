@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/FinkeFlo/kafkito/internal/netguard"
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
@@ -27,6 +28,12 @@ func copyErrorText(err error) string {
 		return privateClusterAddressBlockedMsg
 	}
 	return err.Error()
+}
+
+// unknownDestClusterError is the 400 for a dest_cluster the server does not
+// serve.
+func unknownDestClusterError(cluster string) *apiError {
+	return badRequest("unknown dest_cluster: " + cluster)
 }
 
 // copyBatchSize is the number of records fetched from the source cluster in
@@ -325,6 +332,11 @@ func (s *apiServer) copyJobFor(req gen.CopyMessagesRequestObject, r *http.Reques
 		job.destCluster, job.adhocDest = name, true
 	} else {
 		job.destCluster = strings.TrimSpace(destCluster)
+		// Ad-hoc names only come from dest_cluster_config (or the source's
+		// X-Kafkito-Cluster header); as a dest_cluster they are unknown.
+		if config.IsAdhocClusterName(job.destCluster) {
+			return job, unknownDestClusterError(job.destCluster)
+		}
 	}
 
 	// Refuse to copy a topic into itself: even with the snapshot upper bound
@@ -565,7 +577,7 @@ func (s *apiServer) validateCopyDestination(ctx context.Context, job copyJob) er
 	destDetail, err := s.copyReg.DescribeTopic(ctx, job.destCluster, job.destTopic)
 	switch {
 	case errors.Is(err, kafkapkg.ErrUnknownCluster):
-		return badRequest("unknown dest_cluster: " + job.destCluster)
+		return unknownDestClusterError(job.destCluster)
 	case err != nil && isTopicMissingErr(err):
 		return badRequest(fmt.Sprintf("dest_topic %q does not exist on cluster %q: create it first (kafkito does not auto-create the destination)", job.destTopic, job.destCluster))
 	case err != nil:

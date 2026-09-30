@@ -345,7 +345,7 @@ func clientOptsDial(cfg config.ClusterConfig, log *slog.Logger, adhocDial dialFu
 	// so the dial is guarded against DNS-rebinding SSRF.
 	// Operator-configured clusters are intentionally unguarded — they may
 	// legitimately point at localhost or internal addresses.
-	if IsAdhoc(cfg.Name) {
+	if config.IsAdhocClusterName(cfg.Name) {
 		// A single dialer covers both the SSRF guard and (when enabled) the
 		// TLS handshake. We must NOT also pass kgo.DialTLSConfig here, because
 		// franz-go errors out if Dialer and DialTLSConfig are both set.

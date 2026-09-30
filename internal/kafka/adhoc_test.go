@@ -109,7 +109,7 @@ func TestRegistry_UseAdhoc_DedupsIdenticalConfigsViaFingerprint(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, name1, name2, "identical configs must dedup to the same internal name")
-	assert.True(t, IsAdhoc(name1))
+	assert.True(t, config.IsAdhocClusterName(name1))
 
 	diff := cfg
 	diff.Brokers = []string{"b2:9092"}

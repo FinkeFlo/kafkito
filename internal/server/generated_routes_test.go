@@ -307,7 +307,9 @@ func recordCluster(got *[]string) gen.StrictMiddlewareFunc {
 }
 
 // resolvePrivateClusterParam rewrites {cluster} before the generated wrapper
-// binds it, so handlers see the ad-hoc registry name, not the sentinel.
+// binds it, so handlers see the ad-hoc registry name, not the sentinel. The
+// ad-hoc name itself is not a valid {cluster} value, with or without the
+// header.
 func TestAPIOps_PrivateClusterParam(t *testing.T) {
 	t.Parallel()
 
@@ -321,6 +323,7 @@ func TestAPIOps_PrivateClusterParam(t *testing.T) {
 	r := chi.NewRouter()
 	r.Route("/api/v1", func(v1 chi.Router) {
 		v1.Group(func(g chi.Router) {
+			g.Use(rejectInternalClusterNames(errorWriter{}))
 			g.Use(privateClusterMiddleware)
 			g.Use(rbacMiddleware(impl.policy, nil))
 			g.Use(resolvePrivateClusterParam(reg))
@@ -331,7 +334,7 @@ func TestAPIOps_PrivateClusterParam(t *testing.T) {
 	cfg := config.ClusterConfig{Brokers: []string{unreachableBroker}}
 	adhoc, err := reg.UseAdhoc(cfg)
 	require.NoError(t, err)
-	require.True(t, strings.HasPrefix(adhoc, kafkapkg.AdhocPrefix))
+	require.True(t, config.IsAdhocClusterName(adhoc))
 	header := encodeHeader(t, cfg)
 
 	for _, op := range apiOps {
@@ -342,6 +345,9 @@ func TestAPIOps_PrivateClusterParam(t *testing.T) {
 			{config.PrivateClusterSentinel, header, adhoc},
 			{"static", "", "static"},
 			{"static", header, "static"},
+			// want "": an unknown cluster, the handler does not run.
+			{adhoc, "", ""},
+			{adhoc, header, ""},
 		} {
 			t.Run(op.id+"/"+tc.cluster, func(t *testing.T) {
 				got = nil
@@ -352,6 +358,12 @@ func TestAPIOps_PrivateClusterParam(t *testing.T) {
 				}
 				w := httptest.NewRecorder()
 				r.ServeHTTP(w, req)
+				if tc.want == "" {
+					require.Equal(t, http.StatusNotFound, w.Code, "%s %s: %s", op.method, req.URL.Path, w.Body.String())
+					assert.JSONEq(t, `{"error":"unknown cluster: `+tc.cluster+`"}`, w.Body.String())
+					assert.Empty(t, got)
+					return
+				}
 				require.Equal(t, http.StatusTeapot, w.Code, "%s %s: %s", op.method, req.URL.Path, w.Body.String())
 				assert.Equal(t, []string{tc.want}, got)
 			})

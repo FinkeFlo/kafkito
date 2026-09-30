@@ -93,7 +93,7 @@ supports OpenAPI 3.1 (including `type: [T, "null"]` and `const`).
   generated `ServerInterfaceWrapper` method is registered individually on
   the chi group it belonged to before (`internal/server/api_routes.go`):
   the probes have no auth, the meta endpoints run behind auth, and the
-  cluster routes also run the private-cluster, RBAC and
+  cluster routes also run the internal-name, private-cluster, RBAC and
   private-cluster-param middleware. The relative paths keep the chi route
   patterns unchanged, because RBAC resolves permissions from those patterns.
   A test asserts the pattern, chain and permission of every operation.

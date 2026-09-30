@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -139,8 +138,8 @@ func TestRegistryUseAdhoc(t *testing.T) {
 	require.NoError(t, err, "first UseAdhoc")
 
 	t.Run("returns_adhoc_prefixed_name", func(t *testing.T) {
-		assert.True(t, strings.HasPrefix(n1, kafkapkg.AdhocPrefix),
-			"name = %q, want adhoc prefix %q", n1, kafkapkg.AdhocPrefix)
+		assert.True(t, config.IsAdhocClusterName(n1),
+			"name = %q, want adhoc prefix %q", n1, config.AdhocClusterPrefix)
 	})
 
 	t.Run("same_fingerprint_when_only_display_name_changes", func(t *testing.T) {

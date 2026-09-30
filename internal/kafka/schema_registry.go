@@ -119,8 +119,9 @@ func newSchemaRegistryClient(cfg config.SchemaRegistryConfig, guarded bool) *Sch
 // rebinding. Operator-configured clusters are not guarded (they may
 // legitimately point SR at localhost, and the existing tests rely on this).
 func (r *Connections) SchemaRegistry(cluster string) (*SchemaRegistryClient, error) {
-	// Ad-hoc status comes from the name prefix: UseAdhoc assigns AdhocPrefix
-	// to every ad-hoc name and configured names may not use it.
+	// Ad-hoc status comes from the name prefix: UseAdhoc assigns
+	// config.AdhocClusterPrefix to every ad-hoc name and configured names
+	// may not use it.
 	cc, ok := r.ConfigFor(cluster)
 	if !ok {
 		return nil, ErrUnknownCluster
@@ -128,7 +129,7 @@ func (r *Connections) SchemaRegistry(cluster string) (*SchemaRegistryClient, err
 	if strings.TrimSpace(cc.SchemaRegistry.URL) == "" {
 		return nil, ErrNoSchemaRegistry
 	}
-	isAdhoc := IsAdhoc(cluster)
+	isAdhoc := config.IsAdhocClusterName(cluster)
 	return newSchemaRegistryClient(cc.SchemaRegistry, isAdhoc), nil
 }
 

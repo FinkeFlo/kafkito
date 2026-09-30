@@ -45,12 +45,6 @@ const DefaultIdentityHeader = "X-Kafkito-User"
 // configuration is read from that header rather than the static config.
 const PrivateClusterSentinel = "__private__"
 
-// AdhocClusterPrefix is the internal cluster-name prefix used by the kafka
-// package to register ephemeral (header-provided) cluster configurations.
-// Duplicated here so config.Validate can reject shared-cluster names that
-// would collide.
-const AdhocClusterPrefix = "__adhoc_"
-
 // Config is the root configuration struct.
 type Config struct {
 	Server   ServerConfig    `koanf:"server"`
@@ -474,8 +468,7 @@ func (c Config) Validate() error {
 		if strings.TrimSpace(cl.Name) == "" {
 			return fmt.Errorf("clusters[%d]: name is required", i)
 		}
-		if cl.Name == PrivateClusterSentinel ||
-			strings.HasPrefix(cl.Name, AdhocClusterPrefix) {
+		if cl.Name == PrivateClusterSentinel || IsAdhocClusterName(cl.Name) {
 			return fmt.Errorf("clusters[%d] (%s): name is reserved for private clusters", i, cl.Name)
 		}
 		if _, dup := seen[cl.Name]; dup {

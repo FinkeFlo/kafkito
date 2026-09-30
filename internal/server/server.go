@@ -70,13 +70,14 @@ func New(opts Options) http.Handler {
 		st.copyReg = opts.copyRegistry
 	}
 
+	errs := errorWriter{log: handlerLog}
 	generated, err := newGeneratedRoutes(&apiServer{
 		version:         opts.Version,
 		policy:          policy,
 		stores:          st,
 		log:             handlerLog,
 		testConnTimeout: opts.Config.Server.TestConnectionTimeout,
-	}, errorWriter{log: handlerLog}, opts.strictMiddlewares...)
+	}, errs, opts.strictMiddlewares...)
 	if err != nil {
 		// The document is embedded and covered by tests; failing here is a
 		// build defect, not a runtime condition.
@@ -93,6 +94,7 @@ func New(opts Options) http.Handler {
 			generated.mountMeta(v1)
 			if opts.Registry != nil || opts.stores != nil {
 				v1.Group(func(g chi.Router) {
+					g.Use(rejectInternalClusterNames(errs))
 					g.Use(privateClusterMiddleware)
 					g.Use(rbacMiddleware(policy, withRequestIDLogging(baseLog)))
 					g.Use(resolvePrivateClusterParam(st.clusters))
