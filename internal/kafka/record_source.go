@@ -138,7 +138,7 @@ func (r *Messages) scanClient(s recordScan, cursors map[int32]*scanCursor) (*kgo
 	for p, c := range cursors {
 		offsets[p] = kgo.NewOffset().At(c.pos)
 	}
-	opts := append(clientOptsDial(s.cfg, r.log.With("cluster", s.cluster, "role", s.role), r.adhocDial),
+	opts := append(clientOptsDial(s.cfg, r.log.With("cluster", config.ClusterLogName(s.cluster), "role", s.role), r.adhocDial),
 		kgo.ConsumePartitions(map[string]map[int32]kgo.Offset{s.topic: offsets}),
 		kgo.FetchMaxWait(500*time.Millisecond),
 		// An offset that is out of range, e.g. below a log start moved by

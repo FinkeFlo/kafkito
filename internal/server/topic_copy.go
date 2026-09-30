@@ -437,7 +437,7 @@ func (s *apiServer) runCopy(ctx context.Context, w io.Writer, job copyJob) {
 				return
 			}
 			if errors.Is(consumeErr, netguard.ErrBlockedAddress) {
-				s.log.WarnContext(ctx, "copy: blocked address", "cluster", job.srcCluster, "err", consumeErr)
+				s.log.WarnContext(ctx, "copy: blocked address", "cluster", config.ClusterLogName(job.srcCluster), "err", consumeErr)
 			}
 			sendEvent(copyProgressEvent{Copied: copied, Skipped: skipped, Done: true, Error: "consume: " + copyErrorText(consumeErr)})
 			return
@@ -515,7 +515,7 @@ func (s *apiServer) runCopy(ctx context.Context, w io.Writer, job copyJob) {
 					return
 				}
 				if errors.Is(produceErr, netguard.ErrBlockedAddress) {
-					s.log.WarnContext(ctx, "copy: blocked address", "cluster", job.destCluster, "err", produceErr)
+					s.log.WarnContext(ctx, "copy: blocked address", "cluster", config.ClusterLogName(job.destCluster), "err", produceErr)
 				}
 				sendEvent(copyProgressEvent{Copied: copied, Skipped: skipped, Done: true, Error: "produce: " + copyErrorText(produceErr)})
 				return
@@ -582,7 +582,7 @@ func (s *apiServer) validateCopyDestination(ctx context.Context, job copyJob) er
 		return badRequest(fmt.Sprintf("dest_topic %q does not exist on cluster %q: create it first (kafkito does not auto-create the destination)", job.destTopic, config.PublicClusterName(job.destCluster)))
 	case err != nil:
 		s.log.WarnContext(ctx, "copy: destination pre-flight check skipped",
-			"cluster", job.destCluster, "topic", job.destTopic, "err", err)
+			"cluster", config.ClusterLogName(job.destCluster), "topic", job.destTopic, "err", err)
 		return nil
 	}
 
@@ -600,7 +600,7 @@ func (s *apiServer) validateCopyDestination(ctx context.Context, job copyJob) er
 		srcDetail, srcErr := s.copyReg.DescribeTopic(ctx, job.srcCluster, job.srcTopic)
 		if srcErr != nil {
 			s.log.WarnContext(ctx, "copy: preserve_partition pre-flight check skipped",
-				"cluster", job.srcCluster, "topic", job.srcTopic, "err", srcErr)
+				"cluster", config.ClusterLogName(job.srcCluster), "topic", job.srcTopic, "err", srcErr)
 			return nil
 		}
 		required = highestPartition(srcDetail.Partitions)

@@ -3,7 +3,11 @@
 
 package config
 
-import "strings"
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"strings"
+)
 
 // AdhocClusterPrefix starts the internal registry name of every private
 // cluster: the kafka package registers a header-provided configuration
@@ -26,4 +30,21 @@ func PublicClusterName(name string) string {
 		return PrivateClusterSentinel
 	}
 	return name
+}
+
+// clusterLogIDDomain separates the log id hash from any other hash over a
+// cluster name.
+const clusterLogIDDomain = "kafkito/private-cluster-log-id\x00"
+
+// ClusterLogName returns how logs name the cluster with registry name name.
+// A private cluster is "private-" and 12 hex digits of a SHA-256 over its
+// registry name: the same on every log line of that cluster while the
+// process runs, so the lines correlate, without the registry name itself.
+// Any other name is returned unchanged.
+func ClusterLogName(name string) string {
+	if !IsAdhocClusterName(name) {
+		return name
+	}
+	sum := sha256.Sum256([]byte(clusterLogIDDomain + name))
+	return "private-" + hex.EncodeToString(sum[:6])
 }

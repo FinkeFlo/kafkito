@@ -182,8 +182,9 @@ func findLog(t *testing.T, recs []map[string]any, msg string) map[string]any {
 // Issue #118 pins the log policy for private clusters: broker and Schema
 // Registry host names and resolved IPs MAY appear in operator logs (they
 // are no secret and help debugging); credentials and the raw
-// X-Kafkito-Cluster header never do. The handler lines name the ad-hoc
-// cluster so an operator can correlate them with the request log.
+// X-Kafkito-Cluster header never do. The handler lines name the private
+// cluster by its log name (config.ClusterLogName), never by its registry
+// name, so an operator can correlate them with the request log.
 // docs/architecture.md, section "Private clusters", states the same rule.
 func TestPrivateClusterLogs_HostsAllowedSecretsNever(t *testing.T) {
 	t.Parallel()
@@ -238,7 +239,8 @@ func TestPrivateClusterLogs_HostsAllowedSecretsNever(t *testing.T) {
 
 			line := findLog(t, logRecords(t, logged), tc.wantMsg)
 			assert.Equal(t, tc.wantLevel, line["level"])
-			assert.Regexp(t, `^__adhoc_[0-9a-f]+$`, line["cluster"], "the handler line names the ad-hoc cluster")
+			assert.Regexp(t, `^private-[0-9a-f]{12}$`, line["cluster"], "the handler line names the private cluster by its log name")
+			assert.NotContains(t, logged, config.AdhocClusterPrefix, "the registry name is never logged")
 
 			assert.Contains(t, logged, "192.0.2.1", "broker hosts may be logged (#118)")
 			assert.NotContains(t, logged, leakPassword, "credentials are never logged")

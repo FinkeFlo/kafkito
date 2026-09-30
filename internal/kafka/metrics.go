@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/FinkeFlo/kafkito/internal/config"
 	"github.com/twmb/franz-go/pkg/kadm"
 )
 
@@ -207,7 +208,7 @@ func (mc *metricsCollector) refreshOne(cluster string) {
 		// Cluster unreachable / unknown → clear freshness but keep the
 		// last-known snapshot so the UI doesn't flicker on a transient
 		// hiccup.
-		mc.log.Debug("metrics: admin unavailable", "cluster", cluster, "err", err)
+		mc.log.Debug("metrics: admin unavailable", "cluster", config.ClusterLogName(cluster), "err", err)
 		return
 	}
 

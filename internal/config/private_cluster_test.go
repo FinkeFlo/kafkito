@@ -64,3 +64,26 @@ func TestPublicClusterName(t *testing.T) {
 		assert.Equal(t, tc.want, PublicClusterName(tc.name), "%q", tc.name)
 	}
 }
+
+func TestClusterLogName(t *testing.T) {
+	t.Parallel()
+
+	internal := AdhocClusterPrefix + "0123456789abcdef"
+	for _, tc := range []struct{ name, want string }{
+		{internal, "private-0f3f15bc7c80"},
+		{"prod", "prod"},
+		{PrivateClusterSentinel, PrivateClusterSentinel},
+		{"", ""},
+	} {
+		assert.Equal(t, tc.want, ClusterLogName(tc.name), "%q", tc.name)
+	}
+
+	other := AdhocClusterPrefix + "fedcba9876543210"
+	for _, name := range []string{internal, other, AdhocClusterPrefix} {
+		id := ClusterLogName(name)
+		assert.Regexp(t, `^private-[0-9a-f]{12}$`, id, name)
+		assert.False(t, IsAdhocClusterName(id), "%s is no registry name", id)
+		assert.Equal(t, id, ClusterLogName(id), "a log id maps to itself")
+	}
+	assert.NotEqual(t, ClusterLogName(internal), ClusterLogName(other))
+}

@@ -6,7 +6,9 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +16,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -122,9 +125,9 @@ func TestInternalClusterName_RejectedOnEveryClusterRoute(t *testing.T) {
 	}
 }
 
-// The 404 for a private cluster's registry name is the one every unknown
-// cluster gets: same status, header names and body, naming the cluster as
-// the client sent it.
+// The 404 for a private cluster's registry name, or for its log name, is
+// the one every unknown cluster gets: same status, header names and body,
+// naming the cluster as the client sent it.
 func TestInternalClusterName_SameResponseAsUnknownCluster(t *testing.T) {
 	t.Parallel()
 
@@ -144,6 +147,8 @@ func TestInternalClusterName_SameResponseAsUnknownCluster(t *testing.T) {
 				{"internal name", internal, ""},
 				{"internal name and header", internal, header},
 				{"unregistered internal name", unregisteredAdhocName, ""},
+				{"log name", config.ClusterLogName(internal), ""},
+				{"log name and header", config.ClusterLogName(internal), header},
 			} {
 				rec := sendCluster(h, route.method, "/api/v1/clusters/"+tc.cluster+route.path, route.body, tc.header)
 				assert.Equal(t, unknown.Code, rec.Code, tc.name)
@@ -156,8 +161,8 @@ func TestInternalClusterName_SameResponseAsUnknownCluster(t *testing.T) {
 }
 
 // dest_cluster names a configured cluster. A private cluster's registry
-// name there is an unknown dest_cluster like any other unknown name, also
-// when it is the copy's own source cluster.
+// name or log name there is an unknown dest_cluster like any other unknown
+// name, also when it is the copy's own source cluster.
 func TestCopyMessages_InternalDestClusterIsUnknown(t *testing.T) {
 	t.Parallel()
 
@@ -167,6 +172,7 @@ func TestCopyMessages_InternalDestClusterIsUnknown(t *testing.T) {
 		{"internal name", "static", "", internal, "orders2"},
 		{"internal name with blanks", "static", "", " " + internal + " ", "orders2"},
 		{"unregistered internal name", "static", "", unregisteredAdhocName, "orders2"},
+		{"log name", "static", "", config.ClusterLogName(internal), "orders2"},
 		{"internal name of the source topic", config.PrivateClusterSentinel, header, internal, "orders"},
 		{"internal name of the source cluster", config.PrivateClusterSentinel, header, internal, "orders2"},
 	} {
@@ -364,5 +370,258 @@ func TestCopyMessages_PrivateDestErrorsNameThePrivateSentinel(t *testing.T) {
 		rec := sendCluster(h, http.MethodPost, "/api/v1/clusters/static/topics/orders/copy", body, "")
 		require.Equal(t, http.StatusBadRequest, rec.Code, "%s: %s", tc.name, rec.Body.String())
 		assert.JSONEq(t, tc.want, rec.Body.String(), tc.name)
+	}
+}
+
+// privateLogFormats are the handlers of the json and text log formats
+// (config.LogConfig) at debug level, with the form a string attribute
+// takes in each.
+var privateLogFormats = []struct {
+	name    string
+	handler func(io.Writer) slog.Handler
+	attr    func(key, value string) string
+}{
+	{
+		name: "json",
+		handler: func(w io.Writer) slog.Handler {
+			return slog.NewJSONHandler(w, &slog.HandlerOptions{Level: slog.LevelDebug})
+		},
+		attr: func(key, value string) string { return fmt.Sprintf("%q:%q", key, value) },
+	},
+	{
+		name: "text",
+		handler: func(w io.Writer) slog.Handler {
+			return slog.NewTextHandler(w, &slog.HandlerOptions{Level: slog.LevelDebug})
+		},
+		attr: func(key, value string) string { return key + "=" + value },
+	},
+}
+
+// logLinesWith returns the lines of logs that contain s.
+func logLinesWith(logs, s string) []string {
+	var lines []string
+	for line := range strings.SplitSeq(logs, "\n") {
+		if strings.Contains(line, s) {
+			lines = append(lines, line)
+		}
+	}
+	return lines
+}
+
+// Logs name a private cluster by config.ClusterLogName, never by its
+// registry name, in both log formats: the request log, the 5xx error line,
+// the Test connection warning, the client warnings and a refused registry
+// name in the path.
+func TestPrivateClusterLogs_NameTheLogName(t *testing.T) {
+	t.Parallel()
+
+	plain := config.ClusterConfig{Brokers: []string{unreachableBroker}}
+	insecureTLS := config.ClusterConfig{
+		Brokers: []string{unreachableBroker},
+		TLS:     config.TLSConfig{Enabled: true, InsecureSkipVerify: true},
+	}
+	cases := []struct {
+		name   string
+		cfg    config.ClusterConfig
+		method string
+		// path's {cluster} is __private__ with the X-Kafkito-Cluster header,
+		// or, with registryName, the registry name without the header.
+		path         string
+		registryName bool
+		wantCode     int
+		// wantMsg is a message whose log lines all name the cluster.
+		wantMsg string
+	}{
+		{
+			name: "list topics", cfg: plain, method: http.MethodGet, path: "/api/v1/clusters/{cluster}/topics",
+			wantCode: http.StatusBadGateway, wantMsg: "upstream kafka error",
+		},
+		{
+			name: "list topics request log", cfg: plain, method: http.MethodGet, path: "/api/v1/clusters/{cluster}/topics",
+			wantCode: http.StatusBadGateway, wantMsg: "http request",
+		},
+		{
+			name: "consume", cfg: plain, method: http.MethodGet, path: "/api/v1/clusters/{cluster}/topics/orders/messages",
+			wantCode: http.StatusBadGateway, wantMsg: "upstream kafka error",
+		},
+		{
+			name: "schema registry not configured", cfg: plain, method: http.MethodGet,
+			path: "/api/v1/clusters/{cluster}/schemas/subjects", wantCode: http.StatusNotFound, wantMsg: "http request",
+		},
+		{
+			name: "insecure TLS", cfg: insecureTLS, method: http.MethodGet, path: "/api/v1/clusters/{cluster}/topics",
+			wantCode: http.StatusBadGateway, wantMsg: "TLS verification disabled for cluster",
+		},
+		{
+			name: "test connection", cfg: plain, method: http.MethodPost, path: "/api/v1/clusters/_test",
+			wantCode: http.StatusOK, wantMsg: "testCluster ping failed",
+		},
+		{
+			name: "registry name in the path", cfg: plain, method: http.MethodGet, path: "/api/v1/clusters/{cluster}/topics",
+			registryName: true, wantCode: http.StatusNotFound, wantMsg: "http request",
+		},
+	}
+	for _, format := range privateLogFormats {
+		for _, tc := range cases {
+			t.Run(format.name+"/"+tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				logs := &syncBuffer{}
+				logger := slog.New(format.handler(logs))
+				reg := kafkapkg.NewRegistry(nil, logger)
+				internal, err := reg.UseAdhoc(tc.cfg)
+				require.NoError(t, err)
+				cfg := config.Defaults()
+				cfg.Server.TestConnectionTimeout = 300 * time.Millisecond
+				h := New(Options{Version: "test", Logger: logger, Registry: reg, Config: cfg})
+
+				segment, header := config.PrivateClusterSentinel, encodeHeader(t, tc.cfg)
+				if tc.registryName {
+					segment, header = internal, ""
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+				defer cancel()
+				req := httptest.NewRequestWithContext(ctx, tc.method, strings.Replace(tc.path, "{cluster}", segment, 1), nil)
+				if header != "" {
+					req.Header.Set(PrivateClusterHeader, header)
+				}
+				rec := httptest.NewRecorder()
+				h.ServeHTTP(rec, req)
+				reg.Close()
+
+				require.Equal(t, tc.wantCode, rec.Code, rec.Body.String())
+				logged := logs.String()
+				assert.NotContains(t, logged, config.AdhocClusterPrefix, "the registry name is never logged")
+				lines := logLinesWith(logged, tc.wantMsg)
+				require.NotEmpty(t, lines, "no %q line in:\n%s", tc.wantMsg, logged)
+				for _, line := range lines {
+					assert.Contains(t, line, format.attr("cluster", config.ClusterLogName(internal)))
+				}
+			})
+		}
+	}
+}
+
+// preflightFailingCopyRegistry is a failingCopyRegistry whose DescribeTopic
+// fails for private clusters.
+type preflightFailingCopyRegistry struct{ *failingCopyRegistry }
+
+func (f preflightFailingCopyRegistry) DescribeTopic(ctx context.Context, cluster, topic string) (*kafkapkg.TopicDetail, error) {
+	if config.IsAdhocClusterName(cluster) {
+		return nil, errors.New("describe failed")
+	}
+	return f.failingCopyRegistry.DescribeTopic(ctx, cluster, topic)
+}
+
+// A copy job's warnings name a private source or destination by its log
+// name. Sequential: the job holds a copy slot.
+func TestCopyStream_WarningsNameTheLogName(t *testing.T) {
+	private := config.ClusterConfig{Brokers: []string{unreachableBroker}}
+	const (
+		privateSource = "/api/v1/clusters/__private__/topics/orders/copy"
+		privateDest   = `{"dest_cluster_config":{"brokers":["` + unreachableBroker + `"]},"dest_topic":"orders2","limit":1}`
+	)
+	cases := []struct {
+		name, path, body string
+		header           bool
+		consume, produce error
+		describeFails    bool
+		wantMsg          string
+	}{
+		{
+			name: "blocked private source", path: privateSource, header: true,
+			body: `{"dest_cluster":"dst","dest_topic":"orders2"}`, consume: blockedDialErr(),
+			wantMsg: "copy: blocked address",
+		},
+		{
+			name: "blocked private destination", path: "/api/v1/clusters/src/topics/orders/copy",
+			body: privateDest, produce: blockedDialErr(), wantMsg: "copy: blocked address",
+		},
+		{
+			name: "private destination pre-flight", path: "/api/v1/clusters/src/topics/orders/copy",
+			body: privateDest, describeFails: true, wantMsg: "copy: destination pre-flight check skipped",
+		},
+		{
+			name: "private source preserve_partition pre-flight", path: privateSource, header: true,
+			body:          `{"dest_cluster":"dst","dest_topic":"orders2","preserve_partition":true,"limit":1}`,
+			describeFails: true, wantMsg: "copy: preserve_partition pre-flight check skipped",
+		},
+	}
+	for _, format := range privateLogFormats {
+		for _, tc := range cases {
+			t.Run(format.name+"/"+tc.name, func(t *testing.T) {
+				logs := &syncBuffer{}
+				logger := slog.New(format.handler(logs))
+				reg := kafkapkg.NewRegistry([]config.ClusterConfig{
+					{Name: "src", Brokers: []string{"127.0.0.1:19092"}},
+					{Name: "dst", Brokers: []string{"127.0.0.1:19093"}},
+				}, logger)
+				t.Cleanup(reg.Close)
+				internal, err := reg.UseAdhoc(private)
+				require.NoError(t, err)
+				base := newBlockingCopyRegistry(reg)
+				base.unblockNow()
+				failing := &failingCopyRegistry{blockingCopyRegistry: base, consumeErr: tc.consume, produceErr: tc.produce}
+				var fake copyRegistry = failing
+				if tc.describeFails {
+					fake = preflightFailingCopyRegistry{failing}
+				}
+				h := New(Options{Version: "test", Logger: logger, Registry: reg, Config: config.Defaults(), copyRegistry: fake})
+
+				req := newCopyRequest(tc.path, tc.body)
+				if tc.header {
+					req.Header.Set(PrivateClusterHeader, encodeHeader(t, private))
+				}
+				rec := httptest.NewRecorder()
+				h.ServeHTTP(rec, req)
+				require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+				require.Eventually(t, func() bool { return len(copySlots) == 0 }, 5*time.Second, 10*time.Millisecond,
+					"the copy job releases its slot")
+
+				logged := logs.String()
+				assert.NotContains(t, logged, config.AdhocClusterPrefix, "the registry name is never logged")
+				lines := logLinesWith(logged, tc.wantMsg)
+				require.Len(t, lines, 1, logged)
+				assert.Contains(t, lines[0], format.attr("cluster", config.ClusterLogName(internal)))
+			})
+		}
+	}
+}
+
+// Test connection's warnings name the probed private cluster by its log
+// name.
+func TestTestCluster_WarningsNameTheLogName(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		fc      fakeClusters
+		wantMsg string
+	}{
+		{"ping failed", fakeClusters{ping: errors.New("dial timeout")}, "testCluster ping failed"},
+		{"broker probe failed", fakeClusters{issues: []kafkapkg.BrokerIssue{blockedLocalhostIssue}}, "testCluster broker probe failed"},
+	}
+	for _, format := range privateLogFormats {
+		for _, tc := range cases {
+			t.Run(format.name+"/"+tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				logs := &syncBuffer{}
+				h := New(Options{
+					Version: "test", Logger: slog.New(format.handler(logs)), Config: config.Defaults(),
+					stores: &stores{clusters: tc.fc},
+				})
+				rec := sendCluster(h, http.MethodPost, "/api/v1/clusters/_test", testClusterBody, "")
+				require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+				internal, err := tc.fc.UseAdhoc(config.ClusterConfig{})
+				require.NoError(t, err)
+
+				logged := logs.String()
+				assert.NotContains(t, logged, config.AdhocClusterPrefix, "the registry name is never logged")
+				lines := logLinesWith(logged, tc.wantMsg)
+				require.Len(t, lines, 1, logged)
+				assert.Contains(t, lines[0], format.attr("cluster", config.ClusterLogName(internal)))
+			})
+		}
 	}
 }

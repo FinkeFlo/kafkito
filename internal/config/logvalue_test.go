@@ -61,6 +61,19 @@ func TestLogValue_MasksSecretsInJSONOutput(t *testing.T) {
 			},
 			wantAbsent: []string{"leaky"},
 		},
+		{
+			name:        "private_cluster_config_logs_the_log_name",
+			key:         "cluster",
+			value:       ClusterConfig{Name: AdhocClusterPrefix + "0123456789abcdef", Brokers: []string{"b1:9092"}},
+			wantAbsent:  []string{AdhocClusterPrefix},
+			wantPresent: []string{`"name":"` + ClusterLogName(AdhocClusterPrefix+"0123456789abcdef") + `"`},
+		},
+		{
+			name:        "configured_cluster_config_logs_its_name",
+			key:         "cluster",
+			value:       ClusterConfig{Name: "prod", Brokers: []string{"b1:9092"}},
+			wantPresent: []string{`"name":"prod"`},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
