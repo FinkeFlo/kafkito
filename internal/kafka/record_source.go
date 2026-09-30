@@ -28,6 +28,8 @@ type recordScan struct {
 	ranges map[int32]PartitionRange
 	// chunk > 0 walks every range backward in chunks of that many offsets,
 	// so the newest records come first; 0 reads every range forward once.
+	// A chunk the drainAfter fallback ends is a hole in the range, so a
+	// backward walk stops that partition there instead of reading on below.
 	chunk int64
 	// drainAfter is the number of consecutive polls without any record after
 	// which every partition counts as drained. This is only a fallback:
@@ -55,6 +57,20 @@ type recordBatch struct {
 	// ended lists the drained partitions whose range was read to its end,
 	// i.e. not given up by the drainAfter fallback.
 	ended []int32
+	// chunks lists the chunks this poll finished, at most one per
+	// partition. Every record of a finished chunk's partition in this batch
+	// belongs to that chunk.
+	chunks []finishedChunk
+}
+
+// finishedChunk is a chunk [lower, upper) of a partition's range that a
+// poll finished. Backward walks finish a partition's chunks top down.
+type finishedChunk struct {
+	partition int32
+	lower     int64
+	// forced is set when the drainAfter fallback ended the chunk before its
+	// last offset was seen; the chunk then was not read to its end.
+	forced bool
 }
 
 // scanRecords reads the ranges of s and yields one batch per poll that
@@ -95,8 +111,8 @@ func (r *Messages) scanRecords(ctx context.Context, s recordScan) iter.Seq2[reco
 			if emptyPolls >= s.drainAfter {
 				forceDone(cursors)
 			}
-			drained := exhausted(cursors)
-			batch := recordBatch{records: records, drained: drained, ended: readToEnd(cursors, drained)}
+			drained := s.exhausted(cursors)
+			batch := recordBatch{records: records, drained: drained, ended: readToEnd(cursors, drained), chunks: finished(cursors)}
 			if (len(batch.records) > 0 || len(batch.drained) > 0) && !yield(batch, nil) {
 				return
 			}
@@ -173,12 +189,29 @@ func inRange(fetches kgo.Fetches, cursors map[int32]*scanCursor) []*kgo.Record {
 }
 
 // exhausted returns the partitions whose done chunk is the last one of their
-// range, i.e. the partitions the next advance drops.
-func exhausted(cursors map[int32]*scanCursor) []int32 {
+// range, or a forced chunk of a backward walk, i.e. the partitions the next
+// advance drops.
+func (s recordScan) exhausted(cursors map[int32]*scanCursor) []int32 {
 	var out []int32
 	for p, c := range cursors {
-		if c.done && c.pos <= c.lower {
+		if c.done && s.last(c) {
 			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// last reports whether the current chunk of c is the last one to read.
+func (s recordScan) last(c *scanCursor) bool {
+	return c.pos <= c.lower || (s.chunk > 0 && c.forced)
+}
+
+// finished returns the chunk every done partition just finished.
+func finished(cursors map[int32]*scanCursor) []finishedChunk {
+	var out []finishedChunk
+	for p, c := range cursors {
+		if c.done {
+			out = append(out, finishedChunk{partition: p, lower: c.pos, forced: c.forced})
 		}
 	}
 	return out
@@ -216,14 +249,14 @@ func (s recordScan) advance(cl *kgo.Client, cursors map[int32]*scanCursor) {
 			continue
 		}
 		c.done = false
-		c.upper = c.pos
 		if s.chunk > 0 {
 			reseek = append(reseek, p)
 		}
-		if c.upper <= c.lower {
+		if s.last(c) {
 			delete(cursors, p)
 			continue
 		}
+		c.upper = c.pos
 		c.pos = max(c.lower, c.upper-s.chunk)
 		next[p] = kgo.NewOffset().At(c.pos)
 	}

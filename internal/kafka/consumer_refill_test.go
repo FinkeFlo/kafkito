@@ -108,7 +108,24 @@ func TestReadToEndSkipsForcedDrains(t *testing.T) {
 		1: {lower: 0, upper: 4, pos: 0},             // stalled
 	}
 	forceDone(cursors)
-	drained := exhausted(cursors)
+	drained := recordScan{}.exhausted(cursors)
 	assert.ElementsMatch(t, []int32{0, 1}, drained)
 	assert.Equal(t, []int32{0}, readToEnd(cursors, drained))
+}
+
+// A backward walk stops a partition at a chunk the drainAfter fallback ended:
+// reading on below it would leave a hole in the range.
+func TestBackwardWalkStopsAtAForcedChunk(t *testing.T) {
+	t.Parallel()
+	s := recordScan{chunk: 4}
+	cursors := map[int32]*scanCursor{
+		0: {lower: 0, upper: 12, pos: 8, done: true}, // last offset seen
+		1: {lower: 0, upper: 12, pos: 8},             // stalled
+	}
+	forceDone(cursors)
+	assert.Equal(t, []int32{1}, s.exhausted(cursors))
+	assert.ElementsMatch(t, []finishedChunk{
+		{partition: 0, lower: 8},
+		{partition: 1, lower: 8, forced: true},
+	}, finished(cursors))
 }
