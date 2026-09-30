@@ -44,11 +44,12 @@ const capCacheTTL = 60 * time.Second
 // Capabilities returns the capability probe result for the named cluster,
 // using a 60-second cache.
 //
-// The probe runs without holding mu. If an idle sweep evicted the cluster in
-// the meantime, the result is returned but not cached, so no entry is left
+// The probe runs without holding mu. If the idle janitor evicted the cluster
+// in the meantime, the result is returned but not cached, so no entry is left
 // behind for a cluster that is gone.
 func (r *Clusters) Capabilities(ctx context.Context, cluster string) (*Capabilities, error) {
 	r.mu.Lock()
+	r.touchAdhocLocked(cluster)
 	_, known := r.clusters[cluster]
 	c, cached := r.caps[cluster]
 	r.mu.Unlock()

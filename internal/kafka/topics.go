@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/FinkeFlo/kafkito/internal/config"
@@ -286,5 +288,27 @@ func (r *Topics) describeCachedTopicConfigs(ctx context.Context, cluster, topic 
 	}
 	r.cfgCacheMu.Unlock()
 
+	// The idle janitor may have evicted the ad-hoc cluster while its configs
+	// were read. Its cleanup then ran before the entry above was stored, so
+	// drop the entry here.
+	if config.IsAdhocClusterName(cluster) && !r.registered(cluster) {
+		r.cfgCacheMu.Lock()
+		delete(r.cfgCache, key)
+		r.cfgCacheMu.Unlock()
+	}
+
 	return configs, configsErr
+}
+
+// dropTopicConfigs removes the cached topic configs of the named clusters.
+// It is an evict hook (see Connections.evictHooks).
+func (r *Topics) dropTopicConfigs(clusters []string) {
+	r.cfgCacheMu.Lock()
+	defer r.cfgCacheMu.Unlock()
+	for key := range r.cfgCache {
+		cluster, _, _ := strings.Cut(key, "\x00")
+		if slices.Contains(clusters, cluster) {
+			delete(r.cfgCache, key)
+		}
+	}
 }

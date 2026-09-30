@@ -203,7 +203,9 @@ func (mc *metricsCollector) refreshOne(cluster string) {
 	ctx, cancel := context.WithTimeout(mc.ctx, 12*time.Second)
 	defer cancel()
 
-	adm, err := mc.conns.Admin(cluster)
+	// Not a use of the cluster: the periodic refresh must not keep an idle
+	// ad-hoc cluster from being evicted.
+	cl, err := mc.conns.client(cluster, false)
 	if err != nil {
 		// Cluster unreachable / unknown → clear freshness but keep the
 		// last-known snapshot so the UI doesn't flicker on a transient
@@ -212,7 +214,7 @@ func (mc *metricsCollector) refreshOne(cluster string) {
 		return
 	}
 
-	snap, ok := mc.probe(ctx, adm, state)
+	snap, ok := mc.probe(ctx, kadm.NewClient(cl), state)
 	if !ok {
 		return
 	}
@@ -504,6 +506,17 @@ func (mc *metricsCollector) ensureFresh(
 			mc.states[cluster] = state
 		}
 		mc.statesMu.Unlock()
+		// The idle janitor may have evicted the ad-hoc cluster since the
+		// caller looked it up. Its cleanup then ran before the state above
+		// was added, so drop that state here.
+		if !ok && config.IsAdhocClusterName(cluster) && !mc.conns.registered(cluster) {
+			mc.statesMu.Lock()
+			if mc.states[cluster] == state {
+				delete(mc.states, cluster)
+			}
+			mc.statesMu.Unlock()
+			return
+		}
 	}
 
 	state.probeMu.Lock()
@@ -585,6 +598,20 @@ func (r *Clusters) metricsCollector() *metricsCollector {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.metrics
+}
+
+// dropMetrics removes the collected metrics of the named clusters. It is an
+// evict hook (see Connections.evictHooks).
+func (r *Clusters) dropMetrics(clusters []string) {
+	mc := r.metricsCollector()
+	if mc == nil {
+		return
+	}
+	mc.statesMu.Lock()
+	defer mc.statesMu.Unlock()
+	for _, name := range clusters {
+		delete(mc.states, name)
+	}
 }
 
 // stopMetrics stops the metrics collector, if one is running.

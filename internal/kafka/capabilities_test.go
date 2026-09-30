@@ -178,7 +178,7 @@ func TestCapabilities_UnknownCluster(t *testing.T) {
 }
 
 // TestCapabilities_NotCachedWhenEvictedDuringProbe removes the cluster while
-// its probe is in flight, as an idle sweep of an ad-hoc cluster would. The
+// its probe is in flight, as the idle eviction of an ad-hoc cluster would. The
 // probe result is still returned but must not be cached for a cluster that
 // no longer exists.
 func TestCapabilities_NotCachedWhenEvictedDuringProbe(t *testing.T) {
@@ -207,10 +207,10 @@ func TestCapabilities_NotCachedWhenEvictedDuringProbe(t *testing.T) {
 	assert.False(t, cached, "probe result cached for an evicted cluster")
 }
 
-// TestSweepAdhoc_DropsCapabilitiesEntry checks that evicting an idle ad-hoc
-// cluster also drops its cached capability probe, while entries of clusters
-// that are still in use survive.
-func TestSweepAdhoc_DropsCapabilitiesEntry(t *testing.T) {
+// TestEvictIdleAdhoc_DropsCapabilitiesEntry checks that evicting an idle
+// ad-hoc cluster also drops its cached capability probe, while entries of
+// clusters that are still in use survive.
+func TestEvictIdleAdhoc_DropsCapabilitiesEntry(t *testing.T) {
 	t.Parallel()
 	reg := NewRegistry(nil, slog.New(slog.DiscardHandler))
 	t.Cleanup(reg.Close)
@@ -227,16 +227,14 @@ func TestSweepAdhoc_DropsCapabilitiesEntry(t *testing.T) {
 	reg.adhocLastUsed[idle] = time.Time{}
 	reg.mu.Unlock()
 
-	// Any UseAdhoc call runs the idle sweep.
-	_, err = reg.UseAdhoc(config.ClusterConfig{Brokers: []string{"busy.invalid:9092"}})
-	require.NoError(t, err)
+	reg.evictIdleAdhoc()
 
 	reg.mu.Lock()
 	defer reg.mu.Unlock()
 	_, idleCached := reg.caps[idle]
 	_, busyCached := reg.caps[busy]
-	assert.False(t, idleCached, "sweep left the capability entry of an evicted cluster")
-	assert.True(t, busyCached, "sweep dropped the entry of a cluster still in use")
+	assert.False(t, idleCached, "eviction left the capability entry of an evicted cluster")
+	assert.True(t, busyCached, "eviction dropped the entry of a cluster still in use")
 }
 
 // TestCapabilities_NotCachedWhenRequestEndsDuringProbe cancels the caller's
