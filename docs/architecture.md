@@ -30,9 +30,13 @@ mounts each generated operation on the middleware chain it needs.
 
 - **Auth** validates the bearer token on every `/api/v1/*` request according
   to `KAFKITO_AUTH_MODE` and answers `401` otherwise; `/healthz` and
-  `/readyz` are open. The modes are listed in the
-  [README](https://github.com/FinkeFlo/kafkito/blob/main/README.md#quickstart)
-  and the [API reference](API.md#base-url-and-auth).
+  `/readyz` are open. The JWT modes load the signing keys at startup (a
+  failure only logs a warning) through one shared `KeySource` per key URL
+  (`internal/auth/jwks.go`): requests wait at most 5 s for a load, and a
+  reload runs at most once per minute. The modes, their startup
+  and IdP-outage behaviour and the token rules are listed in the README under
+  [Auth modes](https://github.com/FinkeFlo/kafkito/blob/main/README.md#auth-modes);
+  see also the [API reference](API.md#base-url-and-auth).
 - **RBAC** (`internal/rbac`, `internal/server/rbac.go`) maps the matched
   route pattern and method to a `type:action` permission and checks the
   resource name against prefix-glob rules (`*`, `team-*`, or an exact name).

@@ -31,7 +31,7 @@ Open http://localhost:37421 in your browser. Connect kafkito to a
 broker on your host (`host.docker.internal:9092`), or run a Kafka
 container alongside it on a shared docker network.
 
-### Production image (JWT)
+### Default image (auth enforced)
 
 ```sh
 docker run --rm -p 37421:37421 \
@@ -41,17 +41,27 @@ docker run --rm -p 37421:37421 \
 ```
 
 The default image enforces auth and does not start without
-`KAFKITO_AUTH_MODE`. Use `KAFKITO_AUTH_MODE=mock` for JWT-validation
-testing. A generic OIDC mode is in progress (#95).
+`KAFKITO_AUTH_MODE`. The only mode it can serve today is `mock`, which
+checks tokens against a signing key kafkito creates in memory at every start
+and never hands out. No client can get a token that passes, so every
+`/api/v1/*` request is answered with `401`: the UI shell, `/healthz` and
+`/readyz` work, the API does not. Use it to smoke-test the image, not to
+serve users. For real logins use the `-btp` image with XSUAA; a generic OIDC
+mode is in progress (#95). See [Auth modes](#auth-modes).
 
 ### SAP BTP / XSUAA
 
 ```sh
-docker run --rm -p 37421:37421 ghcr.io/finkeflo/kafkito:latest-btp
+docker run --rm -p 37421:37421 \
+  -e KAFKITO_AUTH_MODE=xsuaa \
+  -e VCAP_SERVICES="$VCAP_SERVICES" \
+  ghcr.io/finkeflo/kafkito:latest-btp
 ```
 
-See [ADR-0004](./docs/adr/0004-xsuaa-build-tag.md) for the
-build-tag rationale.
+Mode `xsuaa` reads its credentials from an XSUAA service binding in
+`VCAP_SERVICES`, which Cloud Foundry sets for a bound app; without it the
+image does not start. See [Auth modes](#auth-modes) and
+[ADR-0004](./docs/adr/0004-xsuaa-build-tag.md) for the build-tag rationale.
 
 ### Build from source
 
@@ -64,7 +74,9 @@ KAFKITO_AUTH_MODE=mock KAFKITO_KAFKA_BROKERS=localhost:9092 ./bin/kafkito
 ```
 
 `make build` produces the default build, which needs an auth mode (see
-[Configuration](#configuration)).
+[Auth modes](#auth-modes)). With `mock` the API answers every request with
+`401`; for a local UI without an IdP, `make run-dev` runs a `devauth` build
+with auth off on `127.0.0.1`.
 
 ### Local development (hot-reload)
 
@@ -103,7 +115,7 @@ YAML file → `KAFKITO_*` variables → `$PORT`.
 | `KAFKITO_TEST_CONNECTION_TIMEOUT` | `server.test_connection_timeout` | `15s`     | Go duration (`30s`, `2m`) for the private-cluster "Test connection" probe. `0` means the default; invalid or negative values fail startup. |
 | `KAFKITO_SERVER_FRAME_ANCESTORS`  | `server.frame_ancestors`         | `'none'`  | CSP `frame-ancestors` source list, see [Security headers](#security-headers). |
 | `KAFKITO_KAFKA_BROKERS`           | —                                | —         | Env-only shortcut: when no `clusters` are configured, defines one cluster named `local` from a comma-separated broker list. |
-| `KAFKITO_AUTH_MODE`               | `auth.mode`                      | `off`     | `mock` (default build), `xsuaa` (`-btp` build) or `off` (only in `-tags devauth` builds such as the `-local` image). A mode the build does not include fails startup, so the default build needs this set. |
+| `KAFKITO_AUTH_MODE`               | `auth.mode`                      | `off`     | `mock` (every build), `xsuaa` (`-btp` build) or `off` (served only by `-tags devauth` builds such as the `-local` image). A mode the build cannot serve fails startup, so the default and `-btp` builds need this set. See [Auth modes](#auth-modes). |
 | `KAFKITO_INSECURE_AUTH_OFF`       | —                                | —         | `true` allows mode `off` on a non-loopback address. Ignored on Cloud Foundry, where `off` always fails startup. |
 
 An invalid listen address (for example `PORT=abc`) fails startup with exit
@@ -111,6 +123,59 @@ code 2.
 
 Per-cluster data masking rules (`clusters[].data_masking`, for record values,
 keys and headers) are described in [docs/data-masking.md](docs/data-masking.md).
+
+### Auth modes
+
+`KAFKITO_AUTH_MODE` (YAML `auth.mode`, case-sensitive, default `off`) picks
+how kafkito checks the bearer token on `/api/v1/*`; `/healthz` and `/readyz`
+are never authenticated. kafkito builds the validator before it listens and
+then logs `auth initialised` with the mode. An unknown mode, or one the build
+cannot serve, logs `auth init failed` at `error` and exits with code 2. A generic `oidc` mode does not exist yet
+(#95).
+
+| Mode    | Builds                          | Startup | IdP outage |
+| ------- | ------------------------------- | ------- | ---------- |
+| `off`   | served only by `-tags devauth` builds (`-local` image); other builds exit with code 2 | Every request gets the synthetic principal `dev-user`. Exits with code 2 (`insecure auth configuration`) always on Cloud Foundry (`VCAP_APPLICATION` set), and on a non-loopback address unless `KAFKITO_INSECURE_AUTH_OFF=true`. | No IdP involved. |
+| `mock`  | every build                     | Starts an issuer on a random `127.0.0.1` port with a signing key created at startup and loads its keys. No client can get a token, so every API request gets `401`. | No external IdP: the issuer runs inside the process. |
+| `xsuaa` | `-btp` builds                   | Reads the first `xsuaa` binding from `VCAP_SERVICES`; a missing variable or binding, or one without `url`, `uaadomain` or `xsappname`, exits with code 2 (`auth init failed`). Then loads the keys from `<url>/token_keys`, waiting at most 5 s. | At startup: logs `auth: JWKS warm-up failed; startup continues` at `warn` (also when `<url>/token_keys` breaks the `jku` rules below) and serves; API requests get `401` until the keys load, and `/readyz` does not change. Later: requests keep working with the keys already loaded; a new signing key is only picked up once the IdP answers again. |
+
+How `mock` and `xsuaa` load keys:
+
+- One load per key URL runs at a time and all requests share it. A request
+  waits at most 5 s for it and then gets `401`; the load itself may take up
+  to 10 s, so a slow IdP still fills the cache for later requests.
+- A load starts at most once per minute per URL: for the first keys, when a
+  token names a `kid` the cached keys lack (key rotation), or in the
+  background once the keys are 15 min old. For the rest of that minute
+  requests do not wait: without keys they get `401` at once, and a token
+  with an unknown `kid` is checked against the cached keys and rejected.
+- Nothing retries on a timer: after a failed start the next load begins with
+  the first API request at least a minute later.
+- A failed load logs `jwks fetch failed` at `warn` and keeps the previous
+  keys. The URL is logged for the configured key URL only; key URLs taken
+  from a token (`xsuaa`) are not.
+- A rejected token is logged only at `debug` (`auth validate failed`, with
+  the rule that failed and no claim values); the `401` itself appears in the
+  request log at `info`.
+
+Tokens (`mock` and `xsuaa`) must meet all of these:
+
+- A compact JWS with exactly one signature, a `kid` header and a JSON claim
+  set as payload.
+- Header `alg` is one of `RS256`, `RS384`, `RS512`, `PS256`, `PS384`,
+  `PS512`, `ES256`, `ES384`, `ES512` or `EdDSA` (HMAC and `none` are always
+  rejected) and equals the key's `alg` when the key has one.
+- `exp` is present and not past; `nbf` and `iat`, when present, are checked
+  too, with 60 s clock skew each way.
+- `sub` is a non-empty string and `aud` is present.
+- `mock`: `iss` equals the embedded issuer URL exactly, `aud` contains
+  `mock-client`.
+- `xsuaa`: `iss` is the binding `url` or a path below it, `aud` contains the
+  binding `clientid` or `xsappname`, `zid` equals the binding
+  `identityzoneid` when that is set, and the `jku` header is
+  `https://<uaadomain or a subdomain>/token_keys` (a DNS name, no port other
+  than 443, no user info, query or fragment). At most 16 different `jku`
+  URLs are accepted per process; tokens naming further ones get `401`.
 
 ### Logging
 

@@ -16,7 +16,13 @@ endpoints that back the web UI — stable, documented, scriptable.
   answers `401` when it is missing or invalid, before any routing or RBAC:
   `{"error": "unauthorized", "message": "missing bearer token"}` (or
   `"invalid token"`) with `WWW-Authenticate: Bearer realm="kafkito"`.
-  `/healthz` and `/readyz` are never authenticated.
+  `/healthz` and `/readyz` are never authenticated. `mock` accepts no token
+  a client can obtain, so every `/api/v1/*` request gets `401`. What each
+  mode needs at startup, how it behaves while the IdP is unreachable
+  (including `401` until the signing keys load) and the rules a token must
+  meet (`alg`, `kid`, `exp`, `sub`, `iss`, `aud`) are listed in the README
+  under
+  [Auth modes](https://github.com/FinkeFlo/kafkito/blob/main/README.md#auth-modes).
 - The verified JWT principal is the RBAC identity. The identity header
   (`X-Kafkito-User` by default, configurable via `rbac.identity.header`) is
   only consulted when no principal is present on the request; a
