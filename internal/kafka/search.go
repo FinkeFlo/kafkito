@@ -351,7 +351,10 @@ type searchScan struct {
 	// pendingErrs holds, per partition, the parse errors of the chunk being
 	// read (newest-first). Like matches, they count only once the chunk is
 	// read to its end; otherwise the next call reads and reports them again.
+	// pendingErrs keeps at most parseErrorOffsetsCap locations; pendingErrN
+	// counts them all.
 	pendingErrs map[int32][]ParseErrorOffset
+	pendingErrN map[int32]int
 	// frontier is, per partition, the lower offset of the lowest chunk read
 	// to its end without a gap from the top of the range (newest-first). It
 	// starts at the range end.
@@ -372,6 +375,7 @@ func newSearchScan(mt matcher, dec recordDecoder, ranges map[int32]PartitionRang
 		newestFirst: dir == DirNewestFirst,
 		pending:     make(map[int32]int, len(ranges)),
 		pendingErrs: make(map[int32][]ParseErrorOffset),
+		pendingErrN: make(map[int32]int),
 		frontier:    make(map[int32]int64, len(ranges)),
 		stuck:       make(map[int32]bool),
 		highest:     make(map[int32]int64, len(ranges)),
@@ -434,10 +438,10 @@ func (sc *searchScan) finish(batch recordBatch) {
 		sc.frontier[p] = ch.lower
 		sc.confirmed += sc.pending[p]
 		sc.pending[p] = 0
-		for _, pe := range sc.pendingErrs[p] {
-			sc.addParseError(pe)
-		}
+		sc.parseErrors += sc.pendingErrN[p]
+		sc.addParseErrorOffsets(sc.pendingErrs[p]...)
 		delete(sc.pendingErrs, p)
+		delete(sc.pendingErrN, p)
 	}
 }
 
@@ -474,16 +478,22 @@ func (sc *searchScan) parseError(ctx context.Context, rec *kgo.Record, err error
 		"error", msg)
 	pe := ParseErrorOffset{Partition: rec.Partition, Offset: rec.Offset, Error: msg}
 	if sc.newestFirst {
-		sc.pendingErrs[rec.Partition] = append(sc.pendingErrs[rec.Partition], pe)
+		sc.pendingErrN[rec.Partition]++
+		if len(sc.pendingErrs[rec.Partition]) < parseErrorOffsetsCap {
+			sc.pendingErrs[rec.Partition] = append(sc.pendingErrs[rec.Partition], pe)
+		}
 		return
 	}
-	sc.addParseError(pe)
+	sc.parseErrors++
+	sc.addParseErrorOffsets(pe)
 }
 
-// addParseError counts a parse error the call reports.
-func (sc *searchScan) addParseError(pe ParseErrorOffset) {
-	sc.parseErrors++
-	if len(sc.parseErrorOffsets) < parseErrorOffsetsCap {
+// addParseErrorOffsets keeps parse error locations up to parseErrorOffsetsCap.
+func (sc *searchScan) addParseErrorOffsets(pes ...ParseErrorOffset) {
+	for _, pe := range pes {
+		if len(sc.parseErrorOffsets) >= parseErrorOffsetsCap {
+			return
+		}
 		sc.parseErrorOffsets = append(sc.parseErrorOffsets, pe)
 	}
 }
