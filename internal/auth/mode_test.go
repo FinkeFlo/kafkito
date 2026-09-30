@@ -26,6 +26,21 @@ func TestBuildValidator_MockMode(t *testing.T) {
 	require.NotNil(t, v, "mock validator must not be nil")
 }
 
+// Not parallel: Register writes the package-level mode registry, which the
+// parallel tests read unsynchronized; sequential tests finish before they resume.
+func TestBuildValidator_ReturnsNoopCleanup_WhenModeHasNone(t *testing.T) {
+	// A mode without resources to release (like xsuaa) returns a nil cleanup.
+	auth.Register("test-nil-cleanup", func(auth.ModeConfig) (auth.Validator, func(), error) {
+		return nil, nil, nil
+	})
+
+	_, cleanup, err := auth.BuildValidator(auth.ModeConfig{Mode: "test-nil-cleanup"})
+
+	require.NoError(t, err)
+	require.NotNil(t, cleanup, "callers defer cleanup unconditionally")
+	cleanup()
+}
+
 func TestBuildValidator_RejectsInvalidMode(t *testing.T) {
 	t.Parallel()
 

@@ -31,8 +31,8 @@ type ModeConfig struct {
 }
 
 // ModeFactory constructs a Validator for a registered auth mode. The returned
-// cleanup function (may be nil) is run on shutdown by callers — used by the
-// mock mode to stop its embedded JWKS server.
+// cleanup function may be nil when the mode has nothing to release;
+// BuildValidator replaces it with a no-op so callers can always defer it.
 type ModeFactory func(cfg ModeConfig) (Validator, func(), error)
 
 // modes is the registry of mode-name -> factory. Generic modes register
@@ -49,12 +49,20 @@ func Register(name string, factory ModeFactory) {
 	modes[name] = factory
 }
 
-// BuildValidator returns the configured validator plus an optional cleanup
-// function callers should defer (used by mock mode to stop the embedded server).
+// BuildValidator returns the configured validator plus a cleanup function
+// callers should defer (mock mode uses it to stop the embedded server). On
+// success the cleanup is never nil.
 func BuildValidator(cfg ModeConfig) (Validator, func(), error) {
 	f, ok := modes[cfg.Mode]
 	if !ok {
 		return nil, nil, fmt.Errorf("unknown KAFKITO_AUTH_MODE %q (build with appropriate tags?)", cfg.Mode)
 	}
-	return f(cfg)
+	v, cleanup, err := f(cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+	if cleanup == nil {
+		cleanup = func() {}
+	}
+	return v, cleanup, nil
 }
