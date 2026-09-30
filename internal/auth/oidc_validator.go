@@ -29,9 +29,6 @@ type OIDCConfig struct {
 	JWKSEndpoint string
 }
 
-// errIssuerMismatch rejects a token whose iss is not exactly IssuerURL.
-var errIssuerMismatch = errors.New("iss does not match the configured issuer")
-
 // OIDCValidator validates asymmetrically signed JWTs against a fixed issuer/audience and
 // a JWKS endpoint. Use this as the default "mock" mode validator, and as a
 // drop-in for any OIDC IdP that publishes a JWKS URL.
@@ -76,7 +73,7 @@ func (o *OIDCValidator) Close() {
 // algorithm and exp/nbf/sub rules), then enforces iss and aud.
 func (o *OIDCValidator) Validate(ctx context.Context, raw string) (*Principal, error) {
 	if raw == "" {
-		return nil, errors.New("empty bearer token")
+		return nil, ErrTokenEmpty
 	}
 
 	set, err := o.keys.Keys(ctx, tokenKeyID(raw))
@@ -90,15 +87,14 @@ func (o *OIDCValidator) Validate(ctx context.Context, raw string) (*Principal, e
 	}
 
 	if iss, ok := tok.Issuer(); !ok || iss != o.cfg.IssuerURL {
-		return nil, errIssuerMismatch
+		return nil, ErrIssuerMismatch
 	}
 
-	auds, _ := tok.Audience()
-	if len(auds) == 0 {
-		return nil, errors.New("aud claim missing")
+	if auds, _ := tok.Audience(); len(auds) == 0 {
+		return nil, ErrAudienceMissing
 	}
 	if !AudienceContains(tok, o.cfg.Audience) {
-		return nil, fmt.Errorf("aud %v does not contain %q", auds, o.cfg.Audience)
+		return nil, ErrAudienceMismatch
 	}
 
 	return oidcPrincipalFromToken(tok), nil

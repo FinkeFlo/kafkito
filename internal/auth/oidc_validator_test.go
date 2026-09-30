@@ -9,6 +9,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -143,8 +144,8 @@ func TestOIDCValidator_RejectsIssuerThatIsNotAnExactMatch(t *testing.T) {
 
 			_, err = v.Validate(context.Background(), tok)
 
-			require.ErrorContains(t, err, "iss does not match", "Validate must reject an iss that is not exactly IssuerURL")
-			assert.NotContains(t, err.Error(), mock.Server.URL, "the error must not echo the claim")
+			require.ErrorIs(t, err, auth.ErrIssuerMismatch, "Validate must reject an iss that is not exactly IssuerURL")
+			assertNoClaimValues(t, err, mock.Server.URL)
 		})
 	}
 }
@@ -171,7 +172,7 @@ func TestOIDCValidator_TrailingSlashInIssuerURLMustMatchExactly(t *testing.T) {
 	_, err = v.Validate(context.Background(), withSlash)
 	require.NoError(t, err, "the configured issuer with its slash is accepted")
 	_, err = v.Validate(context.Background(), withoutSlash)
-	require.ErrorContains(t, err, "iss does not match", "the issuer without the slash is a different issuer")
+	require.ErrorIs(t, err, auth.ErrIssuerMismatch, "the issuer without the slash is a different issuer")
 }
 
 // Keys published without "alg" are usable: the algorithm is inferred from the
@@ -247,10 +248,10 @@ func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
 	type tokenIssuer func(t *testing.T, mock *auth.MockOIDC, aud string) string
 
 	cases := []struct {
-		name             string
-		issue            tokenIssuer
-		rawToken         string
-		wantErrSubstring string
+		name     string
+		issue    tokenIssuer
+		rawToken string
+		wantErr  error
 	}{
 		{
 			name: "wrong_audience",
@@ -260,7 +261,7 @@ func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Issue")
 				return tok
 			},
-			wantErrSubstring: "aud",
+			wantErr: auth.ErrAudienceMismatch,
 		},
 		{
 			name: "wrong_issuer",
@@ -270,7 +271,7 @@ func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Issue")
 				return tok
 			},
-			wantErrSubstring: "iss does not match",
+			wantErr: auth.ErrIssuerMismatch,
 		},
 		{
 			// Distinct from wrong_audience: the aud claim is empty, not
@@ -285,11 +286,9 @@ func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Issue")
 				return tok
 			},
-			wantErrSubstring: "aud claim missing",
+			wantErr: auth.ErrAudienceMissing,
 		},
 		{
-			// Substring not asserted: the upstream library's wording for
-			// expiry isn't part of our public contract. Just require an error.
 			name: "expired_token",
 			issue: func(t *testing.T, mock *auth.MockOIDC, aud string) string {
 				t.Helper()
@@ -301,6 +300,7 @@ func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Issue")
 				return tok
 			},
+			wantErr: auth.ErrTokenExpired,
 		},
 		{
 			name: "missing_exp",
@@ -310,7 +310,7 @@ func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Sign")
 				return tok
 			},
-			wantErrSubstring: "exp",
+			wantErr: auth.ErrExpMissing,
 		},
 		{
 			name: "missing_sub",
@@ -320,7 +320,7 @@ func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Sign")
 				return tok
 			},
-			wantErrSubstring: "sub",
+			wantErr: auth.ErrSubMissing,
 		},
 		{
 			name: "empty_sub",
@@ -330,7 +330,7 @@ func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Sign")
 				return tok
 			},
-			wantErrSubstring: "sub",
+			wantErr: auth.ErrSubMissing,
 		},
 		{
 			name: "missing_kid",
@@ -340,7 +340,7 @@ func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Sign")
 				return tok
 			},
-			wantErrSubstring: "no kid",
+			wantErr: auth.ErrKidMissing,
 		},
 		{
 			name: "nbf_in_the_future",
@@ -351,19 +351,22 @@ func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Sign")
 				return tok
 			},
-			wantErrSubstring: "nbf",
+			wantErr: auth.ErrTokenNotYetValid,
 		},
 		{
 			name:     "malformed_token_garbage",
 			rawToken: "not.a.jwt",
+			wantErr:  auth.ErrTokenMalformed,
 		},
 		{
 			name:     "malformed_token_empty",
 			rawToken: "",
+			wantErr:  auth.ErrTokenEmpty,
 		},
 		{
 			name:     "alg_none_unsigned",
 			rawToken: algNoneToken,
+			wantErr:  auth.ErrAlgNotAllowed,
 		},
 	}
 	for _, tc := range cases {
@@ -378,10 +381,8 @@ func TestOIDCValidator_RejectsInvalidToken(t *testing.T) {
 
 			_, err := v.Validate(context.Background(), tok)
 
-			require.Error(t, err, "Validate must reject this token")
-			if tc.wantErrSubstring != "" {
-				assert.ErrorContains(t, err, tc.wantErrSubstring)
-			}
+			require.ErrorIs(t, err, tc.wantErr, "Validate must reject this token for the row's reason")
+			assertNoClaimValues(t, err, mock.Server.URL, aud, "other-audience", "evil.example", "test-key-")
 		})
 	}
 }
@@ -470,4 +471,54 @@ func TestOIDCValidator_Close_RejectsLaterTokens(t *testing.T) {
 	_, err = v.Validate(context.Background(), tok)
 
 	require.ErrorIs(t, err, auth.ErrKeySourceClosed)
+}
+
+// A token signed by a key the JWKS does not hold fails verification. jwx
+// names the kid in such errors, so Validate must not pass its text on.
+func TestOIDCValidator_RejectsForeignKey_WithoutNamingTheKid(t *testing.T) {
+	t.Parallel()
+
+	mock, v, aud := newOIDCValidator(t)
+	other, err := auth.NewMockOIDC()
+	require.NoError(t, err, "NewMockOIDC")
+	t.Cleanup(other.Close)
+	require.NoError(t, other.RotateKey(), "RotateKey") // other now signs with test-key-2
+	tok, err := other.Issue("secret-subject", aud, mock.Server.URL, nil, nil)
+	require.NoError(t, err, "Issue")
+
+	_, err = v.Validate(context.Background(), tok)
+
+	require.ErrorIs(t, err, auth.ErrTokenInvalid)
+	assertNoClaimValues(t, err, "secret-subject", mock.Server.URL, other.Server.URL, aud, "test-key-")
+}
+
+// A tampered payload keeps kid and alg, so only the signature check fails.
+func TestOIDCValidator_RejectsTamperedSignature(t *testing.T) {
+	t.Parallel()
+
+	mock, v, aud := newOIDCValidator(t)
+	tok, err := mock.Issue("u", aud, mock.Server.URL, nil, nil)
+	require.NoError(t, err, "Issue")
+	parts := strings.Split(tok, ".")
+	require.Len(t, parts, 3)
+	sig := []byte(parts[2])
+	if sig[0] == 'A' {
+		sig[0] = 'B'
+	} else {
+		sig[0] = 'A'
+	}
+	tampered := parts[0] + "." + parts[1] + "." + string(sig)
+
+	_, err = v.Validate(context.Background(), tampered)
+
+	require.ErrorIs(t, err, auth.ErrTokenInvalid)
+}
+
+// assertNoClaimValues fails when err's text carries any of values.
+func assertNoClaimValues(t *testing.T, err error, values ...string) {
+	t.Helper()
+
+	for _, v := range values {
+		assert.NotContains(t, err.Error(), v, "the error must name the rule, not a claim or header value")
+	}
 }

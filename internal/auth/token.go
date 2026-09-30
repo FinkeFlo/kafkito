@@ -8,7 +8,6 @@ package auth
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/lestrrat-go/jwx/v3/jwa"
@@ -30,15 +29,45 @@ var allowedAlgorithms = map[string]struct{}{
 	jwa.EdDSA().String(): {},
 }
 
-// Token check errors. They name the rule, never a claim or header value.
+// Token check errors. Their text names the rule, never a claim or header
+// value, so callers may log them. Errors from jwx are mapped onto them and
+// not wrapped, because jwx messages can carry the kid or a URL.
 var (
-	errTokenNoSignature = errors.New("token has no signatures")
-	errTokenSignatures  = errors.New("token must carry exactly one signature")
-	errAlgNotAllowed    = errors.New("token alg not allowed")
-	errAlgKeyMismatch   = errors.New("token alg does not match the key alg")
-	errSubMissing       = errors.New("sub claim missing")
-	errKidMissing       = errors.New("token has no kid")
-	errNestedToken      = errors.New("token payload is not a JSON object")
+	// ErrTokenEmpty rejects an empty bearer token.
+	ErrTokenEmpty = errors.New("empty bearer token")
+	// ErrTokenMalformed rejects a token that is not a parsable JWS.
+	ErrTokenMalformed = errors.New("token is not a well-formed JWS")
+	// ErrTokenSignatures rejects a JWS without exactly one signature.
+	ErrTokenSignatures = errors.New("token must carry exactly one signature")
+	// ErrAlgNotAllowed rejects a header alg outside the asymmetric allow-list.
+	ErrAlgNotAllowed = errors.New("token alg not allowed")
+	// ErrAlgKeyMismatch rejects a header alg that differs from the key's alg.
+	ErrAlgKeyMismatch = errors.New("token alg does not match the key alg")
+	// ErrKidMissing rejects a token without a kid header.
+	ErrKidMissing = errors.New("token has no kid")
+	// ErrNestedToken rejects a payload that is not a JSON claim set.
+	ErrNestedToken = errors.New("token payload is not a JSON object")
+	// ErrTokenInvalid rejects a token whose signature does not verify against
+	// the key set, for example because no usable key matches its kid.
+	ErrTokenInvalid = errors.New("token signature verification failed")
+	// ErrExpMissing rejects a token without an exp claim.
+	ErrExpMissing = errors.New("exp claim missing")
+	// ErrTokenExpired rejects a token past its exp.
+	ErrTokenExpired = errors.New("token expired")
+	// ErrTokenNotYetValid rejects a token before its nbf.
+	ErrTokenNotYetValid = errors.New("token not yet valid (nbf)")
+	// ErrTokenIssuedAt rejects a token whose iat lies in the future.
+	ErrTokenIssuedAt = errors.New("token iat is in the future")
+	// ErrTokenClaims rejects a claim set that fails any other validation.
+	ErrTokenClaims = errors.New("token claims invalid")
+	// ErrSubMissing rejects a token without a non-empty sub claim.
+	ErrSubMissing = errors.New("sub claim missing")
+	// ErrIssuerMismatch rejects a token whose iss is not the expected issuer.
+	ErrIssuerMismatch = errors.New("iss does not match the configured issuer")
+	// ErrAudienceMissing rejects a token without an aud claim.
+	ErrAudienceMissing = errors.New("aud claim missing")
+	// ErrAudienceMismatch rejects a token whose aud names no expected audience.
+	ErrAudienceMismatch = errors.New("aud does not contain the expected audience")
 )
 
 // ParseToken verifies raw against set and validates its time claims. raw
@@ -51,14 +80,10 @@ var (
 func ParseToken(raw string, set jwk.Set) (jwt.Token, error) {
 	msg, err := jws.Parse([]byte(raw))
 	if err != nil {
-		return nil, fmt.Errorf("parse jws: %w", err)
+		return nil, ErrTokenMalformed
 	}
-	switch len(msg.Signatures()) {
-	case 0:
-		return nil, errTokenNoSignature
-	case 1:
-	default:
-		return nil, errTokenSignatures
+	if len(msg.Signatures()) != 1 {
+		return nil, ErrTokenSignatures
 	}
 	if err := checkAlgorithm(set, msg.Signatures()[0].ProtectedHeaders()); err != nil {
 		return nil, err
@@ -66,7 +91,7 @@ func ParseToken(raw string, set jwk.Set) (jwt.Token, error) {
 	// jwt.Parse would verify a nested JWS payload as well, and that inner
 	// signature would bypass checkAlgorithm; accept claim sets only.
 	if payload := bytes.TrimSpace(msg.Payload()); len(payload) == 0 || payload[0] != '{' {
-		return nil, errNestedToken
+		return nil, ErrNestedToken
 	}
 
 	tok, err := jwt.Parse([]byte(raw),
@@ -76,12 +101,31 @@ func ParseToken(raw string, set jwk.Set) (jwt.Token, error) {
 		jwt.WithRequiredClaim(jwt.ExpirationKey),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("verify jwt: %w", err)
+		return nil, jwtError(err)
 	}
 	if sub, ok := tok.Subject(); !ok || sub == "" {
-		return nil, errSubMissing
+		return nil, ErrSubMissing
 	}
 	return tok, nil
+}
+
+// jwtError maps a jwt.Parse error onto a token check error. The jwx error
+// itself is dropped: its text may name the kid.
+func jwtError(err error) error {
+	switch {
+	case errors.Is(err, jwt.TokenExpiredError()):
+		return ErrTokenExpired
+	case errors.Is(err, jwt.TokenNotYetValidError()):
+		return ErrTokenNotYetValid
+	case errors.Is(err, jwt.InvalidIssuedAtError()):
+		return ErrTokenIssuedAt
+	case errors.Is(err, jwt.MissingRequiredClaimError()):
+		return ErrExpMissing // exp is the only claim ParseToken requires
+	case errors.Is(err, jwt.ValidateError()):
+		return ErrTokenClaims
+	default:
+		return ErrTokenInvalid
+	}
 }
 
 // checkAlgorithm applies the algorithm policy to the first signature's
@@ -91,21 +135,21 @@ func ParseToken(raw string, set jwk.Set) (jwt.Token, error) {
 func checkAlgorithm(set jwk.Set, hdr jws.Headers) error {
 	alg, ok := hdr.Algorithm()
 	if !ok {
-		return errAlgNotAllowed
+		return ErrAlgNotAllowed
 	}
 	if _, allowed := allowedAlgorithms[alg.String()]; !allowed {
-		return errAlgNotAllowed
+		return ErrAlgNotAllowed
 	}
 	kid, ok := hdr.KeyID()
 	if !ok || kid == "" {
-		return errKidMissing
+		return ErrKidMissing
 	}
 	key, ok := set.LookupKeyID(kid)
 	if !ok {
 		return nil // jwx reports the unknown kid
 	}
 	if keyAlg, ok := key.Algorithm(); ok && keyAlg.String() != alg.String() {
-		return errAlgKeyMismatch
+		return ErrAlgKeyMismatch
 	}
 	return nil
 }

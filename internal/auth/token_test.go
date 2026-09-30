@@ -15,6 +15,7 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/lestrrat-go/jwx/v3/jws"
 	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/FinkeFlo/kafkito/internal/auth"
@@ -42,7 +43,7 @@ func TestParseToken_RejectsMoreThanOneSignature(t *testing.T) {
 
 	_, err = auth.ParseToken(string(signed), set)
 
-	require.ErrorContains(t, err, "exactly one signature")
+	require.ErrorIs(t, err, auth.ErrTokenSignatures)
 }
 
 // newRSAKeySet returns a new RSA key and a set with its public key under
@@ -81,5 +82,80 @@ func TestParseToken_RejectsNestedToken(t *testing.T) {
 
 	_, err = auth.ParseToken(string(outer), set)
 
-	require.ErrorContains(t, err, "not a JSON object")
+	require.ErrorIs(t, err, auth.ErrNestedToken)
+}
+
+// jwx names the kid when a key is not usable for signatures. ParseToken
+// reports the rule only.
+func TestParseToken_KeyNotForSignatures_DoesNotNameTheKid(t *testing.T) {
+	t.Parallel()
+
+	const kid = "distinctive-kid-7f3a"
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	pub, err := jwk.Import(&priv.PublicKey)
+	require.NoError(t, err)
+	require.NoError(t, pub.Set(jwk.KeyIDKey, kid))
+	require.NoError(t, pub.Set(jwk.KeyUsageKey, jwk.ForEncryption))
+	set := jwk.NewSet()
+	require.NoError(t, set.AddKey(pub))
+	raw := signRS256(t, priv, kid, map[string]any{jwt.SubjectKey: "u", jwt.ExpirationKey: time.Now().Add(time.Hour)})
+
+	_, err = auth.ParseToken(raw, set)
+
+	require.ErrorIs(t, err, auth.ErrTokenInvalid)
+	assert.NotContains(t, err.Error(), kid)
+}
+
+func TestParseToken_MapsTimeClaimFailuresToSentinels(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	cases := []struct {
+		name   string
+		claims map[string]any
+		want   error
+	}{
+		{"expired", map[string]any{jwt.ExpirationKey: now.Add(-time.Hour)}, auth.ErrTokenExpired},
+		{"exp_missing", map[string]any{}, auth.ErrExpMissing},
+		{"nbf_future", map[string]any{jwt.ExpirationKey: now.Add(time.Hour), jwt.NotBeforeKey: now.Add(time.Hour)}, auth.ErrTokenNotYetValid},
+		{"iat_future", map[string]any{jwt.ExpirationKey: now.Add(time.Hour), jwt.IssuedAtKey: now.Add(time.Hour)}, auth.ErrTokenIssuedAt},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			priv, set := newRSAKeySet(t, true)
+			tc.claims[jwt.SubjectKey] = "u"
+
+			_, err := auth.ParseToken(signRS256(t, priv, "k1", tc.claims), set)
+
+			require.ErrorIs(t, err, tc.want)
+		})
+	}
+}
+
+func TestParseToken_RejectsGarbageAsMalformed(t *testing.T) {
+	t.Parallel()
+
+	_, set := newRSAKeySet(t, true)
+
+	_, err := auth.ParseToken("not.a.jwt", set)
+
+	require.ErrorIs(t, err, auth.ErrTokenMalformed)
+}
+
+// signRS256 signs claims as a compact JWS under kid.
+func signRS256(t *testing.T, priv *rsa.PrivateKey, kid string, claims map[string]any) string {
+	t.Helper()
+
+	tok := jwt.New()
+	for k, v := range claims {
+		require.NoError(t, tok.Set(k, v))
+	}
+	hdr := jws.NewHeaders()
+	require.NoError(t, hdr.Set(jws.KeyIDKey, kid))
+	signed, err := jwt.Sign(tok, jwt.WithKey(jwa.RS256(), priv, jws.WithProtectedHeaders(hdr)))
+	require.NoError(t, err)
+	return string(signed)
 }
