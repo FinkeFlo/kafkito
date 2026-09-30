@@ -20,7 +20,7 @@ import (
 func TestBuildValidator_MockMode(t *testing.T) {
 	t.Parallel()
 
-	v, cleanup, err := auth.BuildValidator(auth.ModeConfig{Mode: "mock", XSAppName: "kafkito!t1"})
+	v, cleanup, err := auth.BuildValidator(auth.ModeConfig{Mode: "mock"})
 	require.NoError(t, err, "BuildValidator(mock)")
 	t.Cleanup(cleanup)
 

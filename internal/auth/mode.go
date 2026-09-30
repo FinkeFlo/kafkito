@@ -25,9 +25,6 @@ type ModeConfig struct {
 	// VCAPServices is the raw VCAP_SERVICES JSON, used by IdP modes that
 	// expect their credentials in a Cloud Foundry service binding.
 	VCAPServices string
-	// XSAppName is an IdP-specific application identifier consumed by modes
-	// that need it. Ignored by the generic modes.
-	XSAppName string
 }
 
 // ModeFactory constructs a Validator for a registered auth mode. The returned
