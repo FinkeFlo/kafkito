@@ -10,6 +10,14 @@ kafkito is a free, open-source web UI for managing and observing Apache Kafka cl
 
 ## Quickstart
 
+> **Run kafkito only behind TLS.** kafkito serves plain HTTP. API requests
+> carry bearer tokens and, for private clusters, broker and Schema Registry
+> credentials in the `X-Kafkito-Cluster` header. The examples below are for
+> your own machine. Anywhere else, terminate TLS in a reverse proxy or
+> platform router, set `Strict-Transport-Security` there, and do not expose
+> port 37421 directly on an untrusted network. See
+> [Running behind TLS](docs/architecture.md#running-behind-tls).
+
 ### Try it locally — no auth setup
 
 The `local` image ships with auth disabled and a logged-in dev
@@ -246,7 +254,8 @@ policy allows no inline scripts or styles and no third-party origins.
   `X-Frame-Options: DENY` is only sent while the value is `'none'`, because it
   cannot express an allow-list.
 - **HSTS** is not set by kafkito: TLS is terminated by the upstream proxy or
-  router, which should send `Strict-Transport-Security`.
+  router, which should send `Strict-Transport-Security` (see
+  [Running behind TLS](docs/architecture.md#running-behind-tls)).
 - **`make dev`** serves the UI through Vite, which sets none of these headers;
   the policy only applies when the Go binary serves the UI (`make build`,
   images, `make e2e`).
