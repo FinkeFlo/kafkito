@@ -1186,6 +1186,9 @@ type GetMessageTimelineParams struct {
 
 // DownloadMessageRawParams defines parameters for DownloadMessageRaw.
 type DownloadMessageRawParams struct {
+	// Decoded `false` serves the value bytes as stored in Kafka instead of the Schema Registry decoded JSON. Only `true` and `false` are accepted.
+	Decoded *bool `form:"decoded,omitempty" json:"decoded,omitempty"`
+
 	// XKafkitoCluster Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400.
 	XKafkitoCluster *PrivateClusterHeader `json:"X-Kafkito-Cluster,omitempty"`
 }
@@ -1369,7 +1372,7 @@ type ServerInterface interface {
 	// GetMessageTimeline Time-sliced message volume over a time range for a topic.
 	// (GET /api/v1/clusters/{cluster}/topics/{topic}/messages/timeline)
 	GetMessageTimeline(w http.ResponseWriter, r *http.Request, cluster Cluster, topic Topic, params GetMessageTimelineParams)
-	// DownloadMessageRaw Download the raw value bytes of a single record.
+	// DownloadMessageRaw Download the full value of a single record.
 	// (GET /api/v1/clusters/{cluster}/topics/{topic}/messages/{partition}/{offset}/raw)
 	DownloadMessageRaw(w http.ResponseWriter, r *http.Request, cluster Cluster, topic Topic, partition int32, offset int64, params DownloadMessageRawParams)
 	// DeleteRecords Delete records up to an offset per partition (low-watermark bump).
@@ -1588,7 +1591,7 @@ func (_ Unimplemented) GetMessageTimeline(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// DownloadMessageRaw Download the raw value bytes of a single record.
+// DownloadMessageRaw Download the full value of a single record.
 // (GET /api/v1/clusters/{cluster}/topics/{topic}/messages/{partition}/{offset}/raw)
 func (_ Unimplemented) DownloadMessageRaw(w http.ResponseWriter, r *http.Request, cluster Cluster, topic Topic, partition int32, offset int64, params DownloadMessageRawParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -3627,6 +3630,19 @@ func (siw *ServerInterfaceWrapper) DownloadMessageRaw(w http.ResponseWriter, r *
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params DownloadMessageRawParams
+
+	// ------------- Optional query parameter "decoded" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "decoded", r.URL.Query(), &params.Decoded, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "decoded"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "decoded", Err: err})
+		}
+		return
+	}
 
 	headers := r.Header
 
@@ -7264,7 +7280,8 @@ type DownloadMessageRawResponseObject interface {
 }
 
 type DownloadMessageRaw200ResponseHeaders struct {
-	ContentDisposition *string
+	ContentDisposition   *string
+	XKafkitoValueDecoded *string
 }
 
 type DownloadMessageRaw200JSONResponse struct {
@@ -7281,6 +7298,9 @@ func (response DownloadMessageRaw200JSONResponse) VisitDownloadMessageRawRespons
 	w.Header().Set("Content-Type", "application/json")
 	if response.Headers.ContentDisposition != nil {
 		w.Header().Set("Content-Disposition", fmt.Sprint(*response.Headers.ContentDisposition))
+	}
+	if response.Headers.XKafkitoValueDecoded != nil {
+		w.Header().Set("X-Kafkito-Value-Decoded", fmt.Sprint(*response.Headers.XKafkitoValueDecoded))
 	}
 	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
@@ -7301,6 +7321,9 @@ func (response DownloadMessageRaw200ApplicationoctetStreamResponse) VisitDownloa
 	}
 	if response.Headers.ContentDisposition != nil {
 		w.Header().Set("Content-Disposition", fmt.Sprint(*response.Headers.ContentDisposition))
+	}
+	if response.Headers.XKafkitoValueDecoded != nil {
+		w.Header().Set("X-Kafkito-Value-Decoded", fmt.Sprint(*response.Headers.XKafkitoValueDecoded))
 	}
 	w.WriteHeader(200)
 
@@ -7326,6 +7349,9 @@ func (response DownloadMessageRaw200ApplicationxmlResponse) VisitDownloadMessage
 	if response.Headers.ContentDisposition != nil {
 		w.Header().Set("Content-Disposition", fmt.Sprint(*response.Headers.ContentDisposition))
 	}
+	if response.Headers.XKafkitoValueDecoded != nil {
+		w.Header().Set("X-Kafkito-Value-Decoded", fmt.Sprint(*response.Headers.XKafkitoValueDecoded))
+	}
 	w.WriteHeader(200)
 
 	if closer, ok := response.Body.(io.ReadCloser); ok {
@@ -7345,6 +7371,9 @@ func (response DownloadMessageRaw200TextResponse) VisitDownloadMessageRawRespons
 	w.Header().Set("Content-Type", "text/plain")
 	if response.Headers.ContentDisposition != nil {
 		w.Header().Set("Content-Disposition", fmt.Sprint(*response.Headers.ContentDisposition))
+	}
+	if response.Headers.XKafkitoValueDecoded != nil {
+		w.Header().Set("X-Kafkito-Value-Decoded", fmt.Sprint(*response.Headers.XKafkitoValueDecoded))
 	}
 	w.WriteHeader(200)
 
@@ -8208,7 +8237,7 @@ type StrictServerInterface interface {
 	// GetMessageTimeline Time-sliced message volume over a time range for a topic.
 	// (GET /api/v1/clusters/{cluster}/topics/{topic}/messages/timeline)
 	GetMessageTimeline(ctx context.Context, request GetMessageTimelineRequestObject) (GetMessageTimelineResponseObject, error)
-	// DownloadMessageRaw Download the raw value bytes of a single record.
+	// DownloadMessageRaw Download the full value of a single record.
 	// (GET /api/v1/clusters/{cluster}/topics/{topic}/messages/{partition}/{offset}/raw)
 	DownloadMessageRaw(ctx context.Context, request DownloadMessageRawRequestObject) (DownloadMessageRawResponseObject, error)
 	// DeleteRecords Delete records up to an offset per partition (low-watermark bump).

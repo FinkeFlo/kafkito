@@ -171,7 +171,7 @@ func TestRecordReaders_RangeEndingInTransactionMarkerDoesNotWaitForTimeout(t *te
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		start := time.Now()
-		_, err := env.reg.FetchRawMessageValue(ctx, kfakeCluster, env.topic, 0, 5)
+		_, err := env.reg.FetchRawMessageValue(ctx, kfakeCluster, env.topic, 0, 5, RawValueOptions{})
 		fast(t, start)
 		assert.ErrorContains(t, err, "record not found")
 	})

@@ -84,11 +84,11 @@ func TestFetchRawMessageValue_DeletedOffsetIsNotFound(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	_, err := env.reg.FetchRawMessageValue(ctx, kfakeCluster, truncatedTopic, 0, 2)
+	_, err := env.reg.FetchRawMessageValue(ctx, kfakeCluster, truncatedTopic, 0, 2, RawValueOptions{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "record not found")
 
-	raw, err := env.reg.FetchRawMessageValue(ctx, kfakeCluster, truncatedTopic, 0, 4)
+	raw, err := env.reg.FetchRawMessageValue(ctx, kfakeCluster, truncatedTopic, 0, 4, RawValueOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, "v-4", string(raw.Value))
 }

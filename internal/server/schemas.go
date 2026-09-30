@@ -99,29 +99,30 @@ func (s *apiServer) RegisterSchema(ctx context.Context, req gen.RegisterSchemaRe
 	return gen.RegisterSchema200JSONResponse(*res), nil
 }
 
-// DeleteSubject deletes a subject, soft by default.
-// strictPermanentFlag accepts only the literal `true` and `false` for the
-// deleteSubject permanent flag. The binding would also take 1, t or TRUE
-// (strconv.ParseBool), which used to mean a soft delete; a hard delete
-// cannot be undone, so those spellings are rejected instead.
-func strictPermanentFlag(r *http.Request) error {
+// strictBoolQuery accepts only the literal `true` and `false` for the
+// boolean query parameter name. The binding would also take 1, t or TRUE
+// (strconv.ParseBool); for the deleteSubject permanent flag those used to
+// mean a soft delete, and a hard delete cannot be undone, so every boolean
+// flag rejects them instead.
+func strictBoolQuery(r *http.Request, name string) error {
 	if r == nil {
 		return nil
 	}
-	for _, v := range r.URL.Query()["permanent"] {
+	for _, v := range r.URL.Query()[name] {
 		if v != "true" && v != "false" {
-			return &apiError{Status: http.StatusBadRequest, Code: invalidRequestCode, Message: `parameter "permanent" in query: must be true or false`}
+			return &apiError{Status: http.StatusBadRequest, Code: invalidRequestCode, Message: `parameter "` + name + `" in query: must be true or false`}
 		}
 	}
 	return nil
 }
 
+// DeleteSubject deletes a subject, soft by default.
 func (s *apiServer) DeleteSubject(ctx context.Context, req gen.DeleteSubjectRequestObject) (gen.DeleteSubjectResponseObject, error) {
 	sr, err := s.schemaRegistry(req.Cluster)
 	if err != nil {
 		return nil, err
 	}
-	if err := strictPermanentFlag(httpRequestFromContext(ctx)); err != nil {
+	if err := strictBoolQuery(httpRequestFromContext(ctx), "permanent"); err != nil {
 		return nil, err
 	}
 	permanent := deref(req.Params.Permanent)

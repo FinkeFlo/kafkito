@@ -356,7 +356,8 @@ export interface paths {
          *     hex preview with the raw bytes in `value_b64`. Schema-Registry encoded
          *     records are decoded transparently when a Schema Registry is configured
          *     for the cluster. Large values are truncated for the list view
-         *     (`value_truncated`); fetch the full bytes via the raw endpoint.
+         *     (`value_truncated`); fetch the full value, decoded the same way, via
+         *     the raw endpoint.
          *
          *     Paging: pass the returned `next_cursor` back as `cursor`. A cursor
          *     forces the seek mode to its direction (backward → `from=end`, forward
@@ -474,17 +475,29 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Download the raw value bytes of a single record.
-         * @description Streams the untouched value bytes as an attachment
-         *     (`<topic>-p<partition>-o<offset>.<ext>`). The content type is sniffed:
+         * Download the full value of a single record.
+         * @description Streams the full, untruncated value as an attachment
+         *     (`<topic>-p<partition>-o<offset>.<ext>`).
+         *
+         *     A value the message list shows Schema Registry decoded (Avro, JSON
+         *     Schema) is served as that decoded JSON: `application/json`, `.json`,
+         *     with the format in `X-Kafkito-Value-Decoded`. `decoded=false` serves
+         *     the Confluent wire-format bytes instead. A framed value that cannot
+         *     be decoded (unknown schema id, Schema Registry unreachable, Protobuf)
+         *     is served as its wire bytes, as `application/octet-stream` / `.bin`,
+         *     and so is every framed value with `decoded=false`.
+         *
+         *     Any other value is served as stored, with a sniffed content type:
          *     `application/json` for valid JSON, `application/xml` for well-formed
          *     XML, `text/plain` for other UTF-8 and `application/octet-stream`
-         *     otherwise. Values above 15 MB are rejected with 413. A value the
-         *     cluster's `data_masking` rules change is refused with 403
-         *     `value_masked`: the raw bytes would bypass the masking. The body never
-         *     contains the key or headers, so masking rules that target only those
-         *     do not block the download. With RBAC enabled, requires `consume` on
-         *     `topic:<topic>`.
+         *     otherwise.
+         *
+         *     Values above 15 MB, before or after decoding, are rejected with 413.
+         *     A value the cluster's `data_masking` rules change is refused with 403
+         *     `value_masked`, in either form: the served bytes would bypass the
+         *     masking. The body never contains the key or headers, so masking rules
+         *     that target only those do not block the download. With RBAC enabled,
+         *     requires `consume` on `topic:<topic>`.
          */
         get: operations["downloadMessageRaw"];
         put?: never;
@@ -1179,7 +1192,7 @@ export interface components {
              * @description Untruncated byte length of the raw value; absent for nil/empty values.
              */
             value_size_bytes?: number;
-            /** @description True when `value` holds only a preview; use the raw endpoint for the full bytes. */
+            /** @description True when `value` holds only a preview; use the raw endpoint for the full value. */
             value_truncated?: boolean;
             key_sr?: components["schemas"]["SRDecodedMeta"];
             value_sr?: components["schemas"]["SRDecodedMeta"];
@@ -2489,7 +2502,10 @@ export interface operations {
     };
     downloadMessageRaw: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description `false` serves the value bytes as stored in Kafka instead of the Schema Registry decoded JSON. Only `true` and `false` are accepted. */
+                decoded?: boolean;
+            };
             header?: {
                 /** @description Base64-encoded JSON `ClusterConfig` of a private (browser-stored) cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment is `__private__` (required then). RBAC is bypassed for private clusters. A malformed header is rejected with 400. */
                 "X-Kafkito-Cluster"?: components["parameters"]["PrivateClusterHeader"];
@@ -2505,12 +2521,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Raw value bytes. */
+            /** @description Full value, decoded or as stored. */
             200: {
                 headers: {
                     "X-Request-Id": components["headers"]["RequestId"];
                     /** @description `attachment; filename="<topic>-p<partition>-o<offset>.<ext>"` */
                     "Content-Disposition"?: string;
+                    /** @description The Schema Registry format (`avro`, `json_schema`) the body was decoded from. Absent when the body holds the stored bytes. */
+                    "X-Kafkito-Value-Decoded"?: string;
                     [name: string]: unknown;
                 };
                 content: {

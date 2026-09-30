@@ -214,38 +214,54 @@ curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/sample?n=10" | jq '.messag
 
 `GET /api/v1/clusters/{cluster}/topics/{topic}/messages/{partition}/{offset}/raw`
 
-Streams the untruncated value bytes of a single record verbatim — no base64,
-no JSON envelope, no Schema-Registry decoding. This is the endpoint to use
-whenever the 64 KB preview in `GET .../messages` is not enough: to inspect a
-large value in full, to confirm a truncated preview's real encoding, or to
-re-produce a record byte-for-byte.
+Streams the untruncated value of a single record — no base64, no JSON
+envelope. This is the endpoint to use whenever the 64 KB preview in
+`GET .../messages` is not enough: to inspect a large value in full, to
+confirm a truncated preview's real encoding, or to re-produce a record
+byte-for-byte.
 
-`partition` and `offset` are exact (no `-1`, no negative offsets); the
-endpoint takes no query parameters.
+`partition` and `offset` are exact (no `-1`, no negative offsets).
+
+Query parameters:
+
+- `decoded` (`true`/`false`, default `true`): a value `GET .../messages`
+  shows Schema Registry decoded (Avro, JSON Schema) is served as that decoded
+  JSON. `decoded=false` serves the stored Confluent wire-format bytes (magic
+  byte, 4-byte schema id, payload) instead, e.g. to re-produce the record.
+  Only the literal `true` and `false` are accepted.
 
 Response headers:
 
-- `Content-Type` is sniffed from the bytes: `application/json` for a value
-  that starts with `{`/`[` *and* validates as JSON, `text/plain; charset=utf-8`
-  for any other valid UTF-8, `application/octet-stream` otherwise. Note that
-  XML is served as `text/plain`.
+- `Content-Type`:
+  - a decoded value is always `application/json`;
+  - a Schema Registry framed value served as stored — with `decoded=false`,
+    or because it cannot be decoded (unknown schema id, Schema Registry
+    unreachable, Protobuf, which kafkito does not decode yet) — is
+    `application/octet-stream`;
+  - any other value is sniffed from the bytes: `application/json` for a value
+    that starts with `{`/`[` *and* validates as JSON, `application/xml` for
+    well-formed XML, `text/plain; charset=utf-8` for any other valid UTF-8,
+    `application/octet-stream` otherwise.
 - `Content-Disposition: attachment; filename="{topic}-p{partition}-o{offset}.{ext}"`
-  with `ext` one of `json`, `txt`, `bin`, matching the sniffed type.
-- `Content-Length` is the exact byte length of the value.
+  with `ext` one of `json`, `xml`, `txt`, `bin`, matching the content type.
+- `X-Kafkito-Value-Decoded: avro|json_schema` when the body is the decoded
+  JSON; absent when it holds the stored bytes.
+- `Content-Length` is the exact byte length of the body.
 
 Status codes:
 
 | Status | When                                                              |
 | ------ | ----------------------------------------------------------------- |
 | `200`  | Value returned in the body.                                       |
-| `400`  | `partition` is not a non-negative int32, or `offset` is not a non-negative int64 (`code: invalid_request`). |
+| `400`  | `partition` is not a non-negative int32, `offset` is not a non-negative int64, or `decoded` is not `true`/`false` (`code: invalid_request`). |
 | `403`  | RBAC denied `topic:consume` on the topic, or the value is masked (`code: value_masked`). |
 | `404`  | Unknown cluster.                                                  |
-| `413`  | Value is larger than the 15 MB download cap.                      |
+| `413`  | Value is larger than the 15 MB download cap, before or after decoding. |
 | `502`  | Broker error, or no record at that partition/offset (`code: kafka_upstream`). |
 
 The 15 MB cap is fixed (not configurable) so a single oversized record cannot
-exhaust process memory.
+exhaust process memory. It applies to the stored value and again to the
+decoded JSON, which is usually larger than its Avro encoding.
 
 Masked values are not downloadable: when the cluster's `data_masking` rules
 change the value of the record (checked on the same decoded rendering
@@ -256,10 +272,8 @@ Records of topics without a masking rule, and records the rules leave
 unchanged, are served as before. The body is the value only, so rules that
 mask just the key or headers do not block the download.
 
-The body is always the **raw wire bytes**. For a Schema-Registry encoded
-record that means the Avro/Protobuf payload including the 5-byte magic +
-schema-id prefix — *not* the decoded JSON that `GET .../messages` returns in
-`value`. Decode it against the schema yourself if you need the JSON form.
+Masking is checked the same way for `decoded=false`: the stored bytes carry
+the same data.
 
 ```bash
 # Inspect a large JSON value in full
@@ -267,6 +281,9 @@ curl -s "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/0/12345/raw" | jq
 
 # Save a binary value to disk
 curl -sOJ "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/0/12345/raw"
+
+# Save the wire-format bytes of a Schema Registry value
+curl -sOJ "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/0/12345/raw?decoded=false"
 
 # A value over the cap returns 413
 curl -s -o /dev/null -w '%{http_code}\n' \

@@ -52,33 +52,46 @@ func (s *apiServer) ConsumeMessages(ctx context.Context, req gen.ConsumeMessages
 	return resp, nil
 }
 
-// rawMessageResponse serves the untouched value bytes of one record as an
-// attachment. The generated response types cannot express the sniffed
-// content type, so it writes the response itself.
+// rawMessageResponse serves the full value of one record as an attachment.
+// The generated response types cannot express the per-value content type,
+// so it writes the response itself.
 type rawMessageResponse struct {
 	filename    string
 	contentType string
-	value       []byte
+	// decodedFormat is the Schema Registry format the value was decoded
+	// from; empty for the stored bytes.
+	decodedFormat string
+	value         []byte
 }
 
 func (r rawMessageResponse) VisitDownloadMessageRawResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", r.contentType)
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, r.filename))
+	if r.decodedFormat != "" {
+		w.Header().Set("X-Kafkito-Value-Decoded", r.decodedFormat)
+	}
 	w.Header().Set("Content-Length", strconv.Itoa(len(r.value)))
 	w.WriteHeader(http.StatusOK)
 	_, err := w.Write(r.value) //nolint:gosec // G705: value is served as attachment (Content-Disposition: attachment), not rendered as HTML.
 	return err
 }
 
-// DownloadMessageRaw returns the raw value bytes of a single record without
-// any string/base64 conversion. Values larger than 15 MB are rejected with
-// 413 so a single oversized record cannot exhaust process memory; values the
-// cluster's masking policy changes are refused with 403 value_masked.
+// DownloadMessageRaw returns the full value of a single record: Schema
+// Registry decoded like the message list unless decoded=false asks for the
+// stored bytes. Values larger than 15 MB, before or after decoding, are
+// rejected with 413 so a single oversized record cannot exhaust process
+// memory; values the cluster's masking policy changes are refused with 403
+// value_masked.
 func (s *apiServer) DownloadMessageRaw(ctx context.Context, req gen.DownloadMessageRawRequestObject) (gen.DownloadMessageRawResponseObject, error) {
+	if err := strictBoolQuery(httpRequestFromContext(ctx), "decoded"); err != nil {
+		return nil, err
+	}
+	opts := kafkapkg.RawValueOptions{WireBytes: req.Params.Decoded != nil && !*req.Params.Decoded}
+
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
-	raw, err := s.messages.FetchRawMessageValue(ctx, req.Cluster, req.Topic, req.Partition, req.Offset)
+	raw, err := s.messages.FetchRawMessageValue(ctx, req.Cluster, req.Topic, req.Partition, req.Offset, opts)
 	if err != nil {
 		if errors.Is(err, kafkapkg.ErrValueTooLarge) || errors.Is(err, kafkapkg.ErrValueMasked) {
 			return nil, err
@@ -86,9 +99,10 @@ func (s *apiServer) DownloadMessageRaw(ctx context.Context, req gen.DownloadMess
 		return nil, clusterError(req.Cluster, "download message raw", err)
 	}
 	return rawMessageResponse{
-		filename:    fmt.Sprintf("%s-p%d-o%d.%s", req.Topic, req.Partition, req.Offset, raw.Extension),
-		contentType: raw.ContentType,
-		value:       raw.Value,
+		filename:      fmt.Sprintf("%s-p%d-o%d.%s", req.Topic, req.Partition, req.Offset, raw.Extension),
+		contentType:   raw.ContentType,
+		decodedFormat: raw.DecodedFormat,
+		value:         raw.Value,
 	}, nil
 }
 

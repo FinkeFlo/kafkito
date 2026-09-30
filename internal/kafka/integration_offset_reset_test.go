@@ -57,7 +57,7 @@ func TestIntegration_OutOfRangeOffsets(t *testing.T) {
 	})
 
 	t.Run("raw download of a deleted offset is not found", func(t *testing.T) {
-		_, err := reg.FetchRawMessageValue(ctx, "it", topic, 0, 2)
+		_, err := reg.FetchRawMessageValue(ctx, "it", topic, 0, 2, RawValueOptions{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "record not found")
 	})
@@ -68,7 +68,7 @@ func TestIntegration_OutOfRangeOffsets(t *testing.T) {
 	t.Run("raw download past the log end waits for the request to end", func(t *testing.T) {
 		fctx, fcancel := context.WithTimeout(ctx, 3*time.Second)
 		defer fcancel()
-		raw, err := reg.FetchRawMessageValue(fctx, "it", topic, 0, 100)
+		raw, err := reg.FetchRawMessageValue(fctx, "it", topic, 0, 100, RawValueOptions{})
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		assert.Nil(t, raw)
 	})
