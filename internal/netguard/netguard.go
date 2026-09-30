@@ -40,8 +40,25 @@ func BlockedIP(ip netip.Addr) bool {
 // ErrBlockedAddress is returned by the guarded dialer when a resolved address is blocked.
 var ErrBlockedAddress = errors.New("dial refused: address resolves to a blocked range")
 
-// resolveFn is the signature of a host-to-IP resolver used internally.
-type resolveFn func(ctx context.Context, network, host string) ([]netip.Addr, error)
+// BlockedAddressError is the error the guarded dialer returns when a resolved
+// address is blocked. It unwraps to ErrBlockedAddress, so errors.Is keeps
+// working, and carries the refused dial target for callers that report it.
+type BlockedAddressError struct {
+	// Addr is the host:port the dial was asked for.
+	Addr string
+	// Host is the host part of Addr, as given (name or IP literal).
+	Host string
+	// IP is the first resolved address that is blocked, as resolved.
+	IP netip.Addr
+}
+
+// Error keeps the text of the former wrapped ErrBlockedAddress byte for byte.
+func (e *BlockedAddressError) Error() string {
+	return fmt.Sprintf("%s: host %q -> %s", ErrBlockedAddress, e.Host, e.IP)
+}
+
+// Unwrap makes errors.Is(err, ErrBlockedAddress) true.
+func (e *BlockedAddressError) Unwrap() error { return ErrBlockedAddress }
 
 // defaultResolver wraps net.DefaultResolver.LookupNetIP.
 func defaultResolver(ctx context.Context, network, host string) ([]netip.Addr, error) {
@@ -66,14 +83,16 @@ func GuardedDialContext(base *net.Dialer) func(ctx context.Context, network, add
 	dialOne := func(ctx context.Context, network, ipAddr string) (net.Conn, error) {
 		return base.DialContext(ctx, network, ipAddr)
 	}
-	return guardedDialWith(defaultResolver, dialOne)
+	return GuardedDialWith(defaultResolver, dialOne)
 }
 
-// guardedDialWith is the testable core of GuardedDialContext. It accepts an
-// injectable resolver and per-IP dial function so tests can inject multi-address
-// resolution and per-IP failure stubs without real network connectivity.
-func guardedDialWith(
-	resolve resolveFn,
+// GuardedDialWith is GuardedDialContext with an injectable resolver and per-IP
+// dial function. Tests in other packages use it to point a guarded client at a
+// local fake broker: the resolver maps a test host to an allowed address and
+// dialOne redirects that address. The SSRF rules still apply to every
+// resolved address, so a blocked address is refused before dialOne runs.
+func GuardedDialWith(
+	resolve func(ctx context.Context, network, host string) ([]netip.Addr, error),
 	dialOne func(ctx context.Context, network, addr string) (net.Conn, error),
 ) func(ctx context.Context, network, addr string) (net.Conn, error) {
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -92,7 +111,7 @@ func guardedDialWith(
 		// policy prevents split-brain rebinding where only some IPs are safe).
 		for _, ip := range ips {
 			if BlockedIP(ip) {
-				return nil, fmt.Errorf("%w: host %q -> %s", ErrBlockedAddress, host, ip)
+				return nil, &BlockedAddressError{Addr: addr, Host: host, IP: ip}
 			}
 		}
 		// Try each validated IP in order; return the first successful connection.

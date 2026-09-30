@@ -109,7 +109,7 @@ func TestGuardedDialContext_FailoverToSecondIP(t *testing.T) {
 	}
 
 	resolve := stubResolver(firstIP, secondIP)
-	dial := netguard.GuardedDialWithForTest(resolve, dialOne)
+	dial := netguard.GuardedDialWith(resolve, dialOne)
 
 	conn, err := dial(context.Background(), "tcp", "myfakehost.internal:"+port)
 	require.NoError(t, err, "dialer must fall over to the second IP and succeed")
