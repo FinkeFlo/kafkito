@@ -424,6 +424,9 @@ func (s *apiServer) runCopy(ctx context.Context, w io.Writer, job copyJob) {
 				// Client gone or safety ceiling hit.
 				return
 			}
+			if errors.Is(consumeErr, netguard.ErrBlockedAddress) {
+				s.log.WarnContext(ctx, "copy: blocked address", "cluster", job.srcCluster, "err", consumeErr)
+			}
 			sendEvent(copyProgressEvent{Copied: copied, Skipped: skipped, Done: true, Error: "consume: " + copyErrorText(consumeErr)})
 			return
 		}
@@ -498,6 +501,9 @@ func (s *apiServer) runCopy(ctx context.Context, w io.Writer, job copyJob) {
 			if produceErr != nil {
 				if errors.Is(produceErr, context.Canceled) || errors.Is(produceErr, context.DeadlineExceeded) {
 					return
+				}
+				if errors.Is(produceErr, netguard.ErrBlockedAddress) {
+					s.log.WarnContext(ctx, "copy: blocked address", "cluster", job.destCluster, "err", produceErr)
 				}
 				sendEvent(copyProgressEvent{Copied: copied, Skipped: skipped, Done: true, Error: "produce: " + copyErrorText(produceErr)})
 				return

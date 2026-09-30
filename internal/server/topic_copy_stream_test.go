@@ -357,11 +357,14 @@ func TestCopyStream_ErrorEventHidesBlockedAddress(t *testing.T) {
 		consume   error
 		produce   error
 		wantError string
+		// wantLogCluster is the cluster the operator WARN names; empty means
+		// no "copy: blocked address" line may be logged.
+		wantLogCluster string
 	}{
-		{"consume blocked", blocked, nil, "consume: " + privateClusterAddressBlockedMsg},
-		{"produce blocked", nil, blocked, "produce: " + privateClusterAddressBlockedMsg},
-		{"consume other", other, nil, "consume: NOT_LEADER_FOR_PARTITION"},
-		{"produce other", nil, other, "produce: NOT_LEADER_FOR_PARTITION"},
+		{"consume blocked", blocked, nil, "consume: " + privateClusterAddressBlockedMsg, "src"},
+		{"produce blocked", nil, blocked, "produce: " + privateClusterAddressBlockedMsg, "dst"},
+		{"consume other", other, nil, "consume: NOT_LEADER_FOR_PARTITION", ""},
+		{"produce other", nil, other, "produce: NOT_LEADER_FOR_PARTITION", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -374,7 +377,9 @@ func TestCopyStream_ErrorEventHidesBlockedAddress(t *testing.T) {
 			base := newBlockingCopyRegistry(reg)
 			base.unblockNow()
 			fake := &failingCopyRegistry{blockingCopyRegistry: base, consumeErr: tc.consume, produceErr: tc.produce}
-			h := New(Options{Version: "test", Logger: slog.Default(), Registry: reg, Config: config.Defaults(), copyRegistry: fake})
+			logs := &syncBuffer{}
+			logger := slog.New(slog.NewJSONHandler(logs, nil))
+			h := New(Options{Version: "test", Logger: logger, Registry: reg, Config: config.Defaults(), copyRegistry: fake})
 
 			rec := httptest.NewRecorder()
 			h.ServeHTTP(rec, newCopyRequest("/api/v1/clusters/src/topics/orders/copy", copyStreamBody))
@@ -387,6 +392,24 @@ func TestCopyStream_ErrorEventHidesBlockedAddress(t *testing.T) {
 			assert.Equal(t, tc.wantError, last.Error)
 			assert.NotContains(t, rec.Body.String(), "rebind.example")
 			assert.NotContains(t, rec.Body.String(), "169.254.169.254")
+
+			// Operators still get the full cause: the #118 log policy allows
+			// hosts and resolved IPs in logs, only the SSE event stays static.
+			var warn map[string]any
+			for _, line := range strings.Split(strings.TrimSpace(logs.String()), "\n") {
+				var entry map[string]any
+				if json.Unmarshal([]byte(line), &entry) == nil && entry["msg"] == "copy: blocked address" {
+					warn = entry
+				}
+			}
+			if tc.wantLogCluster == "" {
+				assert.Nil(t, warn, "no blocked-address WARN for a non-blocked error")
+				return
+			}
+			require.NotNil(t, warn, "blocked-address WARN not logged; logs:\n%s", logs.String())
+			assert.Equal(t, "WARN", warn["level"])
+			assert.Equal(t, tc.wantLogCluster, warn["cluster"])
+			assert.Equal(t, blocked.Error(), warn["err"])
 		})
 	}
 }
