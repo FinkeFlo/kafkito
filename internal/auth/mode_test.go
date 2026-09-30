@@ -9,6 +9,8 @@ package auth_test
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,9 +29,9 @@ func TestBuildValidator_MockMode(t *testing.T) {
 	require.NotNil(t, v, "mock validator must not be nil")
 }
 
-// Not parallel: Register writes the package-level mode registry, which the
-// parallel tests read unsynchronized; sequential tests finish before they resume.
 func TestBuildValidator_ReturnsNoopCleanup_WhenModeHasNone(t *testing.T) {
+	t.Parallel()
+
 	// A mode without resources to release (like xsuaa) returns a nil cleanup.
 	auth.Register("test-nil-cleanup", func(auth.ModeConfig) (auth.Validator, func(), error) {
 		return nil, nil, nil
@@ -90,4 +92,32 @@ func TestBuildValidator_MockMode_CleanupClosesTheKeySource(t *testing.T) {
 	_, err = v.Validate(context.Background(), "not.a.jwt")
 
 	require.ErrorIs(t, err, auth.ErrKeySourceClosed, "cleanup must close the validator, not only the mock server")
+}
+
+// Register and BuildValidator share the mode registry; run with -race.
+func TestRegistry_IsSafeForConcurrentRegisterAndBuild(t *testing.T) {
+	t.Parallel()
+
+	var wg sync.WaitGroup
+	for i := range 8 {
+		name := fmt.Sprintf("test-concurrent-%d", i)
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			auth.Register(name, func(auth.ModeConfig) (auth.Validator, func(), error) {
+				return nil, nil, nil
+			})
+		}()
+		go func() {
+			defer wg.Done()
+			_, _, _ = auth.BuildValidator(auth.ModeConfig{Mode: name})
+		}()
+	}
+	wg.Wait()
+
+	for i := range 8 {
+		_, cleanup, err := auth.BuildValidator(auth.ModeConfig{Mode: fmt.Sprintf("test-concurrent-%d", i)})
+		require.NoError(t, err)
+		cleanup()
+	}
 }

@@ -8,6 +8,7 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"sync"
 )
 
 // ErrModeUnavailable indicates the requested KAFKITO_AUTH_MODE is not compiled in.
@@ -38,11 +39,17 @@ type ModeFactory func(cfg ModeConfig) (Validator, func(), error)
 // BuildValidator.
 var modes = map[string]ModeFactory{}
 
+// modesMu guards modes, so Register and BuildValidator are safe to call
+// concurrently (tests register modes while others build validators).
+var modesMu sync.RWMutex
+
 // Register binds a ModeFactory to the given mode name. Intended for use from
 // init() in mode-specific files. Re-registering a name overwrites the previous
 // factory; this is how mode_devauth.go upgrades "off" from the default
 // (unavailable) to the synthetic-principal variant.
 func Register(name string, factory ModeFactory) {
+	modesMu.Lock()
+	defer modesMu.Unlock()
 	modes[name] = factory
 }
 
@@ -50,7 +57,11 @@ func Register(name string, factory ModeFactory) {
 // callers should defer (mock mode uses it to stop the embedded server). On
 // success the cleanup is never nil.
 func BuildValidator(cfg ModeConfig) (Validator, func(), error) {
+	// The lock covers only the lookup; the factory runs unlocked because it
+	// may block (mock mode starts a server and loads keys).
+	modesMu.RLock()
 	f, ok := modes[cfg.Mode]
+	modesMu.RUnlock()
 	if !ok {
 		return nil, nil, fmt.Errorf("unknown KAFKITO_AUTH_MODE %q (build with appropriate tags?)", cfg.Mode)
 	}
