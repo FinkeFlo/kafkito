@@ -5,8 +5,10 @@
 // internal/server/private_cluster.go and internal/kafka/adhoc.go.
 //
 // Security note: passwords are stored in cleartext in localStorage. This is
-// documented in the UI. A future Webcrypto-based passphrase layer can wrap
-// the value transparently without changing the storage schema.
+// documented in the UI. Export files are encrypted with a user passphrase
+// (private-clusters-export-crypto.ts wraps the exportBundle() JSON); a
+// similar layer could wrap the stored value without changing the storage
+// schema.
 
 import type { components } from "./api.gen";
 

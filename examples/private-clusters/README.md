@@ -18,12 +18,16 @@ row instead of creating a duplicate.
 
 1. Open Kafkito → **Settings** → **Clusters**
 2. Click **Import JSON**, pick a file from this folder
-3. Toast shows `Imported: N added, 0 updated, 0 skipped`
+3. Toast shows `Imported: N added, 0 updated, 0 skipped`, with a tip that the file was not
+   encrypted
 4. The cluster appears in the table; the credentials never leave your browser
 
 The bundle file is read once at import time and converted into entries in `localStorage`
 under key `kafkito.private-clusters.v1`. Subsequent requests against that cluster send the
 credentials in the `X-Kafkito-Cluster` header — the server itself stays stateless.
+
+Files written by **Export JSON** are encrypted with a passphrase. Importing one asks for
+that passphrase first; the decrypted content is a bundle in the shape below.
 
 ## Editing an example before importing
 
@@ -76,7 +80,9 @@ with the file.
 These bundles store passwords and API secrets in **plaintext**. Treat them like any other
 credential file: keep them out of git, share via a password manager or encrypted channel
 (gpg, age, 1Password attachment), and rotate the secrets in the source-of-truth (your IdP,
-Confluent Cloud console, etc.) when the file is no longer needed.
+Confluent Cloud console, etc.) when the file is no longer needed. Once imported, **Export
+JSON** writes an encrypted copy (passphrase of at least 12 characters, AES-256-GCM); keep
+that instead of a plaintext bundle with real secrets.
 
 The browser side has the same constraint — `localStorage` stores them in plaintext too.
 That trade-off is documented in `frontend/src/lib/private-clusters.ts`.

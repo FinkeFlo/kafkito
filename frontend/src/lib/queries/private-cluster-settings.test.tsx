@@ -8,6 +8,7 @@ import {
   createRootRoute,
   createRouter,
 } from "@tanstack/react-router";
+import { toast } from "sonner";
 import type { PrivateCluster } from "@/lib/private-clusters";
 import { Route as SettingsRoute } from "@/routes/settings.clusters";
 import { groupQueries } from "./groups";
@@ -94,6 +95,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  vi.restoreAllMocks();
 });
 
 describe("private cluster settings", () => {
@@ -280,5 +282,129 @@ describe("private cluster transport security", () => {
       "With Skip verify, the broker's certificate is not checked, so the connection can be intercepted.",
     );
     expect(within(form).getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+});
+
+// Exports are encrypted with a passphrase and import again once it is
+// entered; plaintext exports from before still import.
+describe("private cluster export and import", () => {
+  const PASSPHRASE = "correct horse battery staple";
+
+  function captureDownloads() {
+    const blobs: Blob[] = [];
+    const names: string[] = [];
+    vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
+      blobs.push(blob as Blob);
+      return "blob:export";
+    });
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      names.push(this.download);
+    });
+    return { blobs, names };
+  }
+
+  async function upload(user: ReturnType<typeof userEvent.setup>, name: string, text: string) {
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!input) throw new Error("file input not found");
+    await user.upload(input, new File([text], name, { type: "application/json" }));
+  }
+
+  it("encrypts the export and imports it again with the passphrase", async () => {
+    const user = userEvent.setup();
+    const success = vi.spyOn(toast, "success");
+    const downloads = captureDownloads();
+    const payments: PrivateCluster = {
+      ...privateCluster("pc_payments", "payments-dev"),
+      auth: { type: "scram-sha-512", username: "svc-payments", password: "hunter2-hunter2" },
+      tls: { enabled: true, insecure_skip_verify: false },
+    };
+    store(payments, privateCluster("pc_other", "other"));
+    renderSettings();
+
+    await user.click(
+      await screen.findByRole("checkbox", { name: "Select payments-dev for export" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Export 1 selected" }));
+    const exportDialog = await screen.findByRole("dialog", { name: "Export private clusters" });
+    expect(within(exportDialog).getByRole("status")).toHaveTextContent(
+      /^The file contains 1 cluster, including their credentials/,
+    );
+    await user.type(within(exportDialog).getByLabelText("Passphrase"), PASSPHRASE);
+    await user.type(within(exportDialog).getByLabelText("Confirm passphrase"), PASSPHRASE);
+    await user.click(within(exportDialog).getByRole("button", { name: "Export" }));
+
+    await waitFor(() => expect(downloads.blobs).toHaveLength(1), { timeout: 5_000 });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(downloads.names).toEqual([
+      expect.stringMatching(/^kafkito-private-clusters-\d{4}-\d{2}-\d{2}\.json$/),
+    ]);
+    expect(downloads.blobs[0].type).toBe("application/json");
+    const file = await downloads.blobs[0].text();
+    expect(JSON.parse(file)).toMatchObject({
+      format: "kafkito.private-clusters.export",
+      version: 2,
+      kdf: { iterations: 600_000 },
+    });
+    for (const secret of ["hunter2-hunter2", "svc-payments", "payments-dev", "10.0.0.1"]) {
+      expect(file).not.toContain(secret);
+    }
+
+    localStorage.clear();
+    await upload(user, "clusters.json", file);
+    const importDialog = await screen.findByRole("dialog", { name: "Import private clusters" });
+    expect(importDialog).toHaveTextContent("clusters.json is encrypted.");
+    const passphrase = within(importDialog).getByLabelText("Passphrase");
+    await user.type(passphrase, "not the passphrase");
+    await user.click(within(importDialog).getByRole("button", { name: "Import" }));
+    expect(
+      await within(importDialog).findByRole("alert", {}, { timeout: 5_000 }),
+    ).toHaveTextContent("Wrong passphrase or damaged file.");
+    expect(stored()).toEqual([]);
+
+    await user.clear(passphrase);
+    await user.type(passphrase, PASSPHRASE);
+    await user.click(within(importDialog).getByRole("button", { name: "Import" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument(), {
+      timeout: 5_000,
+    });
+    expect(stored()).toEqual([payments]);
+    expect(success).toHaveBeenCalledExactlyOnceWith("Imported: 1 added, 0 updated, 0 skipped", {
+      description: undefined,
+    });
+  });
+
+  it("still imports a plaintext export and suggests exporting again", async () => {
+    const user = userEvent.setup();
+    const success = vi.spyOn(toast, "success");
+    renderSettings();
+    await screen.findByRole("button", { name: "Import JSON" });
+
+    const legacy = privateCluster("pc_legacy", "legacy");
+    const bundle = {
+      schema: "kafkito.private-clusters/v1",
+      exported_at: "2026-01-01T00:00:00.000Z",
+      clusters: [legacy],
+    };
+    await upload(user, "old-export.json", JSON.stringify(bundle, null, 2));
+
+    expect(await screen.findByRole("row", { name: /Select legacy for export/ })).toBeVisible();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(stored()).toEqual([legacy]);
+    expect(success).toHaveBeenCalledExactlyOnceWith("Imported: 1 added, 0 updated, 0 skipped", {
+      description:
+        "This file was not encrypted. Export again for an encrypted copy, and delete the unencrypted file.",
+    });
+  });
+
+  it("says that stored credentials are unencrypted and exports are encrypted", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+    const form = await openAddForm(user);
+    expect(form).toHaveTextContent(
+      "Credentials are stored unencrypted in this browser's localStorage. Exports are encrypted with a passphrase you choose",
+    );
   });
 });

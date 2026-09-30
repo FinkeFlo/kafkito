@@ -35,8 +35,8 @@ The cluster appears in **Private clusters**, in the cluster selector, and in Fle
 
 **What can I do?**  
 1. Select it and start working in Topics, Groups, and Brokers.  
-2. Use **Export JSON** to back up cluster configs.  
-3. Use **Import JSON** to move them to another device/browser.
+2. Use **Export JSON** to back up cluster configs. Kafkito asks for a passphrase (at least 12 characters) and encrypts the file with it. The file cannot be opened without the passphrase, and Kafkito cannot recover a lost one.  
+3. Use **Import JSON** to move them to another device/browser. For an encrypted file, enter the passphrase it was exported with. Unencrypted files from older versions still import; export again to get an encrypted copy.
 
 **When should I use this?**  
 Use this for cross-device migration or sharing connection configs within your team.
@@ -61,7 +61,7 @@ Use this when connectivity behaves unexpectedly or a newly added cluster is not 
 
 ## Security note
 
-Private-cluster credentials are stored in your browser and sent to backend only for requests targeting the selected private cluster. Export files include the same data.
+Private-cluster credentials are stored unencrypted in your browser's localStorage and sent to backend only for requests targeting the selected private cluster. Export files include the same data, encrypted with the passphrase you choose.
 
 The credentials travel in a request header, so only add a private cluster when kafkito is served over HTTPS (see [Running behind TLS](../architecture.md#running-behind-tls)).
 
