@@ -63,7 +63,6 @@ func TestBuildValidator_RejectsInvalidMode(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -71,7 +70,7 @@ func TestBuildValidator_RejectsInvalidMode(t *testing.T) {
 
 			require.Error(t, err, "BuildValidator(%q) must reject", tc.mode)
 			if tc.wantErrIs != nil {
-				assert.ErrorIs(t, err, tc.wantErrIs)
+				require.ErrorIs(t, err, tc.wantErrIs)
 			}
 			if tc.wantErrSubstring != "" {
 				assert.ErrorContains(t, err, tc.wantErrSubstring)

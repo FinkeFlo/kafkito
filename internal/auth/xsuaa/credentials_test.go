@@ -49,7 +49,6 @@ func TestParseCredentialsFromVCAP_ExtractsAllFields(t *testing.T) {
 		{"LocalScopePrefix", c.LocalScopePrefix(), "kafkito!t12345."},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.field, func(t *testing.T) {
 			t.Parallel()
 
