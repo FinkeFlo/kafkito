@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/netip"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -55,6 +56,14 @@ type probeFixture struct {
 // advertised instead. IPs listed in reachable are redirected to the broker's
 // loopback socket; any other allowed IP fails like a refused connection.
 func newProbeFixture(t *testing.T, advertise []string, reachable map[string]bool) *probeFixture {
+	t.Helper()
+	return newProbeFixtureWithDial(t, advertise, reachable, nil)
+}
+
+// newProbeFixtureWithDial is newProbeFixture with onDial, when non-nil,
+// called at the start of every dial the guard lets through; the dial goes
+// on once the func onDial returned has been called.
+func newProbeFixtureWithDial(t *testing.T, advertise []string, reachable map[string]bool, onDial func(host string) func()) *probeFixture {
 	t.Helper()
 
 	var mu sync.Mutex
@@ -107,6 +116,9 @@ func newProbeFixture(t *testing.T, advertise []string, reachable map[string]bool
 		if err != nil {
 			return nil, err
 		}
+		if onDial != nil {
+			defer onDial(host)()
+		}
 		mu.Lock()
 		target, ok := loopback[host]
 		mu.Unlock()
@@ -130,8 +142,9 @@ func (f *probeFixture) probe(t *testing.T) []BrokerIssue {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	require.NoError(t, f.conns.Ping(ctx, f.name), "the seed must answer")
-	issues, err := f.conns.ProbeBrokers(ctx, f.name)
+	issues, skipped, err := f.conns.ProbeBrokers(ctx, f.name)
 	require.NoError(t, err)
+	assert.Zero(t, skipped)
 	return issues
 }
 
@@ -189,6 +202,93 @@ func TestProbeBrokers_UnknownCluster(t *testing.T) {
 	t.Parallel()
 
 	conns := newConnections(nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	_, err := conns.ProbeBrokers(context.Background(), "nope")
+	_, _, err := conns.ProbeBrokers(context.Background(), "nope")
 	assert.ErrorIs(t, err, ErrUnknownCluster)
+}
+
+// probeTestIPs returns n allowed TEST-NET-1 addresses, 192.0.2.20 onwards.
+func probeTestIPs(n int) []string {
+	ips := make([]string, n)
+	for i := range ips {
+		ips[i] = fmt.Sprintf("192.0.2.%d", 20+i)
+	}
+	return ips
+}
+
+// A seed advertising more than maxProbedBrokers brokers gets only the first
+// maxProbedBrokers (by node ID) dialled; the rest are counted as skipped.
+func TestProbeBrokers_CapsProbedBrokers(t *testing.T) {
+	t.Parallel()
+
+	ips := probeTestIPs(maxProbedBrokers + 6)
+	reachable := map[string]bool{}
+	for _, ip := range ips {
+		reachable[ip] = true
+	}
+	var armed atomic.Bool
+	var mu sync.Mutex
+	dialled := map[string]bool{}
+	f := newProbeFixtureWithDial(t, ips, reachable, func(host string) func() {
+		if armed.Load() && host != probeSeedIP {
+			mu.Lock()
+			dialled[host] = true
+			mu.Unlock()
+		}
+		return func() {}
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	require.NoError(t, f.conns.Ping(ctx, f.name))
+	armed.Store(true)
+	issues, skipped, err := f.conns.ProbeBrokers(ctx, f.name)
+	require.NoError(t, err)
+
+	assert.Empty(t, issues)
+	assert.Equal(t, 6, skipped)
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Len(t, dialled, maxProbedBrokers)
+	for _, ip := range ips[maxProbedBrokers:] {
+		assert.False(t, dialled[ip], "broker %s beyond the cap must not be dialled", ip)
+	}
+}
+
+// No more than maxConcurrentBrokerProbes dials are in flight at once.
+func TestProbeBrokers_BoundsConcurrency(t *testing.T) {
+	t.Parallel()
+
+	ips := probeTestIPs(3 * maxConcurrentBrokerProbes)
+	reachable := map[string]bool{}
+	for _, ip := range ips {
+		reachable[ip] = true
+	}
+	var armed atomic.Bool
+	var inFlight, peak atomic.Int32
+	f := newProbeFixtureWithDial(t, ips, reachable, func(host string) func() {
+		if !armed.Load() || host == probeSeedIP {
+			return func() {}
+		}
+		n := inFlight.Add(1)
+		for {
+			p := peak.Load()
+			if n <= p || peak.CompareAndSwap(p, n) {
+				break
+			}
+		}
+		time.Sleep(20 * time.Millisecond) // let concurrent dials overlap
+		return func() { inFlight.Add(-1) }
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	require.NoError(t, f.conns.Ping(ctx, f.name))
+	armed.Store(true)
+	issues, skipped, err := f.conns.ProbeBrokers(ctx, f.name)
+	require.NoError(t, err)
+
+	assert.Empty(t, issues)
+	assert.Zero(t, skipped)
+	assert.LessOrEqual(t, peak.Load(), int32(maxConcurrentBrokerProbes))
+	assert.Greater(t, peak.Load(), int32(1), "brokers are probed in parallel")
 }

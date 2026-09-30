@@ -26,6 +26,16 @@ const (
 	BrokerIssueUnreachable = "unreachable"
 )
 
+// Bounds on ProbeBrokers. For a private cluster the broker list comes from
+// a user-chosen seed, so without them one seed could make kafkito open
+// thousands of connections at once or use it to scan arbitrary addresses.
+const (
+	// maxProbedBrokers is how many advertised brokers are dialled at most.
+	maxProbedBrokers = 64
+	// maxConcurrentBrokerProbes is how many probes run at the same time.
+	maxConcurrentBrokerProbes = 8
+)
+
 // BrokerIssue is an advertised broker that a probe could not talk to.
 type BrokerIssue struct {
 	NodeID int32  `json:"node_id"`
@@ -38,23 +48,42 @@ type BrokerIssue struct {
 // ProbeBrokers asks a seed broker of the named cluster for the brokers it
 // advertises and sends each of them a request through the cluster's own
 // client, so the dial goes through the same guard, TLS and SASL setup as
-// every later request. Brokers are probed in parallel under ctx. It returns
-// the brokers that failed, sorted by node ID, or nil when all answered.
-// The error is non-nil only when no seed returned the broker list.
-func (r *Connections) ProbeBrokers(ctx context.Context, name string) ([]BrokerIssue, error) {
+// every later request. The caller must run Ping first: it loads the
+// client's broker list, without which cl.Broker cannot resolve a node ID
+// (such a broker is then reported as unreachable). Host and port of each
+// issue are the ones the seed's metadata advertises.
+//
+// Brokers are probed in node ID order, at most maxConcurrentBrokerProbes at
+// a time, under ctx. Only the first maxProbedBrokers are dialled; skipped
+// is the number of advertised brokers beyond that cap, which were neither
+// dialled nor reported, so the caller can say the result is partial.
+//
+// It returns the brokers that failed, sorted by node ID, or nil when all
+// probed brokers answered. The error is non-nil only when no seed returned
+// the broker list.
+func (r *Connections) ProbeBrokers(ctx context.Context, name string) (issues []BrokerIssue, skipped int, err error) {
 	cl, err := r.Client(name)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	brokers, err := seedBrokerList(ctx, cl)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
+	}
+
+	sort.Slice(brokers, func(i, j int) bool { return brokers[i].NodeID < brokers[j].NodeID })
+	if len(brokers) > maxProbedBrokers {
+		skipped = len(brokers) - maxProbedBrokers
+		brokers = brokers[:maxProbedBrokers]
 	}
 
 	results := make([]*BrokerIssue, len(brokers))
+	sem := make(chan struct{}, maxConcurrentBrokerProbes)
 	var wg sync.WaitGroup
 	for i, b := range brokers {
+		sem <- struct{}{}
 		wg.Go(func() {
+			defer func() { <-sem }()
 			req := kmsg.NewPtrMetadataRequest()
 			req.Topics = []kmsg.MetadataRequestTopic{}
 			if _, err := cl.Broker(int(b.NodeID)).Request(ctx, req); err != nil {
@@ -71,14 +100,13 @@ func (r *Connections) ProbeBrokers(ctx context.Context, name string) ([]BrokerIs
 	}
 	wg.Wait()
 
-	var issues []BrokerIssue
 	for _, is := range results {
 		if is != nil {
 			issues = append(issues, *is)
 		}
 	}
-	sort.Slice(issues, func(i, j int) bool { return issues[i].NodeID < issues[j].NodeID })
-	return issues, nil
+	// results follows brokers, which is sorted by node ID.
+	return issues, skipped, nil
 }
 
 // seedBrokerList asks the seed brokers, one after another, for the brokers
