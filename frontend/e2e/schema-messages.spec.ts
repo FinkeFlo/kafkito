@@ -58,9 +58,7 @@ test.describe("Messages of a Schema Registry topic", () => {
     await expect(second.getByText(`value · avro · sr id ${v2Id}`)).toBeVisible();
   });
 
-  test("a truncated Avro record offers only the raw download, which skips Schema Registry decoding", async ({
-    page,
-  }) => {
+  test("a truncated Avro record loads and downloads its decoded JSON in full", async ({ page }) => {
     const v2Id = await schemaId(page, 2);
 
     const large = page.getByTestId("message-row").filter({ hasText: "preview" });
@@ -73,23 +71,44 @@ test.describe("Messages of a Schema Registry topic", () => {
       large.getByText(/^value · avro · sr id \d+ · preview only — full size/),
     ).toBeVisible();
 
-    // Pins today's behaviour, see #87: the raw-value endpoint returns the
-    // undecoded wire bytes, so the decoded preview gets no "Load full value"
-    // action, and "Download full value" saves the Confluent wire format
-    // (magic byte 0x00 + big-endian schema id + Avro body) as a .bin file
-    // instead of the decoded JSON. Update this walk when #87 is fixed.
-    await expect(large.getByRole("button", { name: /Load full value/ })).toHaveCount(0);
-    await expect(large.getByText("click to filter")).toHaveCount(0);
+    // The raw-value endpoint serves the decoded JSON (#87), so the preview
+    // can be completed for click-to-filter.
+    const loadButton = large.getByRole("button", {
+      name: "Load full value to enable click-to-filter",
+      exact: true,
+    });
+    await expect(loadButton).toBeVisible();
+    await loadButton.click();
+    await expect(large.getByText("click to filter")).toBeVisible();
+    await expect(large.getByRole("button", { name: '"E2E-AVRO-3"', exact: true })).toBeVisible();
 
     const downloadPromise = page.waitForEvent("download");
     await large.getByRole("button", { name: "Download full value", exact: true }).click();
     const download = await downloadPromise;
 
-    expect(download.suggestedFilename()).toBe(`${TOPIC}-p0-o2.bin`);
-    const body = await readFile(await download.path());
+    expect(download.suggestedFilename()).toBe(`${TOPIC}-p0-o2.json`);
+    const decoded = JSON.parse(await readFile(await download.path(), "utf8")) as {
+      order_id: string;
+      amount_cents: number;
+      currency: string;
+      note: string;
+    };
+    expect(decoded.order_id).toBe("E2E-AVRO-3");
+    expect(decoded.amount_cents).toBe(500);
+    expect(decoded.currency).toBe("EUR");
+    expect(decoded.note).toHaveLength(100_000);
+
+    // decoded=false still serves the Confluent wire format: magic byte 0x00,
+    // big-endian schema id, Avro body.
+    const wire = await page.request.get(
+      `/api/v1/clusters/${c}/topics/${TOPIC}/messages/0/2/raw?decoded=false`,
+    );
+    expect(wire.ok()).toBe(true);
+    expect(wire.headers()["content-type"]).toBe("application/octet-stream");
+    expect(wire.headers()["x-kafkito-value-decoded"]).toBeUndefined();
+    const body = await wire.body();
     expect(body[0]).toBe(0);
     expect(body.readUInt32BE(1)).toBe(v2Id);
-    expect(body.length).toBeGreaterThan(100_000);
     expect(body.subarray(5).toString("latin1")).toContain("E2E-AVRO-3");
     expect(body.toString("latin1")).not.toContain('"order_id"');
   });
