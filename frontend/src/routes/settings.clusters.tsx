@@ -28,9 +28,11 @@ import {
   type PrivateClusterAuth,
 } from "@/lib/private-clusters";
 import { testCluster } from "@/lib/api";
+import { PrivateClustersNotice } from "@/features/clusters/PrivateClustersNotice";
 import { TestConnectionResult, type TestOutcome } from "@/features/clusters/TestConnectionResult";
 import { removePrivateClusterQueries } from "@/lib/queries/cluster-key";
 import { useCluster } from "@/lib/use-cluster";
+import { usePrivateClusterAccess } from "@/lib/use-private-cluster-access";
 
 export const Route = createFileRoute("/settings/clusters")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -127,6 +129,8 @@ function ClusterSettingsPage() {
     [clusters],
   );
   const qc = useQueryClient();
+  const privateAccess = usePrivateClusterAccess();
+  const unavailableId = privateAccess.allowed ? undefined : "private-clusters-unavailable";
   const [items, setItems] = useState(() => listPrivateClusters());
   const forceRefresh = () => setItems(listPrivateClusters());
   useEffect(() => {
@@ -240,6 +244,8 @@ function ClusterSettingsPage() {
               size="sm"
               leadingIcon={<Plus className="h-4 w-4" aria-hidden />}
               onClick={openNew}
+              disabled={!privateAccess.allowed}
+              aria-describedby={unavailableId}
             >
               Add cluster
             </Button>
@@ -257,6 +263,8 @@ function ClusterSettingsPage() {
               size="sm"
               leadingIcon={<Upload className="h-4 w-4" aria-hidden />}
               onClick={() => fileRef.current?.click()}
+              disabled={!privateAccess.allowed}
+              aria-describedby={unavailableId}
             >
               Import JSON
             </Button>
@@ -274,6 +282,8 @@ function ClusterSettingsPage() {
           </>
         }
       />
+
+      {unavailableId && <PrivateClustersNotice id={unavailableId} mode={privateAccess.mode} />}
 
       {items.length > 0 && (
         <Toolbar
@@ -447,6 +457,8 @@ function ClusterForm({
   const [testing, setTesting] = useState(false);
   const [testOutcome, setTestOutcome] = useState<TestOutcome | null>(null);
   const [testElapsed, setTestElapsed] = useState(0);
+  const privateAccess = usePrivateClusterAccess();
+  const unavailableId = privateAccess.allowed ? undefined : "private-cluster-form-unavailable";
 
   useEffect(() => {
     if (!testing) {
@@ -510,7 +522,13 @@ function ClusterForm({
       title={f.id ? "Edit private cluster" : "Add private cluster"}
       actions={
         <>
-          <Button variant="secondary" size="sm" onClick={onTest} disabled={testing || !complete}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onTest}
+            disabled={testing || !complete || !privateAccess.allowed}
+            aria-describedby={unavailableId}
+          >
             {testing ? "Testing…" : "Test connection"}
           </Button>
           <Button variant="ghost" size="sm" onClick={onClose}>
@@ -526,6 +544,9 @@ function ClusterForm({
         Credentials are stored in this browser's localStorage in plaintext. Use Export/Import to
         migrate between devices.
       </p>
+      {unavailableId && (
+        <PrivateClustersNotice id={unavailableId} mode={privateAccess.mode} className="mt-4" />
+      )}
 
       <div className="mt-4 grid gap-4">
         <div>

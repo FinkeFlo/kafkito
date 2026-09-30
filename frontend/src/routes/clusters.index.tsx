@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/Button";
 import { formatRelative } from "@/lib/format";
 import { useFormatters } from "@/lib/use-formatters";
 import { clusterQueries } from "@/lib/queries/clusters";
+import { usePrivateClusterAccess } from "@/lib/use-private-cluster-access";
 
 type ClusterRowInfo = ClusterInfo & { is_private?: boolean };
 
@@ -69,15 +70,16 @@ function HomePage() {
     const unsub = subscribePrivateClusters(() => setPrivateClusters(listPrivateClusters()));
     return unsub;
   }, []);
+  const privateAllowed = usePrivateClusterAccess().allowed;
 
   const merged: ClusterRowInfo[] | undefined = useMemo(() => {
     if (!clustersQuery.data) return undefined;
     const serverNames = new Set(clustersQuery.data.map((c) => c.name));
-    const privateRows = privateClusters
+    const privateRows = (privateAllowed ? privateClusters : [])
       .filter((p) => !serverNames.has(p.name))
       .map(privateClusterToRow);
     return [...clustersQuery.data, ...privateRows];
-  }, [clustersQuery.data, privateClusters]);
+  }, [clustersQuery.data, privateClusters, privateAllowed]);
 
   return (
     <div className="space-y-5 p-6">

@@ -9,6 +9,7 @@ import {
   type PrivateCluster,
 } from "./private-clusters";
 import { clusterQueries } from "@/lib/queries/clusters";
+import { usePrivateClusterAccess } from "@/lib/use-private-cluster-access";
 
 const STORAGE_KEY = "kafkito.cluster";
 
@@ -94,10 +95,13 @@ export function useCluster(): UseClusterResult {
   });
 
   const privateClusters = usePrivateClusters();
+  // Stored entries stay in localStorage; they are only left out while the
+  // server does not allow private clusters for this user.
+  const privateAllowed = usePrivateClusterAccess().allowed;
 
   const clusters = useMemo<ClusterListItem[] | undefined>(() => {
     const shared = clustersQuery.data?.map(sharedToListItem) ?? [];
-    const priv = privateClusters.map(privateToListItem);
+    const priv = privateAllowed ? privateClusters.map(privateToListItem) : [];
     // Dedupe: if a private cluster happens to share its name with a shared
     // cluster, the shared entry wins and the private one is dropped from the
     // switcher (the user can rename).
@@ -105,7 +109,7 @@ export function useCluster(): UseClusterResult {
     const merged = [...shared, ...priv.filter((c) => !seen.has(c.name))];
     if (!clustersQuery.data && priv.length === 0) return undefined;
     return merged;
-  }, [clustersQuery.data, privateClusters]);
+  }, [clustersQuery.data, privateClusters, privateAllowed]);
 
   const defaultCluster = useMemo(() => {
     if (!clusters || clusters.length === 0) return null;
