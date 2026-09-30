@@ -7,10 +7,15 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log/slog"
+	"maps"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"slices"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -296,4 +301,154 @@ func TestValidateClusterPolicy_LookupErrorIsFixedText(t *testing.T) {
 	err := validateClusterPolicyWith(t.Context(), cfg, netguard.NewHostValidator(lookup))
 
 	require.EqualError(t, err, "schema_registry.url: host name could not be resolved")
+}
+
+// countingLookup resolves every host to a documentation address, except the
+// hosts in unresolvable, and counts the lookups per host.
+type countingLookup struct {
+	unresolvable []string
+
+	mu    sync.Mutex
+	calls map[string]int
+}
+
+func (c *countingLookup) lookup(_ context.Context, host string) ([]string, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.calls == nil {
+		c.calls = make(map[string]int)
+	}
+	c.calls[host]++
+	if slices.Contains(c.unresolvable, host) {
+		return nil, &net.DNSError{Err: "no such host", Name: host, IsNotFound: true}
+	}
+	return []string{"203.0.113.10"}, nil
+}
+
+func (c *countingLookup) counts() map[string]int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return maps.Clone(c.calls)
+}
+
+// manyBrokers returns n broker addresses with distinct host names.
+func manyBrokers(n int) []string {
+	out := make([]string, n)
+	for i := range out {
+		out[i] = fmt.Sprintf("echo-broker-%d.example.test:9092", i+1)
+	}
+	return out
+}
+
+// A definition names at most 50 brokers. The count is checked before any
+// host is resolved.
+func TestValidateClusterPolicy_BrokerCap(t *testing.T) {
+	t.Parallel()
+
+	var lookups countingLookup
+	err := validateClusterPolicyWith(t.Context(), config.ClusterConfig{Brokers: manyBrokers(maxBrokersPerCluster + 1)}, netguard.NewHostValidator(lookups.lookup))
+	require.EqualError(t, err, "too many brokers (max 50)")
+	assert.Empty(t, lookups.counts(), "no host is resolved")
+
+	err = validateClusterPolicyWith(t.Context(), config.ClusterConfig{Brokers: manyBrokers(maxBrokersPerCluster)}, netguard.NewHostValidator(lookups.lookup))
+	require.NoError(t, err)
+	assert.Len(t, lookups.counts(), maxBrokersPerCluster)
+}
+
+// The definitions of one request share its HostValidator: each distinct
+// host, in any letter case, is resolved once per request.
+func TestValidateClusterPolicy_ResolvesEachHostOncePerRequest(t *testing.T) {
+	t.Parallel()
+
+	var lookups countingLookup
+	var ctxs []context.Context
+	h := hostValidatorMiddleware(lookups.lookup)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		ctxs = append(ctxs, r.Context())
+	}))
+	for range 2 {
+		h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+	}
+	require.Len(t, ctxs, 2)
+
+	require.NoError(t, validateClusterPolicy(ctxs[0], config.ClusterConfig{
+		Brokers:        []string{"a.example.test:9092", "A.example.test:9093", "b.example.test:9092"},
+		SchemaRegistry: config.SchemaRegistryConfig{URL: "https://b.example.test:8081"},
+	}))
+	require.NoError(t, validateClusterPolicy(ctxs[0], config.ClusterConfig{
+		Brokers: []string{"b.example.test:9094", "c.example.test:9092", "a.example.test:9092"},
+	}))
+	assert.Equal(t, map[string]int{"a.example.test": 1, "b.example.test": 1, "c.example.test": 1}, lookups.counts())
+
+	// Another request resolves again.
+	require.NoError(t, validateClusterPolicy(ctxs[1], config.ClusterConfig{Brokers: []string{"a.example.test:9092"}}))
+	assert.Equal(t, 2, lookups.counts()["a.example.test"])
+}
+
+// The X-Kafkito-Cluster header and a Test connection body or a
+// dest_cluster_config of the same request resolve each distinct host once.
+func TestPrivateClusterRequests_ResolveEachHostOnce(t *testing.T) {
+	t.Parallel()
+
+	header := encodeHeader(t, config.ClusterConfig{Brokers: []string{"a.example.test:9092", "b.example.test:9092", "A.example.test:9093"}})
+	for _, tc := range []struct {
+		name, path, body, want string
+	}{
+		{
+			"test connection", "/api/v1/clusters/_test",
+			`{"brokers":["b.example.test:9094","c.example.test:9092"]}`,
+			`{"error":"broker 2: host name could not be resolved"}`,
+		},
+		{
+			"copy", "/api/v1/clusters/" + config.PrivateClusterSentinel + "/topics/orders/copy",
+			`{"dest_topic":"t","dest_cluster_config":{"brokers":["B.example.test:9094","c.example.test:9092"]}}`,
+			`{"error":"dest_cluster_config: broker 2: host name could not be resolved"}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			lookups := &countingLookup{unresolvable: []string{"c.example.test"}}
+			st := stores{clusters: fakeClusters{}}
+			h := New(Options{
+				Version:    "v-test",
+				Logger:     slog.New(slog.DiscardHandler),
+				Config:     config.Defaults(),
+				stores:     &st,
+				lookupHost: lookups.lookup,
+			})
+			req := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set(PrivateClusterHeader, header)
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+			assert.JSONEq(t, tc.want, rec.Body.String())
+			assert.Equal(t, map[string]int{"a.example.test": 1, "b.example.test": 1, "c.example.test": 1}, lookups.counts())
+		})
+	}
+}
+
+// The X-Kafkito-Cluster header is not schema-validated: its broker count is
+// checked in Go, before any host is resolved.
+func TestPrivateClusterHeader_TooManyBrokers(t *testing.T) {
+	t.Parallel()
+
+	lookups := &countingLookup{}
+	st := stores{clusters: fakeClusters{}}
+	h := New(Options{
+		Version:    "v-test",
+		Logger:     slog.New(slog.DiscardHandler),
+		Config:     config.Defaults(),
+		stores:     &st,
+		lookupHost: lookups.lookup,
+	})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/"+config.PrivateClusterSentinel+"/topics", nil)
+	req.Header.Set(PrivateClusterHeader, encodeHeader(t, config.ClusterConfig{Brokers: manyBrokers(60)}))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	assert.JSONEq(t, `{"error":"X-Kafkito-Cluster: too many brokers (max 50)"}`, rec.Body.String())
+	assert.Empty(t, lookups.counts())
 }

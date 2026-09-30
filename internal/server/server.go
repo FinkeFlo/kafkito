@@ -17,6 +17,7 @@ import (
 	"github.com/FinkeFlo/kafkito/internal/auth"
 	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
+	"github.com/FinkeFlo/kafkito/internal/netguard"
 	"github.com/FinkeFlo/kafkito/internal/rbac"
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
 	"github.com/go-chi/chi/v5"
@@ -40,6 +41,11 @@ type Options struct {
 	copyRegistry copyRegistry
 	// strictMiddlewares run around every generated handler in tests.
 	strictMiddlewares []gen.StrictMiddlewareFunc
+	// testConnLimiter replaces the Test connection rate limiter in tests.
+	testConnLimiter *rateLimiter
+	// lookupHost replaces the resolver of the outbound-host pre-check in
+	// tests.
+	lookupHost netguard.LookupFunc
 }
 
 // New returns a ready-to-serve http.Handler.
@@ -72,6 +78,10 @@ func New(opts Options) http.Handler {
 
 	errs := errorWriter{log: handlerLog}
 	privateClusters := privateClusterAccess{cfg: opts.Config.PrivateClusters, policy: policy}
+	testConnLimiter := opts.testConnLimiter
+	if testConnLimiter == nil {
+		testConnLimiter = newTestConnLimiter()
+	}
 	generated, err := newGeneratedRoutes(&apiServer{
 		version:         opts.Version,
 		policy:          policy,
@@ -98,6 +108,8 @@ func New(opts Options) http.Handler {
 				v1.Group(func(g chi.Router) {
 					g.Use(rejectInternalClusterNames(errs))
 					g.Use(privateClusterGate(privateClusters, errs))
+					g.Use(testConnRateLimit(testConnLimiter, errs))
+					g.Use(hostValidatorMiddleware(opts.lookupHost))
 					g.Use(privateClusterMiddleware)
 					g.Use(rbacMiddleware(policy, withRequestIDLogging(baseLog)))
 					g.Use(resolvePrivateClusterParam(st.clusters))

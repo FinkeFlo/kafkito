@@ -185,12 +185,19 @@ paths:
         A definition that fails validation is a 400. Its message names a
         broker by its 1-based position in `brokers` and never repeats a
         submitted value, for example `broker 2: host name could not be
-        resolved` or `schema_registry.url: invalid URL`.
+        resolved` or `schema_registry.url: invalid URL`. A definition names
+        at most 50 brokers.
 
         The probed definition is a private cluster, so `private_clusters.mode`
         applies: 403 `private_clusters_disabled` or
         `private_clusters_forbidden` when the caller may not use private
         clusters. No other RBAC permission is required.
+
+        Each caller may send 10 requests at once, then one every 6 seconds;
+        more get 429 `rate_limited` (see the response). The caller is the
+        verified principal of the request, else the client address of the
+        connection; request headers do not count. A request the mode refuses
+        does not count.
       parameters:
         - $ref: "#/components/parameters/PrivateClusterHeader"
       requestBody:
@@ -209,6 +216,20 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "429":
+          description: >
+            The caller sent more than 10 Test connection requests in a burst
+            or more than one every 6 seconds after that. The body is
+            `{"error": "too many requests", "code": "rate_limited"}`.
+          headers:
+            X-Request-Id: { $ref: "#/components/headers/RequestId" }
+            Retry-After:
+              description: Whole seconds until the next request is accepted.
+              required: true
+              schema: { type: integer, minimum: 1 }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /api/v1/clusters/{cluster}/capabilities:
     parameters:
       - $ref: "#/components/parameters/Cluster"
@@ -1340,9 +1361,10 @@ components:
       schema: { type: string, contentEncoding: base64 }
       description: >
         Base64-encoded JSON `ClusterConfig` of a private (browser-stored)
-        cluster, max 8 KiB decoded. Honoured when the `{cluster}` path segment
-        is `__private__` (required then). A malformed header or a definition
-        that fails validation is rejected with 400; the message names the
+        cluster, max 8 KiB decoded and at most 50 brokers. Honoured when the
+        `{cluster}` path segment is `__private__` (required then). A
+        malformed header or a definition that fails validation is rejected
+        with 400; the message names the
         field and a fixed reason, a broker by its 1-based position, and never
         repeats a value from the header. When `private_clusters.mode` does
         not allow the caller private
@@ -1459,6 +1481,7 @@ components:
             `private_cluster_address_blocked`, `private_clusters_disabled`,
             `private_clusters_forbidden`,
             `production_confirmation_required`, `copy_concurrency_limit`,
+            `rate_limited`,
             `kafka_message_too_large`, `kafka_not_authorized`, `rbac_denied`,
             `topic_consumers_timeout`, `value_masked`, `invalid_request` (the
             request does not match this document; `error` names the parameter
@@ -2196,6 +2219,9 @@ components:
           type: array
           minItems: 1
           items: { type: string }
+          description: >
+            Seed broker addresses (`host:port`), at most 50. A definition
+            with more gets 400 `too many brokers (max 50)`.
         auth:
           type: object
           properties:

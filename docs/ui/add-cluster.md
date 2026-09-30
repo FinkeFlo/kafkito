@@ -13,7 +13,7 @@ Under **Settings → Private clusters**, you get a table of browser-local cluste
 
 **What can I do?**  
 1. Open **Add cluster**.  
-2. Enter `Name` and `Brokers (comma-separated)`.  
+2. Enter `Name` and `Brokers (comma-separated)`, at most 50 brokers.  
 3. Choose `Auth type` (`none`, `SASL/PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`).  
 4. For auth types other than `none`, provide username/password.  
 5. Optionally mark the cluster as **Production**.  
@@ -49,11 +49,12 @@ Connection test/save errors or missing availability in certain tabs (for example
 **What can I do?**  
 1. **First test is slow/timeout**: on cold DNS, first probe can be slow; retry is often much faster.  
 2. **Generic error texts**: a failed test only says what went wrong: `connection refused`, `connection timed out`, `host name could not be resolved`, `TLS handshake failed`, `authentication failed`, `destination not allowed` or `broker not reachable`. A rejected broker is named by its position in your list (`broker 2: ...`), not by its address. Your operator finds the full error in the server log.  
-3. **Schemas unavailable**: without Schema Registry URL, Schemas cannot be used. Configure SR in cluster settings.  
-4. **Auth failure**: verify `Auth type` matches broker setup and credentials are complete.  
-5. **Produce warning on prod**: if a cluster is marked as Production, producing a message requires an extra confirmation step.  
-6. **Name conflicts**: if a private cluster has the same name as a shared cluster, shared cluster wins in selector. Use distinct names.  
-7. **Delete is local**: deleting removes the entry only from the current browser. Export before deleting if needed.
+3. **Too many tests**: you can run **Test connection** 10 times in a row, then once every 6 seconds. Beyond that the test shows `HTTP 429: too many requests`; wait a few seconds and run it again.  
+4. **Schemas unavailable**: without Schema Registry URL, Schemas cannot be used. Configure SR in cluster settings.  
+5. **Auth failure**: verify `Auth type` matches broker setup and credentials are complete.  
+6. **Produce warning on prod**: if a cluster is marked as Production, producing a message requires an extra confirmation step.  
+7. **Name conflicts**: if a private cluster has the same name as a shared cluster, shared cluster wins in selector. Use distinct names.  
+8. **Delete is local**: deleting removes the entry only from the current browser. Export before deleting if needed.
 
 ![Production warning before produce](../assets/screenshots/ui-produce-prod-warning.png)
 

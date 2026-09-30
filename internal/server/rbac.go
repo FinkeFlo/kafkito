@@ -48,8 +48,9 @@ func rbacSubject(r *http.Request, policy *rbac.Policy) string {
 // is closed until it is mapped or listed here.
 var rbacExemptRoutes = map[string]string{
 	testClusterRoute: "probes a private cluster definition sent in the body " +
-		"or header: privateClusterGate applies private_clusters.mode, no " +
-		"configured cluster is involved and the outbound-host guard applies",
+		"or header: privateClusterGate applies private_clusters.mode, " +
+		"testConnRateLimit limits it per caller, no configured cluster is " +
+		"involved and the outbound-host guard applies",
 }
 
 // rbacMiddleware enforces RBAC for cluster routes. The identity is resolved

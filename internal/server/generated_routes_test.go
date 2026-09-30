@@ -497,7 +497,8 @@ func TestAPIOps_Requests(t *testing.T) {
 	t.Cleanup(reg.Close)
 	cfg := config.Defaults()
 	cfg.Server.TestConnectionTimeout = 300 * time.Millisecond
-	h := New(Options{Version: "v-test", Logger: slog.Default(), Registry: reg, Config: cfg})
+	// h gets more Test connection requests than one caller may send.
+	h := New(Options{Version: "v-test", Logger: slog.Default(), Registry: reg, Config: cfg, testConnLimiter: noTestConnLimit()})
 
 	upOnly := kafkapkg.NewRegistry([]config.ClusterConfig{{Name: "up-only", Brokers: []string{broker.addr()}}}, slog.Default())
 	t.Cleanup(upOnly.Close)
@@ -510,6 +511,9 @@ func TestAPIOps_Requests(t *testing.T) {
 	upperAuthHeader := encodeHeader(t, config.ClusterConfig{Brokers: []string{unreachableBroker}, Auth: config.AuthConfig{Type: "PLAIN", Username: "u", Password: "p"}})
 	paddedAuthHeader := encodeHeader(t, config.ClusterConfig{Brokers: []string{unreachableBroker}, Auth: config.AuthConfig{Type: " plain ", Username: "u", Password: "p"}})
 	blankBrokerHeader := encodeHeader(t, config.ClusterConfig{Brokers: []string{unreachableBroker, " "}})
+	tooManyBrokers := slices.Repeat([]string{unreachableBroker}, maxBrokersPerCluster+1)
+	tooManyBrokersHeader := encodeHeader(t, config.ClusterConfig{Brokers: tooManyBrokers})
+	tooManyBrokersBody := `{"brokers":["` + strings.Join(tooManyBrokers, `","`) + `"]}`
 	jsonCT := "application/json"
 
 	cases := []handlerCase{
@@ -540,12 +544,14 @@ func TestAPIOps_Requests(t *testing.T) {
 		{h, requestCase{name: "test via header upper-case auth type", method: http.MethodPost, path: "/api/v1/clusters/_test", header: map[string]string{PrivateClusterHeader: upperAuthHeader}, wantStatus: 200, wantBody: `"auth_type":"plain"`}},
 		{h, requestCase{name: "test via header padded auth type", method: http.MethodPost, path: "/api/v1/clusters/_test", header: map[string]string{PrivateClusterHeader: paddedAuthHeader}, wantStatus: 200, wantBody: `"auth_type":"plain"`}},
 		{h, requestCase{name: "test via header blank broker", method: http.MethodPost, path: "/api/v1/clusters/_test", header: map[string]string{PrivateClusterHeader: blankBrokerHeader}, wantStatus: 400, wantBody: `{"error":"X-Kafkito-Cluster: broker 2: address must not be empty"}`}},
+		{h, requestCase{name: "test via header too many brokers", method: http.MethodPost, path: "/api/v1/clusters/_test", header: map[string]string{PrivateClusterHeader: tooManyBrokersHeader}, wantStatus: 400, wantBody: `{"error":"X-Kafkito-Cluster: too many brokers (max 50)"}`}},
 		{h, requestCase{name: "test via body", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":["` + unreachableBroker + `"],"auth":{"type":"plain","username":"u","password":"p"}}`, wantStatus: 200, wantBody: `"auth_type":"plain"`}},
 		{h, requestCase{name: "test body upper-case auth type", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":["` + unreachableBroker + `"],"auth":{"type":"PLAIN","username":"u","password":"p"}}`, wantStatus: 400, wantBody: `{"code":"invalid_request","error":"request body \"/auth/type\": must be one of the allowed values"}`}},
 		{h, requestCase{name: "test body padded auth type", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":["` + unreachableBroker + `"],"auth":{"type":" plain ","username":"u","password":"p"}}`, wantStatus: 400, wantBody: `{"code":"invalid_request","error":"request body \"/auth/type\": must be one of the allowed values"}`}},
 		{h, requestCase{name: "test body with charset", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: "application/json; charset=utf-8", body: `{"brokers":["` + unreachableBroker + `"],"auth":{"type":"scram-sha-512","username":"u","password":"p"}}`, wantStatus: 200}},
 		{h, requestCase{name: "test without config", method: http.MethodPost, path: "/api/v1/clusters/_test", wantStatus: 400, wantBody: `{"error":"cluster config required in body or X-Kafkito-Cluster header"}`}},
 		{h, requestCase{name: "test no brokers", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":[]}`, wantStatus: 400, wantBody: `{"code":"invalid_request","error":"request body \"/brokers\": must have at least 1 items"}`}},
+		{h, requestCase{name: "test too many brokers", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: tooManyBrokersBody, wantStatus: 400, wantBody: `{"error":"too many brokers (max 50)"}`}},
 		{h, requestCase{name: "test brokers missing", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{}`, wantStatus: 400, wantBody: `"error":"request body \"/brokers\": is required"`}},
 		{h, requestCase{name: "test blank broker", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":["` + unreachableBroker + `"," "]}`, wantStatus: 400, wantBody: `{"error":"broker 2: address must not be empty"}`}},
 		{h, requestCase{name: "test empty broker", method: http.MethodPost, path: "/api/v1/clusters/_test", contentType: jsonCT, body: `{"brokers":[""]}`, wantStatus: 400, wantBody: `{"error":"broker 1: address must not be empty"}`}},

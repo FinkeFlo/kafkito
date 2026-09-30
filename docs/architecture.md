@@ -14,7 +14,7 @@ flowchart TD
     B[Browser / SPA] --> P["Auth proxy (optional, e.g. approuter)"]
     P --> M["Security headers, request log, 30 s timeout"]
     M --> A[Auth middleware]
-    A --> PC["Internal cluster name refusal, private cluster mode, private-cluster header decode + SSRF pre-check"]
+    A --> PC["Internal cluster name refusal, private cluster mode, Test connection rate limit, private-cluster header decode + SSRF pre-check"]
     PC --> R[RBAC]
     R --> PR[Private-cluster resolution]
     PR --> V["Body limit + OpenAPI request validation (kin-openapi)"]
@@ -146,6 +146,28 @@ in `error`:
 
 Each `broker_issues` entry carries its own class; its `host` and `port` are
 the ones the cluster advertises. The full error goes to the server log only.
+
+A cluster definition (the `X-Kafkito-Cluster` header, a Test connection
+body, a `dest_cluster_config`) names at most 50 brokers, checked before any
+host is resolved; more get `400 too many brokers (max 50)`, prefixed with
+the field (`X-Kafkito-Cluster: `, `dest_cluster_config: `) where the
+definition is not the body itself. All definitions of one
+request share one pre-check (`hostValidatorMiddleware`), which resolves each
+distinct host once.
+
+Test connection resolves and dials whatever the caller sends, so it is rate
+limited per caller (`internal/server/ratelimit.go`): 10 requests at once,
+then one every 6 seconds. A request over the limit gets
+`429 rate_limited` with `Retry-After` in whole seconds before the header is
+decoded, so it resolves no host. The caller is the verified principal (user
+name, else subject) or, without one, the host of the connection's remote
+address. No request header counts: the client chooses the RBAC identity
+header and `X-Forwarded-For` freely, and kafkito does not rewrite the remote
+address from proxy headers. Behind a reverse proxy without authentication,
+all callers therefore share the proxy's address and one limit. A caller
+that `private_clusters.mode` refuses gets its `403` without counting
+against the limit. The limiter forgets a caller once its bucket is full
+again and keeps at most 10,000 callers.
 
 ## Security headers
 
