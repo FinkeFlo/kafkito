@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -17,12 +18,16 @@ import (
 // ad-hoc clusters while other goroutines read the same clusters through every
 // lookup that touches the shared maps. Run with -race: an unlocked read shows
 // up as a data race (or a fatal concurrent map access). The timeout guards the
-// mu -> srMu lock order against deadlocks.
+// lock order against deadlocks.
 func TestConnections_AdhocChurnRacesWithReaders(t *testing.T) {
 	t.Parallel()
 
 	r := NewRegistry(nil, slog.New(slog.DiscardHandler))
 	t.Cleanup(r.Close)
+	r.StartMetrics(t.Context(), time.Hour)
+	mc := r.metricsCollector()
+	require.NotNil(t, mc)
+	unreachable := &fakeAdmin{metadataErr: errors.New("unreachable")}
 
 	const clusters = 8
 	cfgs := make([]config.ClusterConfig, clusters)
@@ -37,10 +42,10 @@ func TestConnections_AdhocChurnRacesWithReaders(t *testing.T) {
 		names[i] = name
 	}
 
-	// Backdating the last-use stamps makes the next UseAdhoc sweep evict
-	// every entry, so the writers keep deleting and re-adding map entries.
-	// A capability entry is seeded for each cluster so the sweep drops it
-	// too.
+	// Backdating the last-use stamps makes the next eviction drop every
+	// entry, so the evictor and the writers keep deleting and re-adding map
+	// entries. A capability entry is seeded for each cluster so the eviction
+	// drops it too.
 	expireAll := func() {
 		r.mu.Lock()
 		for name := range r.adhocLastUsed {
@@ -55,6 +60,7 @@ func TestConnections_AdhocChurnRacesWithReaders(t *testing.T) {
 	wg.Go(func() {
 		for range iterations {
 			expireAll()
+			r.evictIdleAdhoc()
 		}
 	})
 	for w := range 2 {
@@ -74,6 +80,7 @@ func TestConnections_AdhocChurnRacesWithReaders(t *testing.T) {
 				assert.NotNil(t, r.MaskingPolicy(name))
 				_, _ = r.ConfigFor(name)
 				r.RefreshCapabilities(name)
+				mc.ensureFresh(t.Context(), name, time.Minute, unreachable)
 			}
 		})
 	}
@@ -86,14 +93,15 @@ func TestConnections_AdhocChurnRacesWithReaders(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(30 * time.Second):
-		t.Fatal("adhoc churn did not finish: possible deadlock between mu and srMu")
+		t.Fatal("adhoc churn did not finish: possible lock order deadlock")
 	}
 
-	// Once quiet, a final sweep leaves no cached decoder behind for a
+	// Once quiet, a final eviction leaves nothing cached behind for a
 	// cluster that is no longer registered.
 	expireAll()
 	_, err := r.UseAdhoc(config.ClusterConfig{Brokers: []string{"final.invalid:9092"}})
 	require.NoError(t, err)
+	r.evictIdleAdhoc()
 
 	r.mu.Lock()
 	registered := make(map[string]bool, len(r.clusters))
@@ -105,8 +113,13 @@ func TestConnections_AdhocChurnRacesWithReaders(t *testing.T) {
 	}
 	r.mu.Unlock()
 	r.srMu.Lock()
-	defer r.srMu.Unlock()
 	for name := range r.srDecoders {
 		assert.Truef(t, registered[name], "decoder cached for evicted cluster %s", name)
+	}
+	r.srMu.Unlock()
+	mc.statesMu.RLock()
+	defer mc.statesMu.RUnlock()
+	for name := range mc.states {
+		assert.Truef(t, registered[name], "metrics kept for evicted cluster %s", name)
 	}
 }

@@ -7,8 +7,9 @@
 //
 // Connections owns one *kgo.Client + kadm.Client per configured cluster.
 // Clients are created lazily on first use and reused for the process'
-// lifetime. Registry bundles Connections with the domain operations; call
-// Registry.Close() on shutdown to release all connections.
+// lifetime; those of ad-hoc (private) clusters are closed once idle. Registry
+// bundles Connections with the domain operations; call Registry.Close() on
+// shutdown to release all connections.
 package kafka
 
 import (
@@ -48,10 +49,13 @@ const ProducerBatchMaxBytes = 10 << 20 // 10 MiB
 // decoder and the masking policy.
 //
 // Locking: mu guards clusters, masking, clients, adhocLastUsed and caps,
-// which UseAdhoc and its idle sweep modify at runtime; srMu guards srDecoders.
-// ordered is written only by the constructor. The lock order is mu -> srMu
-// (the sweep holds mu while it drops cached decoders), so code holding srMu
-// must never take mu or call a method that does.
+// which UseAdhoc and evictIdleAdhoc modify at runtime; srMu guards
+// srDecoders; janitorMu guards janitor and janitorClosed. ordered, now,
+// adhocSweepEvery, evictHooks and adhocDial are set before the first ad-hoc
+// registration and only read afterwards. The lock order is
+// janitorMu -> mu -> srMu: the janitor holds janitorMu for a whole run, so
+// no code may take janitorMu while holding another lock, and code holding
+// srMu must never take mu or call a method that does.
 type Connections struct {
 	log      *slog.Logger
 	ordered  []config.ClusterConfig
@@ -76,6 +80,21 @@ type Connections struct {
 
 	srMu       sync.Mutex
 	srDecoders map[string]*SRDecoder
+
+	// now is the clock of the ad-hoc last-use times and of idle eviction;
+	// adhocSweepEvery is the janitor's interval. Tests replace them.
+	now             func() time.Time
+	adhocSweepEvery time.Duration
+	// evictHooks drop what the services keep per cluster (collected
+	// metrics, cached topic configs) for the ad-hoc clusters evictIdleAdhoc
+	// removed.
+	evictHooks []func(clusters []string)
+
+	// janitor runs evictIdleAdhoc while ad-hoc entries exist; nil while
+	// disarmed. janitorClosed is set by Registry.Close and keeps it off.
+	janitorMu     sync.Mutex
+	janitor       *time.Timer
+	janitorClosed bool
 
 	// adhocDial, when non-nil, replaces netguard.GuardedDialContext as the
 	// guarded dial of ad-hoc clusters (TLS still wraps it). Never set it
@@ -148,17 +167,19 @@ type Registry struct {
 func NewRegistry(cfg []config.ClusterConfig, log *slog.Logger) *Registry {
 	conns := newConnections(cfg, log)
 	clusters := &Clusters{Connections: conns}
+	topics := &Topics{
+		Connections: conns,
+		stats:       clusters,
+		cfgCache:    make(map[string]topicConfigsCacheEntry),
+	}
+	conns.evictHooks = []func([]string){topics.dropTopicConfigs, clusters.dropMetrics}
 	return &Registry{
 		Connections: conns,
-		Topics: &Topics{
-			Connections: conns,
-			stats:       clusters,
-			cfgCache:    make(map[string]topicConfigsCacheEntry),
-		},
-		Groups:   &Groups{Connections: conns},
-		Messages: &Messages{Connections: conns},
-		Security: &Security{Connections: conns},
-		Clusters: clusters,
+		Topics:      topics,
+		Groups:      &Groups{Connections: conns},
+		Messages:    &Messages{Connections: conns},
+		Security:    &Security{Connections: conns},
+		Clusters:    clusters,
 	}
 }
 
@@ -188,13 +209,15 @@ func newConnections(cfg []config.ClusterConfig, log *slog.Logger) *Connections {
 		}
 	}
 	return &Connections{
-		log:        log,
-		ordered:    ordered,
-		clusters:   m,
-		masking:    policies,
-		clients:    make(map[string]*kgo.Client),
-		caps:       make(map[string]capCache),
-		srDecoders: make(map[string]*SRDecoder),
+		log:             log,
+		ordered:         ordered,
+		clusters:        m,
+		masking:         policies,
+		clients:         make(map[string]*kgo.Client),
+		caps:            make(map[string]capCache),
+		srDecoders:      make(map[string]*SRDecoder),
+		now:             time.Now,
+		adhocSweepEvery: adhocSweepInterval,
 	}
 }
 
@@ -225,7 +248,7 @@ func (r *Connections) srDecoderFor(cluster string) *SRDecoder {
 	}
 	r.srMu.Unlock()
 
-	// An idle sweep may have evicted the cluster while the decoder was
+	// The idle janitor may have evicted the cluster while the decoder was
 	// built. Its cleanup then ran before the entry above was stored, so drop
 	// the entry here instead of leaving it behind for a cluster that is gone.
 	if _, ok := r.ConfigFor(cluster); !ok {
@@ -242,6 +265,7 @@ func (r *Connections) srDecoderFor(cluster string) *SRDecoder {
 // Returns an empty policy if the cluster is unknown or no rules configured.
 func (r *Connections) MaskingPolicy(cluster string) *masking.Policy {
 	r.mu.Lock()
+	r.touchAdhocLocked(cluster)
 	p, ok := r.masking[cluster]
 	r.mu.Unlock()
 	if ok && p != nil {
@@ -270,18 +294,30 @@ func (r *Connections) ConfigsOrdered() []config.ClusterConfig {
 // ConfigFor returns the ClusterConfig registered under the given internal
 // name (static or ad-hoc/private). Used by the HTTP layer to check
 // cluster-level flags (e.g. IsProd) before performing a mutating operation.
+// Like Client and MaskingPolicy, it counts as a use of an ad-hoc cluster.
 func (r *Connections) ConfigFor(name string) (config.ClusterConfig, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.touchAdhocLocked(name)
 	cfg, ok := r.clusters[name]
 	return cfg, ok
 }
 
-// Client returns (or creates) a kgo.Client for the given cluster name.
+// Client returns (or creates) a kgo.Client for the given cluster name. It
+// counts as a use of an ad-hoc cluster and so postpones its idle eviction.
 func (r *Connections) Client(name string) (*kgo.Client, error) {
+	return r.client(name, true)
+}
+
+// client is Client; use false keeps the call from counting as a use, for
+// background work that must not keep an idle ad-hoc cluster alive.
+func (r *Connections) client(name string, use bool) (*kgo.Client, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	if use {
+		r.touchAdhocLocked(name)
+	}
 	if c, ok := r.clients[name]; ok {
 		return c, nil
 	}
@@ -456,9 +492,10 @@ func (r *Connections) Ping(ctx context.Context, name string) error {
 	return cl.Ping(ctx)
 }
 
-// Close stops the metrics collector and releases all underlying Kafka
-// clients.
+// Close stops the idle janitor and the metrics collector and releases all
+// underlying Kafka clients.
 func (r *Registry) Close() {
+	r.stopJanitor()
 	r.stopMetrics()
 	r.closeClients()
 }

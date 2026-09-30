@@ -15,12 +15,17 @@ import (
 
 	"github.com/FinkeFlo/kafkito/internal/config"
 	"github.com/FinkeFlo/kafkito/internal/masking"
+	"github.com/twmb/franz-go/pkg/kgo"
 )
 
 // adhocIdleTTL is how long an unused ad-hoc cluster entry (and its kgo.Client)
 // is kept before being evicted. Kept conservative: keeps hot tabs snappy but
 // releases resources for closed ones.
 const adhocIdleTTL = 15 * time.Minute
+
+// adhocSweepInterval is how often the janitor evicts idle ad-hoc entries, so
+// an entry outlives its last use by at most adhocIdleTTL plus this interval.
+const adhocSweepInterval = time.Minute
 
 // adhocFPKey returns the process-local secret used to key the ad-hoc
 // fingerprint HMAC, generating it on first use. The key never leaves the
@@ -96,13 +101,9 @@ func (r *Connections) UseAdhoc(cfg config.ClusterConfig) (string, error) {
 	name := config.AdhocClusterPrefix + fp
 
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	// Opportunistic sweep of idle adhoc entries to bound memory.
-	r.sweepAdhocLocked()
-
 	if _, exists := r.clusters[name]; exists {
 		r.touchAdhocLocked(name)
+		r.mu.Unlock()
 		return name, nil
 	}
 
@@ -113,41 +114,119 @@ func (r *Connections) UseAdhoc(cfg config.ClusterConfig) (string, error) {
 
 	r.clusters[name] = cfg
 	r.masking[name] = empty
-	r.touchAdhocLocked(name)
-	return name, nil
-}
-
-// touchAdhocLocked records the last-use timestamp for an adhoc cluster.
-// Must be called while holding r.mu.
-func (r *Connections) touchAdhocLocked(name string) {
 	if r.adhocLastUsed == nil {
 		r.adhocLastUsed = make(map[string]time.Time, 4)
 	}
-	r.adhocLastUsed[name] = time.Now()
+	r.adhocLastUsed[name] = r.now()
+	r.mu.Unlock()
+
+	r.startJanitor()
+	return name, nil
 }
 
-// sweepAdhocLocked evicts adhoc entries whose last use is older than
-// adhocIdleTTL. Must be called while holding r.mu.
-func (r *Connections) sweepAdhocLocked() {
-	if len(r.adhocLastUsed) == 0 {
-		return
+// touchAdhocLocked records a use of an ad-hoc cluster, which postpones its
+// idle eviction. Names without a last-use entry (configured, evicted or
+// unknown clusters) are left alone. Must be called while holding r.mu.
+func (r *Connections) touchAdhocLocked(name string) {
+	if _, ok := r.adhocLastUsed[name]; ok {
+		r.adhocLastUsed[name] = r.now()
 	}
-	cutoff := time.Now().Add(-adhocIdleTTL)
+}
+
+// registered reports whether name is a registered cluster. Unlike ConfigFor
+// it does not count as a use of an ad-hoc cluster.
+func (r *Connections) registered(name string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	_, ok := r.clusters[name]
+	return ok
+}
+
+// evictIdleAdhoc removes every ad-hoc cluster whose last use is adhocIdleTTL
+// or longer ago, together with everything kept for it: the client (closed),
+// the config, the masking policy, the cached capabilities and Schema
+// Registry decoder and, through evictHooks, the collected metrics and the
+// cached topic configs. It is the only place that removes ad-hoc entries and
+// returns how many are left.
+func (r *Connections) evictIdleAdhoc() (remaining int) {
+	cutoff := r.now().Add(-adhocIdleTTL)
+	var evicted []string
+	var clients []*kgo.Client
+
+	r.mu.Lock()
 	for name, last := range r.adhocLastUsed {
 		if last.After(cutoff) {
 			continue
 		}
+		evicted = append(evicted, name)
 		if cl, ok := r.clients[name]; ok {
-			cl.Close()
+			clients = append(clients, cl)
 			delete(r.clients, name)
 		}
 		delete(r.clusters, name)
 		delete(r.masking, name)
 		delete(r.adhocLastUsed, name)
 		delete(r.caps, name)
+	}
+	remaining = len(r.adhocLastUsed)
+	r.mu.Unlock()
 
-		r.srMu.Lock()
+	if len(evicted) == 0 {
+		return remaining
+	}
+	r.srMu.Lock()
+	for _, name := range evicted {
 		delete(r.srDecoders, name)
-		r.srMu.Unlock()
+	}
+	r.srMu.Unlock()
+	for _, drop := range r.evictHooks {
+		drop(evicted)
+	}
+	// Closed without holding mu, so requests for other clusters do not wait
+	// for the clients to shut down.
+	for _, cl := range clients {
+		cl.Close()
+	}
+	return remaining
+}
+
+// startJanitor arms the timer that runs evictIdleAdhoc every
+// adhocSweepEvery, unless it is armed already or the registry is closed.
+// UseAdhoc calls it after every new registration.
+func (r *Connections) startJanitor() {
+	r.janitorMu.Lock()
+	defer r.janitorMu.Unlock()
+	if r.janitor != nil || r.janitorClosed {
+		return
+	}
+	r.janitor = time.AfterFunc(r.adhocSweepEvery, r.runJanitor)
+}
+
+// runJanitor evicts idle ad-hoc entries and re-arms the timer while any are
+// left; once none is left the timer stays off until the next registration.
+// It holds janitorMu for the whole run, so stopJanitor waits for a run in
+// progress.
+func (r *Connections) runJanitor() {
+	r.janitorMu.Lock()
+	defer r.janitorMu.Unlock()
+	if r.janitorClosed {
+		return
+	}
+	if r.evictIdleAdhoc() == 0 {
+		r.janitor = nil
+		return
+	}
+	r.janitor.Reset(r.adhocSweepEvery)
+}
+
+// stopJanitor stops the janitor for good: it waits for a run in progress
+// and keeps later registrations from arming it again.
+func (r *Connections) stopJanitor() {
+	r.janitorMu.Lock()
+	defer r.janitorMu.Unlock()
+	r.janitorClosed = true
+	if r.janitor != nil {
+		r.janitor.Stop()
+		r.janitor = nil
 	}
 }

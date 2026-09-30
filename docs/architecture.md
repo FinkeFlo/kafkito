@@ -138,10 +138,14 @@ inline scripts or styles), `X-Content-Type-Options`, `Referrer-Policy`,
   under `kafkito.private-clusters.v1`, **credentials in plaintext**.
 - The SPA sends the definition base64-encoded in `X-Kafkito-Cluster` on every
   request for the path segment `__private__`. The server validates it and
-  persists nothing; it only keeps the Kafka client in memory until it has
-  been idle for 15 minutes. The raw header and its credentials never appear
-  in logs, error bodies or validation messages. Broker and Schema Registry
-  host names and resolved IPs may appear in operator logs (franz-go
+  persists nothing. It keeps the definition, its Kafka client and what it
+  caches for the cluster (metrics, topic configs, capabilities, Schema
+  Registry decoder) in memory only: a background check, about once a minute,
+  closes the client and drops all of it once no request (a running copy
+  included) has used the cluster for 15 minutes. The periodic metrics
+  collection does not count as use. The raw header and its credentials never
+  appear in logs, error bodies or validation messages. Broker and Schema
+  Registry host names and resolved IPs may appear in operator logs (franz-go
   connection warnings, the 5xx error log, the Test connection warnings);
   credentials and the raw header never do. `private_cluster_leak_test.go`
   pins both.
