@@ -52,7 +52,12 @@ export function SearchResultBanner({
           Stopped
         </span>
       )}
-      {!searching && stopReason === "complete" && !stats.more_available && (
+      {!searching && stopReason === "timeout" && (
+        <span className="rounded bg-[var(--color-warning-subtle)] px-1.5 py-0.5 text-[var(--color-warning)]">
+          {stats.timed_out ? "Timed out" : "No progress"}
+        </span>
+      )}
+      {!searching && stopReason === "complete" && !stats.more_available && !stats.timed_out && (
         <span className="rounded bg-[var(--color-success-subtle)] px-1.5 py-0.5 text-[var(--color-success)]">
           Range fully scanned
         </span>

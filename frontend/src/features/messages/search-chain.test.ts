@@ -129,11 +129,61 @@ describe("runSearchChain", () => {
     expect(searchMessages).toHaveBeenCalledTimes(1);
   });
 
-  it("treats a call that scanned nothing as complete", async () => {
+  it("stops as timed out when a call scanned nothing but reports more", async () => {
     searchMessages.mockResolvedValue(page([], { scanned: 0, more_available: true }));
     const { done } = run({ budget: 0 });
-    await expect(done).resolves.toBe("complete");
+    await expect(done).resolves.toBe("timeout");
     expect(searchMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops as timed out when a call did not move any cursor", async () => {
+    const range = { "0": { start: 0, end: 50 }, "1": { start: 0, end: 20 } };
+    searchMessages.mockResolvedValue(
+      page([], {
+        scanned: 7,
+        timed_out: true,
+        more_available: true,
+        resolved_range: range,
+        next_cursors: { "0": 50, "1": 20 },
+      }),
+    );
+    const { done } = run({ budget: 0 });
+    await expect(done).resolves.toBe("timeout");
+    expect(searchMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it("checks progress against the range start when oldest first", async () => {
+    searchMessages.mockResolvedValue(
+      page([], {
+        scanned: 7,
+        timed_out: true,
+        more_available: true,
+        direction: "oldest_first",
+        resolved_range: { "0": { start: 10, end: 50 } },
+        next_cursors: { "0": 10 },
+      }),
+    );
+    const { done } = run({ budget: 0 });
+    await expect(done).resolves.toBe("timeout");
+    expect(searchMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps chaining after a timed-out call that moved a cursor", async () => {
+    searchMessages
+      .mockResolvedValueOnce(
+        page([], {
+          scanned: 7,
+          timed_out: true,
+          more_available: true,
+          resolved_range: { "0": { start: 0, end: 50 }, "1": { start: 0, end: 20 } },
+          next_cursors: { "0": 40, "1": 20 },
+        }),
+      )
+      .mockResolvedValueOnce(page([], { scanned: 5 }));
+    const { done } = run({ budget: 0 });
+    await expect(done).resolves.toBe("complete");
+    expect(searchMessages).toHaveBeenCalledTimes(2);
+    expect(searchMessages.mock.calls[1][2].cursors).toEqual({ "0": 40, "1": 20 });
   });
 
   it("uses the per-call cap when unlimited", async () => {

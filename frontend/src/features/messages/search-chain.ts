@@ -1,6 +1,11 @@
 import { searchMessages, type Message, type SearchRequest, type SearchStats } from "@/lib/api";
 
-export type SearchStopReason = "budget" | "complete" | "limit" | "stopped";
+/**
+ * Why a search chain stopped. "timeout" means a call reported more to search
+ * but made no progress (typically its server-side timeout hit before it could
+ * read anything new); "Search more" can retry from the same position.
+ */
+export type SearchStopReason = "budget" | "complete" | "limit" | "stopped" | "timeout";
 
 export type SearchResult = { messages: Message[]; stats: SearchStats; req: SearchRequest };
 
@@ -22,6 +27,23 @@ type ChainOptions = {
   /** Called with the cumulative result after every call. */
   onProgress: (result: SearchResult) => void;
 };
+
+/**
+ * Reports whether a call moved any partition's cursor off the boundary of the
+ * range it searched: the end when newest first, the start when oldest first.
+ * A call without progress would be repeated with the same cursors forever.
+ */
+function madeProgress(s: SearchStats): boolean {
+  if (s.scanned === 0) return false;
+  const range = s.resolved_range;
+  const next = s.next_cursors;
+  if (!range || !next) return true;
+  const newestFirst = s.direction !== "oldest_first";
+  return Object.entries(range).some(([p, r]) => {
+    const c = next[p];
+    return c !== undefined && c !== (newestFirst ? r.end : r.start);
+  });
+}
 
 /**
  * Chains search calls, feeding each call's next_cursors into the next, until
@@ -80,7 +102,6 @@ export async function runSearchChain({
     if (!s.more_available) return "complete";
     if (stopOnLimit && accMatched >= limit) return "limit";
     if (shouldStop()) return "stopped";
-    // Safety: a call that scanned nothing but reports more would loop forever.
-    if (s.scanned === 0) return "complete";
+    if (!madeProgress(s)) return "timeout";
   }
 }
