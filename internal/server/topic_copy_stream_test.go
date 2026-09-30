@@ -5,10 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -21,6 +23,7 @@ import (
 
 	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
+	"github.com/FinkeFlo/kafkito/internal/netguard"
 )
 
 // The tests in this file drive the copy SSE stream with a fake registry. They
@@ -316,5 +319,74 @@ func TestCopyStream_EventsMatchSpec(t *testing.T) {
 		var v any
 		require.NoError(t, json.Unmarshal([]byte(strings.TrimPrefix(ev, "data: ")), &v))
 		assert.NoError(t, schema.VisitJSON(v, openapi3.MultiErrors()), ev)
+	}
+}
+
+// failingCopyRegistry is a blockingCopyRegistry whose consume or produce
+// call fails with the given error.
+type failingCopyRegistry struct {
+	*blockingCopyRegistry
+	consumeErr error
+	produceErr error
+}
+
+func (f *failingCopyRegistry) ConsumeMessages(ctx context.Context, cluster, topic string, opts kafkapkg.ConsumeOptions) (*kafkapkg.ConsumeResult, error) {
+	if f.consumeErr != nil {
+		return nil, f.consumeErr
+	}
+	return f.blockingCopyRegistry.ConsumeMessages(ctx, cluster, topic, opts)
+}
+
+func (f *failingCopyRegistry) ProduceBatch(ctx context.Context, cluster, topic string, reqs []kafkapkg.ProduceRequest) (int, error) {
+	if f.produceErr != nil {
+		return 0, f.produceErr
+	}
+	return f.blockingCopyRegistry.ProduceBatch(ctx, cluster, topic, reqs)
+}
+
+// Issue #126: a copy job that hits an address the outbound guard refused
+// reports the same static message as the 502, not the refused host, which
+// may come from the X-Kafkito-Cluster header. Other errors keep their text.
+func TestCopyStream_ErrorEventHidesBlockedAddress(t *testing.T) {
+	blocked := fmt.Errorf("unable to dial: %w", &netguard.BlockedAddressError{
+		Addr: "rebind.example:9092", Host: "rebind.example", IP: netip.MustParseAddr("169.254.169.254"),
+	})
+	other := errors.New("NOT_LEADER_FOR_PARTITION")
+	cases := []struct {
+		name      string
+		consume   error
+		produce   error
+		wantError string
+	}{
+		{"consume blocked", blocked, nil, "consume: " + privateClusterAddressBlockedMsg},
+		{"produce blocked", nil, blocked, "produce: " + privateClusterAddressBlockedMsg},
+		{"consume other", other, nil, "consume: NOT_LEADER_FOR_PARTITION"},
+		{"produce other", nil, other, "produce: NOT_LEADER_FOR_PARTITION"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			holdCopySlots(t, maxConcurrentCopies)
+			reg := kafkapkg.NewRegistry([]config.ClusterConfig{
+				{Name: "src", Brokers: []string{"127.0.0.1:19092"}},
+				{Name: "dst", Brokers: []string{"127.0.0.1:19093"}},
+			}, slog.Default())
+			t.Cleanup(reg.Close)
+			base := newBlockingCopyRegistry(reg)
+			base.unblockNow()
+			fake := &failingCopyRegistry{blockingCopyRegistry: base, consumeErr: tc.consume, produceErr: tc.produce}
+			h := New(Options{Version: "test", Logger: slog.Default(), Registry: reg, Config: config.Defaults(), copyRegistry: fake})
+
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, newCopyRequest("/api/v1/clusters/src/topics/orders/copy", copyStreamBody))
+			require.Equal(t, http.StatusOK, rec.Code)
+
+			events := strings.Split(strings.TrimSuffix(rec.Body.String(), "\n\n"), "\n\n")
+			var last copyProgressEvent
+			require.NoError(t, json.Unmarshal([]byte(strings.TrimPrefix(events[len(events)-1], "data: ")), &last))
+			assert.True(t, last.Done)
+			assert.Equal(t, tc.wantError, last.Error)
+			assert.NotContains(t, rec.Body.String(), "rebind.example")
+			assert.NotContains(t, rec.Body.String(), "169.254.169.254")
+		})
 	}
 }

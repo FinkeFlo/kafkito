@@ -14,8 +14,20 @@ import (
 	"time"
 
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
+	"github.com/FinkeFlo/kafkito/internal/netguard"
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
 )
+
+// copyErrorText is the text a copy job's error event carries for err. A
+// dial the outbound guard refused gets the static message of the 502
+// private_cluster_address_blocked response: the refused host may come from
+// the X-Kafkito-Cluster header, and responses never echo header content.
+func copyErrorText(err error) string {
+	if errors.Is(err, netguard.ErrBlockedAddress) {
+		return privateClusterAddressBlockedMsg
+	}
+	return err.Error()
+}
 
 // copyBatchSize is the number of records fetched from the source cluster in
 // each iteration. Capped by the registry's own per-page limit.
@@ -412,7 +424,7 @@ func (s *apiServer) runCopy(ctx context.Context, w io.Writer, job copyJob) {
 				// Client gone or safety ceiling hit.
 				return
 			}
-			sendEvent(copyProgressEvent{Copied: copied, Skipped: skipped, Done: true, Error: "consume: " + consumeErr.Error()})
+			sendEvent(copyProgressEvent{Copied: copied, Skipped: skipped, Done: true, Error: "consume: " + copyErrorText(consumeErr)})
 			return
 		}
 
@@ -487,7 +499,7 @@ func (s *apiServer) runCopy(ctx context.Context, w io.Writer, job copyJob) {
 				if errors.Is(produceErr, context.Canceled) || errors.Is(produceErr, context.DeadlineExceeded) {
 					return
 				}
-				sendEvent(copyProgressEvent{Copied: copied, Skipped: skipped, Done: true, Error: "produce: " + produceErr.Error()})
+				sendEvent(copyProgressEvent{Copied: copied, Skipped: skipped, Done: true, Error: "produce: " + copyErrorText(produceErr)})
 				return
 			}
 		}
