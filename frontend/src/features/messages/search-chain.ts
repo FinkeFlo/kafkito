@@ -34,10 +34,9 @@ type ChainOptions = {
  * A call without progress would be repeated with the same cursors forever.
  */
 function madeProgress(s: SearchStats): boolean {
-  if (s.scanned === 0) return false;
   const range = s.resolved_range;
   const next = s.next_cursors;
-  if (!range || !next) return true;
+  if (!range || !next) return s.scanned > 0;
   const newestFirst = s.direction !== "oldest_first";
   return Object.entries(range).some(([p, r]) => {
     const c = next[p];
@@ -73,6 +72,11 @@ export async function runSearchChain({
   // range is exhausted (more_available=false), the limit is hit, or Stop.
   const unlimited = budget <= 0;
   let scannedThisRun = 0;
+  // A newest-first call only moves its cursors over whole chunks, and the
+  // server sizes chunks by the call budget. When a call times out before it
+  // finishes one, the next call gets a smaller budget. "Search more" after a
+  // timeout starts from the last call's budget.
+  let callCap = prior?.stats.timed_out ? (prior.req.budget ?? Infinity) : Infinity;
 
   for (;;) {
     let callBudget: number;
@@ -83,6 +87,7 @@ export async function runSearchChain({
       if (remaining <= 0) return "budget";
       callBudget = remaining;
     }
+    callBudget = Math.min(callBudget, callCap);
     const req: SearchRequest = { ...baseReq, budget: callBudget, cursors };
     const r = await searchMessages(cluster, topic, req);
     const s = r.search;
@@ -102,6 +107,10 @@ export async function runSearchChain({
     if (!s.more_available) return "complete";
     if (stopOnLimit && accMatched >= limit) return "limit";
     if (shouldStop()) return "stopped";
-    if (!madeProgress(s)) return "timeout";
+    if (!madeProgress(s)) {
+      const smaller = Math.min(Math.floor(callBudget / 2), Math.floor(s.scanned / 2));
+      if (!s.timed_out || smaller < 1) return "timeout";
+      callCap = smaller;
+    }
   }
 }

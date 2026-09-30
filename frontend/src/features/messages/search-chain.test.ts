@@ -149,7 +149,84 @@ describe("runSearchChain", () => {
     );
     const { done } = run({ budget: 0 });
     await expect(done).resolves.toBe("timeout");
+    // Each retry halves the budget (capped by what the call scanned) until
+    // nothing is left to shrink.
+    expect(searchMessages.mock.calls.map((c) => c[2].budget)).toEqual([1_000_000, 3, 1]);
+  });
+
+  it("stops at once when a call without progress did not time out", async () => {
+    searchMessages.mockResolvedValue(
+      page([], {
+        scanned: 7,
+        more_available: true,
+        resolved_range: { "0": { start: 0, end: 50 } },
+        next_cursors: { "0": 50 },
+      }),
+    );
+    const { done } = run({ budget: 0 });
+    await expect(done).resolves.toBe("timeout");
     expect(searchMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a timed-out call with a smaller budget and keeps it while chaining", async () => {
+    const range = { "0": { start: 0, end: 5000 } };
+    searchMessages
+      .mockResolvedValueOnce(
+        page([], {
+          scanned: 3000,
+          timed_out: true,
+          more_available: true,
+          resolved_range: range,
+          next_cursors: { "0": 5000 },
+        }),
+      )
+      .mockResolvedValueOnce(
+        page([], {
+          scanned: 1500,
+          more_available: true,
+          resolved_range: range,
+          next_cursors: { "0": 3500 },
+        }),
+      )
+      .mockResolvedValueOnce(page([], { scanned: 1500 }));
+    const { done } = run({ budget: 0 });
+    await expect(done).resolves.toBe("complete");
+    expect(searchMessages.mock.calls.map((c) => c[2].budget)).toEqual([1_000_000, 1500, 1500]);
+    expect(searchMessages.mock.calls[1][2].cursors).toEqual({ "0": 5000 });
+    expect(searchMessages.mock.calls[2][2].cursors).toEqual({ "0": 3500 });
+  });
+
+  it("counts moved cursors as progress even without scanned records", async () => {
+    searchMessages
+      .mockResolvedValueOnce(
+        page([], {
+          scanned: 0,
+          more_available: true,
+          resolved_range: { "0": { start: 0, end: 50 } },
+          next_cursors: { "0": 40 },
+        }),
+      )
+      .mockResolvedValueOnce(page([], { scanned: 5 }));
+    const { done } = run({ budget: 0 });
+    await expect(done).resolves.toBe("complete");
+    expect(searchMessages).toHaveBeenCalledTimes(2);
+  });
+
+  it("continues after a timeout with the last call's budget", async () => {
+    searchMessages.mockResolvedValueOnce(page([], { scanned: 30 }));
+    const prior: SearchResult = {
+      messages: [],
+      stats: stats({
+        scanned: 100,
+        timed_out: true,
+        more_available: true,
+        next_cursors: { "0": 50 },
+      }),
+      req: { ...baseReq, budget: 40 },
+    };
+    const { done } = run({ prior, budget: 0 });
+    await expect(done).resolves.toBe("complete");
+    expect(searchMessages.mock.calls[0][2]).toMatchObject({ budget: 40, cursors: { "0": 50 } });
   });
 
   it("checks progress against the range start when oldest first", async () => {
@@ -165,7 +242,7 @@ describe("runSearchChain", () => {
     );
     const { done } = run({ budget: 0 });
     await expect(done).resolves.toBe("timeout");
-    expect(searchMessages).toHaveBeenCalledTimes(1);
+    expect(searchMessages).toHaveBeenCalledTimes(3);
   });
 
   it("keeps chaining after a timed-out call that moved a cursor", async () => {
