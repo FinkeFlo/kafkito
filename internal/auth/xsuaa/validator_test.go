@@ -184,10 +184,10 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 	type tokenIssuer func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string
 
 	cases := []struct {
-		name             string
-		mutateCreds      func(*xsuaa.Credentials)
-		issueToken       tokenIssuer
-		wantErrSubstring string
+		name        string
+		mutateCreds func(*xsuaa.Credentials)
+		issueToken  tokenIssuer
+		wantErr     error
 	}{
 		{
 			name: "wrong_issuer",
@@ -197,11 +197,9 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Issue")
 				return tok
 			},
-			wantErrSubstring: "not under",
+			wantErr: auth.ErrIssuerMismatch,
 		},
 		{
-			// Upstream library wording for audience errors isn't part of our public
-			// contract, so we only require that an error is returned.
 			name: "wrong_audience",
 			issueToken: func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string {
 				t.Helper()
@@ -209,6 +207,7 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Issue")
 				return tok
 			},
+			wantErr: auth.ErrAudienceMismatch,
 		},
 		{
 			name: "bad_jku_host",
@@ -223,7 +222,7 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Issue")
 				return tok
 			},
-			wantErrSubstring: "jku",
+			wantErr: xsuaa.ErrJKUNotOwned,
 		},
 		{
 			name: "missing_jku",
@@ -233,10 +232,9 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "IssueWithoutJKU")
 				return raw
 			},
-			wantErrSubstring: "jku",
+			wantErr: xsuaa.ErrJKUMissing,
 		},
 		{
-			// Signature error wording isn't substring-stable across upstream versions.
 			name: "tampered_signature",
 			issueToken: func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string {
 				t.Helper()
@@ -255,6 +253,7 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				parts[2] = base64.RawURLEncoding.EncodeToString(sig)
 				return strings.Join(parts, ".")
 			},
+			wantErr: auth.ErrTokenInvalid,
 		},
 		{
 			name: "expired_token",
@@ -268,6 +267,7 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Issue")
 				return tok
 			},
+			wantErr: auth.ErrTokenExpired,
 		},
 		{
 			name: "missing_exp",
@@ -278,7 +278,7 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Sign")
 				return tok
 			},
-			wantErrSubstring: "exp",
+			wantErr: auth.ErrExpMissing,
 		},
 		{
 			name: "missing_sub",
@@ -289,7 +289,7 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Sign")
 				return tok
 			},
-			wantErrSubstring: "sub",
+			wantErr: auth.ErrSubMissing,
 		},
 		{
 			name: "empty_sub",
@@ -299,7 +299,7 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Sign")
 				return tok
 			},
-			wantErrSubstring: "sub",
+			wantErr: auth.ErrSubMissing,
 		},
 		{
 			name: "missing_kid",
@@ -309,7 +309,7 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Sign")
 				return tok
 			},
-			wantErrSubstring: "no kid",
+			wantErr: auth.ErrKidMissing,
 		},
 		{
 			// Unsigned token whose header names the mock's own jku and kid,
@@ -327,7 +327,7 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				return base64.RawURLEncoding.EncodeToString(hdr) + "." +
 					base64.RawURLEncoding.EncodeToString(payload) + "."
 			},
-			wantErrSubstring: "token alg",
+			wantErr: auth.ErrAlgNotAllowed,
 		},
 		{
 			name: "nbf_in_the_future",
@@ -338,7 +338,7 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Sign")
 				return tok
 			},
-			wantErrSubstring: "nbf",
+			wantErr: auth.ErrTokenNotYetValid,
 		},
 		{
 			name: "wrong_zid",
@@ -350,7 +350,7 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Issue")
 				return tok
 			},
-			wantErrSubstring: "zid",
+			wantErr: xsuaa.ErrZoneMismatch,
 		},
 		{
 			// UAADomain="ost" must not match mock.Host() == "127.0.0.1" by suffix.
@@ -364,7 +364,7 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Issue")
 				return tok
 			},
-			wantErrSubstring: "jku",
+			wantErr: xsuaa.ErrJKUNotOwned,
 		},
 		{
 			// iss = creds.URL + ".evil.com" — strings.HasPrefix would match without the / boundary check.
@@ -376,7 +376,7 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Issue")
 				return tok
 			},
-			wantErrSubstring: "not under",
+			wantErr: auth.ErrIssuerMismatch,
 		},
 	}
 	for _, tc := range cases {
@@ -396,9 +396,12 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 
 			_, err := v.Validate(context.Background(), tok)
 
-			require.Error(t, err, "Validate must reject")
-			if tc.wantErrSubstring != "" {
-				assert.ErrorContains(t, err, tc.wantErrSubstring)
+			require.ErrorIs(t, err, tc.wantErr, "Validate must reject the token for the row's reason")
+			for _, value := range []string{
+				mock.Host(), "evil", "kafkito!t12345", "sb-other", "test-zone", "different-zone",
+				"different.example.com", "test-key-",
+			} {
+				assert.NotContains(t, err.Error(), value, "the error must name the rule, not a claim or header value")
 			}
 		})
 	}

@@ -13,3 +13,10 @@ package xsuaa
 func NewValidatorForTest(creds Credentials) (*Validator, error) {
 	return newValidator(creds, true)
 }
+
+// Sentinel errors for the black-box tests.
+var (
+	ErrJKUMissing   = errJKUMissing
+	ErrJKUNotOwned  = errJKUNotOwned
+	ErrZoneMismatch = errZoneMismatch
+)

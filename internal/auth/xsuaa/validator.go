@@ -29,17 +29,20 @@ const maxJKUs = 16
 // tokenKeysPath is the only path XSUAA serves its key set at.
 const tokenKeysPath = "/token_keys"
 
-// jku policy errors. They name the rule, never the header value.
+// jku policy and claim errors. They name the rule, never a header or claim
+// value.
 var (
-	errJKUInvalid  = errors.New("jku is not an absolute URL")
-	errJKUScheme   = errors.New("jku must use https")
-	errJKUPath     = errors.New("jku path must be " + tokenKeysPath)
-	errJKUExtras   = errors.New("jku must not carry user info, a query or a fragment")
-	errJKUTooMany  = errors.New("jku rejected: too many distinct jku URLs")
-	errNoOwnJKU    = errors.New("xsuaa: credentials url does not yield an allowed jku")
-	errJKUNotOwned = errors.New("jku host outside uaadomain")
-	errJKUHost     = errors.New("jku host must be a DNS name")
-	errJKUPort     = errors.New("jku must not name a port other than 443")
+	errJKUMissing   = errors.New("token missing jku header")
+	errZoneMismatch = errors.New("zid does not match the bound identity zone")
+	errJKUInvalid   = errors.New("jku is not an absolute URL")
+	errJKUScheme    = errors.New("jku must use https")
+	errJKUPath      = errors.New("jku path must be " + tokenKeysPath)
+	errJKUExtras    = errors.New("jku must not carry user info, a query or a fragment")
+	errJKUTooMany   = errors.New("jku rejected: too many distinct jku URLs")
+	errNoOwnJKU     = errors.New("xsuaa: credentials url does not yield an allowed jku")
+	errJKUNotOwned  = errors.New("jku host outside uaadomain")
+	errJKUHost      = errors.New("jku host must be a DNS name")
+	errJKUPort      = errors.New("jku must not name a port other than 443")
 )
 
 // Validator validates asymmetrically signed tokens issued by an XSUAA tenant. Construct via
@@ -122,21 +125,21 @@ func (x *Validator) Close() {
 // or xsappname, and zid matches the identity zone when one is bound.
 func (x *Validator) Validate(ctx context.Context, raw string) (*auth.Principal, error) {
 	if raw == "" {
-		return nil, errors.New("empty bearer token")
+		return nil, auth.ErrTokenEmpty
 	}
 
 	// Parse JWS to read header (jku, kid) before fetching keys.
 	msg, err := jws.Parse([]byte(raw))
 	if err != nil {
-		return nil, fmt.Errorf("parse jws: %w", err)
+		return nil, auth.ErrTokenMalformed
 	}
-	if len(msg.Signatures()) == 0 {
-		return nil, errors.New("token has no signatures")
+	if len(msg.Signatures()) != 1 {
+		return nil, auth.ErrTokenSignatures
 	}
 	hdr := msg.Signatures()[0].ProtectedHeaders()
 	jkuStr, ok := hdr.JWKSetURL()
 	if !ok || jkuStr == "" {
-		return nil, errors.New("token missing jku header")
+		return nil, errJKUMissing
 	}
 	jku, err := x.canonicalJKU(jkuStr)
 	if err != nil {
@@ -159,19 +162,18 @@ func (x *Validator) Validate(ctx context.Context, raw string) (*auth.Principal, 
 
 	iss, issOK := tok.Issuer()
 	if !issOK || (iss != x.creds.URL && !strings.HasPrefix(iss, x.creds.URL+"/")) {
-		return nil, fmt.Errorf("iss %q not under %q", iss, x.creds.URL)
+		return nil, auth.ErrIssuerMismatch
 	}
 
-	auds, _ := tok.Audience()
-	if len(auds) == 0 {
-		return nil, errors.New("aud claim missing")
+	if auds, _ := tok.Audience(); len(auds) == 0 {
+		return nil, auth.ErrAudienceMissing
 	}
 	if !auth.AudienceContains(tok, x.creds.ClientID) && !auth.AudienceContains(tok, x.creds.XSAppName) {
-		return nil, fmt.Errorf("aud %v contains neither clientid nor xsappname", auds)
+		return nil, auth.ErrAudienceMismatch
 	}
 
 	if zid, ok := auth.TokString(tok, "zid"); x.creds.IdentityZoneID != "" && (!ok || zid != x.creds.IdentityZoneID) {
-		return nil, fmt.Errorf("zid %q != %q", zid, x.creds.IdentityZoneID)
+		return nil, errZoneMismatch
 	}
 
 	return principalFromToken(tok, x.creds.LocalScopePrefix()), nil
@@ -202,7 +204,7 @@ func (x *Validator) canonicalJKU(raw string) (string, error) {
 	}
 	domain := strings.ToLower(x.creds.UAADomain)
 	if host != domain && !strings.HasSuffix(host, "."+domain) {
-		return "", fmt.Errorf("%w %q", errJKUNotOwned, x.creds.UAADomain)
+		return "", errJKUNotOwned
 	}
 	if port := u.Port(); !loopback && port != "" && port != "443" {
 		return "", errJKUPort
