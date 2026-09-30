@@ -681,7 +681,12 @@ func (r *Messages) FetchRawMessageValue(ctx context.Context, cluster, topic stri
 		return nil, ErrValueTooLarge
 	}
 	d := r.recordDecoder(cluster, topic)
-	decoded := d.decodeValue(ctx, rec)
+	// The stored bytes need no decode unless the masking check does: a
+	// Schema Registry lookup could only slow them down.
+	var decoded decodedValue
+	if !opts.WireBytes || d.masks {
+		decoded = d.decodeValue(ctx, rec)
+	}
 	if d.masks {
 		if _, did := d.maskedValue(rec, decoded); did {
 			return nil, ErrValueMasked

@@ -218,7 +218,7 @@ Streams the untruncated value of a single record — no base64, no JSON
 envelope. This is the endpoint to use whenever the 64 KB preview in
 `GET .../messages` is not enough: to inspect a large value in full, to
 confirm a truncated preview's real encoding, or to re-produce a record
-byte-for-byte.
+byte-for-byte (for a Schema Registry value, with `decoded=false`).
 
 `partition` and `offset` are exact (no `-1`, no negative offsets).
 

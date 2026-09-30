@@ -5,6 +5,9 @@ package kafka
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -93,6 +96,28 @@ func TestFetchRawMessageValue_WithoutSchemaRegistryServesWireBytes(t *testing.T)
 	raw, err := env.reg.FetchRawMessageValue(context.Background(), kfakeCluster, env.topic, 0, 0, RawValueOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, &RawMessageValue{Value: frame, ContentType: "application/octet-stream", Extension: "bin"}, raw)
+}
+
+// The stored bytes of an unmasked topic are served without a Schema
+// Registry lookup, so an unreachable registry cannot delay them.
+func TestFetchRawMessageValue_WireBytesSkipTheSchemaRegistry(t *testing.T) {
+	t.Parallel()
+	var lookups atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		lookups.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	t.Cleanup(srv.Close)
+	env := newKfakeEnv(t, "users", 1, func(c *config.ClusterConfig) {
+		c.SchemaRegistry = config.SchemaRegistryConfig{URL: srv.URL}
+	})
+	frame := avroUserFrame(t, 1, "alice")
+	env.produce(t, &kgo.Record{Value: frame})
+
+	raw, err := env.reg.FetchRawMessageValue(context.Background(), kfakeCluster, env.topic, 0, 0, RawValueOptions{WireBytes: true})
+	require.NoError(t, err)
+	assert.Equal(t, frame, raw.Value)
+	assert.Zero(t, lookups.Load())
 }
 
 // The masking check covers the wire bytes too: they carry the same data.

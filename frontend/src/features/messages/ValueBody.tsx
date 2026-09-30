@@ -16,13 +16,17 @@
 // too: /raw serves them decoded, like the list. Protobuf is never decoded, so
 // its value stays binary and gets no button.
 //
-// Two cases deliberately do *not* offer the button:
+// Besides non-JSON encodings, two cases deliberately do *not* offer the
+// button:
 //
 //   - Masked values. The server refuses their raw download, since the raw
 //     bytes would bypass the masking.
 //   - Values above JsonInteractive's own SIZE_LIMIT_BYTES. Downloading them
 //     would succeed only for the tree renderer to refuse them, so say so up
-//     front with a disabled button and a visible reason.
+//     front with a disabled button and a visible reason. value_size_bytes
+//     is the stored size, so for a Schema-Registry value this check is
+//     best-effort: its decoded JSON is usually larger, and JsonInteractive
+//     still refuses an oversized tree itself.
 import { useMemo, useState } from "react";
 import { base64ToUtf8, RawValueTooLargeError, type Message } from "@/lib/api";
 import { isJsonLikeEncoding, prettyValue } from "@/lib/format";
