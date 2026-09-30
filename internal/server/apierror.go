@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
+	"github.com/FinkeFlo/kafkito/internal/netguard"
 )
 
 // apiError is an error with a client-facing representation: the HTTP status
@@ -38,10 +39,30 @@ func badRequest(msg string) *apiError {
 	return &apiError{Status: http.StatusBadRequest, Message: msg}
 }
 
+// privateClusterAddressBlockedCode marks a 502 whose cause is a private
+// cluster address the outbound guard refused (netguard.ErrBlockedAddress).
+const privateClusterAddressBlockedCode = "private_cluster_address_blocked"
+
+// privateClusterAddressBlockedMsg is static on purpose: the refused host may
+// come from the X-Kafkito-Cluster header (a DNS-rebinding seed), and the
+// response never echoes header content. Test connection names the broker.
+const privateClusterAddressBlockedMsg = "a broker or Schema Registry address of this private cluster " +
+	"resolves to an address kafkito does not connect to; run Test connection for details"
+
 // upstreamError reports a failed broker or Schema Registry call. The client
 // gets a generic 502 so internal hostnames and topology are not leaked; the
-// full error is logged with op as context.
+// full error is logged with op as context. A dial the outbound guard refused
+// gets its own code, so the UI can point the user to Test connection.
 func upstreamError(op string, err error) *apiError {
+	if errors.Is(err, netguard.ErrBlockedAddress) {
+		return &apiError{
+			Status:  http.StatusBadGateway,
+			Code:    privateClusterAddressBlockedCode,
+			Message: privateClusterAddressBlockedMsg,
+			Op:      op,
+			Err:     err,
+		}
+	}
 	return &apiError{
 		Status:  http.StatusBadGateway,
 		Code:    "kafka_upstream",
