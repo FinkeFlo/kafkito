@@ -19,6 +19,15 @@ type ClusterInfo struct {
 	TLS            bool          `json:"tls"`
 	SchemaRegistry bool          `json:"schema_registry"`
 	Capabilities   *Capabilities `json:"capabilities,omitempty"`
+	// BrokerIssues lists the advertised brokers a Test connection could not
+	// reach (see Connections.ProbeBrokers). Only the Test connection
+	// endpoint fills it; a non-empty list implies Reachable is false.
+	BrokerIssues []BrokerIssue `json:"broker_issues,omitempty"`
+	// BrokersSkipped is how many advertised brokers a Test connection did
+	// not check because the probe caps how many it dials. Only the Test
+	// connection endpoint fills it; on its own it does not make the
+	// cluster unreachable.
+	BrokersSkipped int `json:"brokers_skipped,omitempty"`
 	// Aggregate counts and metrics (filled best-effort from the metrics
 	// collector; nil when unknown yet or when the cluster is unreachable).
 	Brokers         *int     `json:"brokers,omitempty"`

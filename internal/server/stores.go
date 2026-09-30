@@ -33,6 +33,7 @@ type clusterStore interface {
 	Describe(ctx context.Context, probeTimeout time.Duration) []kafkapkg.ClusterInfo
 	Client(name string) (*kgo.Client, error)
 	Ping(ctx context.Context, name string) error
+	ProbeBrokers(ctx context.Context, name string) (issues []kafkapkg.BrokerIssue, skipped int, err error)
 	Capabilities(ctx context.Context, cluster string) (*kafkapkg.Capabilities, error)
 	RefreshCapabilities(cluster string)
 	ListBrokers(ctx context.Context, cluster string) ([]kafkapkg.BrokerInfo, error)

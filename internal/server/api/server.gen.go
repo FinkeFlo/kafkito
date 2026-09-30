@@ -360,6 +360,9 @@ type AlterTopicConfigsResult = kafka.AlterTopicConfigsResult
 // BrokerInfo defines model for BrokerInfo.
 type BrokerInfo = kafka.BrokerInfo
 
+// BrokerIssue defines model for BrokerIssue.
+type BrokerIssue = kafka.BrokerIssue
+
 // Capabilities defines model for Capabilities.
 type Capabilities = kafka.Capabilities
 

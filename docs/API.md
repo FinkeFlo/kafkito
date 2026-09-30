@@ -60,7 +60,10 @@ The server keeps nothing between requests.
 - RBAC does not apply to private clusters, and their lists are not
   filtered; only the broker's own ACLs apply.
 - `POST /api/v1/clusters/_test` probes a cluster definition sent in the body
-  (the "Test connection" button).
+  (the "Test connection" button). It checks the seed and then every broker
+  the cluster advertises; a broker that is blocked for private clusters or
+  does not answer is listed in `broker_issues`, and `reachable` is false.
+  At most 64 brokers are checked; `brokers_skipped` counts the rest.
 
 ```bash
 PRIVATE=$(printf '%s' '{"name":"mine","brokers":["broker.example.com:9092"],"auth":{"type":"none"},"tls":{"enabled":false}}' | base64 | tr -d '\n')

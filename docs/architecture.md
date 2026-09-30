@@ -103,6 +103,18 @@ resolved address at connect time, so DNS rebinding between check and dial
 cannot reach them. Private network ranges stay allowed. Configured clusters
 are trusted and not guarded.
 
+Kafka clients talk to the addresses brokers advertise in their metadata
+(`advertised.listeners`), not only to the configured seeds, and the guarded
+dialer applies to those too. A private cluster whose seed is allowed but
+whose broker advertises, say, `localhost:39092` therefore passes the
+pre-check and fails at the first request that needs that broker. Test
+connection (`POST /api/v1/clusters/_test`) catches this: after the seed
+answered it sends a request to every advertised broker, in parallel within
+the same budget, and reports each blocked or unreachable one in
+`broker_issues` with `reachable: false`. Regular requests that hit such a
+broker return `502 private_cluster_address_blocked` with a static message
+that names no host.
+
 ## Security headers
 
 Every response carries a strict Content-Security-Policy (`'self'` only, no
