@@ -625,7 +625,7 @@ const maxRawDownloadBytes = MaxRawDownloadMB * 1024 * 1024
 // RawMessageValue is the result of FetchRawMessageValue.
 type RawMessageValue struct {
 	Value       []byte
-	ContentType string // "application/json", "text/plain", or "application/octet-stream"
+	ContentType string // "application/json", "application/xml", "text/plain", or "application/octet-stream"
 	Extension   string // suggested file extension without leading dot
 }
 
@@ -686,7 +686,9 @@ var ErrValueTooLarge = errors.New("value exceeds download size limit")
 var ErrValueMasked = errors.New("value is masked and cannot be downloaded")
 
 // detectContentType returns a MIME type and file extension for raw Kafka value
-// bytes. JSON and UTF-8 text are distinguished from binary payloads.
+// bytes. JSON, XML and other UTF-8 text are distinguished from binary payloads;
+// XML uses the same well-formedness check as decodeBytes so the download and
+// the message list agree.
 func detectContentType(b []byte) (mimeType, ext string) {
 	if len(b) == 0 {
 		return "application/octet-stream", "bin"
@@ -695,6 +697,9 @@ func detectContentType(b []byte) (mimeType, ext string) {
 		trimmed := bytesTrimSpace(b)
 		if len(trimmed) > 0 && (trimmed[0] == '{' || trimmed[0] == '[') && json.Valid(trimmed) {
 			return "application/json", "json"
+		}
+		if len(trimmed) > 0 && trimmed[0] == '<' && validXML(trimmed) {
+			return "application/xml", "xml"
 		}
 		return "text/plain; charset=utf-8", "txt"
 	}
