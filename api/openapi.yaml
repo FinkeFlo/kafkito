@@ -16,12 +16,12 @@ info:
 
     Authentication: every `/api/v1/*` request is validated by kafkito's auth
     middleware. Depending on `KAFKITO_AUTH_MODE` it expects an
-    `Authorization: Bearer <JWT>` header (`mock`, `xsuaa` in `-tags btp`
-    builds) and answers 401 when it is missing or invalid, or injects a
+    `Authorization: Bearer <JWT>` header (`mock`, `oidc`, `xsuaa` in
+    `-tags btp` builds) and answers 401 when it is missing or invalid, or injects a
     synthetic principal (`off`, `-tags devauth` builds only). kafkito has no
     login flow of its own:
     interactive login is handled by an upstream auth proxy (for example the
-    SAP approuter), which forwards the bearer token. The validated principal
+    SAP approuter or oauth2-proxy), which forwards the bearer token. The validated principal
     feeds the optional RBAC policy. `/healthz` and `/readyz` are never
     authenticated.
 
@@ -1245,7 +1245,7 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: >
-        JWT validated by kafkito (auth modes `mock` and `xsuaa`). In mode
+        JWT validated by kafkito (auth modes `mock`, `oidc` and `xsuaa`). In mode
         `off` (`-tags devauth` builds only) no token is required and a
         synthetic principal is used.
   headers:
