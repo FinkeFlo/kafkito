@@ -17,6 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -26,14 +28,14 @@ import (
 
 // newValidator starts a mock XSUAA (key set at /token_keys) and a validator
 // that accepts the mock's plain-http loopback jku.
-func newValidator(t *testing.T) (*auth.MockOIDC, *xsuaa.Validator, xsuaa.Credentials) {
+func newValidator(t *testing.T, opts ...auth.MockOIDCOption) (*auth.MockOIDC, *xsuaa.Validator, xsuaa.Credentials) {
 	t.Helper()
 
-	mock, err := auth.NewMockOIDC(
+	mock, err := auth.NewMockOIDC(append([]auth.MockOIDCOption{
 		auth.WithScopePrefix("kafkito!t12345"),
 		auth.WithZoneID("test-zone"),
 		auth.WithJWKSPath("/token_keys"),
-	)
+	}, opts...)...)
 	require.NoError(t, err, "NewMockOIDC")
 	t.Cleanup(mock.Close)
 
@@ -81,6 +83,96 @@ func TestValidator_HappyPath_AcceptsAudienceViaXSAppName(t *testing.T) {
 	require.NoError(t, err, "Validate")
 	require.NotNil(t, p)
 	assert.Equal(t, "u", p.Subject)
+}
+
+// XSUAA sets sub to the client id in client-credentials tokens, which carry
+// no user_name; such tokens stay valid now that sub is required.
+func TestValidator_AcceptsClientCredentialsToken(t *testing.T) {
+	t.Parallel()
+
+	mock, v, creds := newValidator(t)
+	tok, err := mock.Token(creds.ClientID, creds.ClientID, creds.URL).
+		Scopes("Display").
+		Claim("grant_type", "client_credentials").
+		Sign()
+	require.NoError(t, err, "Sign")
+
+	p, err := v.Validate(context.Background(), tok)
+
+	require.NoError(t, err, "Validate")
+	assert.Equal(t, creds.ClientID, p.Subject)
+}
+
+// xsuaa keeps its issuer rule: the credentials url or a path under it.
+func TestValidator_AcceptsIssuerUnderTheCredentialsURL(t *testing.T) {
+	t.Parallel()
+
+	for _, suffix := range []string{"/", "/oauth/token"} {
+		t.Run(suffix, func(t *testing.T) {
+			t.Parallel()
+
+			mock, v, creds := newValidator(t)
+			tok, err := mock.Issue("u", creds.ClientID, creds.URL+suffix, []string{"Display"}, nil)
+			require.NoError(t, err, "Issue")
+
+			_, err = v.Validate(context.Background(), tok)
+
+			require.NoError(t, err, "Validate")
+		})
+	}
+}
+
+// Keys published without "alg" are usable with an inferred asymmetric alg.
+func TestValidator_KeyWithoutAlg_AcceptsAsymmetricAlgorithms(t *testing.T) {
+	t.Parallel()
+
+	for _, alg := range []jwa.SignatureAlgorithm{jwa.RS256(), jwa.PS384()} {
+		t.Run(alg.String(), func(t *testing.T) {
+			t.Parallel()
+
+			mock, v, creds := newValidator(t, auth.WithoutJWKAlg())
+			tok, err := mock.Token("u", creds.ClientID, creds.URL).Scopes("Display").Alg(alg).Sign()
+			require.NoError(t, err, "Sign")
+
+			p, err := v.Validate(context.Background(), tok)
+
+			require.NoError(t, err, "Validate")
+			assert.Equal(t, "u", p.Subject)
+		})
+	}
+}
+
+// Algorithm pinning: HMAC is never accepted, and a key's own alg wins over
+// the token header.
+func TestValidator_RejectsAlgorithmOutsidePolicy(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		keyAlg bool // the JWKS key carries alg=RS256
+		alg    jwa.SignatureAlgorithm
+	}{
+		{name: "hs256_with_public_key", keyAlg: true, alg: jwa.HS256()},
+		{name: "hs256_with_public_key_key_without_alg", keyAlg: false, alg: jwa.HS256()},
+		{name: "header_alg_differs_from_key_alg", keyAlg: true, alg: jwa.RS384()},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var opts []auth.MockOIDCOption
+			if !tc.keyAlg {
+				opts = append(opts, auth.WithoutJWKAlg())
+			}
+			mock, v, creds := newValidator(t, opts...)
+			tok, err := mock.Token("u", creds.ClientID, creds.URL).Scopes("Display").Alg(tc.alg).Sign()
+			require.NoError(t, err, "Sign")
+
+			_, err = v.Validate(context.Background(), tok)
+
+			require.ErrorContains(t, err, "token alg", "the algorithm policy must reject it")
+		})
+	}
 }
 
 func TestValidator_RejectsInvalidToken(t *testing.T) {
@@ -176,6 +268,49 @@ func TestValidator_RejectsInvalidToken(t *testing.T) {
 				require.NoError(t, err, "Issue")
 				return tok
 			},
+		},
+		{
+			name: "missing_exp",
+			issueToken: func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string {
+				t.Helper()
+				tok, err := mock.Token("u", creds.ClientID, creds.URL).Scopes("Display").
+					Without(jwt.ExpirationKey).Sign()
+				require.NoError(t, err, "Sign")
+				return tok
+			},
+			wantErrSubstring: "exp",
+		},
+		{
+			name: "missing_sub",
+			issueToken: func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string {
+				t.Helper()
+				tok, err := mock.Token("u", creds.ClientID, creds.URL).Scopes("Display").
+					Without(jwt.SubjectKey).Sign()
+				require.NoError(t, err, "Sign")
+				return tok
+			},
+			wantErrSubstring: "sub",
+		},
+		{
+			name: "empty_sub",
+			issueToken: func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string {
+				t.Helper()
+				tok, err := mock.Token("", creds.ClientID, creds.URL).Scopes("Display").Sign()
+				require.NoError(t, err, "Sign")
+				return tok
+			},
+			wantErrSubstring: "sub",
+		},
+		{
+			name: "nbf_in_the_future",
+			issueToken: func(t *testing.T, mock *auth.MockOIDC, creds xsuaa.Credentials) string {
+				t.Helper()
+				tok, err := mock.Token("u", creds.ClientID, creds.URL).Scopes("Display").
+					Claim(jwt.NotBeforeKey, time.Now().Add(10*time.Minute).Unix()).Sign()
+				require.NoError(t, err, "Sign")
+				return tok
+			},
+			wantErrSubstring: "nbf",
 		},
 		{
 			name: "wrong_zid",

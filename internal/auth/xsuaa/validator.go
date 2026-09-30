@@ -16,10 +16,8 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/lestrrat-go/jwx/v3/jws"
-	"github.com/lestrrat-go/jwx/v3/jwt"
 
 	"github.com/FinkeFlo/kafkito/internal/auth"
 )
@@ -44,7 +42,7 @@ var (
 	errJKUPort     = errors.New("jku must not name a port other than 443")
 )
 
-// Validator validates RS256 tokens issued by an XSUAA tenant. Construct via
+// Validator validates asymmetrically signed tokens issued by an XSUAA tenant. Construct via
 // NewValidator with the credentials parsed from VCAP_SERVICES, and Close it
 // on shutdown.
 type Validator struct {
@@ -118,7 +116,10 @@ func (x *Validator) Close() {
 	}
 }
 
-// Validate parses, signature-verifies, and applies XSUAA-specific claim checks.
+// Validate parses and signature-verifies raw (see auth.ParseToken for the
+// algorithm and exp/nbf/sub rules), then applies the XSUAA claim checks:
+// iss is the credentials url or a path under it, aud names the client id
+// or xsappname, and zid matches the identity zone when one is bound.
 func (x *Validator) Validate(ctx context.Context, raw string) (*auth.Principal, error) {
 	if raw == "" {
 		return nil, errors.New("empty bearer token")
@@ -151,13 +152,9 @@ func (x *Validator) Validate(ctx context.Context, raw string) (*auth.Principal, 
 		return nil, fmt.Errorf("fetch jwks: %w", err)
 	}
 
-	tok, err := jwt.Parse([]byte(raw),
-		jwt.WithKeySet(set),
-		jwt.WithValidate(true),
-		jwt.WithAcceptableSkew(60*time.Second),
-	)
+	tok, err := auth.ParseToken(raw, set)
 	if err != nil {
-		return nil, fmt.Errorf("verify jwt: %w", err)
+		return nil, err
 	}
 
 	iss, issOK := tok.Issuer()
