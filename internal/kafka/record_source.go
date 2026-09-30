@@ -113,7 +113,7 @@ func (r *Messages) scanRecords(ctx context.Context, s recordScan) iter.Seq2[reco
 			}
 			drained := s.exhausted(cursors)
 			batch := recordBatch{records: records, drained: drained, ended: readToEnd(cursors, drained), chunks: finished(cursors)}
-			if (len(batch.records) > 0 || len(batch.drained) > 0) && !yield(batch, nil) {
+			if (len(batch.records) > 0 || len(batch.drained) > 0 || len(batch.chunks) > 0) && !yield(batch, nil) {
 				return
 			}
 			s.advance(cl, cursors)

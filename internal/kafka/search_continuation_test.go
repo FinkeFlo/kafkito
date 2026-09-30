@@ -4,8 +4,11 @@
 package kafka
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"math/rand/v2"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -137,4 +140,118 @@ func TestSearch_BudgetChainCoversALaggingPartition(t *testing.T) {
 			})
 		}
 	}
+}
+
+// errOnMatcher fails to evaluate the records whose value is "bad" and
+// matches every other record.
+type errOnMatcher struct{}
+
+func (errOnMatcher) match(m *Message) (bool, error) {
+	if m.Value == "bad" {
+		return false, errors.New("bad value")
+	}
+	return true, nil
+}
+
+// feed visits recs of partition 0 and applies batch to sc.
+func feed(t *testing.T, sc *searchScan, batch recordBatch, values map[int64]string) {
+	t.Helper()
+	for off, v := range values {
+		batch.records = append(batch.records, &kgo.Record{Partition: 0, Offset: off, Value: []byte(v)})
+	}
+	for _, rec := range batch.records {
+		sc.visit(context.Background(), rec)
+	}
+	sc.finish(batch)
+}
+
+func TestSearchScan_NewestFirstConfirmsOnlyFinishedChunks(t *testing.T) {
+	t.Parallel()
+	ranges := map[int32]PartitionRange{0: {Start: 0, End: 12}}
+
+	t.Run("a chunk cut short by a stop keeps the cursor above it", func(t *testing.T) {
+		t.Parallel()
+		sc := newSearchScan(errOnMatcher{}, recordDecoder{}, ranges, DirNewestFirst)
+		feed(t, sc, recordBatch{chunks: []finishedChunk{{partition: 0, lower: 8}}}, map[int64]string{8: "a", 9: "bad", 10: "b", 11: "c"})
+		feed(t, sc, recordBatch{}, map[int64]string{4: "d", 5: "bad"}) // the stop comes here
+
+		assert.Equal(t, 3, sc.confirmed)
+		assert.Equal(t, []int64{8, 10, 11}, sortedOffsets(sc.confirmedMatches()))
+		assert.Equal(t, 1, sc.parseErrors, "the parse error of the unfinished chunk is reported by the call that finishes it")
+		assert.Equal(t, []ParseErrorOffset{{Partition: 0, Offset: 9, Error: "bad value"}}, sc.parseErrorOffsets)
+		next, more := sc.continuation(ranges)
+		assert.Equal(t, map[int32]int64{0: 8}, next)
+		assert.True(t, more)
+	})
+
+	t.Run("a forced chunk is a hole the frontier never passes", func(t *testing.T) {
+		t.Parallel()
+		sc := newSearchScan(errOnMatcher{}, recordDecoder{}, ranges, DirNewestFirst)
+		feed(t, sc, recordBatch{chunks: []finishedChunk{{partition: 0, lower: 8}}}, map[int64]string{8: "a", 11: "b"})
+		feed(t, sc, recordBatch{chunks: []finishedChunk{{partition: 0, lower: 4, forced: true}}}, map[int64]string{4: "c"})
+		feed(t, sc, recordBatch{chunks: []finishedChunk{{partition: 0, lower: 0}}}, map[int64]string{0: "d"})
+
+		assert.Equal(t, []int64{8, 11}, sortedOffsets(sc.confirmedMatches()))
+		next, more := sc.continuation(ranges)
+		assert.Equal(t, map[int32]int64{0: 8}, next)
+		assert.True(t, more)
+	})
+
+	t.Run("an unvisited partition keeps its range", func(t *testing.T) {
+		t.Parallel()
+		sc := newSearchScan(errOnMatcher{}, recordDecoder{}, ranges, DirNewestFirst)
+		next, more := sc.continuation(ranges)
+		assert.Equal(t, map[int32]int64{0: 12}, next)
+		assert.True(t, more)
+	})
+}
+
+func TestSearchScan_OldestFirstContinuesAfterTheHighestRecord(t *testing.T) {
+	t.Parallel()
+	ranges := map[int32]PartitionRange{0: {Start: 2, End: 12}}
+
+	sc := newSearchScan(errOnMatcher{}, recordDecoder{}, ranges, DirOldestFirst)
+	next, more := sc.continuation(ranges)
+	assert.Equal(t, map[int32]int64{0: 2}, next, "an unvisited partition keeps its range")
+	assert.True(t, more)
+
+	feed(t, sc, recordBatch{}, map[int64]string{2: "a", 3: "bad", 4: "b"})
+	assert.Equal(t, 2, sc.confirmed)
+	assert.Equal(t, 1, sc.parseErrors)
+	next, more = sc.continuation(ranges)
+	assert.Equal(t, map[int32]int64{0: 5}, next)
+	assert.True(t, more)
+
+	feed(t, sc, recordBatch{drained: []int32{0}, ended: []int32{0}}, map[int64]string{10: "c"})
+	next, more = sc.continuation(ranges)
+	assert.Equal(t, map[int32]int64{0: 12}, next, "a range read to its end is done even if a marker ends it")
+	assert.False(t, more)
+}
+
+func sortedOffsets(msgs []Message) []int64 {
+	out := messageOffsets(msgs)
+	slices.Sort(out)
+	return out
+}
+
+// A newest-first stop-on-limit search stops only after a chunk is read to
+// its end, so its cursor never skips the rest of a chunk and the chain
+// returns every hit once, newest first. Every chunk holds exactly Limit
+// hits here: hits cut off by the limit are #110 item 1, not pinned here.
+func TestSearch_NewestFirstStopOnLimitDoesNotSkipTheRestOfAChunk(t *testing.T) {
+	t.Parallel()
+	env := newKfakeEnv(t, "newest-limit-chunk", 1, nil)
+	env.produceSeq(t, make([]int32, 10))
+
+	var got []int
+	opts := SearchOptions{Partition: -1, Limit: 2, Budget: 4, StopOnLimit: true, Mode: SearchModeJS, Value: "parsed.seq % 2 === 0"}
+	for range 20 {
+		res := searchTopic(t, env, opts)
+		got = append(got, seqs(t, res.Messages)...)
+		if !res.Stats.MoreAvailable {
+			break
+		}
+		opts.Cursors = res.Stats.NextCursors
+	}
+	assert.Equal(t, []int{8, 6, 4, 2, 0}, got)
 }
