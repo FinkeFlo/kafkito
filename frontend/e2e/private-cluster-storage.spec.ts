@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { hostAddress } from "./fixtures/host-address";
+import { privateClusterBroker } from "./fixtures/host-address";
 
 /**
  * Saved private clusters (with their passwords) live in localStorage under
@@ -82,7 +82,7 @@ test.describe("Private-cluster storage v1", () => {
   test("stored connections load, reach the broker and keep their secrets out of logs", async ({
     page,
   }) => {
-    const broker = `${hostAddress()}:39092`;
+    const broker = privateClusterBroker();
     const payload = v1Payload(broker);
     await seed(page, payload);
     const consoleLines = collectConsole(page);

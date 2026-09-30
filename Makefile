@@ -10,6 +10,13 @@ TAGS ?=
 AIR_VERSION ?= v1.65.1
 # Port for `make run-dev`.
 DEV_PORT ?= 37421
+# Host IPv4 that the fixture broker advertises on its PLAINTEXT_PRIVATE
+# listener (:39093) and that the e2e specs dial for private clusters (the
+# backend refuses loopback brokers for them). frontend/e2e/fixtures/
+# host-address.ts computes it, so docker compose and Playwright agree; set
+# KAFKITO_E2E_HOST_IP to override. Every target that starts the kafka
+# container passes it: a different value recreates the container.
+KAFKITO_E2E_HOST_IP ?= $(shell cd frontend && bun -e 'import { hostAddress } from "./e2e/fixtures/host-address.ts"; console.log(hostAddress())' 2>/dev/null)
 
 help:
 	@echo "Targets:"
@@ -158,7 +165,7 @@ docker-build:
 	docker build --build-arg VERSION=$(VERSION) -t $(IMAGE) .
 
 compose-up:
-	docker compose up -d
+	KAFKITO_E2E_HOST_IP=$(KAFKITO_E2E_HOST_IP) docker compose up -d
 
 compose-app:
 	docker compose --profile app up -d --build
@@ -210,13 +217,14 @@ e2e-up:
 	@if [ -z "$$(docker compose ps -q --status running schema-registry 2>/dev/null)" ]; then \
 		touch $(E2E_SR_MARKER); \
 	fi
-	docker compose up -d --wait kafka
+	@echo "e2e: private-cluster listener advertises $(KAFKITO_E2E_HOST_IP):39093"
+	KAFKITO_E2E_HOST_IP=$(KAFKITO_E2E_HOST_IP) docker compose up -d --wait kafka
 	@# Only seed.sh's last step needs the registry, so its image pull and JVM
 	@# start run in the background, next to the builds below; seed.sh waits
 	@# for it (wait_for_schema_registry) and prints $(E2E_SR_UP_LOG) if it
 	@# never comes up.
 	@echo "e2e: starting schema-registry in the background"
-	@docker compose up -d schema-registry > $(E2E_SR_UP_LOG) 2>&1 &
+	@KAFKITO_E2E_HOST_IP=$(KAFKITO_E2E_HOST_IP) docker compose up -d schema-registry > $(E2E_SR_UP_LOG) 2>&1 &
 	cd frontend && bun run build
 	go build -tags devauth -ldflags "-X main.version=e2e-dev" -o bin/kafkito-e2e ./cmd/kafkito
 	@echo "e2e: starting kafkito-e2e on port $(E2E_PORT)"
@@ -244,7 +252,7 @@ e2e-up:
 	KAFKITO_E2E_SR_UP_LOG=$(E2E_SR_UP_LOG) bash frontend/e2e/fixtures/seed.sh
 
 e2e-test:
-	cd frontend && mkdir -p test-results && KAFKITO_E2E_BASE_URL=http://localhost:$(E2E_PORT) bunx playwright test
+	cd frontend && mkdir -p test-results && KAFKITO_E2E_HOST_IP=$(KAFKITO_E2E_HOST_IP) KAFKITO_E2E_BASE_URL=http://localhost:$(E2E_PORT) bunx playwright test
 
 e2e-down:
 	@if [ -f $(E2E_PID) ]; then \
@@ -322,7 +330,7 @@ dev:
 		echo "no .env.dev — run 'make worktree-init' first to pick free ports."; \
 		echo "falling back to defaults: PORT=37421 KAFKITO_FRONTEND_PORT=37422"; \
 	fi
-	docker compose up -d --wait kafka schema-registry
+	KAFKITO_E2E_HOST_IP=$(KAFKITO_E2E_HOST_IP) docker compose up -d --wait kafka schema-registry
 	@set -a; if [ -f .env.dev ]; then . ./.env.dev; fi; set +a; \
 	export KAFKITO_LOG_FORMAT="$${KAFKITO_LOG_FORMAT:-text}"; \
 	bunx --bun concurrently@^9 \

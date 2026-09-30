@@ -10,7 +10,8 @@ PR builds (`.github/workflows/e2e.yml`).
 `make e2e` does NOT collide with a running `make dev` stack. It uses:
 
 ```
-Kafka broker      docker compose ↑ kafkito-kafka  : 39092 (host)  ← seed.sh writes here
+Kafka broker      docker compose ↑ kafkito-kafka  : 39092 (host, advertises localhost)  ← seed.sh writes here
+                  and : 39093 (host, advertises the host's private IPv4)
                   runs the StandardAuthorizer with User:ANONYMOUS as super
                   user, so the ACL walk can create and delete rules
 Schema Registry   docker compose ↑ kafkito-schema-registry : 38081 (host)  ← seed.sh registers subjects here
@@ -126,16 +127,22 @@ Makefile :: e2e, e2e-up, e2e-test, e2e-down
   the cluster defined in `fixtures/kafkito-e2e.yaml`).
 - `clusters.spec.ts`, `status-indicators.spec.ts`,
   `private-cluster-storage.spec.ts` and `private-cluster-same-name.spec.ts`
-  test private-cluster
-  connections against the fixture broker through the host's private IPv4
-  address (`fixtures/host-address.ts`), because the backend refuses
-  loopback brokers for private clusters. It picks the first RFC 1918
-  interface address; set `KAFKITO_E2E_HOST_IP` to override.
-  The fixture broker advertises `localhost:39092`, which the backend refuses
-  for private clusters too, so data requests to a private cluster on the
-  fixture broker can fail with 502 once the client dials the advertised
-  address. Specs that need a private cluster's data answer those requests
-  with `page.route` (see `private-cluster-same-name.spec.ts`).
+  test private-cluster connections against the fixture broker through the
+  host's private IPv4 address (`fixtures/host-address.ts`), because the
+  backend refuses loopback brokers for private clusters. It picks the first
+  RFC 1918 interface address; set `KAFKITO_E2E_HOST_IP` to override. The
+  Makefile computes the address with the same function and passes it to
+  docker compose and Playwright, so both agree.
+  A Kafka broker hands out the address configured for the listener a
+  client came in on, and private clusters are refused loopback there too.
+  The fixture broker therefore has two host listeners: `:39092` advertises
+  `localhost:39092` (the configured cluster, and the Test connection check
+  in `clusters.spec.ts` that a blocked advertised broker is reported, see
+  #126), and `:39093` advertises `<host-ip>:39093`
+  (`privateClusterBroker()`), which works end to end.
+- Start the stack through make (`make dev`, `make e2e`, `make compose-up`).
+  A plain `docker compose up` advertises `127.0.0.1:39093`, and the next
+  make run recreates the `kafkito-kafka` container with the host address.
 
 ## What is NOT here yet
 
