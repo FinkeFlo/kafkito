@@ -5,11 +5,10 @@
 
 // Package auth provides OIDC-based authentication primitives: a Validator
 // interface plus a generic OIDCValidator implementation, principal extraction
-// from a verified JWT, chi middleware that runs the validation, and helpers
-// for scope-based authorisation. IdP-specific validators live in sub-packages
-// and register themselves with the mode registry behind build tags. See
-// `oidc_validator.go` for the generic JWT validation pipeline and `mode.go`
-// for runtime mode selection.
+// from a verified JWT and chi middleware that runs the validation.
+// IdP-specific validators live in sub-packages and register themselves with
+// the mode registry behind build tags. See `oidc_validator.go` for the
+// generic JWT validation pipeline and `mode.go` for runtime mode selection.
 package auth
 
 import "context"
