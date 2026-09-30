@@ -1099,7 +1099,7 @@ type ConsumeMessagesParams struct {
 	// Limit Page size. Values above 500 are clamped to 500.
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 
-	// From Seek mode. `end` = newest records, `start` = oldest, `offset` = from `offset` (single partition) or `partition_offsets`, `timestamp` = first record at or after `from_ts_ms`.
+	// From Seek mode. `end` = newest records, `start` = oldest, `offset` = from `offset` (single partition) or `partition_offsets`; `from_ts_ms` / `to_ts_ms` narrow the range here too: the offset is lifted to the first record at or after `from_ts_ms`, and the page stops before `to_ts_ms`. `timestamp` = first record at or after `from_ts_ms`.
 	From *ConsumeMessagesParamsFrom `form:"from,omitempty" json:"from,omitempty"`
 
 	// Offset Required when `from=offset` and `partition_offsets` is not set.
