@@ -43,6 +43,24 @@ func (e *SRError) Error() string {
 	return fmt.Sprintf("sr %d: %s", e.Status, e.Message)
 }
 
+// Size caps for registry responses. A private cluster can point at any
+// registry URL, so no response size is trusted.
+const (
+	// maxSRResponseBytes caps a success body, such as a subject list or a
+	// schema.
+	maxSRResponseBytes = 16 << 20
+	// maxSRErrorBodyBytes caps the part of an error body that is read and
+	// kept as the SRError message.
+	maxSRErrorBodyBytes = 4 << 10
+)
+
+// srTruncatedMarker ends an SRError message cut at maxSRErrorBodyBytes.
+const srTruncatedMarker = " [truncated]"
+
+// errSRResponseTooLarge is returned instead of decoding a success body
+// larger than maxSRResponseBytes.
+var errSRResponseTooLarge = errors.New("schema registry response too large")
+
 // Subject represents a Schema Registry subject with its available versions.
 type Subject struct {
 	Name     string `json:"name"`
@@ -162,24 +180,43 @@ func (c *SchemaRegistryClient) do(ctx context.Context, method, path string, body
 	}
 	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode >= 400 {
-		data, _ := io.ReadAll(res.Body)
-		// SR errors look like {"error_code":40401,"message":"..."}
-		var parsed struct {
-			Code    int    `json:"error_code"`
-			Message string `json:"message"`
-		}
-		msg := strings.TrimSpace(string(data))
-		code := 0
-		if err := json.Unmarshal(data, &parsed); err == nil && parsed.Message != "" {
-			msg = parsed.Message
-			code = parsed.Code
-		}
-		return &SRError{Status: res.StatusCode, Code: code, Message: msg}
+		return srError(res)
 	}
 	if out == nil {
 		return nil
 	}
-	return json.NewDecoder(res.Body).Decode(out)
+	// Read one byte past the cap to tell a body at the cap from a larger one.
+	data, err := io.ReadAll(io.LimitReader(res.Body, maxSRResponseBytes+1))
+	if err != nil {
+		return err
+	}
+	if len(data) > maxSRResponseBytes {
+		return fmt.Errorf("%w: more than %d bytes", errSRResponseTooLarge, maxSRResponseBytes)
+	}
+	return json.Unmarshal(data, out)
+}
+
+// srError builds the error for a failed registry response from at most
+// maxSRErrorBodyBytes of its body.
+func srError(res *http.Response) *SRError {
+	data, _ := io.ReadAll(io.LimitReader(res.Body, maxSRErrorBodyBytes+1))
+	truncated := len(data) > maxSRErrorBodyBytes
+	if truncated {
+		data = data[:maxSRErrorBodyBytes]
+	}
+	// SR errors look like {"error_code":40401,"message":"..."}
+	var parsed struct {
+		Code    int    `json:"error_code"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(data, &parsed); err == nil && parsed.Message != "" {
+		return &SRError{Status: res.StatusCode, Code: parsed.Code, Message: parsed.Message}
+	}
+	msg := strings.TrimSpace(string(data))
+	if truncated {
+		msg += srTruncatedMarker
+	}
+	return &SRError{Status: res.StatusCode, Message: msg}
 }
 
 // ListSubjects returns all subjects registered in SR.
