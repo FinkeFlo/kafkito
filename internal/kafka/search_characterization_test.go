@@ -424,7 +424,9 @@ func TestSearchCharacterization_SchemaRegistryDecodedValues(t *testing.T) {
 	assert.Len(t, tail.Messages[0].Value, maxMessageValueBytes)
 
 	ids := searchTopic(t, env, SearchOptions{Partition: -1, Direction: DirOldestFirst, Mode: SearchModeJS, Value: "parsed.id >= 2"})
-	assert.Len(t, ids.Messages, 2)
+	// The stats tell a JS timeout (parse_errors) from a cut-short scan
+	// (more_available) should this ever fail again.
+	assert.Len(t, ids.Messages, 2, "stats: %+v", ids.Stats)
 }
 
 func TestSearchCharacterization_MatchesMaskedValue(t *testing.T) {

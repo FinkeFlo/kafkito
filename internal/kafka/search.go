@@ -204,9 +204,11 @@ const (
 	defaultSearchBudget = 10000
 	maxSearchBudget     = 500000
 	// searchChunkSize is how many offsets per partition a newest-first
-	// search reads per backward step. Larger values reduce re-seek overhead;
-	// smaller values give tighter stop-on-limit responsiveness when matches
-	// are dense near the end.
+	// search reads per backward step at most. Larger values reduce re-seek
+	// overhead; smaller values give tighter stop-on-limit responsiveness
+	// when matches are dense near the end. A call only advances its cursor
+	// over whole chunks, so the chunk also shrinks to the budget's share per
+	// partition (see searchChunk).
 	searchChunkSize int64 = 4000
 )
 
@@ -244,28 +246,24 @@ func (r *Messages) SearchMessages(ctx context.Context, cluster, topic string, op
 	}
 
 	started := time.Now()
-	sc := &searchScan{
-		match:   mt,
-		dec:     r.recordDecoder(cluster, topic),
-		lowest:  make(map[int32]int64, len(ranges)),
-		highest: make(map[int32]int64, len(ranges)),
-	}
+	sc := newSearchScan(mt, r.recordDecoder(cluster, topic), ranges, opts.Direction)
 	scan := recordScan{cluster: cluster, topic: topic, role: "search", cfg: cfg, ranges: ranges, drainAfter: 1}
 	if opts.Direction == DirNewestFirst {
-		scan.chunk = searchChunkSize
+		scan.chunk = searchChunk(opts.Budget, len(ranges))
 	}
 	budgetExhausted, timedOut, err := r.runSearch(ctx, scan, opts, sc)
 	if err != nil {
 		return nil, err
 	}
 
-	matches := sc.matches
+	matches := sc.confirmedMatches()
 	sortMessages(matches, opts.Direction == DirNewestFirst)
 	matched := len(matches)
 	if matched > opts.Limit {
 		matches = matches[:opts.Limit]
 	}
-	nextCursors, moreAvailable := sc.continuation(ranges, opts.Direction)
+	nextCursors, moreAvailable := sc.continuation(ranges)
+	carryDoneCursors(nextCursors, opts.Cursors, offs.parts)
 
 	return &SearchResult{Messages: matches, Stats: SearchStats{
 		Scanned:           sc.scanned,
@@ -280,6 +278,13 @@ func (r *Messages) SearchMessages(ctx context.Context, cluster, topic string, op
 		ParseErrorOffsets: sc.parseErrorOffsets,
 		Durations:         map[string]int64{"total": time.Since(started).Milliseconds()},
 	}}, nil
+}
+
+// searchChunk is the chunk size of a newest-first search: searchChunkSize,
+// capped to the budget's share per partition so that every call can finish
+// at least one chunk and move its cursor.
+func searchChunk(budget, partitions int) int64 {
+	return max(1, min(searchChunkSize, int64(budget/max(1, partitions))))
 }
 
 func (o SearchOptions) withDefaults() SearchOptions {
@@ -316,35 +321,67 @@ func (r *Messages) runSearch(ctx context.Context, s recordScan, opts SearchOptio
 		for _, rec := range batch.records {
 			sc.visit(ctx, rec)
 		}
+		sc.finish(batch)
 		if sc.scanned >= opts.Budget {
 			return true, false, nil
 		}
-		if opts.StopOnLimit && len(sc.matches) >= opts.Limit {
+		if opts.StopOnLimit && sc.confirmed >= opts.Limit {
 			break
 		}
 	}
 	return false, false, nil
 }
 
-// searchScan accumulates the matches and stats of one SearchMessages call.
+// searchScan accumulates the matches and stats of one SearchMessages call
+// and tracks, per partition, how far the range was read without a gap.
 type searchScan struct {
 	match             matcher
 	dec               recordDecoder
+	newestFirst       bool
 	matches           []Message
 	scanned           int
 	parseErrors       int
 	parseErrorOffsets []ParseErrorOffset
-	// lowest/highest offset processed per partition, for the next cursors.
-	lowest, highest map[int32]int64
+	// confirmed counts the matches at or above their partition's frontier,
+	// i.e. the matches this call returns (before the limit).
+	confirmed int
+	// pending counts, per partition, the matches of the chunk being read
+	// (newest-first); they are confirmed once the chunk is read to its end.
+	pending map[int32]int
+	// frontier is, per partition, the lower offset of the lowest chunk read
+	// to its end without a gap from the top of the range (newest-first). It
+	// starts at the range end.
+	frontier map[int32]int64
+	// stuck marks the partitions whose walk hit a chunk that was not read to
+	// its end (newest-first); their frontier no longer moves.
+	stuck map[int32]bool
+	// highest is the highest offset processed per partition (oldest-first).
+	highest map[int32]int64
+	// ended marks the partitions whose range was read to its end.
+	ended map[int32]bool
+}
+
+func newSearchScan(mt matcher, dec recordDecoder, ranges map[int32]PartitionRange, dir SearchDirection) *searchScan {
+	sc := &searchScan{
+		match:       mt,
+		dec:         dec,
+		newestFirst: dir == DirNewestFirst,
+		pending:     make(map[int32]int, len(ranges)),
+		frontier:    make(map[int32]int64, len(ranges)),
+		stuck:       make(map[int32]bool),
+		highest:     make(map[int32]int64, len(ranges)),
+		ended:       make(map[int32]bool, len(ranges)),
+	}
+	for p, rng := range ranges {
+		sc.frontier[p] = rng.End
+	}
+	return sc
 }
 
 func (sc *searchScan) visit(ctx context.Context, rec *kgo.Record) {
 	p := rec.Partition
 	if cur, ok := sc.highest[p]; !ok || rec.Offset > cur {
 		sc.highest[p] = rec.Offset
-	}
-	if cur, ok := sc.lowest[p]; !ok || rec.Offset < cur {
-		sc.lowest[p] = rec.Offset
 	}
 	sc.scanned++
 	// Match against the full, untruncated record: truncating first would
@@ -362,7 +399,55 @@ func (sc *searchScan) visit(ctx context.Context, rec *kgo.Record) {
 	}
 	if hit {
 		sc.matches = append(sc.matches, sc.dec.message(ctx, rec))
+		if sc.newestFirst {
+			sc.pending[p]++
+		} else {
+			sc.confirmed++
+		}
 	}
+}
+
+// finish applies what a poll finished: the partitions read to their end and,
+// newest-first, the chunks that move a partition's frontier down. A chunk
+// the reader gave up on stops the frontier above it for good.
+func (sc *searchScan) finish(batch recordBatch) {
+	for _, p := range batch.ended {
+		sc.ended[p] = true
+	}
+	if !sc.newestFirst {
+		return
+	}
+	for _, ch := range batch.chunks {
+		p := ch.partition
+		if sc.stuck[p] {
+			continue
+		}
+		if ch.forced {
+			sc.stuck[p] = true
+			continue
+		}
+		sc.frontier[p] = ch.lower
+		sc.confirmed += sc.pending[p]
+		sc.pending[p] = 0
+	}
+}
+
+// confirmedMatches returns the matches this call reports. Newest-first, it
+// drops the matches below their partition's frontier: they come from a
+// chunk that was not read to its end, so the next call, which continues at
+// the frontier, reads them again, and keeping them would also break the
+// newest-first order across calls.
+func (sc *searchScan) confirmedMatches() []Message {
+	if !sc.newestFirst {
+		return sc.matches
+	}
+	out := sc.matches[:0]
+	for _, m := range sc.matches {
+		if m.Offset >= sc.frontier[m.Partition] {
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 // parseErrorWithheld replaces the parse error text on topics with an active
@@ -388,25 +473,42 @@ func (sc *searchScan) parseError(ctx context.Context, rec *kgo.Record, err error
 	}
 }
 
+// carryDoneCursors copies the cursors of partitions that an earlier call
+// already finished into next. Such a partition resolves to an empty range
+// and so gets no cursor of its own; without its cursor a follow-up call
+// would search it again from the start.
+func carryDoneCursors(next, cursors map[int32]int64, parts []int32) {
+	for _, p := range parts {
+		if _, ok := next[p]; ok {
+			continue
+		}
+		if c, ok := cursors[p]; ok {
+			next[p] = c
+		}
+	}
+}
+
 // continuation returns the per-partition cursors for a follow-up search and
-// whether that search would scan anything. Partitions without a scanned
-// record are treated as fully scanned.
-func (sc *searchScan) continuation(ranges map[int32]PartitionRange, dir SearchDirection) (map[int32]int64, bool) {
+// whether that search would scan anything. A cursor never skips an offset
+// this call did not read: only a partition read to its end is done, one
+// without any record keeps its whole range.
+func (sc *searchScan) continuation(ranges map[int32]PartitionRange) (map[int32]int64, bool) {
 	next := make(map[int32]int64, len(ranges))
 	more := false
 	for p, rng := range ranges {
-		if dir == DirNewestFirst {
-			// A follow-up scans [Start, lowest): everything above is done.
-			next[p] = rng.Start
-			if lo, ok := sc.lowest[p]; ok {
-				next[p] = lo
-			}
+		if sc.newestFirst {
+			// A follow-up scans [Start, frontier): everything above is done.
+			next[p] = sc.frontier[p]
 			more = more || next[p] > rng.Start
 			continue
 		}
-		next[p] = rng.End
-		if hi, ok := sc.highest[p]; ok {
+		switch hi, ok := sc.highest[p]; {
+		case sc.ended[p]:
+			next[p] = rng.End
+		case ok:
 			next[p] = hi + 1
+		default:
+			next[p] = rng.Start
 		}
 		more = more || next[p] < rng.End
 	}
