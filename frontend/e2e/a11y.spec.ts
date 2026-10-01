@@ -140,7 +140,11 @@ const ROUTES: Route[] = [
 // Interaction states that only exist after a click: dialogs, expanded rows
 // and panels. Each one starts from a route above and opens the state the way
 // a user would.
-type State = Route & { open: (page: Page) => Promise<void> };
+// `scope` limits the scan to the opened element. Use it only for a non-modal
+// popover over a route that is scanned on its own above: its edge cuts through
+// whatever page controls happen to sit under it, and target-size then measures
+// the visible sliver, which depends on font metrics, not on the popover.
+type State = Route & { open: (page: Page) => Promise<void>; scope?: string };
 
 function route(name: string): Route {
   const found = ROUTES.find((r) => r.name === name);
@@ -275,6 +279,7 @@ const STATES: State[] = [
   {
     ...route("topics"),
     name: "user-menu",
+    scope: '[role="dialog"][aria-label="Account and settings"]',
     open: async (page) => {
       await page.getByRole("button", { name: /^Account menu for / }).click();
       await expect(page.getByLabel("Account and settings")).toBeVisible();
@@ -307,7 +312,7 @@ for (const theme of THEMES) {
         await expectTheme(page, theme);
         await state.ready(page);
         await state.open(page);
-        await expectNoBlockingA11yViolations(page, testInfo, `${state.name}-${theme}`);
+        await expectNoBlockingA11yViolations(page, testInfo, `${state.name}-${theme}`, state.scope);
       });
     }
 
