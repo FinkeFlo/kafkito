@@ -212,6 +212,7 @@ func newConnections(cfg []config.ClusterConfig, log *slog.Logger) *Connections {
 				slog.String("cluster", c.Name),
 				slog.String("url", c.SchemaRegistry.URL))
 		}
+		warnTransportSettings(log, c)
 	}
 	return &Connections{
 		log:             log,
@@ -223,6 +224,21 @@ func newConnections(cfg []config.ClusterConfig, log *slog.Logger) *Connections {
 		srDecoders:      make(map[string]*SRDecoder),
 		now:             time.Now,
 		adhocSweepEvery: adhocSweepInterval,
+	}
+}
+
+// warnTransportSettings logs one warning for a configured cluster that uses
+// SASL/PLAIN without TLS and one for a configured cluster that does not
+// verify the broker certificate. Both are allowed for configured clusters;
+// private clusters refuse the first one unless the operator allows it.
+func warnTransportSettings(log *slog.Logger, c config.ClusterConfig) {
+	if !c.TLS.Enabled && strings.EqualFold(strings.TrimSpace(c.Auth.Type), "plain") {
+		log.Warn("SASL/PLAIN without TLS: user name, password and records are sent unencrypted",
+			slog.String("cluster", c.Name))
+	}
+	if c.TLS.Enabled && c.TLS.InsecureSkipVerify {
+		log.Warn("TLS certificate verification disabled (insecure_skip_verify=true)",
+			slog.String("cluster", c.Name))
 	}
 }
 
@@ -377,7 +393,9 @@ func clientOptsDial(cfg config.ClusterConfig, log *slog.Logger, adhocDial dialFu
 		kgo.ProducerBatchMaxBytes(10 << 20),
 	}
 
-	if cfg.TLS.Enabled && cfg.TLS.InsecureSkipVerify {
+	// A configured cluster got this warning once, when the registry was
+	// built (warnTransportSettings); a private cluster gets it per client.
+	if cfg.TLS.Enabled && cfg.TLS.InsecureSkipVerify && config.IsAdhocClusterName(cfg.Name) {
 		log.Warn("TLS verification disabled for cluster (InsecureSkipVerify=true)",
 			slog.String("cluster", config.ClusterLogName(cfg.Name)))
 	}

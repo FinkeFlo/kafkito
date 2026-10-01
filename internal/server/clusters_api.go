@@ -34,8 +34,8 @@ func (s *apiServer) TestCluster(ctx context.Context, req gen.TestClusterRequestO
 	var cfg config.ClusterConfig
 	if req.Body != nil {
 		cfg = *req.Body
-		if err := validateClusterPolicy(ctx, cfg); err != nil {
-			return nil, badRequest(err.Error())
+		if err := validateClusterPolicy(ctx, cfg, s.privateClusters.cfg); err != nil {
+			return nil, definitionError("", err)
 		}
 	} else if ctxCfg, ok := privateClusterFromContext(ctx); ok {
 		cfg = ctxCfg

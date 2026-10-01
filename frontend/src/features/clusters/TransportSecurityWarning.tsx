@@ -8,7 +8,7 @@ function warningText(
 ): string | null {
   if (!tlsEnabled) {
     return authType === "plain"
-      ? "SASL/PLAIN without TLS sends the username and password in cleartext, and all data as well."
+      ? "SASL/PLAIN without TLS sends the username and password in cleartext, and all data as well. kafkito rejects SASL/PLAIN without TLS for private clusters unless the operator allows it."
       : "Without TLS, all data travels unencrypted.";
   }
   if (tlsInsecure) {
@@ -19,6 +19,8 @@ function warningText(
 
 // Inline warning for the broker connection settings of a private cluster.
 // It never blocks saving or testing; it only says what the settings expose.
+// The server decides whether SASL/PLAIN without TLS is accepted
+// (private_clusters.allow_plain_without_tls), so the text names both cases.
 export function TransportSecurityWarning({
   authType,
   tlsEnabled,

@@ -82,31 +82,53 @@ func requestHostValidator(ctx context.Context) *netguard.HostValidator {
 }
 
 // privateClusterMiddleware inspects the PrivateClusterHeader on every request.
-// When present it decodes and validates a ClusterConfig and stashes it in the
-// request context. Malformed headers are rejected with 400 to fail fast; an
-// absent header is a no-op.
-func privateClusterMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		raw := r.Header.Get(PrivateClusterHeader)
-		if raw == "" {
-			next.ServeHTTP(w, r)
-			return
-		}
-		cfg, err := decodePrivateClusterHeader(r.Context(), raw)
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{
-				"error": PrivateClusterHeader + ": " + err.Error(),
-			})
-			return
-		}
-		ctx := context.WithValue(r.Context(), privateCtxKey{}, cfg)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+// When present it decodes and validates a ClusterConfig under settings and
+// stashes it in the request context. Malformed headers are rejected with 400
+// to fail fast; an absent header is a no-op.
+func privateClusterMiddleware(settings config.PrivateClustersConfig, errs errorWriter) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			raw := r.Header.Get(PrivateClusterHeader)
+			if raw == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			cfg, err := decodePrivateClusterHeader(r.Context(), raw, settings)
+			if err != nil {
+				errs.writeError(w, r, definitionError(PrivateClusterHeader+": ", err))
+				return
+			}
+			ctx := context.WithValue(r.Context(), privateCtxKey{}, cfg)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }
 
-// decodePrivateClusterHeader decodes and validates the header value. Its
-// errors are fixed texts that never repeat a value from the header.
-func decodePrivateClusterHeader(ctx context.Context, raw string) (config.ClusterConfig, error) {
+// plainWithoutTLSCode marks the 400 for a private cluster definition that
+// uses SASL/PLAIN with TLS off (errPlainWithoutTLS).
+const plainWithoutTLSCode = "plain_without_tls"
+
+// errPlainWithoutTLS rejects SASL/PLAIN without TLS for a private cluster
+// unless private_clusters.allow_plain_without_tls is set: PLAIN sends the
+// password unencrypted, so only TLS protects it and the records on the way
+// to the broker.
+var errPlainWithoutTLS = errors.New("SASL/PLAIN requires TLS for private clusters")
+
+// definitionError is the 400 for a cluster definition that failed
+// validation: prefix and the fixed text of err, plus plainWithoutTLSCode
+// for errPlainWithoutTLS.
+func definitionError(prefix string, err error) *apiError {
+	ae := badRequest(prefix + err.Error())
+	if errors.Is(err, errPlainWithoutTLS) {
+		ae.Code = plainWithoutTLSCode
+	}
+	return ae
+}
+
+// decodePrivateClusterHeader decodes and validates the header value under
+// settings. Its errors are fixed texts that never repeat a value from the
+// header.
+func decodePrivateClusterHeader(ctx context.Context, raw string, settings config.PrivateClustersConfig) (config.ClusterConfig, error) {
 	if len(raw) > maxPrivateClusterHeaderBytes*2 {
 		return config.ClusterConfig{}, fmt.Errorf("header too large")
 	}
@@ -121,7 +143,7 @@ func decodePrivateClusterHeader(ctx context.Context, raw string) (config.Cluster
 	if err := json.Unmarshal(payload, &cfg); err != nil {
 		return config.ClusterConfig{}, fmt.Errorf("invalid JSON")
 	}
-	if err := validatePrivateClusterConfig(ctx, cfg); err != nil {
+	if err := validatePrivateClusterConfig(ctx, cfg, settings); err != nil {
 		return config.ClusterConfig{}, err
 	}
 	return cfg, nil
@@ -135,39 +157,45 @@ func privateClusterFromContext(ctx context.Context) (config.ClusterConfig, bool)
 // validatePrivateClusterConfig enforces the minimum fields required to
 // connect. Matches the rules in config.Validate for static clusters minus
 // the name (caller-facing name doesn't matter for ad-hoc).
-func validatePrivateClusterConfig(ctx context.Context, cfg config.ClusterConfig) error {
+func validatePrivateClusterConfig(ctx context.Context, cfg config.ClusterConfig, settings config.PrivateClustersConfig) error {
 	if len(cfg.Brokers) == 0 {
 		return errors.New("at least one broker is required")
 	}
-	return validateClusterPolicy(ctx, cfg)
+	return validateClusterPolicy(ctx, cfg, settings)
 }
 
 // validateClusterPolicy checks the rules of a cluster definition that the
 // OpenAPI document does not express, or does not apply to the
 // X-Kafkito-Cluster header because the header is not schema-validated: at
-// most maxBrokersPerCluster brokers, non-blank broker addresses, the
-// outbound-host (SSRF) policy for broker and Schema Registry hosts, and the
-// credentials a SASL mechanism requires. It also rejects unknown auth
-// types, which only the header can carry: it accepts auth.type
+// most maxBrokersPerCluster brokers, SASL/PLAIN only with TLS unless
+// settings.AllowPlainWithoutTLS (errPlainWithoutTLS), non-blank broker
+// addresses, the outbound-host (SSRF) policy for broker and Schema Registry
+// hosts, and the credentials a SASL mechanism requires. It also rejects
+// unknown auth types, which only the header can carry: it accepts auth.type
 // case-insensitively and trimmed, while request bodies are held to the
 // spec's lowercase enum by the request validator.
 //
-// The broker count is checked before any host is resolved; the host checks
-// use the request's HostValidator (requestHostValidator).
+// The broker count and the PLAIN rule are checked before any host is
+// resolved; the host checks use the request's HostValidator
+// (requestHostValidator).
 //
 // Its messages are fixed texts that name a broker by its 1-based position.
 // They never repeat a submitted value (host, URL, auth type), a resolved
 // address or a resolver error, because the caller returns them to the
 // client.
-func validateClusterPolicy(ctx context.Context, cfg config.ClusterConfig) error {
-	return validateClusterPolicyWith(ctx, cfg, requestHostValidator(ctx))
+func validateClusterPolicy(ctx context.Context, cfg config.ClusterConfig, settings config.PrivateClustersConfig) error {
+	return validateClusterPolicyWith(ctx, cfg, settings, requestHostValidator(ctx))
 }
 
 // validateClusterPolicyWith is validateClusterPolicy with the host checks
 // of v, which resolves each distinct host once.
-func validateClusterPolicyWith(ctx context.Context, cfg config.ClusterConfig, v *netguard.HostValidator) error {
+func validateClusterPolicyWith(ctx context.Context, cfg config.ClusterConfig, settings config.PrivateClustersConfig, v *netguard.HostValidator) error {
 	if len(cfg.Brokers) > maxBrokersPerCluster {
 		return fmt.Errorf("too many brokers (max %d)", maxBrokersPerCluster)
+	}
+	authType := strings.ToLower(strings.TrimSpace(cfg.Auth.Type))
+	if authType == "plain" && !cfg.TLS.Enabled && !settings.AllowPlainWithoutTLS {
+		return errPlainWithoutTLS
 	}
 	for i, b := range cfg.Brokers {
 		b = strings.TrimSpace(b)
@@ -178,7 +206,7 @@ func validateClusterPolicyWith(ctx context.Context, cfg config.ClusterConfig, v 
 			return fmt.Errorf("broker %d: %w", i+1, err)
 		}
 	}
-	switch strings.ToLower(strings.TrimSpace(cfg.Auth.Type)) {
+	switch authType {
 	case "", "none":
 	case "plain", "scram-sha-256", "scram-sha-512":
 		if cfg.Auth.Username == "" || cfg.Auth.Password == "" {

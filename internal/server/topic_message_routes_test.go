@@ -214,6 +214,7 @@ func TestTopicMessageOps_ValidationErrorsNeverLeakCredentials(t *testing.T) {
 	header := encodeHeader(t, config.ClusterConfig{
 		Brokers: []string{unreachableBroker},
 		Auth:    config.AuthConfig{Type: "plain", Username: "leak-user", Password: leakPassword},
+		TLS:     config.TLSConfig{Enabled: true},
 	})
 	destCfg := func(extra string) string {
 		return `{"dest_topic":"t","dest_cluster_config":{"brokers":["` + unreachableBroker + `"],"auth":{"type":"plain","username":"u","password":"` + leakPassword + `"}` + extra + `}}`

@@ -193,3 +193,87 @@ func TestValidate_PrivateClustersMode(t *testing.T) {
 		}
 	}
 }
+
+func allowPlainYAML(v string) string {
+	return "private_clusters:\n  allow_plain_without_tls: " + v + "\n"
+}
+
+func TestPrivateClustersAllowPlainWithoutTLS(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		yaml string
+		env  string
+		want bool
+	}{
+		{name: "default", want: false},
+		{name: "yaml true", yaml: allowPlainYAML("true"), want: true},
+		{name: "yaml false", yaml: allowPlainYAML("false"), want: false},
+		{name: "yaml quoted", yaml: allowPlainYAML(`"true"`), want: true},
+		{name: "yaml empty", yaml: allowPlainYAML(`""`), want: false},
+		{name: "yaml null", yaml: allowPlainYAML(""), want: false},
+		{name: "yaml next to mode", yaml: "private_clusters:\n  mode: on\n  allow_plain_without_tls: true\n", want: true},
+		{name: "env true", env: "true", want: true},
+		{name: "env trimmed", env: " TRUE ", want: true},
+		{name: "env 1", env: "1", want: true},
+		{name: "env false", env: "false", want: false},
+		{name: "env beats yaml", yaml: allowPlainYAML("true"), env: "false", want: false},
+		{name: "empty env keeps yaml", yaml: allowPlainYAML("true"), env: " ", want: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			isolateEnv(t)
+			if tc.env != "" {
+				t.Setenv("KAFKITO_PRIVATE_CLUSTERS_ALLOW_PLAIN_WITHOUT_TLS", tc.env)
+			}
+			path := ""
+			if tc.yaml != "" {
+				path = writeYAML(t, tc.yaml)
+			}
+
+			cfg, err := Load(path)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, cfg.PrivateClusters.AllowPlainWithoutTLS)
+			assert.Equal(t, PrivateClustersOn, cfg.PrivateClusters.EffectiveMode())
+		})
+	}
+}
+
+func TestPrivateClustersAllowPlainWithoutTLSRejected(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		yaml    string
+		env     string
+		wantErr string
+	}{
+		{name: "yaml word", yaml: allowPlainYAML("yes"), wantErr: `private_clusters.allow_plain_without_tls "yes" is not a boolean (use true|false)`},
+		{name: "yaml number", yaml: allowPlainYAML("2"), wantErr: `private_clusters.allow_plain_without_tls 2 is not a boolean (use true|false)`},
+		{name: "yaml list", yaml: allowPlainYAML("[true]"), wantErr: `private_clusters.allow_plain_without_tls [true] is not a boolean (use true|false)`},
+		{name: "env word", env: "enabled", wantErr: `private_clusters.allow_plain_without_tls "enabled" is not a boolean (use true|false)`},
+		{name: "env beats valid yaml", yaml: allowPlainYAML("true"), env: "on", wantErr: `private_clusters.allow_plain_without_tls "on" is not a boolean (use true|false)`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			isolateEnv(t)
+			if tc.env != "" {
+				t.Setenv("KAFKITO_PRIVATE_CLUSTERS_ALLOW_PLAIN_WITHOUT_TLS", tc.env)
+			}
+			path := ""
+			if tc.yaml != "" {
+				path = writeYAML(t, tc.yaml)
+			}
+
+			_, err := Load(path)
+			require.Error(t, err)
+			assert.EqualError(t, err, tc.wantErr)
+		})
+	}
+}
+
+// A scalar private_clusters block stays an error: parsing the opt-out must
+// not replace it with a map holding only the opt-out.
+func TestPrivateClustersBlockNotAMap(t *testing.T) {
+	isolateEnv(t)
+	t.Setenv("KAFKITO_PRIVATE_CLUSTERS_ALLOW_PLAIN_WITHOUT_TLS", "false")
+
+	_, err := Load(writeYAML(t, "private_clusters: off\n"))
+	require.Error(t, err)
+	assert.EqualError(t, err, "private_clusters must be a block with mode and allow_plain_without_tls, not off")
+}

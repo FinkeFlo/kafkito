@@ -57,10 +57,12 @@ func TestPrivateClusterHeader_NeverLeaksCredentials(t *testing.T) {
 	t.Parallel()
 
 	sasl := config.AuthConfig{Type: "plain", Username: "leak-user", Password: leakPassword}
+	tls := config.TLSConfig{Enabled: true}
 	unreachable := encodeHeader(t, config.ClusterConfig{
 		Name:    "leak-probe",
 		Brokers: []string{unreachableBroker},
 		Auth:    sasl,
+		TLS:     tls,
 		SchemaRegistry: config.SchemaRegistryConfig{
 			URL: "http://192.0.2.1:8081", Username: "sr-user", Password: leakPassword,
 		},
@@ -100,7 +102,7 @@ func TestPrivateClusterHeader_NeverLeaksCredentials(t *testing.T) {
 		{
 			name: "SSRF-blocked broker", method: http.MethodGet, path: "/api/v1/clusters/__private__/topics",
 			header: encodeHeader(t, config.ClusterConfig{
-				Brokers: []string{"127.0.0.1:9092"}, Auth: sasl,
+				Brokers: []string{"127.0.0.1:9092"}, Auth: sasl, TLS: tls,
 			}),
 			wantCode: http.StatusBadRequest,
 		},
@@ -193,6 +195,7 @@ func TestPrivateClusterLogs_HostsAllowedSecretsNever(t *testing.T) {
 	header := encodeHeader(t, config.ClusterConfig{
 		Brokers: []string{unreachableBroker},
 		Auth:    config.AuthConfig{Type: "plain", Username: "leak-user", Password: leakPassword},
+		TLS:     config.TLSConfig{Enabled: true},
 		SchemaRegistry: config.SchemaRegistryConfig{
 			URL: "http://192.0.2.1:8081", Username: "sr-user", Password: leakPassword,
 		},

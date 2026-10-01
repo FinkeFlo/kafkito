@@ -110,7 +110,7 @@ func New(opts Options) http.Handler {
 					g.Use(privateClusterGate(privateClusters, errs))
 					g.Use(testConnRateLimit(testConnLimiter, errs))
 					g.Use(hostValidatorMiddleware(opts.lookupHost))
-					g.Use(privateClusterMiddleware)
+					g.Use(privateClusterMiddleware(privateClusters.cfg, errs))
 					g.Use(rbacMiddleware(policy, withRequestIDLogging(baseLog)))
 					g.Use(resolvePrivateClusterParam(st.clusters))
 					generated.mountClusters(g)

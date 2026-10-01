@@ -329,8 +329,8 @@ func (s *apiServer) copyJobFor(req gen.CopyMessagesRequestObject, r *http.Reques
 	// correctly detects "same actual cluster" even across differently
 	// labelled private-cluster configs that point at the same broker.
 	if cfg := body.DestClusterConfig; cfg != nil {
-		if err := validatePrivateClusterConfig(r.Context(), *cfg); err != nil {
-			return job, badRequest(fmt.Errorf("dest_cluster_config: %w", err).Error())
+		if err := validatePrivateClusterConfig(r.Context(), *cfg, s.privateClusters.cfg); err != nil {
+			return job, definitionError("dest_cluster_config: ", err)
 		}
 		name, err := s.copyReg.UseAdhoc(*cfg)
 		if err != nil {

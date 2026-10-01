@@ -58,6 +58,7 @@ func run(configPath string) int {
 		"log_level", strings.ToLower(cfg.Log.SlogLevel().String()),
 		"log_format", cfg.Log.FormatName(),
 		"private_clusters", string(cfg.PrivateClusters.EffectiveMode()),
+		"private_clusters_allow_plain_without_tls", cfg.PrivateClusters.AllowPlainWithoutTLS,
 	)
 
 	registry := kafkapkg.NewRegistry(cfg.Clusters, logger)
