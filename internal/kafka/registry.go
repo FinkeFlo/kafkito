@@ -154,6 +154,12 @@ type Clusters struct {
 	// metrics is lazily started; nil until StartMetrics is called.
 	// Protected by Connections.mu.
 	metrics *metricsCollector
+
+	// pingMu guards pingFailures. No other lock is taken while it is held.
+	pingMu sync.Mutex
+	// pingFailures holds the class of the last failed ping per configured
+	// cluster that Describe found unreachable (see notePing).
+	pingFailures map[string]connerr.Class
 }
 
 // Registry bundles the cluster connections with the per-resource services.

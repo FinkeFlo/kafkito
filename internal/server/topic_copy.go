@@ -13,21 +13,64 @@ import (
 	"strings"
 	"time"
 
+	"github.com/twmb/franz-go/pkg/kerr"
+	"github.com/twmb/franz-go/pkg/kgo"
+
 	"github.com/FinkeFlo/kafkito/internal/config"
+	"github.com/FinkeFlo/kafkito/internal/connerr"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 	"github.com/FinkeFlo/kafkito/internal/netguard"
 	gen "github.com/FinkeFlo/kafkito/internal/server/api"
 )
 
-// copyErrorText is the text a copy job's error event carries for err. A
-// dial the outbound guard refused gets the static message of the 502
-// private_cluster_address_blocked response: the refused host may come from
-// the X-Kafkito-Cluster header, and responses never echo header content.
+// copyErrorText is the text a copy job's error event carries for err. It
+// never names an address, a port or an operating system error: a source or
+// destination may come from the X-Kafkito-Cluster header or a
+// dest_cluster_config, and responses never echo either. In order:
+//
+//   - a dial the outbound guard refused: the static message of the 502
+//     private_cluster_address_blocked response;
+//   - kafkito's sentinel errors: their own texts, as in the JSON responses;
+//   - a cancelled context or a closed client: "cancelled";
+//   - a Kafka error code: its name and description, for example
+//     "TOPIC_AUTHORIZATION_FAILED: Not authorized to access topics: ...";
+//   - a missing topic or partition: a fixed text;
+//   - anything else: the fixed text of its connerr class.
+//
+// The caller logs the full error.
 func copyErrorText(err error) string {
 	if errors.Is(err, netguard.ErrBlockedAddress) {
 		return privateClusterAddressBlockedMsg
 	}
-	return err.Error()
+	for _, s := range sentinelErrors {
+		if errors.Is(err, s.target) {
+			return s.msg
+		}
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, kgo.ErrClientClosed) {
+		return "cancelled"
+	}
+	if ke, ok := errors.AsType[*kerr.Error](err); ok {
+		return ke.Error()
+	}
+	if isTopicMissingErr(err) {
+		return kafkapkg.ErrTopicNotFound.Error()
+	}
+	if isPartitionMissingErr(err) {
+		return "partition not found"
+	}
+	return connerr.Message(err)
+}
+
+// logCopyError logs the full cause of a failed copy step ("consume" from the
+// source, "produce" to the destination), which the error event reports by
+// copyErrorText only. It may name broker addresses, see docs/architecture.md.
+func (s *apiServer) logCopyError(ctx context.Context, step, cluster, topic string, err error) {
+	msg := "copy: " + step + " failed"
+	if errors.Is(err, netguard.ErrBlockedAddress) {
+		msg = "copy: blocked address"
+	}
+	s.log.WarnContext(ctx, msg, "cluster", config.ClusterLogName(cluster), "topic", topic, "err", err)
 }
 
 // unknownDestClusterError is the 400 for a dest_cluster the server does not
@@ -443,9 +486,7 @@ func (s *apiServer) runCopy(ctx context.Context, w io.Writer, job copyJob) {
 				// Client gone or safety ceiling hit.
 				return
 			}
-			if errors.Is(consumeErr, netguard.ErrBlockedAddress) {
-				s.log.WarnContext(ctx, "copy: blocked address", "cluster", config.ClusterLogName(job.srcCluster), "err", consumeErr)
-			}
+			s.logCopyError(ctx, "consume", job.srcCluster, job.srcTopic, consumeErr)
 			sendEvent(copyProgressEvent{Copied: copied, Skipped: skipped, Done: true, Error: "consume: " + copyErrorText(consumeErr)})
 			return
 		}
@@ -521,9 +562,7 @@ func (s *apiServer) runCopy(ctx context.Context, w io.Writer, job copyJob) {
 				if errors.Is(produceErr, context.Canceled) || errors.Is(produceErr, context.DeadlineExceeded) {
 					return
 				}
-				if errors.Is(produceErr, netguard.ErrBlockedAddress) {
-					s.log.WarnContext(ctx, "copy: blocked address", "cluster", config.ClusterLogName(job.destCluster), "err", produceErr)
-				}
+				s.logCopyError(ctx, "produce", job.destCluster, job.destTopic, produceErr)
 				sendEvent(copyProgressEvent{Copied: copied, Skipped: skipped, Done: true, Error: "produce: " + copyErrorText(produceErr)})
 				return
 			}
@@ -645,6 +684,12 @@ func checkDestPartitions(destTopic string, destCount int, highestSrcPartition in
 			"add partitions to the destination or drop preserve_partition",
 		destTopic, destCount, highestSrcPartition+1,
 	)
+}
+
+// isPartitionMissingErr reports whether err is the registry's error for a
+// partition the topic does not have.
+func isPartitionMissingErr(err error) bool {
+	return err != nil && strings.Contains(err.Error(), " not found in topic ")
 }
 
 // isTopicMissingErr reports whether err says a topic does not exist, as opposed

@@ -538,6 +538,15 @@ func TestCopyStream_WarningsNameTheLogName(t *testing.T) {
 			body: privateDest, produce: blockedDialErr(), wantMsg: "copy: blocked address",
 		},
 		{
+			name: "failing private source", path: privateSource, header: true,
+			body: `{"dest_cluster":"dst","dest_topic":"orders2"}`, consume: refusedDialErr(),
+			wantMsg: "copy: consume failed",
+		},
+		{
+			name: "failing private destination", path: "/api/v1/clusters/src/topics/orders/copy",
+			body: privateDest, produce: refusedDialErr(), wantMsg: "copy: produce failed",
+		},
+		{
 			name: "private destination pre-flight", path: "/api/v1/clusters/src/topics/orders/copy",
 			body: privateDest, describeFails: true, wantMsg: "copy: destination pre-flight check skipped",
 		},

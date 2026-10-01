@@ -70,9 +70,15 @@ private cluster's address. The body is always
 server-side. The log line names the cluster (`cluster`) when the route has
 one. Messages are static texts or name the failed rule, never the submitted
 value, so they never contain credentials, host names or the raw
-`X-Kafkito-Cluster` header. Connection failures of private clusters are
-reported by class, see
-[Outbound connections](#outbound-connections-ssrf-guard).
+`X-Kafkito-Cluster` header. Connection failures are reported by a class
+with a fixed text (see
+[Outbound connections](#outbound-connections-ssrf-guard)) in Test
+connection, in the cluster list and `/readyz` for a configured cluster that
+cannot be reached, and in the error event of a copy job (`copyErrorText`).
+A copy job reports a Kafka error code, a missing topic or partition and a
+cancellation by their own fixed texts. The full error goes to the log, for
+a configured cluster as `cluster not reachable` when the failure starts or
+its class changes.
 
 ## OpenAPI as the contract
 
@@ -231,7 +237,10 @@ network path can read them. Run kafkito only behind TLS:
   `err` field of the 5xx error log, the Test connection warnings
   (`testCluster ping failed`, `testCluster broker probe failed`, with the
   full error of a failure the caller only sees as a class) and the topic
-  copy warnings; at `debug` level, more lines can. Credentials and the
+  copy warnings (`copy: consume failed`, `copy: produce failed`,
+  `copy: blocked address`); at `debug` level, more lines can. For
+  configured clusters, `cluster not reachable` carries the full ping error
+  too. Credentials and the
   raw header never appear; `private_cluster_leak_test.go` pins both. Treat
   the logs as containing infrastructure details of your users' clusters and
   restrict who can read them.

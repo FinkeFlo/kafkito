@@ -147,7 +147,10 @@ class's fixed text in `error`. Every entry of `broker_issues` has its own
 
 Apart from the advertised `host` and `port` of a broker issue, the response
 names no address, port, resolver or operating system error; the server log
-has the full error. A definition that fails validation is a
+has the full error. The same classes and texts describe a configured
+cluster that cannot be reached in `GET /api/v1/clusters` and `/readyz` (see
+[Clusters](#clusters)) and a connection failure of a copy job (see
+[Copy messages](#copy-messages-to-another-topic)). A definition that fails validation is a
 `400` whose message names the field and a fixed reason, for example
 `broker 2: destination not allowed` or `schema_registry.url: invalid URL`.
 
@@ -204,6 +207,14 @@ curl -sX POST $BASE/api/v1/clusters/$CLUSTER/capabilities/refresh | jq
 # List brokers (id, host, port, rack, controller flag)
 curl -s $BASE/api/v1/clusters/$CLUSTER/brokers | jq '.brokers[]'
 ```
+
+A configured cluster that cannot be reached is listed with
+`reachable: false`, the class of the failure in `error_class` and the
+class's fixed text in `error` (see [Test connection](#test-connection) for
+the classes); `/readyz` reports its clusters the same way. Neither names a
+broker address. The server logs the full error as `cluster not reachable`
+when the failure starts or its class changes, and `cluster reachable again`
+once it recovers.
 
 `GET /api/v1/clusters/{cluster}/brokers` requires `view` on `cluster:<cluster>`
 with RBAC enabled.
@@ -571,6 +582,16 @@ Progress events arrive periodically — one right after the stream opens and at
 least one per fetched page. Because the SSE headers are sent before the copy
 starts, a failure *during* the copy surfaces as a `done` event carrying `error`
 **with HTTP status 200**: inspect the events, not just the status code.
+
+`error` starts with `consume: ` (reading the source) or `produce: ` (writing
+to the destination). The rest names no address, port or operating system
+error: a Kafka error code with its description (for example
+`produce: TOPIC_AUTHORIZATION_FAILED: Not authorized to access topics: ...`),
+`topic not found`, `partition not found`, `cancelled`, the message of the
+`private_cluster_address_blocked` error, or a connection class text such as
+`connection refused` (see [Test connection](#test-connection)). The server
+logs the full error as `copy: consume failed` or `copy: produce failed`
+(`copy: blocked address` for a refused address).
 
 Watch the stream with `jq`:
 

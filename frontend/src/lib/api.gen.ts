@@ -986,8 +986,9 @@ export interface components {
         ClusterInfo: {
             name: string;
             reachable: boolean;
+            /** @description Why the cluster is not reachable; absent when `reachable` is true. A fixed text that names no address, port, resolver or operating system detail: the text of `error_class`, or for Test connection a summary of `broker_issues` by node ID. The server log has the full error. */
             error?: string;
-            /** @description Test connection only: the class of `error` when the seed broker or the broker list could not be reached. Absent when `reachable` is true and when only `broker_issues` failed; each issue carries its own class. */
+            /** @description The class of `error` when the cluster could not be reached: the ping of a configured cluster in the cluster list and `/readyz`, or the seed broker or the broker list of a Test connection. Absent when `reachable` is true and, for Test connection, when only `broker_issues` failed; each issue carries its own class. */
             error_class?: components["schemas"]["ConnectionErrorClass"];
             is_prod: boolean;
             auth_type: string;
@@ -1026,7 +1027,7 @@ export interface components {
             error_class: components["schemas"]["ConnectionErrorClass"];
         };
         /**
-         * @description Class of a failed connection attempt to a private cluster. Each class has a fixed text: `refused` connection refused, `timeout` connection timed out, `dns` host name could not be resolved, `tls` TLS handshake failed, `sasl` authentication failed, `blocked` destination not allowed (outbound address guard), `unreachable` broker not reachable (any other failure).
+         * @description Class of a failed connection attempt to a cluster. Each class has a fixed text: `refused` connection refused, `timeout` connection timed out, `dns` host name could not be resolved, `tls` TLS handshake failed, `sasl` authentication failed, `blocked` destination not allowed (outbound address guard), `unreachable` broker not reachable (any other failure).
          * @enum {string}
          */
         ConnectionErrorClass: "refused" | "timeout" | "dns" | "tls" | "sasl" | "blocked" | "unreachable";
@@ -1464,7 +1465,7 @@ export interface components {
             skipped?: number;
             /** @description True on the final event only; omitted otherwise. */
             done?: boolean;
-            /** @description Set on the final event when the job aborted. Omitted when empty. Errors after the stream opened still carry HTTP status 200. */
+            /** @description Set on the final event when the job aborted. Omitted when empty. Errors after the stream opened still carry HTTP status 200. The text starts with `consume: ` (reading the source) or `produce: ` (writing to the destination), followed by a text that names no address, port or operating system detail: a Kafka error code with its description (for example `TOPIC_AUTHORIZATION_FAILED: ...`), `topic not found`, `partition not found`, `cancelled`, the message of the `private_cluster_address_blocked` error, or the fixed text of a `ConnectionErrorClass`. The server log has the full error. */
             error?: string;
         };
         /** @description Ad-hoc ("private") cluster definition supplied per request instead of from the server config — the same JSON the `X-Kafkito-Cluster` header carries (base64-encoded there). Broker and Schema Registry hosts are subject to the server's outbound-host (SSRF) policy. A definition that violates it or fails validation gets a 400 whose message names the field (a broker by its 1-based position) and a fixed reason, never the submitted value. */
