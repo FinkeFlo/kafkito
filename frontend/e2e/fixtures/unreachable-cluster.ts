@@ -14,7 +14,8 @@ export async function withUnreachableCluster(page: Page): Promise<void> {
     body.clusters.push({
       name: UNREACHABLE_CLUSTER,
       reachable: false,
-      error: "dial tcp 127.0.0.1:1: connect: connection refused",
+      error: "connection refused",
+      error_class: "refused",
       is_prod: false,
       auth_type: "none",
       tls: false,

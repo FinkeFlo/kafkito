@@ -379,7 +379,7 @@ type ClusterConfig = config.ClusterConfig
 // ClusterInfo defines model for ClusterInfo.
 type ClusterInfo = kafka.ClusterInfo
 
-// ConnectionErrorClass Class of a failed connection attempt to a private cluster. Each class has a fixed text: `refused` connection refused, `timeout` connection timed out, `dns` host name could not be resolved, `tls` TLS handshake failed, `sasl` authentication failed, `blocked` destination not allowed (outbound address guard), `unreachable` broker not reachable (any other failure).
+// ConnectionErrorClass Class of a failed connection attempt to a cluster. Each class has a fixed text: `refused` connection refused, `timeout` connection timed out, `dns` host name could not be resolved, `tls` TLS handshake failed, `sasl` authentication failed, `blocked` destination not allowed (outbound address guard), `unreachable` broker not reachable (any other failure).
 type ConnectionErrorClass = connerr.Class
 
 // CopyProgressEvent One SSE event of the copy stream, sent as a `data: {json}` line pair. Progress events arrive periodically — one right after the stream opens and at least one per fetched page — and the final event has `done: true`.
@@ -390,7 +390,7 @@ type CopyProgressEvent struct {
 	// Done True on the final event only; omitted otherwise.
 	Done *bool `json:"done,omitempty"`
 
-	// Error Set on the final event when the job aborted. Omitted when empty. Errors after the stream opened still carry HTTP status 200.
+	// Error Set on the final event when the job aborted. Omitted when empty. Errors after the stream opened still carry HTTP status 200. The text starts with `consume: ` (reading the source) or `produce: ` (writing to the destination), followed by a text that names no address, port or operating system detail: a Kafka error code with its description (for example `TOPIC_AUTHORIZATION_FAILED: ...`), `topic not found`, `partition not found`, `cancelled`, the message of the `private_cluster_address_blocked` error, or the fixed text of a `ConnectionErrorClass`. The server log has the full error.
 	Error *string `json:"error,omitempty"`
 
 	// Skipped Source records deliberately left out because they cannot be reproduced byte-for-byte (Schema-Registry-decoded, or masked values, keys or header values). Omitted while 0.

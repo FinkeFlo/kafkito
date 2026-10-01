@@ -8,18 +8,23 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/twmb/franz-go/pkg/kerr"
+	"github.com/twmb/franz-go/pkg/kgo"
 
 	"github.com/FinkeFlo/kafkito/internal/config"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
@@ -344,27 +349,40 @@ func (f *failingCopyRegistry) ProduceBatch(ctx context.Context, cluster, topic s
 	return f.blockingCopyRegistry.ProduceBatch(ctx, cluster, topic, reqs)
 }
 
+// refusedDialErr is a refused dial as franz-go reports it, naming the
+// broker address.
+func refusedDialErr() error {
+	return fmt.Errorf("unable to dial: %w", &net.OpError{
+		Op: "dial", Net: "tcp", Addr: &net.TCPAddr{IP: net.IPv4(10, 0, 0, 7), Port: 9092},
+		Err: &os.SyscallError{Syscall: "connect", Err: syscall.ECONNREFUSED},
+	})
+}
+
 // Issue #126: a copy job that hits an address the outbound guard refused
 // reports the same static message as the 502, not the refused host, which
-// may come from the X-Kafkito-Cluster header. Other errors keep their text.
-func TestCopyStream_ErrorEventHidesBlockedAddress(t *testing.T) {
+// may come from the X-Kafkito-Cluster header. Other errors get a text
+// without address either (see copyErrorText). The operator WARN carries the
+// full error.
+func TestCopyStream_ErrorEventHidesAddresses(t *testing.T) {
 	blocked := fmt.Errorf("unable to dial: %w", &netguard.BlockedAddressError{
 		Addr: "rebind.example:9092", Host: "rebind.example", IP: netip.MustParseAddr("169.254.169.254"),
 	})
-	other := errors.New("NOT_LEADER_FOR_PARTITION")
+	refused := refusedDialErr()
+	notLeader := fmt.Errorf("fetch topic %q partition 0 on cluster %q: %w", "orders", "src", kerr.NotLeaderForPartition)
 	cases := []struct {
 		name      string
 		consume   error
 		produce   error
 		wantError string
-		// wantLogCluster is the cluster the operator WARN names; empty means
-		// no "copy: blocked address" line may be logged.
-		wantLogCluster string
+		// wantLog is the operator WARN; wantLogCluster the cluster it names.
+		wantLog, wantLogCluster string
 	}{
-		{"consume blocked", blocked, nil, "consume: " + privateClusterAddressBlockedMsg, "src"},
-		{"produce blocked", nil, blocked, "produce: " + privateClusterAddressBlockedMsg, "dst"},
-		{"consume other", other, nil, "consume: NOT_LEADER_FOR_PARTITION", ""},
-		{"produce other", nil, other, "produce: NOT_LEADER_FOR_PARTITION", ""},
+		{"consume blocked", blocked, nil, "consume: " + privateClusterAddressBlockedMsg, "copy: blocked address", "src"},
+		{"produce blocked", nil, blocked, "produce: " + privateClusterAddressBlockedMsg, "copy: blocked address", "dst"},
+		{"consume refused", refused, nil, "consume: connection refused", "copy: consume failed", "src"},
+		{"produce refused", nil, fmt.Errorf("produce: %w", refused), "produce: connection refused", "copy: produce failed", "dst"},
+		{"consume kafka error", notLeader, nil, "consume: " + kerr.NotLeaderForPartition.Error(), "copy: consume failed", "src"},
+		{"produce kafka error", nil, fmt.Errorf("produce: %w", kerr.TopicAuthorizationFailed), "produce: " + kerr.TopicAuthorizationFailed.Error(), "copy: produce failed", "dst"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -390,26 +408,72 @@ func TestCopyStream_ErrorEventHidesBlockedAddress(t *testing.T) {
 			require.NoError(t, json.Unmarshal([]byte(strings.TrimPrefix(events[len(events)-1], "data: ")), &last))
 			assert.True(t, last.Done)
 			assert.Equal(t, tc.wantError, last.Error)
-			assert.NotContains(t, rec.Body.String(), "rebind.example")
-			assert.NotContains(t, rec.Body.String(), "169.254.169.254")
+			for _, raw := range []string{"rebind.example", "169.254.169.254", "10.0.0.7", "9092", "dial", "connect:"} {
+				assert.NotContains(t, rec.Body.String(), raw)
+			}
 
 			// Operators still get the full cause: the #118 log policy allows
-			// hosts and resolved IPs in logs, only the SSE event stays static.
-			var warn map[string]any
+			// hosts and resolved IPs in logs, only the SSE event stays generic.
+			var warns []map[string]any
 			for _, line := range strings.Split(strings.TrimSpace(logs.String()), "\n") {
 				var entry map[string]any
-				if json.Unmarshal([]byte(line), &entry) == nil && entry["msg"] == "copy: blocked address" {
-					warn = entry
+				if json.Unmarshal([]byte(line), &entry) == nil && strings.HasPrefix(fmt.Sprint(entry["msg"]), "copy: ") {
+					warns = append(warns, entry)
 				}
 			}
-			if tc.wantLogCluster == "" {
-				assert.Nil(t, warn, "no blocked-address WARN for a non-blocked error")
-				return
-			}
-			require.NotNil(t, warn, "blocked-address WARN not logged; logs:\n%s", logs.String())
+			require.Len(t, warns, 1, "one copy WARN; logs:\n%s", logs.String())
+			warn := warns[0]
+			assert.Equal(t, tc.wantLog, warn["msg"])
 			assert.Equal(t, "WARN", warn["level"])
 			assert.Equal(t, tc.wantLogCluster, warn["cluster"])
-			assert.Equal(t, blocked.Error(), warn["err"])
+			wantErr, wantTopic := tc.consume, "orders"
+			if wantErr == nil {
+				wantErr, wantTopic = tc.produce, "orders2"
+			}
+			assert.Equal(t, wantTopic, warn["topic"])
+			assert.Equal(t, wantErr.Error(), warn["err"])
+			// The job releases its slot after closing the stream, so the
+			// next case waits for it.
+			assert.Eventually(t, func() bool { return len(copySlots) == 0 }, 5*time.Second, 10*time.Millisecond, "slot released")
+		})
+	}
+}
+
+// copyErrorText keeps what helps the user and names no address, port or
+// operating system error.
+func TestCopyErrorText(t *testing.T) {
+	t.Parallel()
+
+	refused := refusedDialErr()
+	cases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"blocked", blockedDialErr(), privateClusterAddressBlockedMsg},
+		{"unknown cluster", fmt.Errorf("%w: __private__", kafkapkg.ErrUnknownCluster), kafkapkg.ErrUnknownCluster.Error()},
+		{"topic sentinel", fmt.Errorf("describe: %w", kafkapkg.ErrTopicNotFound), kafkapkg.ErrTopicNotFound.Error()},
+		{"cancelled", fmt.Errorf("produce: %w", context.Canceled), "cancelled"},
+		{"client closed", fmt.Errorf("produce: %w", kgo.ErrClientClosed), "cancelled"},
+		{"not authorized", fmt.Errorf("produce: %w", kerr.TopicAuthorizationFailed), kerr.TopicAuthorizationFailed.Error()},
+		{"record too large", fmt.Errorf("produce: %w", kerr.MessageTooLarge), kerr.MessageTooLarge.Error()},
+		{"destination topic missing", fmt.Errorf("produce: %w", kerr.UnknownTopicOrPartition), kerr.UnknownTopicOrPartition.Error()},
+		{"not confirmed in time", fmt.Errorf("%w, last err: %w", kgo.ErrRecordTimeout, kerr.NotEnoughReplicas), kerr.NotEnoughReplicas.Error()},
+		{"source topic missing", errors.New(`topic "orders" not found on cluster "src"`), kafkapkg.ErrTopicNotFound.Error()},
+		{"partition missing", errors.New(`partition 7 not found in topic "orders" on cluster "src"`), "partition not found"},
+		{"refused", fmt.Errorf("fetch metadata for topic %q on cluster %q: %w", "orders", "src", refused), "connection refused"},
+		{"timeout after a refused dial", fmt.Errorf("%w, last err: %w", kgo.ErrRecordTimeout, refused), "connection refused"},
+		{"deadline", fmt.Errorf("list offsets: %w", context.DeadlineExceeded), "connection timed out"},
+		{"unclassified", errors.New("broker 10.0.0.7:9092 closed the connection"), "broker not reachable"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := copyErrorText(tc.err)
+			assert.Equal(t, tc.want, got)
+			for _, raw := range []string{"10.0.0.7", "9092", "169.254", "dial", "connect:"} {
+				assert.NotContains(t, got, raw)
+			}
 		})
 	}
 }

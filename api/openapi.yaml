@@ -1585,14 +1585,22 @@ components:
       properties:
         name: { type: string }
         reachable: { type: boolean }
-        error: { type: string }
+        error:
+          type: string
+          description: >
+            Why the cluster is not reachable; absent when `reachable` is
+            true. A fixed text that names no address, port, resolver or
+            operating system detail: the text of `error_class`, or for Test
+            connection a summary of `broker_issues` by node ID. The server
+            log has the full error.
         error_class:
           $ref: "#/components/schemas/ConnectionErrorClass"
           description: >
-            Test connection only: the class of `error` when the seed broker
-            or the broker list could not be reached. Absent when
-            `reachable` is true and when only `broker_issues` failed; each
-            issue carries its own class.
+            The class of `error` when the cluster could not be reached: the
+            ping of a configured cluster in the cluster list and `/readyz`,
+            or the seed broker or the broker list of a Test connection.
+            Absent when `reachable` is true and, for Test connection, when
+            only `broker_issues` failed; each issue carries its own class.
         is_prod: { type: boolean }
         auth_type: { type: string }
         tls: { type: boolean }
@@ -1647,8 +1655,8 @@ components:
       type: string
       enum: [refused, timeout, dns, tls, sasl, blocked, unreachable]
       description: >
-        Class of a failed connection attempt to a private cluster. Each class
-        has a fixed text: `refused` connection refused, `timeout` connection
+        Class of a failed connection attempt to a cluster. Each class has a
+        fixed text: `refused` connection refused, `timeout` connection
         timed out, `dns` host name could not be resolved, `tls` TLS handshake
         failed, `sasl` authentication failed, `blocked` destination not
         allowed (outbound address guard), `unreachable` broker not reachable
@@ -2218,7 +2226,15 @@ components:
           type: string
           description: >
             Set on the final event when the job aborted. Omitted when empty.
-            Errors after the stream opened still carry HTTP status 200.
+            Errors after the stream opened still carry HTTP status 200. The
+            text starts with `consume: ` (reading the source) or
+            `produce: ` (writing to the destination), followed by a text
+            that names no address, port or operating system detail: a Kafka
+            error code with its description (for example
+            `TOPIC_AUTHORIZATION_FAILED: ...`), `topic not found`,
+            `partition not found`, `cancelled`, the message of the
+            `private_cluster_address_blocked` error, or the fixed text of a
+            `ConnectionErrorClass`. The server log has the full error.
     ClusterConfig:
       type: object
       required: [brokers]

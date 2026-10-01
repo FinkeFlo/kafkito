@@ -21,9 +21,10 @@ type ClusterInfo struct {
 	TLS            bool          `json:"tls"`
 	SchemaRegistry bool          `json:"schema_registry"`
 	Capabilities   *Capabilities `json:"capabilities,omitempty"`
-	// ErrorClass is the class of Error when a Test connection could not
-	// reach the seed or list the brokers (see connerr); Error is then the
-	// class's fixed text. Only the Test connection endpoint fills it.
+	// ErrorClass is the class of Error when the cluster could not be
+	// reached (see connerr): a configured cluster's ping in Describe, or the
+	// seed or broker list of a Test connection. Error is then the class's
+	// fixed text.
 	ErrorClass connerr.Class `json:"error_class,omitempty"`
 	// BrokerIssues lists the advertised brokers a Test connection could not
 	// reach (see Connections.ProbeBrokers). Only the Test connection
@@ -45,8 +46,11 @@ type ClusterInfo struct {
 }
 
 // Describe returns ClusterInfo for every configured cluster, each probed
-// with the given per-cluster timeout. If probeCaps is true, the capability
-// probe is also attached (using the 60s cache).
+// with the given per-cluster timeout. A reachable cluster also gets its
+// capabilities (using the 60s cache) and the collected aggregates. An
+// unreachable one gets the class of the ping error and its fixed text; the
+// full error, which can name broker addresses, goes to the log only (see
+// notePing).
 func (r *Clusters) Describe(ctx context.Context, probeTimeout time.Duration) []ClusterInfo {
 	configs := r.ConfigsOrdered()
 	out := make([]ClusterInfo, 0, len(configs))
@@ -66,8 +70,10 @@ func (r *Clusters) Describe(ctx context.Context, probeTimeout time.Duration) []C
 			TLS:            c.TLS.Enabled,
 			SchemaRegistry: strings.TrimSpace(c.SchemaRegistry.URL) != "",
 		}
+		r.notePing(ctx, c.Name, err)
 		if err != nil {
-			info.Error = err.Error()
+			info.ErrorClass = connerr.Classify(err)
+			info.Error = info.ErrorClass.Message()
 		} else {
 			cctx, ccancel := context.WithTimeout(ctx, 4*time.Second)
 			if caps, err := r.Capabilities(cctx, c.Name); err == nil {
@@ -79,4 +85,34 @@ func (r *Clusters) Describe(ctx context.Context, probeTimeout time.Duration) []C
 		out = append(out, info)
 	}
 	return out
+}
+
+// notePing logs the outcome of a configured cluster's ping in Describe. The
+// cluster list is polled by every open UI and /readyz by the orchestrator,
+// so a failure is logged when it starts and when its class changes, not on
+// every poll, and the recovery once. A ping that failed because the caller
+// went away says nothing about the cluster and is ignored.
+func (r *Clusters) notePing(ctx context.Context, cluster string, err error) {
+	if err != nil && ctx.Err() != nil {
+		return
+	}
+	class := connerr.Classify(err)
+	r.pingMu.Lock()
+	prev, failing := r.pingFailures[cluster]
+	if err == nil {
+		delete(r.pingFailures, cluster)
+	} else {
+		if r.pingFailures == nil {
+			r.pingFailures = make(map[string]connerr.Class)
+		}
+		r.pingFailures[cluster] = class
+	}
+	r.pingMu.Unlock()
+
+	switch {
+	case err != nil && (!failing || prev != class):
+		r.log.WarnContext(ctx, "cluster not reachable", "cluster", cluster, "error_class", string(class), "err", err)
+	case err == nil && failing:
+		r.log.InfoContext(ctx, "cluster reachable again", "cluster", cluster)
+	}
 }
