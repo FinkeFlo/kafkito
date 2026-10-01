@@ -61,6 +61,11 @@ export interface DataTableColumn<Row> {
   primary?: boolean;
 }
 
+export interface DataTableSort {
+  key: string;
+  dir: "asc" | "desc";
+}
+
 export interface ColumnDrivenProps<Row> {
   columns: DataTableColumn<Row>[];
   rows: Row[] | undefined;
@@ -74,6 +79,18 @@ export interface ColumnDrivenProps<Row> {
   onRowClick?: (row: Row) => void;
   /** Exposes the row action as a disclosure (`aria-expanded`), e.g. an inline detail panel. */
   isRowExpanded?: (row: Row) => boolean;
+  /**
+   * For rows whose action is a control the cell renders itself (e.g. a
+   * `<Link>` marked `data-row-primary`): adds the row hover and forwards
+   * pointer clicks to it, without the built-in button and chevron.
+   */
+  clickableRows?: boolean;
+  /**
+   * Controlled sort, e.g. to keep it in the URL. Pass both; the table then
+   * reports clicks through `onSortChange` instead of keeping its own state.
+   */
+  sort?: DataTableSort | null;
+  onSortChange?: (next: DataTableSort | null) => void;
   /** Async loading flag. Renders skeleton rows. */
   isLoading?: boolean;
   /** Number of skeleton rows to render while loading. */
@@ -106,6 +123,9 @@ export interface CompositionProps {
   rowKey?: undefined;
   onRowClick?: undefined;
   isRowExpanded?: undefined;
+  clickableRows?: undefined;
+  sort?: undefined;
+  onSortChange?: undefined;
   isLoading?: undefined;
   skeletonRows?: undefined;
   emptyState?: undefined;
@@ -156,14 +176,20 @@ function DataTableColumnView<Row>({
   rowKey,
   onRowClick,
   isRowExpanded,
+  clickableRows,
+  sort,
+  onSortChange,
   isLoading,
   skeletonRows = 5,
   emptyState,
   caption,
   className,
 }: ColumnDrivenProps<Row>) {
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [ownSort, setOwnSort] = useState<DataTableSort | null>(null);
+  const controlled = onSortChange !== undefined;
+  const current = controlled ? (sort ?? null) : ownSort;
+  const sortKey = current?.key ?? null;
+  const sortDir: SortDir = current?.dir ?? "asc";
 
   const sorted = useMemo(() => {
     if (!rows || !sortKey) return rows ?? [];
@@ -182,14 +208,14 @@ function DataTableColumnView<Row>({
 
   const toggleSort = (col: DataTableColumn<Row>) => {
     if (!col.sortValue) return;
-    if (sortKey !== col.id) {
-      setSortKey(col.id);
-      setSortDir("asc");
-    } else if (sortDir === "asc") {
-      setSortDir("desc");
-    } else {
-      setSortKey(null);
-    }
+    const next: DataTableSort | null =
+      sortKey !== col.id
+        ? { key: col.id, dir: "asc" }
+        : sortDir === "asc"
+          ? { key: col.id, dir: "desc" }
+          : null;
+    if (controlled) onSortChange(next);
+    else setOwnSort(next);
   };
 
   const renderEmpty = !isLoading && rows && rows.length === 0;
@@ -265,13 +291,14 @@ function DataTableColumnView<Row>({
                 ? null
                 : sorted.map((row) => {
                     const onActivate = onRowClick ? () => onRowClick(row) : undefined;
+                    const forwards = !!onActivate || !!clickableRows;
                     return (
                       <tr
                         key={rowKey(row)}
-                        onClick={onActivate ? forwardRowClick : undefined}
+                        onClick={forwards ? forwardRowClick : undefined}
                         className={cn(
                           "group transition-colors duration-150",
-                          onActivate && "cursor-pointer hover:bg-hover",
+                          forwards && "cursor-pointer hover:bg-hover",
                         )}
                       >
                         {columns.map((col) => (
