@@ -46,7 +46,7 @@ func (d recordDecoder) message(ctx context.Context, rec *kgo.Record) Message {
 	if !d.masks {
 		return m
 	}
-	if mv, did := d.maskedValue(ctx, rec); did {
+	if mv, did := d.maskedValue(rec, d.decodeValue(ctx, rec)); did {
 		if int64(len(mv)) > maxMessageValueBytes {
 			mv = mv[:maxMessageValueBytes]
 			m.ValueTruncated = true
@@ -85,27 +85,38 @@ func (d recordDecoder) maskKeyAndHeaders(m *Message) {
 	slices.Sort(m.MaskedHeaders)
 }
 
-// maskedValue applies the masking policy to the full decoded value of rec,
-// the rendering the search matchers see, and reports whether the policy
-// changed it. Masking the 64 KB preview instead would miss JSONPath fields
-// of any larger JSON value, because the cut-off preview does not parse.
-func (d recordDecoder) maskedValue(ctx context.Context, rec *kgo.Record) (string, bool) {
-	value := renderForMatch(rec.Value)
-	if d.sr != nil {
-		if rendered, _, ok, _ := d.sr.Decode(ctx, rec.Value); ok {
-			value = rendered
-		}
-	}
-	return d.mask.Apply(d.topic, value)
+// decodedValue is the Schema Registry decoding of a record value.
+type decodedValue struct {
+	rendered string // the decoded JSON; set only when ok
+	format   string // the SR format; empty when the value is not framed
+	ok       bool   // true when decoding succeeded
 }
 
-// valueMasked reports whether the masking policy changes the value of rec.
-func (d recordDecoder) valueMasked(ctx context.Context, rec *kgo.Record) bool {
-	if !d.masks {
-		return false
+// decodeValue decodes the value of rec via the Schema Registry, exactly
+// when the message list would.
+func (d recordDecoder) decodeValue(ctx context.Context, rec *kgo.Record) decodedValue {
+	if d.sr == nil {
+		return decodedValue{}
 	}
-	_, did := d.maskedValue(ctx, rec)
-	return did
+	rendered, meta, ok, _ := d.sr.Decode(ctx, rec.Value)
+	if !ok {
+		return decodedValue{format: meta.Format}
+	}
+	return decodedValue{rendered: rendered, format: meta.Format, ok: true}
+}
+
+// maskedValue applies the masking policy to the full decoded value of rec,
+// the rendering the search matchers see, and reports whether the policy
+// changed it. decoded is the Schema Registry decoding of rec's value (see
+// decodeValue). Masking the 64 KB preview instead would miss JSONPath
+// fields of any larger JSON value, because the cut-off preview does not
+// parse.
+func (d recordDecoder) maskedValue(rec *kgo.Record, decoded decodedValue) (string, bool) {
+	value := decoded.rendered
+	if !decoded.ok {
+		value = renderForMatch(rec.Value)
+	}
+	return d.mask.Apply(d.topic, value)
 }
 
 // matchMessage renders rec for the search matchers: full and decoded, with

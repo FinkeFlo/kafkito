@@ -62,7 +62,7 @@ type groupStore interface {
 // messageStore backs the message read and produce handlers.
 type messageStore interface {
 	ConsumeMessages(ctx context.Context, cluster, topic string, opts kafkapkg.ConsumeOptions) (*kafkapkg.ConsumeResult, error)
-	FetchRawMessageValue(ctx context.Context, cluster, topic string, partition int32, offset int64) (*kafkapkg.RawMessageValue, error)
+	FetchRawMessageValue(ctx context.Context, cluster, topic string, partition int32, offset int64, opts kafkapkg.RawValueOptions) (*kafkapkg.RawMessageValue, error)
 	CountMessages(ctx context.Context, cluster, topic string, opts kafkapkg.CountMessagesOptions) (*kafkapkg.MessageCountResult, error)
 	MessageTimeline(ctx context.Context, cluster, topic string, opts kafkapkg.MessageTimelineOptions) (*kafkapkg.MessageTimelineResult, error)
 	SearchMessages(ctx context.Context, cluster, topic string, opts kafkapkg.SearchOptions) (*kafkapkg.SearchResult, error)

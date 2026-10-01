@@ -43,13 +43,13 @@ func TestFetchRawMessageValue_RefusesMaskedRecords(t *testing.T) {
 	ctx := context.Background()
 
 	for _, offset := range []int64{0, 2} {
-		raw, err := env.reg.FetchRawMessageValue(ctx, kfakeCluster, env.topic, 0, offset)
+		raw, err := env.reg.FetchRawMessageValue(ctx, kfakeCluster, env.topic, 0, offset, RawValueOptions{})
 		require.ErrorIs(t, err, ErrValueMasked, "offset %d", offset)
 		assert.Nil(t, raw)
 	}
 
 	for offset, want := range map[int64][]byte{1: []byte(`{"id":2}`), 3: {0xff, 0x00, 0xfe}} {
-		raw, err := env.reg.FetchRawMessageValue(ctx, kfakeCluster, env.topic, 0, offset)
+		raw, err := env.reg.FetchRawMessageValue(ctx, kfakeCluster, env.topic, 0, offset, RawValueOptions{})
 		require.NoError(t, err, "the policy leaves offset %d unchanged", offset)
 		assert.Equal(t, want, raw.Value)
 	}
@@ -61,7 +61,7 @@ func TestFetchRawMessageValue_UnmaskedTopicIsUnchanged(t *testing.T) {
 	value := []byte(`{"id":1,"email":"alice@example.com"} iban-de001`)
 	env.produce(t, &kgo.Record{Value: value})
 
-	raw, err := env.reg.FetchRawMessageValue(context.Background(), kfakeCluster, env.topic, 0, 0)
+	raw, err := env.reg.FetchRawMessageValue(context.Background(), kfakeCluster, env.topic, 0, 0, RawValueOptions{})
 	require.NoError(t, err, "no rule targets the topic")
 	assert.Equal(t, value, raw.Value)
 }
@@ -75,7 +75,7 @@ func TestFetchRawMessageValue_ChecksSchemaRegistryDecodedValue(t *testing.T) {
 	})
 	env.produce(t, &kgo.Record{Value: avroUserFrame(t, 1, "alice")})
 
-	_, err := env.reg.FetchRawMessageValue(context.Background(), kfakeCluster, env.topic, 0, 0)
+	_, err := env.reg.FetchRawMessageValue(context.Background(), kfakeCluster, env.topic, 0, 0, RawValueOptions{})
 	require.ErrorIs(t, err, ErrValueMasked, "the decoded JSON has the masked field")
 }
 
@@ -100,7 +100,7 @@ func TestConsume_MasksLargeValuesInFull(t *testing.T) {
 		assert.NotContains(t, m.Value, "@example.com", "offset %d", m.Offset)
 	}
 
-	_, err := env.reg.FetchRawMessageValue(context.Background(), kfakeCluster, env.topic, 0, 1)
+	_, err := env.reg.FetchRawMessageValue(context.Background(), kfakeCluster, env.topic, 0, 1, RawValueOptions{})
 	require.ErrorIs(t, err, ErrValueMasked, "the field past 64 KB is masked, so the raw value is refused")
 }
 
@@ -394,7 +394,7 @@ func TestFetchRawMessageValue_KeyAndHeaderMaskingLeavesValueDownload(t *testing.
 	env := newKfakeEnv(t, customersTopic, 1, keyHeaderRules)
 	env.produce(t, keyHeaderRecords()...)
 
-	raw, err := env.reg.FetchRawMessageValue(context.Background(), kfakeCluster, env.topic, 0, 0)
+	raw, err := env.reg.FetchRawMessageValue(context.Background(), kfakeCluster, env.topic, 0, 0, RawValueOptions{})
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"order":"o-1"}`, string(raw.Value))
 }

@@ -97,7 +97,7 @@ func TestRawValueCharacterization(t *testing.T) {
 	env, fx := newOrdersEnv(t)
 	ctx := context.Background()
 
-	raw, err := env.reg.FetchRawMessageValue(ctx, kfakeCluster, env.topic, 0, 3)
+	raw, err := env.reg.FetchRawMessageValue(ctx, kfakeCluster, env.topic, 0, 3, RawValueOptions{})
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"seq":6,"kind":"even","name":"rec-6"}`, string(raw.Value))
 	assert.Equal(t, "application/json", raw.ContentType)
@@ -106,19 +106,30 @@ func TestRawValueCharacterization(t *testing.T) {
 
 	bin := newKfakeEnv(t, "bin", 1, nil)
 	bin.produce(t, &kgo.Record{Value: []byte{0xff, 0x00, 0xfe}}, &kgo.Record{Value: []byte("plain")})
-	raw, err = bin.reg.FetchRawMessageValue(ctx, kfakeCluster, "bin", 0, 0)
+	raw, err = bin.reg.FetchRawMessageValue(ctx, kfakeCluster, "bin", 0, 0, RawValueOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, &RawMessageValue{Value: []byte{0xff, 0x00, 0xfe}, ContentType: "application/octet-stream", Extension: "bin"}, raw)
-	raw, err = bin.reg.FetchRawMessageValue(ctx, kfakeCluster, "bin", 0, 1)
+	raw, err = bin.reg.FetchRawMessageValue(ctx, kfakeCluster, "bin", 0, 1, RawValueOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, "text/plain; charset=utf-8", raw.ContentType)
 
+	// A Schema Registry value is served decoded, as the list shows it, and
+	// its wire bytes on request.
+	frame := avroUserFrame(t, 1, "alice")
+	sr := srUsersEnv(t, frame)
+	raw, err = sr.reg.FetchRawMessageValue(ctx, kfakeCluster, sr.topic, 0, 0, RawValueOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, &RawMessageValue{Value: []byte(`{"id":1,"name":"alice"}`), ContentType: "application/json", Extension: "json", DecodedFormat: "avro"}, raw)
+	raw, err = sr.reg.FetchRawMessageValue(ctx, kfakeCluster, sr.topic, 0, 0, RawValueOptions{WireBytes: true})
+	require.NoError(t, err)
+	assert.Equal(t, &RawMessageValue{Value: frame, ContentType: "application/octet-stream", Extension: "bin"}, raw)
+
 	short, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
-	_, err = env.reg.FetchRawMessageValue(short, kfakeCluster, env.topic, 2, 100)
+	_, err = env.reg.FetchRawMessageValue(short, kfakeCluster, env.topic, 2, 100, RawValueOptions{})
 	require.Error(t, err, "an offset past the end waits for the context and fails")
 
-	_, err = env.reg.FetchRawMessageValue(ctx, "nope", env.topic, 0, 0)
+	_, err = env.reg.FetchRawMessageValue(ctx, "nope", env.topic, 0, 0, RawValueOptions{})
 	require.ErrorIs(t, err, ErrUnknownCluster)
 }
 
@@ -134,7 +145,7 @@ func TestRecordReaders_CloseTheirClients(t *testing.T) {
 		consumePage(t, env, ConsumeOptions{Partition: -1, Limit: 5, From: FromStart})
 		searchTopic(t, env, SearchOptions{Partition: -1, Limit: 500, Value: "rec"})
 		searchTopic(t, env, SearchOptions{Partition: -1, Limit: 500, Direction: DirOldestFirst, Value: "rec"})
-		_, err := env.reg.FetchRawMessageValue(ctx, kfakeCluster, env.topic, 0, 3)
+		_, err := env.reg.FetchRawMessageValue(ctx, kfakeCluster, env.topic, 0, 3, RawValueOptions{})
 		require.NoError(t, err)
 		_, err = env.reg.CountMessages(ctx, kfakeCluster, env.topic, CountMessagesOptions{Partition: -1})
 		require.NoError(t, err)

@@ -51,7 +51,7 @@ func TestDownloadMessageRaw_RBAC(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			fetched := 0
-			h := rbacFakeServer(t, tc.cfg, stores{messages: fakeMessages{raw: func(topic string, partition int32, offset int64) (*kafkapkg.RawMessageValue, error) {
+			h := rbacFakeServer(t, tc.cfg, stores{messages: fakeMessages{raw: func(topic string, partition int32, offset int64, _ kafkapkg.RawValueOptions) (*kafkapkg.RawMessageValue, error) {
 				fetched++
 				assert.Equal(t, "orders", topic)
 				assert.EqualValues(t, 0, partition)

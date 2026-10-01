@@ -186,22 +186,55 @@ const avroUserSchema = `{"type":"record","name":"User","fields":[{"name":"id","t
 // avroUserSchemaID is the id the fake Schema Registry serves avroUserSchema under.
 const avroUserSchemaID = 7
 
-// startFakeSchemaRegistry serves avroUserSchema under avroUserSchemaID.
+// jsonUserSchemaID is the id the fake Schema Registry serves a JSON Schema
+// under.
+const jsonUserSchemaID = 8
+
+// protoUserSchemaID is the id the fake Schema Registry serves a Protobuf
+// schema under; kafkito does not decode Protobuf payloads.
+const protoUserSchemaID = 9
+
+// startFakeSchemaRegistry serves avroUserSchema under avroUserSchemaID, a
+// JSON Schema under jsonUserSchemaID and a Protobuf schema under
+// protoUserSchemaID. Every other id is unknown (404).
 func startFakeSchemaRegistry(t *testing.T) string {
 	t.Helper()
 	mux := http.NewServeMux()
-	mux.HandleFunc(fmt.Sprintf("/schemas/ids/%d", avroUserSchemaID), func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/vnd.schemaregistry.v1+json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"schema":     avroUserSchema,
-			"schemaType": "AVRO",
-			"subject":    "users-value",
-			"version":    1,
+	serve := func(id int, body map[string]any) {
+		mux.HandleFunc(fmt.Sprintf("/schemas/ids/%d", id), func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/vnd.schemaregistry.v1+json")
+			_ = json.NewEncoder(w).Encode(body)
 		})
+	}
+	serve(avroUserSchemaID, map[string]any{
+		"schema":     avroUserSchema,
+		"schemaType": "AVRO",
+		"subject":    "users-value",
+		"version":    1,
+	})
+	serve(jsonUserSchemaID, map[string]any{
+		"schema":     `{"type":"object","properties":{"id":{"type":"integer"}}}`,
+		"schemaType": "JSON",
+		"subject":    "users-json-value",
+		"version":    1,
+	})
+	serve(protoUserSchemaID, map[string]any{
+		"schema":     `syntax = "proto3"; message User { int64 id = 1; }`,
+		"schemaType": "PROTOBUF",
+		"subject":    "users-proto-value",
+		"version":    1,
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	return srv.URL
+}
+
+// srFrame wraps payload in the Confluent wire format under schema id.
+func srFrame(id uint32, payload []byte) []byte {
+	framed := make([]byte, 5+len(payload))
+	binary.BigEndian.PutUint32(framed[1:5], id)
+	copy(framed[5:], payload)
+	return framed
 }
 
 // avroUserFrame encodes a User in the Confluent wire format.
@@ -211,8 +244,5 @@ func avroUserFrame(t *testing.T, id int64, name string) []byte {
 	require.NoError(t, err)
 	payload, err := avro.Marshal(schema, map[string]any{"id": id, "name": name})
 	require.NoError(t, err)
-	framed := make([]byte, 5+len(payload))
-	binary.BigEndian.PutUint32(framed[1:5], avroUserSchemaID)
-	copy(framed[5:], payload)
-	return framed
+	return srFrame(avroUserSchemaID, payload)
 }

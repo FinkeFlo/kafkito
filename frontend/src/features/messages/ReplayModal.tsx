@@ -134,6 +134,10 @@ export function ReplayModal({
     partition: message.partition,
     offset: message.offset,
     enabled: needsFullValue,
+    // The stored bytes, never a Schema-Registry decoded rendering: a value
+    // the list could not decode is not blocked by replayBlocker, and the
+    // raw endpoint might decode it now.
+    decoded: false,
   });
 
   // Re-arm the "replay the truncated preview anyway" opt-in whenever the

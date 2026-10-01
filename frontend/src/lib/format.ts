@@ -262,14 +262,28 @@ export function lagVariant(lag: number | bigint | null | undefined): LagVariant 
 }
 
 /**
+ * Value encodings whose rendered value is JSON: plain JSON, and the
+ * Schema-Registry formats the backend decodes to JSON (Avro, JSON Schema).
+ * Protobuf is never decoded, so a Protobuf value keeps the "binary"
+ * encoding and is not JSON-like.
+ */
+const JSON_LIKE_ENCODINGS: readonly string[] = ["json", "avro", "json_schema"];
+
+/** Whether a value of this encoding is rendered as JSON. */
+export function isJsonLikeEncoding(encoding: string): boolean {
+  return JSON_LIKE_ENCODINGS.includes(encoding);
+}
+
+/**
  * Pretty-prints a message value for display in a <pre> block.
  *
- * Only re-indents values the backend already classified as JSON, and falls
- * back to the original string whenever parsing fails — which is the normal
- * case for a value the list path truncated mid-structure.
+ * Only re-indents values the backend already rendered as JSON (see
+ * isJsonLikeEncoding), and falls back to the original string whenever
+ * parsing fails — which is the normal case for a value the list path
+ * truncated mid-structure.
  */
 export function prettyValue(s: string, encoding: string): string {
-  if (encoding !== "json") return s;
+  if (!isJsonLikeEncoding(encoding)) return s;
   try {
     return JSON.stringify(JSON.parse(s), null, 2);
   } catch {

@@ -627,18 +627,31 @@ type RawMessageValue struct {
 	Value       []byte
 	ContentType string // "application/json", "application/xml", "text/plain", or "application/octet-stream"
 	Extension   string // suggested file extension without leading dot
+	// DecodedFormat is the Schema Registry format ("avro", "json_schema")
+	// Value was decoded from, or empty when Value holds the wire bytes.
+	DecodedFormat string
 }
 
-// FetchRawMessageValue fetches the raw value bytes of a single Kafka record
-// identified by cluster, topic, partition, and offset. It never builds a
-// Message struct or performs any string/base64 conversion, so it is safe to
-// call for records larger than maxMessageValueBytes as long as the payload
-// stays within maxRawDownloadBytes.
+// RawValueOptions selects the form FetchRawMessageValue serves.
+type RawValueOptions struct {
+	// WireBytes serves the value bytes as stored in Kafka instead of the
+	// Schema Registry decoded JSON the message list shows.
+	WireBytes bool
+}
+
+// FetchRawMessageValue fetches the full value of a single Kafka record
+// identified by cluster, topic, partition, and offset. A value the message
+// list shows Schema Registry decoded is served as that decoded JSON, unless
+// opts.WireBytes asks for the stored bytes; every other value, including a
+// framed one that fails to decode, is served as stored. It never builds a
+// Message struct, so it is safe to call for records larger than
+// maxMessageValueBytes as long as the value stays within
+// maxRawDownloadBytes.
 //
-// Returns ErrValueTooLarge when the record's value exceeds maxRawDownloadBytes
-// and ErrValueMasked when the cluster's masking policy changes the record's
-// value: the raw bytes would bypass the masking.
-func (r *Messages) FetchRawMessageValue(ctx context.Context, cluster, topic string, partition int32, offset int64) (*RawMessageValue, error) {
+// Returns ErrValueTooLarge when the stored or the decoded value exceeds
+// maxRawDownloadBytes and ErrValueMasked when the cluster's masking policy
+// changes the record's value: the served bytes would bypass the masking.
+func (r *Messages) FetchRawMessageValue(ctx context.Context, cluster, topic string, partition int32, offset int64, opts RawValueOptions) (*RawMessageValue, error) {
 	cfg, ok := r.ConfigFor(cluster)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrUnknownCluster, cluster)
@@ -663,19 +676,49 @@ func (r *Messages) FetchRawMessageValue(ctx context.Context, cluster, topic stri
 		return nil, fmt.Errorf("record not found: partition %d offset %d", partition, offset)
 	}
 
+	// Checked before decoding too, so an oversized record is never decoded.
 	if int64(len(rec.Value)) > maxRawDownloadBytes {
 		return nil, ErrValueTooLarge
 	}
-	if r.recordDecoder(cluster, topic).valueMasked(ctx, rec) {
-		return nil, ErrValueMasked
+	d := r.recordDecoder(cluster, topic)
+	// The stored bytes need no decode unless the masking check does: a
+	// Schema Registry lookup could only slow them down.
+	var decoded decodedValue
+	if !opts.WireBytes || d.masks {
+		decoded = d.decodeValue(ctx, rec)
 	}
+	if d.masks {
+		if _, did := d.maskedValue(rec, decoded); did {
+			return nil, ErrValueMasked
+		}
+	}
+	return rawValueFor(rec.Value, decoded, opts.WireBytes, maxRawDownloadBytes)
+}
 
-	ct, ext := detectContentType(rec.Value)
-	return &RawMessageValue{
-		Value:       rec.Value,
-		ContentType: ct,
-		Extension:   ext,
-	}, nil
+// rawValueFor picks what FetchRawMessageValue serves for the stored value
+// wire: the decoded JSON when decoding succeeded and wireBytes is false,
+// else wire. The decoded value is typed explicitly rather than sniffed,
+// because an Avro primitive such as "abc" would sniff as text, and it is
+// checked against limit again, since Avro decoded to JSON is usually larger
+// than its encoding. Framed wire bytes are binary even when they happen to
+// be valid UTF-8.
+func rawValueFor(wire []byte, decoded decodedValue, wireBytes bool, limit int64) (*RawMessageValue, error) {
+	if decoded.ok && !wireBytes {
+		if int64(len(decoded.rendered)) > limit {
+			return nil, ErrValueTooLarge
+		}
+		return &RawMessageValue{
+			Value:         []byte(decoded.rendered),
+			ContentType:   "application/json",
+			Extension:     "json",
+			DecodedFormat: decoded.format,
+		}, nil
+	}
+	if IsSRFramed(wire) {
+		return &RawMessageValue{Value: wire, ContentType: "application/octet-stream", Extension: "bin"}, nil
+	}
+	ct, ext := detectContentType(wire)
+	return &RawMessageValue{Value: wire, ContentType: ct, Extension: ext}, nil
 }
 
 // ErrValueTooLarge is returned when a raw value exceeds maxRawDownloadBytes.

@@ -164,7 +164,7 @@ func (f fakeSchemaClient) DeleteSubject(_ context.Context, subject string, perma
 
 type fakeMessages struct {
 	messageStore
-	raw      func(topic string, partition int32, offset int64) (*kafkapkg.RawMessageValue, error)
+	raw      func(topic string, partition int32, offset int64, opts kafkapkg.RawValueOptions) (*kafkapkg.RawMessageValue, error)
 	consume  func(opts kafkapkg.ConsumeOptions) (*kafkapkg.ConsumeResult, error)
 	count    func(opts kafkapkg.CountMessagesOptions) (*kafkapkg.MessageCountResult, error)
 	timeline func(opts kafkapkg.MessageTimelineOptions) (*kafkapkg.MessageTimelineResult, error)
@@ -175,8 +175,8 @@ func (f fakeMessages) SearchMessages(_ context.Context, _, _ string, opts kafkap
 	return f.search(opts)
 }
 
-func (f fakeMessages) FetchRawMessageValue(_ context.Context, _, topic string, partition int32, offset int64) (*kafkapkg.RawMessageValue, error) {
-	return f.raw(topic, partition, offset)
+func (f fakeMessages) FetchRawMessageValue(_ context.Context, _, topic string, partition int32, offset int64, opts kafkapkg.RawValueOptions) (*kafkapkg.RawMessageValue, error) {
+	return f.raw(topic, partition, offset, opts)
 }
 
 func (f fakeMessages) ConsumeMessages(_ context.Context, _, _ string, opts kafkapkg.ConsumeOptions) (*kafkapkg.ConsumeResult, error) {

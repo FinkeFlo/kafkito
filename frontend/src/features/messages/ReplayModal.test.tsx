@@ -81,6 +81,15 @@ describe("ReplayModal truncated value handling", () => {
     renderModal(truncatedMessage());
 
     await waitFor(() => expect(screen.getByText(/full value .* loaded/i)).toBeInTheDocument());
+    // Replay re-produces the stored bytes, never a decoded rendering.
+    expect(fetchMessageRawBase64).toHaveBeenCalledWith(
+      "src",
+      "src-topic",
+      expect.any(Number),
+      expect.any(Number),
+      expect.anything(),
+      false,
+    );
     await user.type(screen.getByPlaceholderText("topic-name"), "dest-topic");
     expect(screen.getByRole("button", { name: /^replay$/i })).toBeEnabled();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();

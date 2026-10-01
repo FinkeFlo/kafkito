@@ -69,11 +69,15 @@ export const messageQueries = {
       },
       staleTime: 5 * 60_000,
     }),
-  /** Full raw value of one record, base64-encoded. */
-  raw: (cluster: string, topic: string, partition: number, offset: number) =>
+  /**
+   * Full value of one record, base64-encoded: Schema-Registry decoded like
+   * the list, or the stored bytes when `decoded` is false.
+   */
+  raw: (cluster: string, topic: string, partition: number, offset: number, decoded = true) =>
     queryOptions({
-      queryKey: ["message-raw", clusterKey(cluster), topic, partition, offset] as const,
-      queryFn: ({ signal }) => fetchMessageRawBase64(cluster, topic, partition, offset, signal),
+      queryKey: ["message-raw", clusterKey(cluster), topic, partition, offset, decoded] as const,
+      queryFn: ({ signal }) =>
+        fetchMessageRawBase64(cluster, topic, partition, offset, signal, decoded),
       staleTime: 5 * 60_000,
       // Deliberately short: these entries are megabyte-sized base64 strings,
       // so they must not linger in the cache once nothing renders them.

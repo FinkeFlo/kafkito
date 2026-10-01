@@ -77,8 +77,9 @@ frontend/e2e/fixtures/kafkito-e2e.yaml  kafkito config: cluster `local` + its Sc
                                     data_masking for e2e-masked(-kh)
 frontend/e2e/schemas.spec.ts        Schemas page (list, filter, subject detail, versions, delete) and
                                     the topic Schema tab, incl. their shared query cache
-frontend/e2e/schema-messages.spec.ts  decoded Avro records in the messages view and the raw download
-                                    of a truncated one (still the wire format, see #87)
+frontend/e2e/schema-messages.spec.ts  decoded Avro records in the messages view, and loading and
+                                    downloading a truncated one in full (decoded JSON; wire format
+                                    with decoded=false)
 frontend/e2e/*.spec.ts              the actual walks
 frontend/e2e/csp.spec.ts            fails on any Content-Security-Policy violation (needs the Go-served build)
 frontend/e2e/a11y.spec.ts           axe scan of the main routes, dialogs and form error states in light
