@@ -77,3 +77,102 @@ describe("DataTable clickable rows", () => {
     expect(primary).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("DataTable column mode with own row controls", () => {
+  it("forwards clicks to the cell's own data-row-primary control without adding a button", () => {
+    const open = vi.fn();
+    render(
+      <DataTable<Row>
+        columns={[
+          {
+            id: "id",
+            header: "ID",
+            cell: (r) => (
+              <a href={`#${r.id}`} data-row-primary="" onClick={open}>
+                {r.id}
+              </a>
+            ),
+          },
+          { id: "state", header: "State", cell: (r) => r.state },
+        ]}
+        rows={rows}
+        rowKey={(r) => r.id}
+        clickableRows
+      />,
+    );
+    expect(screen.queryByRole("button")).toBeNull();
+    fireEvent.click(screen.getByText("Empty"));
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("DataTable controlled sort", () => {
+  const columns = [
+    { id: "id", header: "ID", cell: (r: Row) => r.id, sortValue: (r: Row) => r.id },
+    { id: "state", header: "State", cell: (r: Row) => r.state, sortValue: (r: Row) => r.state },
+  ];
+
+  it("sorts by the given key and announces it with aria-sort", () => {
+    render(
+      <DataTable<Row>
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        sort={{ key: "state", dir: "asc" }}
+        onSortChange={() => {}}
+      />,
+    );
+    const [, first, second] = screen.getAllByRole("row");
+    expect(first).toHaveTextContent("beta");
+    expect(second).toHaveTextContent("alpha");
+    expect(screen.getByRole("columnheader", { name: /state/i })).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
+    expect(screen.getByRole("columnheader", { name: /id/i })).toHaveAttribute("aria-sort", "none");
+  });
+
+  it("reports the next sort state instead of keeping its own", () => {
+    const onSortChange = vi.fn();
+    const { rerender } = render(
+      <DataTable<Row>
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        sort={null}
+        onSortChange={onSortChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /state/i }));
+    expect(onSortChange).toHaveBeenLastCalledWith({ key: "state", dir: "asc" });
+    // Nothing changes until the parent passes the new sort back in.
+    expect(screen.getByRole("columnheader", { name: /state/i })).toHaveAttribute(
+      "aria-sort",
+      "none",
+    );
+
+    rerender(
+      <DataTable<Row>
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        sort={{ key: "state", dir: "asc" }}
+        onSortChange={onSortChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /state/i }));
+    expect(onSortChange).toHaveBeenLastCalledWith({ key: "state", dir: "desc" });
+
+    rerender(
+      <DataTable<Row>
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        sort={{ key: "state", dir: "desc" }}
+        onSortChange={onSortChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /state/i }));
+    expect(onSortChange).toHaveBeenLastCalledWith(null);
+  });
+});
