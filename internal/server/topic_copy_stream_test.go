@@ -161,7 +161,7 @@ func TestCopyStream_EventsArriveIncrementally(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "text/event-stream", resp.Header.Get("Content-Type"))
-	assert.Equal(t, "no-cache", resp.Header.Get("Cache-Control"))
+	assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"))
 	assert.Equal(t, "no", resp.Header.Get("X-Accel-Buffering"))
 	assert.Empty(t, resp.Header.Get("Content-Length"))
 	assert.Equal(t, int64(-1), resp.ContentLength, "the stream has no length")

@@ -126,13 +126,13 @@ func nullableStrings(s []string) *[]string {
 	return &s
 }
 
-// openAPISpecResponse serves the raw document with an explicit charset and
-// no caching; the generated response type only sets `application/yaml`.
+// openAPISpecResponse serves the raw document with an explicit charset; the
+// generated response type only sets `application/yaml`. Like every /api
+// response it is not cached (noStoreMiddleware).
 type openAPISpecResponse struct{}
 
 func (openAPISpecResponse) VisitGetOpenApiSpecResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
 	_, err := bytes.NewReader(api.Spec).WriteTo(w)
 	return err

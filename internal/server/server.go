@@ -99,6 +99,7 @@ func New(opts Options) http.Handler {
 	generated.mountRoot(r)
 
 	r.Route("/api", func(api chi.Router) {
+		api.Use(noStoreMiddleware)
 		api.Route("/v1", func(v1 chi.Router) {
 			if opts.Auth != nil {
 				v1.Use(auth.MiddlewareFor(opts.Auth), capturePrincipal)

@@ -183,6 +183,9 @@ inline scripts or styles), `X-Content-Type-Options`, `Referrer-Policy`,
 `X-Frame-Options` (`internal/server/secheaders.go`). The exact values and the
 `frame_ancestors` setting are in the
 [README](https://github.com/FinkeFlo/kafkito/blob/main/README.md#security-headers).
+Responses under `/api`, errors and the copy event stream included, also
+carry `Cache-Control: no-store` (`noStoreMiddleware` on the `/api` router);
+the SPA shell and its assets keep their own caching.
 
 ## Running behind TLS
 

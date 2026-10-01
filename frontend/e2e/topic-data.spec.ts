@@ -100,6 +100,29 @@ test.describe("Topic data (produce, search, raw download, bulk copy)", () => {
   });
 
   test("bulk copy streams progress and lands the records in the destination", async ({ page }) => {
+    // Keep a copy of the copy job's SSE body in the page. Playwright reads
+    // response bodies through the DevTools protocol, which returns no body
+    // for this response: like every /api response it carries
+    // Cache-Control: no-store.
+    await page.addInitScript(() => {
+      const w = window as unknown as { __copyBody?: Promise<string> };
+      const fetchOriginal = window.fetch.bind(window);
+      window.fetch = async (input, init) => {
+        const res = await fetchOriginal(input, init);
+        const url = input instanceof Request ? input.url : String(input);
+        if (!new URL(url, window.location.href).pathname.endsWith("/copy") || !res.body) {
+          return res;
+        }
+        const [forApp, forTest] = res.body.tee();
+        w.__copyBody = new Response(forTest).text();
+        return new Response(forApp, {
+          status: res.status,
+          statusText: res.statusText,
+          headers: res.headers,
+        });
+      };
+    });
+
     await page.goto(topicPath(COPY_SOURCE, "messages"));
     await page.getByRole("button", { name: /Copy messages to another cluster/ }).click();
     await page.getByPlaceholder("topic-name").fill(COPY_DEST);
@@ -135,7 +158,11 @@ test.describe("Topic data (produce, search, raw download, bulk copy)", () => {
     // Checked on the SSE body: events that arrive in one network chunk are
     // handled in one task, so React renders only the last of them and the
     // DOM cannot be relied on to show every intermediate count.
-    const events = (await (await copyResponse).text())
+    expect((await copyResponse).headers()["cache-control"]).toBe("no-store");
+    const body = await page.evaluate(
+      () => (window as unknown as { __copyBody?: Promise<string> }).__copyBody ?? "",
+    );
+    const events = body
       .split("\n")
       .filter((line) => line.startsWith("data: "))
       .map((line) => JSON.parse(line.slice(6)) as { copied: number; done?: boolean });
