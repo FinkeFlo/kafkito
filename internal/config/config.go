@@ -425,6 +425,14 @@ func Load(path string) (Config, error) {
 			return Config{}, fmt.Errorf("load config file %q: %w", path, err)
 		}
 	}
+	// Checked before the env vars merge: a KAFKITO_PRIVATE_CLUSTERS_* variable
+	// would replace a scalar (for example "private_clusters: off") with a
+	// block holding only its own key, so the scalar would be dropped.
+	if v := k.Get(privateClustersKey); v != nil {
+		if _, ok := v.(map[string]any); !ok {
+			return Config{}, fmt.Errorf("%s must be a block with mode and allow_plain_without_tls, not %v", privateClustersKey, v)
+		}
+	}
 
 	// Env is loaded into its own instance first so env-only shortcuts
 	// (KAFKITO_KAFKA_BROKERS) cannot be triggered from the YAML file.
@@ -444,6 +452,17 @@ func Load(path string) (Config, error) {
 	if b, ok := k.Get(privateClustersModeKey).(bool); ok {
 		if err := k.Set(privateClustersModeKey, string(privateClusterModeOf(b))); err != nil {
 			return Config{}, fmt.Errorf("set %s: %w", privateClustersModeKey, err)
+		}
+	}
+	// Parsed here so that a value that is not a boolean fails with a clear
+	// message instead of Unmarshal's weak conversion.
+	if v := k.Get(allowPlainWithoutTLSKey); v != nil {
+		allow, err := parseBoolSetting(allowPlainWithoutTLSKey, v)
+		if err != nil {
+			return Config{}, err
+		}
+		if err := k.Set(allowPlainWithoutTLSKey, allow); err != nil {
+			return Config{}, fmt.Errorf("set %s: %w", allowPlainWithoutTLSKey, err)
 		}
 	}
 
@@ -537,14 +556,15 @@ const kafkaBrokersKey = "kafka.brokers"
 // envKeyAliases maps env vars whose koanf key contains an underscore, which
 // the generic "_" -> "." transform cannot express.
 var envKeyAliases = map[string]string{
-	"KAFKITO_TEST_CONNECTION_TIMEOUT": "server.test_connection_timeout",
-	"KAFKITO_SERVER_FRAME_ANCESTORS":  "server.frame_ancestors",
-	"KAFKITO_AUTH_OIDC_ISSUER_URL":    "auth.oidc.issuer_url",
-	"KAFKITO_AUTH_OIDC_AUDIENCE":      "auth.oidc.audience",
-	"KAFKITO_AUTH_OIDC_JWKS_URL":      "auth.oidc.jwks_url",
-	"KAFKITO_AUTH_OIDC_REQUIRED_TYP":  "auth.oidc.required_typ",
-	"KAFKITO_AUTH_OIDC_ALLOWED_AZP":   "auth.oidc.allowed_azp",
-	"KAFKITO_PRIVATE_CLUSTERS":        privateClustersModeKey,
+	"KAFKITO_TEST_CONNECTION_TIMEOUT":                  "server.test_connection_timeout",
+	"KAFKITO_SERVER_FRAME_ANCESTORS":                   "server.frame_ancestors",
+	"KAFKITO_AUTH_OIDC_ISSUER_URL":                     "auth.oidc.issuer_url",
+	"KAFKITO_AUTH_OIDC_AUDIENCE":                       "auth.oidc.audience",
+	"KAFKITO_AUTH_OIDC_JWKS_URL":                       "auth.oidc.jwks_url",
+	"KAFKITO_AUTH_OIDC_REQUIRED_TYP":                   "auth.oidc.required_typ",
+	"KAFKITO_AUTH_OIDC_ALLOWED_AZP":                    "auth.oidc.allowed_azp",
+	"KAFKITO_PRIVATE_CLUSTERS":                         privateClustersModeKey,
+	"KAFKITO_PRIVATE_CLUSTERS_ALLOW_PLAIN_WITHOUT_TLS": allowPlainWithoutTLSKey,
 }
 
 // envListKeys are aliased keys whose value is a comma-separated list.

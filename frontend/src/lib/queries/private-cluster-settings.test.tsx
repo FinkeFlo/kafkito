@@ -224,7 +224,7 @@ describe("private cluster transport security", () => {
     await user.selectOptions(within(form).getByLabelText("Auth type"), "plain");
     const alert = within(form).getByRole("alert");
     expect(alert).toHaveTextContent(
-      "SASL/PLAIN without TLS sends the username and password in cleartext, and all data as well.",
+      "SASL/PLAIN without TLS sends the username and password in cleartext, and all data as well. kafkito rejects SASL/PLAIN without TLS for private clusters unless the operator allows it.",
     );
     expect(within(alert).getByRole("img", { name: "Warning" })).toBeInTheDocument();
 

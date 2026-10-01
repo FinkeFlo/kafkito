@@ -210,6 +210,7 @@ func TestAdminOps_ErrorsNeverLeakCredentials(t *testing.T) {
 	header := encodeHeader(t, config.ClusterConfig{
 		Brokers: []string{unreachableBroker},
 		Auth:    config.AuthConfig{Type: "plain", Username: "leak-user", Password: leakPassword},
+		TLS:     config.TLSConfig{Enabled: true},
 	})
 	const (
 		priv  = "/api/v1/clusters/__private__"

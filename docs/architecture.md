@@ -210,6 +210,19 @@ network path can read them. Run kafkito only behind TLS:
   appear in logs, error bodies or validation messages. Error bodies and
   validation messages repeat no other value of the definition either: no
   host name, URL or auth type.
+- A private cluster with SASL/PLAIN must enable TLS, because PLAIN sends the
+  user name and password in clear text. The validation that the header,
+  Test connection and a copy's `dest_cluster_config` share answers
+  `400 plain_without_tls` otherwise, after the broker count and before any
+  host is resolved or a broker is contacted. Operators can allow it with
+  `private_clusters.allow_plain_without_tls`
+  (`KAFKITO_PRIVATE_CLUSTERS_ALLOW_PLAIN_WITHOUT_TLS`), for example for a
+  local development broker. SCRAM without TLS and TLS without certificate
+  verification stay allowed; the add-cluster form warns about both.
+  Configured clusters are never refused: at startup kafkito logs one
+  warning per configured cluster that uses SASL/PLAIN without TLS and one
+  per configured cluster with `insecure_skip_verify`, naming the cluster
+  only. `plain_without_tls_test.go` pins this.
 - Operator logs do contain the addresses of private clusters: broker and
   Schema Registry host names, resolved IPs and ports. This is intentional;
   they are needed to troubleshoot connections. Lines that carry them include

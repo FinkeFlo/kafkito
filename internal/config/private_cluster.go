@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -27,8 +28,12 @@ const (
 	PrivateClustersRole PrivateClusterMode = "role"
 )
 
-// privateClustersModeKey is the koanf key of PrivateClustersConfig.Mode.
-const privateClustersModeKey = "private_clusters.mode"
+// The koanf keys of PrivateClustersConfig.
+const (
+	privateClustersKey      = "private_clusters"
+	privateClustersModeKey  = "private_clusters.mode"
+	allowPlainWithoutTLSKey = "private_clusters.allow_plain_without_tls"
+)
 
 // PrivateClustersConfig is the private_clusters block. Settings for private
 // clusters are fields of this block next to Mode.
@@ -36,6 +41,10 @@ type PrivateClustersConfig struct {
 	// Mode is on, off or role, case-insensitive; empty means on. Load also
 	// accepts a YAML boolean: true is on, false is off.
 	Mode PrivateClusterMode `koanf:"mode"`
+	// AllowPlainWithoutTLS lets a private cluster use SASL/PLAIN without
+	// TLS. By default such a definition is rejected, because PLAIN sends
+	// the password in clear text. Configured clusters are not affected.
+	AllowPlainWithoutTLS bool `koanf:"allow_plain_without_tls"`
 }
 
 // EffectiveMode returns Mode trimmed and lowercased, PrivateClustersOn when
@@ -59,6 +68,29 @@ func (p PrivateClustersConfig) validate(rbacEnabled bool) error {
 		return nil
 	default:
 		return fmt.Errorf("private_clusters.mode %q not supported (use on|off|role)", p.Mode)
+	}
+}
+
+// parseBoolSetting returns the boolean value v of the koanf key key: a YAML
+// boolean as is, a string (env var, quoted YAML) parsed by strconv.ParseBool
+// after trimming, where an empty string is false. Any other value is an
+// error.
+func parseBoolSetting(key string, v any) (bool, error) {
+	switch v := v.(type) {
+	case bool:
+		return v, nil
+	case string:
+		s := strings.TrimSpace(v)
+		if s == "" {
+			return false, nil
+		}
+		b, err := strconv.ParseBool(s)
+		if err != nil {
+			return false, fmt.Errorf("%s %q is not a boolean (use true|false)", key, v)
+		}
+		return b, nil
+	default:
+		return false, fmt.Errorf("%s %v is not a boolean (use true|false)", key, v)
 	}
 }
 

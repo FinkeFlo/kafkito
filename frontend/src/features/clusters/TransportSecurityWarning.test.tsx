@@ -5,11 +5,11 @@ import { TransportSecurityWarning } from "./TransportSecurityWarning";
 afterEach(cleanup);
 
 describe("TransportSecurityWarning", () => {
-  it("says that SASL/PLAIN without TLS sends the credentials in cleartext", () => {
+  it("says that SASL/PLAIN without TLS sends the credentials in cleartext and is rejected", () => {
     render(<TransportSecurityWarning authType="plain" tlsEnabled={false} tlsInsecure={false} />);
     const alert = screen.getByRole("alert");
     expect(alert).toHaveTextContent(
-      "SASL/PLAIN without TLS sends the username and password in cleartext, and all data as well.",
+      "SASL/PLAIN without TLS sends the username and password in cleartext, and all data as well. kafkito rejects SASL/PLAIN without TLS for private clusters unless the operator allows it.",
     );
     expect(within(alert).getByRole("img", { name: "Warning" })).toBeInTheDocument();
   });
@@ -23,6 +23,7 @@ describe("TransportSecurityWarning", () => {
       const alert = screen.getByRole("alert");
       expect(alert).toHaveTextContent("Without TLS, all data travels unencrypted.");
       expect(alert).not.toHaveTextContent(/password/);
+      expect(alert).not.toHaveTextContent(/rejects/);
       expect(within(alert).getByRole("img", { name: "Warning" })).toBeInTheDocument();
     },
   );

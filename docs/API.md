@@ -93,6 +93,21 @@ The server keeps nothing between requests.
 - A definition names at most 50 brokers. More get `400`
   `too many brokers (max 50)`, prefixed with `X-Kafkito-Cluster: ` or
   `dest_cluster_config: ` where the definition comes from there.
+- SASL/PLAIN requires TLS (`"tls":{"enabled":true}`), because PLAIN sends
+  the password in clear text. A definition with `auth.type` `plain` and TLS
+  off gets `400` with `"code":"plain_without_tls"` in the header, Test
+  connection and a copy's `dest_cluster_config`, before a broker is
+  contacted:
+
+  ```json
+  { "error": "X-Kafkito-Cluster: SASL/PLAIN requires TLS for private clusters", "code": "plain_without_tls" }
+  ```
+
+  A Test connection body has no prefix, a `dest_cluster_config` the prefix
+  `dest_cluster_config: `. Operators can allow PLAIN without TLS with
+  `private_clusters.allow_plain_without_tls` (env
+  `KAFKITO_PRIVATE_CLUSTERS_ALLOW_PLAIN_WITHOUT_TLS=true`), for example for
+  a local development broker. SCRAM without TLS stays allowed.
 - Responses and error messages name a private cluster `__private__`, for
   example in the `cluster` field. Only `__private__` with the header
   selects it; no other `{cluster}` value does.
@@ -588,7 +603,7 @@ Status codes returned **before** the stream starts:
 | Code | Meaning                                                                                                                                                                  |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 200  | Job started; body is `text/event-stream`.                                                                                                                                |
-| 400  | Invalid body (including unknown fields or a body over 32 KiB), missing `dest_topic`, both or neither destination field, destination equal to the source cluster+topic (would never terminate), unknown `dest_cluster`, `dest_topic` does not exist (the destination is never auto-created), or `preserve_partition` with too few destination partitions. |
+| 400  | Invalid body (including unknown fields or a body over 32 KiB), missing `dest_topic`, both or neither destination field, destination equal to the source cluster+topic (would never terminate), unknown `dest_cluster`, a `dest_cluster_config` that fails validation (message prefixed `dest_cluster_config: `; SASL/PLAIN without TLS carries `code: plain_without_tls`), `dest_topic` does not exist (the destination is never auto-created), or `preserve_partition` with too few destination partitions. |
 | 403  | RBAC denied consume on the source or produce on the destination, or `private_clusters.mode` refuses a `dest_cluster_config` (`private_clusters_disabled`, `private_clusters_forbidden`). |
 | 428  | Destination cluster is marked `is_prod` and the `X-Kafkito-Confirm-Prod: true` header is missing.                                                                         |
 | 429  | Too many concurrent copy jobs server-wide (4); body carries `code: copy_concurrency_limit` and the response has a `Retry-After: 30` header. Copies hold broker connections for their whole run, so the server sheds load instead of queueing. |

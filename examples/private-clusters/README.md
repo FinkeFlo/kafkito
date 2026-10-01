@@ -10,7 +10,7 @@ row instead of creating a duplicate.
 | File | Contents | When to use |
 | --- | --- | --- |
 | [`localhost-dev.json`](localhost-dev.json) | Single cluster pointing at `localhost:39092` plain + Schema Registry on `localhost:38081` | When running the project's `docker compose up -d` dev stack alongside Kafkito |
-| [`localhost-secure.json`](localhost-secure.json) | Single cluster, SASL/PLAIN on `localhost:39093` with the demo user `kafkito / kafkito-secret` | When the `kafka-secure` profile of the dev stack is up |
+| [`localhost-secure.json`](localhost-secure.json) | Single cluster, SASL/PLAIN without TLS on `localhost:39093` with the demo user `kafkito / kafkito-secret` | When the `kafka-secure` profile of the dev stack is up and the server allows SASL/PLAIN without TLS (see [Server settings](#server-settings)) |
 | [`confluent-cloud-template.json`](confluent-cloud-template.json) | TLS + SASL/PLAIN template with `REPLACE_ME` placeholders | Starting point for a Confluent Cloud cluster — fill broker hostname, API key, API secret, and the Schema Registry URL/keys |
 | [`multi-env-bundle.json`](multi-env-bundle.json) | Three clusters in one bundle (dev / staging / prod), SCRAM-SHA-512, TLS, SR per env | Onboarding a new colleague: ship them one file with all relevant environments |
 
@@ -28,6 +28,22 @@ credentials in the `X-Kafkito-Cluster` header — the server itself stays statel
 
 Files written by **Export JSON** are encrypted with a passphrase. Importing one asks for
 that passphrase first; the decrypted content is a bundle in the shape below.
+
+## Server settings
+
+The server decides whether these clusters can be used:
+
+- Operators can disable private clusters or restrict them to a role with
+  `private_clusters.mode` (env `KAFKITO_PRIVATE_CLUSTERS`): `on` (the default) allows
+  them for every user, `off` for nobody, and `role` only for RBAC subjects with the
+  permission `private_cluster:use`. When your account may not use private clusters,
+  **Import JSON** is disabled.
+- kafkito rejects SASL/PLAIN without TLS for private clusters with
+  `400 plain_without_tls`, because PLAIN sends the password in clear text.
+  `localhost-secure.json` uses SASL/PLAIN without TLS, so it only works when the
+  operator sets `private_clusters.allow_plain_without_tls: true` (env
+  `KAFKITO_PRIVATE_CLUSTERS_ALLOW_PLAIN_WITHOUT_TLS=true`). Set it on a local
+  development server only. The other bundles use TLS or no authentication.
 
 ## Editing an example before importing
 

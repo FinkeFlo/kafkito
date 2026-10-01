@@ -44,7 +44,7 @@ func TestDecodePrivateClusterHeader_AcceptsValidConfig(t *testing.T) {
 		Auth:    config.AuthConfig{Type: "none"},
 	}
 
-	got, err := decodePrivateClusterHeader(t.Context(), encodeHeader(t, good))
+	got, err := decodePrivateClusterHeader(t.Context(), encodeHeader(t, good), config.PrivateClustersConfig{})
 
 	require.NoError(t, err)
 	require.Len(t, got.Brokers, 1)
@@ -83,7 +83,7 @@ func TestDecodePrivateClusterHeader_RejectsInvalidEncoding(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := decodePrivateClusterHeader(t.Context(), tc.raw)
+			_, err := decodePrivateClusterHeader(t.Context(), tc.raw, config.PrivateClustersConfig{})
 
 			assert.Error(t, err, "decodePrivateClusterHeader(%q) must reject", tc.name)
 		})
@@ -104,7 +104,7 @@ func TestPrivateClusterMiddleware_StoresDecodedConfigInContext_WhenHeaderValid(t
 		assert.Equal(t, "203.0.113.10:9092", got.Brokers[0])
 		seen = true
 	})
-	h := privateClusterMiddleware(next)
+	h := privateClusterMiddleware(config.PrivateClustersConfig{}, errorWriter{})(next)
 	req := httptest.NewRequest(http.MethodGet, "/x", nil)
 	req.Header.Set(PrivateClusterHeader, encodeHeader(t, cfg))
 
@@ -119,7 +119,7 @@ func TestPrivateClusterMiddleware_Returns400_WhenHeaderNotBase64(t *testing.T) {
 	next := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		t.Error("next handler must not run on malformed header")
 	})
-	h := privateClusterMiddleware(next)
+	h := privateClusterMiddleware(config.PrivateClustersConfig{}, errorWriter{})(next)
 	req := httptest.NewRequest(http.MethodGet, "/x", nil)
 	req.Header.Set(PrivateClusterHeader, "!!!not-base64!!!")
 	rec := httptest.NewRecorder()
@@ -183,7 +183,7 @@ func TestResolvePrivateClusterParam_RewritesSentinelToFingerprint_WhenRouted(t *
 	r := chi.NewRouter()
 	r.Route("/api/v1", func(v1 chi.Router) {
 		v1.Group(func(g chi.Router) {
-			g.Use(privateClusterMiddleware)
+			g.Use(privateClusterMiddleware(config.PrivateClustersConfig{}, errorWriter{}))
 			g.Use(resolvePrivateClusterParam(reg))
 			g.Get("/clusters/{cluster}/topics", func(_ http.ResponseWriter, req *http.Request) {
 				captured = chi.URLParam(req, "cluster")
@@ -207,7 +207,7 @@ func TestResolvePrivateClusterParam_Returns400_WhenHeaderMissing(t *testing.T) {
 	r := chi.NewRouter()
 	r.Route("/api/v1", func(v1 chi.Router) {
 		v1.Group(func(g chi.Router) {
-			g.Use(privateClusterMiddleware)
+			g.Use(privateClusterMiddleware(config.PrivateClustersConfig{}, errorWriter{}))
 			g.Use(resolvePrivateClusterParam(reg))
 			g.Get("/clusters/{cluster}/topics", func(_ http.ResponseWriter, _ *http.Request) {
 				t.Error("handler must not run without header")
@@ -265,7 +265,7 @@ func TestValidatePrivateClusterConfig_BlocksSSRFSchemaRegistry(t *testing.T) {
 		},
 	}
 
-	err := validatePrivateClusterConfig(t.Context(), cfg)
+	err := validatePrivateClusterConfig(t.Context(), cfg, config.PrivateClustersConfig{})
 
 	require.EqualError(t, err, "schema_registry.url: destination not allowed",
 		"SR URL pointing at the metadata endpoint must be rejected")
@@ -279,7 +279,7 @@ func TestValidatePrivateClusterConfig_BlocksSSRFBroker(t *testing.T) {
 		Auth:    config.AuthConfig{Type: "none"},
 	}
 
-	err := validatePrivateClusterConfig(t.Context(), cfg)
+	err := validatePrivateClusterConfig(t.Context(), cfg, config.PrivateClustersConfig{})
 
 	require.EqualError(t, err, "broker 2: destination not allowed",
 		"a loopback broker must be rejected even after a valid one, named by its position")
@@ -298,7 +298,7 @@ func TestValidateClusterPolicy_LookupErrorIsFixedText(t *testing.T) {
 		SchemaRegistry: config.SchemaRegistryConfig{URL: "https://echo-sr.example.test"},
 	}
 
-	err := validateClusterPolicyWith(t.Context(), cfg, netguard.NewHostValidator(lookup))
+	err := validateClusterPolicyWith(t.Context(), cfg, config.PrivateClustersConfig{}, netguard.NewHostValidator(lookup))
 
 	require.EqualError(t, err, "schema_registry.url: host name could not be resolved")
 }
@@ -346,11 +346,11 @@ func TestValidateClusterPolicy_BrokerCap(t *testing.T) {
 	t.Parallel()
 
 	var lookups countingLookup
-	err := validateClusterPolicyWith(t.Context(), config.ClusterConfig{Brokers: manyBrokers(maxBrokersPerCluster + 1)}, netguard.NewHostValidator(lookups.lookup))
+	err := validateClusterPolicyWith(t.Context(), config.ClusterConfig{Brokers: manyBrokers(maxBrokersPerCluster + 1)}, config.PrivateClustersConfig{}, netguard.NewHostValidator(lookups.lookup))
 	require.EqualError(t, err, "too many brokers (max 50)")
 	assert.Empty(t, lookups.counts(), "no host is resolved")
 
-	err = validateClusterPolicyWith(t.Context(), config.ClusterConfig{Brokers: manyBrokers(maxBrokersPerCluster)}, netguard.NewHostValidator(lookups.lookup))
+	err = validateClusterPolicyWith(t.Context(), config.ClusterConfig{Brokers: manyBrokers(maxBrokersPerCluster)}, config.PrivateClustersConfig{}, netguard.NewHostValidator(lookups.lookup))
 	require.NoError(t, err)
 	assert.Len(t, lookups.counts(), maxBrokersPerCluster)
 }
@@ -373,14 +373,14 @@ func TestValidateClusterPolicy_ResolvesEachHostOncePerRequest(t *testing.T) {
 	require.NoError(t, validateClusterPolicy(ctxs[0], config.ClusterConfig{
 		Brokers:        []string{"a.example.test:9092", "A.example.test:9093", "b.example.test:9092"},
 		SchemaRegistry: config.SchemaRegistryConfig{URL: "https://b.example.test:8081"},
-	}))
+	}, config.PrivateClustersConfig{}))
 	require.NoError(t, validateClusterPolicy(ctxs[0], config.ClusterConfig{
 		Brokers: []string{"b.example.test:9094", "c.example.test:9092", "a.example.test:9092"},
-	}))
+	}, config.PrivateClustersConfig{}))
 	assert.Equal(t, map[string]int{"a.example.test": 1, "b.example.test": 1, "c.example.test": 1}, lookups.counts())
 
 	// Another request resolves again.
-	require.NoError(t, validateClusterPolicy(ctxs[1], config.ClusterConfig{Brokers: []string{"a.example.test:9092"}}))
+	require.NoError(t, validateClusterPolicy(ctxs[1], config.ClusterConfig{Brokers: []string{"a.example.test:9092"}}, config.PrivateClustersConfig{}))
 	assert.Equal(t, 2, lookups.counts()["a.example.test"])
 }
 

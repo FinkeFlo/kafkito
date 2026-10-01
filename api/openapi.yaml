@@ -37,7 +37,11 @@ info:
     (`POST /api/v1/clusters/_test`) and to copies into a
     `dest_cluster_config`; `GET /api/v1/me` reports it. Once a request is
     allowed, kafkito's RBAC does not apply to the private cluster and its
-    lists are not filtered; the broker's own ACLs apply.
+    lists are not filtered; the broker's own ACLs apply. A private cluster
+    with SASL/PLAIN must enable TLS: kafkito answers 400
+    `plain_without_tls` otherwise, unless the operator sets
+    `private_clusters.allow_plain_without_tls`
+    (`KAFKITO_PRIVATE_CLUSTERS_ALLOW_PLAIN_WITHOUT_TLS`).
 
     Conventions:
     - List endpoints return objects (`{ "<resource>": [...] }`), never bare
@@ -186,7 +190,12 @@ paths:
         broker by its 1-based position in `brokers` and never repeats a
         submitted value, for example `broker 2: host name could not be
         resolved` or `schema_registry.url: invalid URL`. A definition names
-        at most 50 brokers.
+        at most 50 brokers. SASL/PLAIN without TLS gets 400 with
+        `code: plain_without_tls` and the message `SASL/PLAIN requires TLS
+        for private clusters` (prefixed `X-Kafkito-Cluster: ` when the
+        definition came from the header) unless the operator sets
+        `private_clusters.allow_plain_without_tls`; no broker is contacted
+        then.
 
         The probed definition is a private cluster, so `private_clusters.mode`
         applies: 403 `private_clusters_disabled` or
@@ -894,8 +903,11 @@ paths:
             field set, destination equal to the source cluster+topic (the copy
             would never terminate), unknown `dest_cluster`, `dest_topic` does
             not exist on the destination (the destination is never
-            auto-created), or `preserve_partition` with too few partitions on
-            the destination topic.
+            auto-created), `preserve_partition` with too few partitions on
+            the destination topic, or a `dest_cluster_config` that fails
+            validation (message prefixed `dest_cluster_config: `; SASL/PLAIN
+            without TLS carries `code: plain_without_tls` unless the operator
+            sets `private_clusters.allow_plain_without_tls`).
           headers:
             X-Request-Id: { $ref: "#/components/headers/RequestId" }
           content:
@@ -1366,8 +1378,10 @@ components:
         malformed header or a definition that fails validation is rejected
         with 400; the message names the
         field and a fixed reason, a broker by its 1-based position, and never
-        repeats a value from the header. When `private_clusters.mode` does
-        not allow the caller private
+        repeats a value from the header. SASL/PLAIN without TLS is rejected
+        with 400 `plain_without_tls` unless the operator sets
+        `private_clusters.allow_plain_without_tls`. When
+        `private_clusters.mode` does not allow the caller private
         clusters, the header is never read: a `__private__` request gets 403
         (`private_clusters_disabled` or `private_clusters_forbidden`), and any
         other request ignores it. On an allowed request kafkito's RBAC does
@@ -1398,7 +1412,11 @@ components:
       description: Optional exclusive upper timestamp bound in Unix milliseconds.
   responses:
     BadRequest:
-      description: Invalid request (parameters, body, or private-cluster header).
+      description: >
+        Invalid request (parameters, body, or private-cluster header). A
+        private cluster definition with SASL/PLAIN and TLS off gets
+        `code: plain_without_tls` unless the operator sets
+        `private_clusters.allow_plain_without_tls`.
       headers:
         X-Request-Id: { $ref: "#/components/headers/RequestId" }
       content:
@@ -1479,7 +1497,7 @@ components:
           description: >
             Machine-readable code where one exists, e.g. `kafka_upstream`,
             `private_cluster_address_blocked`, `private_clusters_disabled`,
-            `private_clusters_forbidden`,
+            `private_clusters_forbidden`, `plain_without_tls`,
             `production_confirmation_required`, `copy_concurrency_limit`,
             `rate_limited`,
             `kafka_message_too_large`, `kafka_not_authorized`, `rbac_denied`,
@@ -2230,7 +2248,9 @@ components:
               enum: ["", none, plain, scram-sha-256, scram-sha-512]
               description: >
                 Canonical lowercase values; empty means `none`. `plain` /
-                `scram-*` require `username` and `password`. The
+                `scram-*` require `username` and `password`. `plain`
+                requires `tls.enabled` (400 `plain_without_tls`) unless the
+                operator sets `private_clusters.allow_plain_without_tls`. The
                 `X-Kafkito-Cluster` header is not schema-validated (the server
                 decodes it) and still accepts these values case-insensitively
                 and trimmed, for compatibility with stored private clusters.
