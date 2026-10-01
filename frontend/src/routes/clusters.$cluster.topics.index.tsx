@@ -1,99 +1,184 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { Boxes, ChevronDown } from "lucide-react";
-import { clsx } from "clsx";
-import { createTopic, can, type ClusterInfo, type TopicInfo } from "@/lib/api";
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { Boxes, Check, X } from "lucide-react";
+import { toast } from "sonner";
+import { can, type TopicInfo } from "@/lib/api";
 import { useAuth } from "@/auth/hooks";
 import { useCluster } from "@/lib/use-cluster";
-import { Tag } from "@/components/ui/Tag";
+import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
-import { DataTable, DataTableHead, DataTableRow, DataTableTh } from "@/components/ui/DataTable";
-import { SearchInput } from "@/components/ui/SearchInput";
-import { Highlight } from "@/components/ui/Highlight";
+import { FilterSelect } from "@/components/ui/FilterSelect";
+import { KpiCard } from "@/components/ui/KpiCard";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SearchInput } from "@/components/ui/SearchInput";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { Toolbar } from "@/components/ui/Toolbar";
-import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
-import { Notice } from "@/components/ui/Notice";
-import { useFuzzy, type HighlightRange } from "@/lib/fuzzy";
+import { CreateTopicModal } from "@/features/topics/CreateTopicModal";
+import { TopicsTable } from "@/features/topics/TopicsTable";
+import {
+  filterTopics,
+  hasKnownRetention,
+  summarizeTopics,
+  type PartitionBucket,
+  type RetentionBucket,
+} from "@/features/topics/topic-filters";
+import { parseTopicListSearch, type TopicListSearch } from "@/features/topics/topic-list-params";
+import { useFuzzy } from "@/lib/fuzzy";
+import { claimOncePerSession } from "@/lib/once-per-session";
 import { useFormatters } from "@/lib/use-formatters";
+import { cn } from "@/lib/utils";
 import { topicQueries } from "@/lib/queries/topics";
 
 export const Route = createFileRoute("/clusters/$cluster/topics/")({
+  validateSearch: parseTopicListSearch,
   component: TopicsPage,
 });
 
+const FUZZY_KEYS: (keyof TopicInfo)[] = ["name"];
+
+const PARTITION_OPTIONS: { value: PartitionBucket | "any"; label: string }[] = [
+  { value: "any", label: "Any" },
+  { value: "1", label: "1" },
+  { value: "2-10", label: "2–10" },
+  { value: "gt10", label: "More than 10" },
+];
+
+const RETENTION_OPTIONS: { value: RetentionBucket | "any"; label: string }[] = [
+  { value: "any", label: "Any" },
+  { value: "le1d", label: "Up to 1 day" },
+  { value: "le7d", label: "Up to 7 days" },
+  { value: "gt7d", label: "More than 7 days" },
+  { value: "infinite", label: "Infinite" },
+  { value: "unknown", label: "Unknown" },
+];
+
 function TopicsPage() {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
   const { cluster, clusters } = useCluster();
   const clusterInfo = useMemo(() => clusters?.find((c) => c.name === cluster), [clusters, cluster]);
+  const caps = clusterInfo?.capabilities;
+  const { me } = useAuth();
+  const fmt = useFormatters();
+  const [createOpen, setCreateOpen] = useState(false);
 
   const topicsQuery = useQuery({
     ...topicQueries.list(cluster!),
     enabled: !!cluster,
   });
+  const topics = topicsQuery.data;
 
-  return (
-    <div className="space-y-5 p-6">
-      <TopicsPageInner
-        cluster={cluster}
-        clusterInfo={clusterInfo}
-        topics={topicsQuery.data}
-        isLoading={topicsQuery.isLoading}
-        isError={topicsQuery.isError}
-        error={topicsQuery.error as Error | undefined}
-        onRetry={() => topicsQuery.refetch()}
-      />
-    </div>
-  );
-}
+  // Re-parse the merged state so defaults ("", false, "any") drop out of the URL.
+  const setSearch = (patch: Partial<Record<keyof TopicListSearch, unknown>>) =>
+    navigate({ search: (prev) => parseTopicListSearch({ ...prev, ...patch }), replace: true });
 
-function TopicsPageInner({
-  cluster,
-  clusterInfo,
-  topics,
-  isLoading,
-  isError,
-  error,
-  onRetry,
-}: {
-  cluster: string | null;
-  clusterInfo: ClusterInfo | undefined;
-  topics: TopicInfo[] | undefined;
-  isLoading: boolean;
-  isError: boolean;
-  error?: Error;
-  onRetry: () => void;
-}) {
-  const [createOpen, setCreateOpen] = useState(false);
-  const { me } = useAuth();
-  const fmt = useFormatters();
-  const rbacAllowsCreate = cluster ? can(me, cluster, "topic", "edit") : false;
-  const caps = clusterInfo?.capabilities;
   const createDisabledReason = !cluster
     ? "select a cluster"
-    : !rbacAllowsCreate
+    : !can(me, cluster, "topic", "edit")
       ? "forbidden by RBAC policy"
       : caps?.create_topic === false
         ? (caps?.errors?.create_topic ?? "CREATE on TOPIC required")
         : undefined;
 
-  const visible = topics?.filter((t) => !t.is_internal) ?? [];
-  const partitionSum = visible.reduce((s, t) => s + t.partitions, 0);
-  const totalSize = visible.reduce((s, t) => (t.size_bytes != null ? s + t.size_bytes : s), 0);
-  const anySize = visible.some((t) => t.size_bytes != null);
-  const subtitle =
-    !topics || !cluster
-      ? "—"
-      : anySize
-        ? `${visible.length} topics · ${partitionSum} partitions · ${fmt.bytes(totalSize)} retained`
-        : `${visible.length} topics · ${partitionSum} partitions`;
+  // Missing DESCRIBE_CONFIGS only costs the retention column, so it gets a
+  // single toast per cluster and session instead of a permanent banner.
+  const describeConfigsDenied = caps?.describe_configs === false;
+  useEffect(() => {
+    if (!cluster || !describeConfigsDenied) return;
+    if (!claimOncePerSession(`topics.retention-denied.${cluster}`)) return;
+    toast.warning("Retention not available", {
+      description: (
+        <>
+          The Kafka user lacks <code className="font-mono">DESCRIBE_CONFIGS</code> on{" "}
+          <code className="font-mono">TOPIC:*</code>.
+        </>
+      ),
+      duration: 8000,
+    });
+  }, [cluster, describeConfigsDenied]);
+
+  const all = topics ?? [];
+  const internalCount = all.filter((t) => t.is_internal).length;
+  const base = useMemo(
+    () => filterTopics(topics ?? [], { showInternal: search.internal }),
+    [topics, search.internal],
+  );
+  const retentionKnown = hasKnownRetention(base);
+  const retentionDisabledReason =
+    topics && base.length > 0 && !retentionKnown
+      ? describeConfigsDenied
+        ? "Retention filter unavailable: the Kafka user lacks DESCRIBE_CONFIGS on TOPIC:*."
+        : "Retention filter unavailable: no topic reports its retention."
+      : undefined;
+  const retention = retentionDisabledReason ? undefined : search.retention;
+
+  const filtered = useMemo(
+    () =>
+      filterTopics(topics ?? [], {
+        showInternal: search.internal,
+        partitions: search.partitions,
+        retention,
+      }),
+    [topics, search.internal, search.partitions, retention],
+  );
+  const q = search.q ?? "";
+  const fuzzy = useFuzzy(filtered, { keys: FUZZY_KEYS, query: q });
+  const summary = summarizeTopics(base);
+  const maxSize = Math.max(0, ...base.map((t) => t.size_bytes ?? 0));
+  const filtersActive = !!q || !!search.partitions || !!retention;
+  const clearFilters = () =>
+    setSearch({ q: undefined, partitions: undefined, retention: undefined });
+
+  const isLoading = topicsQuery.isLoading;
+  const loadingValue = <Skeleton height="h-7" width="w-16" />;
+  // Same height as the loaded delta line, so the cards do not grow when data arrives.
+  const loadingDelta = <Skeleton height="h-3" width="w-24" className="my-0.5" />;
+  const [sizeValue, sizeUnit] =
+    summary.sizeBytes === null ? ["—", undefined] : splitUnit(fmt.bytes(summary.sizeBytes));
+
+  const empty = filtersActive ? (
+    <EmptyState
+      icon={Boxes}
+      title={
+        q && !search.partitions && !retention
+          ? `No topics match “${q}”`
+          : "No topics match your filters"
+      }
+      description="Try a shorter name or loosen the partition and retention filters."
+      action={
+        <Button variant="secondary" size="sm" onClick={clearFilters}>
+          Clear filters
+        </Button>
+      }
+    />
+  ) : (
+    <EmptyState
+      icon={Boxes}
+      title="No topics yet"
+      description={
+        !search.internal && internalCount > 0
+          ? `${internalCount} internal ${internalCount === 1 ? "topic is" : "topics are"} hidden.`
+          : "Create a topic to get started."
+      }
+      action={
+        !search.internal && internalCount > 0 ? (
+          <Button variant="secondary" size="sm" onClick={() => setSearch({ internal: true })}>
+            Show internal
+          </Button>
+        ) : !createDisabledReason ? (
+          <Button variant="secondary" size="sm" onClick={() => setCreateOpen(true)}>
+            + New topic
+          </Button>
+        ) : undefined
+      }
+    />
+  );
 
   const createReasonId = "topics-create-disabled-reason";
   return (
-    <>
+    <div className="space-y-5 p-6">
       <PageHeader
         eyebrow={
           <>
@@ -102,7 +187,7 @@ function TopicsPageInner({
           </>
         }
         title="Topics"
-        subtitle={subtitle}
+        subtitle="Browse, filter and create topics in this cluster."
         actions={
           <>
             <Button
@@ -131,400 +216,174 @@ function TopicsPageInner({
         />
       )}
 
-      {cluster && isError && (
-        <ErrorState title="Failed to load topics" detail={error?.message} onRetry={onRetry} />
-      )}
-
-      {cluster && !isError && (
-        <TopicsBody
-          cluster={cluster}
-          topics={topics}
-          isLoading={isLoading}
-          createOpen={createOpen}
-          setCreateOpen={setCreateOpen}
-          createDisabledReason={createDisabledReason}
+      {cluster && topicsQuery.isError && (
+        <ErrorState
+          title="Failed to load topics"
+          detail={(topicsQuery.error as Error | null)?.message}
+          onRetry={() => topicsQuery.refetch()}
         />
       )}
-    </>
-  );
-}
 
-interface BodyProps {
-  cluster: string;
-  topics: TopicInfo[] | undefined;
-  isLoading: boolean;
-  createOpen: boolean;
-  setCreateOpen: (v: boolean) => void;
-  createDisabledReason: string | undefined;
-}
+      {cluster && !topicsQuery.isError && (
+        <>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <KpiCard
+              label="Topics"
+              value={isLoading ? loadingValue : fmt.number(summary.topics)}
+              delta={
+                isLoading
+                  ? loadingDelta
+                  : internalCount === 0
+                    ? undefined
+                    : search.internal
+                      ? `incl. ${internalCount} internal`
+                      : `${internalCount} internal hidden`
+              }
+            />
+            <KpiCard
+              label="Partitions"
+              value={isLoading ? loadingValue : fmt.number(summary.partitions)}
+              delta={
+                isLoading
+                  ? loadingDelta
+                  : summary.topics === 0
+                    ? undefined
+                    : `avg ${fmt.decimal(summary.partitions / summary.topics, 1)} per topic`
+              }
+            />
+            <KpiCard
+              label="Retained"
+              value={isLoading ? loadingValue : sizeValue}
+              unit={isLoading ? undefined : sizeUnit}
+              delta={
+                isLoading ? (
+                  loadingDelta
+                ) : !summary.largest ? undefined : (
+                  <>
+                    Largest <span className="font-mono">{summary.largest}</span>
+                  </>
+                )
+              }
+            />
+            <KpiCard
+              label="Throughput"
+              value={
+                isLoading
+                  ? loadingValue
+                  : summary.ratePerSec === null
+                    ? "—"
+                    : fmt.rate(summary.ratePerSec)
+              }
+              delta={
+                isLoading
+                  ? loadingDelta
+                  : summary.ratePerSec === null
+                    ? undefined
+                    : `${summary.idle} ${summary.idle === 1 ? "topic" : "topics"} idle`
+              }
+            />
+          </div>
 
-function TopicsBody({
-  cluster,
-  topics,
-  isLoading,
-  createOpen,
-  setCreateOpen,
-  createDisabledReason,
-}: BodyProps) {
-  const [q, setQ] = useState("");
-  const [showInternal, setShowInternal] = useState(false);
-
-  const visibleTopics = useMemo(() => {
-    if (!topics) return [];
-    return topics
-      .filter((tp) => (showInternal ? true : !tp.is_internal))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [topics, showInternal]);
-
-  const fuzzy = useFuzzy(visibleTopics, { keys: ["name"], query: q });
-  const filtered = fuzzy.results;
-
-  const showSize = useMemo(
-    () => visibleTopics.some((t) => t.size_bytes !== null && t.size_bytes !== undefined),
-    [visibleTopics],
-  );
-  const showRetention = useMemo(
-    () => visibleTopics.some((t) => t.retention_ms !== null && t.retention_ms !== undefined),
-    [visibleTopics],
-  );
-
-  // `createDisabledReason` and `setCreateOpen` are owned by the parent
-  // (which mounts the button in <PageHeader actions/>). We only consume
-  // them here to gate the modal mount and to render the inline reason.
-  void createDisabledReason;
-  return (
-    <>
-      <Toolbar
-        search={
-          <SearchInput
-            value={q}
-            onChange={setQ}
-            placeholder="Filter topics by name…"
-            ariaLabel="Filter topics"
-            count={{ visible: filtered.length, total: visibleTopics.length }}
+          <Toolbar
+            search={
+              <SearchInput
+                value={q}
+                onChange={(v) => setSearch({ q: v })}
+                placeholder="Filter topics by name…"
+                ariaLabel="Filter topics"
+                count={{ visible: fuzzy.results.length, total: base.length }}
+              />
+            }
+            filters={
+              <>
+                <FilterSelect
+                  label="Partitions"
+                  value={search.partitions ?? "any"}
+                  options={PARTITION_OPTIONS}
+                  onChange={(v) => setSearch({ partitions: v })}
+                />
+                <FilterSelect
+                  label="Retention"
+                  value={retention ?? "any"}
+                  options={RETENTION_OPTIONS}
+                  onChange={(v) => setSearch({ retention: v })}
+                  disabledReason={retentionDisabledReason}
+                />
+                {/* A toggle button rather than a bare checkbox: the whole h-9 pill
+                    is the target, so it stays operable when a popover covers part
+                    of it (WCAG 2.5.8). The check mark carries the state, not colour. */}
+                <button
+                  type="button"
+                  aria-pressed={!!search.internal}
+                  onClick={() => setSearch({ internal: !search.internal })}
+                  className={cn(
+                    "flex h-9 items-center gap-2 rounded-md border bg-panel px-3 text-xs text-muted transition-colors hover:text-text",
+                    search.internal
+                      ? "border-border-strong text-text"
+                      : "border-border hover:border-border-hover",
+                  )}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "grid h-3.5 w-3.5 place-items-center rounded-sm border",
+                      search.internal
+                        ? "border-accent bg-accent text-accent-foreground"
+                        : "border-border-strong",
+                    )}
+                  >
+                    {search.internal ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+                  </span>
+                  Show internal
+                  {internalCount > 0 ? (
+                    <span aria-hidden="true" className="font-mono text-[11px] text-subtle-text">
+                      {internalCount}
+                    </span>
+                  ) : null}
+                </button>
+                {filtersActive ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    leadingIcon={<X className="h-4 w-4" aria-hidden />}
+                    onClick={clearFilters}
+                  >
+                    Clear filters
+                  </Button>
+                ) : null}
+              </>
+            }
           />
-        }
-        filters={
-          <>
-            <PlaceholderFilter label="Retention: any" />
-            <PlaceholderFilter label="Partitions: any" />
-            <label className="flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-panel px-3 text-xs text-muted">
-              <input
-                type="checkbox"
-                checked={showInternal}
-                onChange={(e) => setShowInternal(e.target.checked)}
-                className="h-3.5 w-3.5 accent-accent"
-              />
-              Show internal
-            </label>
-          </>
-        }
-      />
 
-      {isLoading ? (
-        <TopicsSkeleton />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={Boxes}
-          title={q ? "No topics match your filter" : "No topics yet"}
-          description={q ? undefined : "Create your first topic or toggle “Show internal”."}
+          {!isLoading && topics && fuzzy.results.length === 0 ? (
+            empty
+          ) : (
+            <TopicsTable
+              cluster={cluster}
+              rows={topics ? fuzzy.results : undefined}
+              isLoading={isLoading}
+              rangesFor={(t) => fuzzy.rangesFor(t, "name")}
+              maxSize={maxSize}
+              sort={search.sort ? { key: search.sort, dir: search.dir ?? "asc" } : null}
+              onSortChange={(next) => setSearch({ sort: next?.key, dir: next?.dir })}
+            />
+          )}
+        </>
+      )}
+
+      {createOpen && cluster && (
+        <CreateTopicModal
+          cluster={cluster}
+          brokers={clusterInfo?.brokers}
+          onClose={() => setCreateOpen(false)}
         />
-      ) : (
-        <DataTable>
-          <DataTableHead>
-            <tr>
-              <DataTableTh>Topic</DataTableTh>
-              <DataTableTh align="right">Partitions</DataTableTh>
-              <DataTableTh align="right">RF</DataTableTh>
-              <DataTableTh align="right">Messages</DataTableTh>
-              {showSize && <DataTableTh align="right">Size</DataTableTh>}
-              <DataTableTh align="right">Rate</DataTableTh>
-              <DataTableTh align="right">Lag</DataTableTh>
-              {showRetention && <DataTableTh>Retention</DataTableTh>}
-            </tr>
-          </DataTableHead>
-          <tbody>
-            {filtered.map((t) => (
-              <TopicRow
-                key={t.name}
-                cluster={cluster}
-                topic={t}
-                showSize={showSize}
-                showRetention={showRetention}
-                nameHighlight={fuzzy.rangesFor(t, "name")}
-              />
-            ))}
-          </tbody>
-        </DataTable>
       )}
-
-      {createOpen && <CreateTopicModal cluster={cluster} onClose={() => setCreateOpen(false)} />}
-    </>
-  );
-}
-
-function TopicRow({
-  cluster,
-  topic,
-  nameHighlight,
-  showSize,
-  showRetention,
-}: {
-  cluster: string;
-  topic: TopicInfo;
-  nameHighlight?: readonly HighlightRange[];
-  showSize: boolean;
-  showRetention: boolean;
-}) {
-  const fmt = useFormatters();
-  return (
-    <DataTableRow clickable>
-      <td className="px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          <Link
-            to="/clusters/$cluster/topics/$topic"
-            params={{ cluster, topic: topic.name }}
-            data-row-primary=""
-            className="font-mono text-[13px] tabular-nums text-text"
-          >
-            <Highlight text={topic.name} ranges={nameHighlight ?? []} />
-          </Link>
-          {topic.is_internal && <Tag>INTERNAL</Tag>}
-        </div>
-      </td>
-      {/* TODO(backend): per-topic owner not exposed yet */}
-      <td className="px-4 py-2.5 text-right font-mono text-[13px] tabular-nums">
-        {topic.partitions}
-      </td>
-      <td className="px-4 py-2.5 text-right font-mono text-[13px] tabular-nums">
-        {topic.replication_factor}
-      </td>
-      {/* TODO(backend): per-topic msg rate (rate_per_sec aggregated server-side) */}
-      <MetricCell align="right" value={topic.messages} format={fmt.count} />
-      {showSize && <MetricCell align="right" value={topic.size_bytes} format={fmt.bytes} />}
-      <MetricCell align="right" value={topic.rate_per_sec} format={fmt.rate} />
-      <MetricCell align="right" value={topic.lag} format={fmt.count} />
-      {showRetention && <MetricCell value={topic.retention_ms} format={fmt.duration} />}
-    </DataTableRow>
-  );
-}
-
-function MetricCell({
-  value,
-  format,
-  align = "left",
-}: {
-  value: number | null | undefined;
-  format: (n: number) => string;
-  align?: "left" | "right";
-}) {
-  const known = value !== null && value !== undefined;
-  return (
-    <td
-      className={clsx(
-        "px-4 py-2.5 font-mono text-[13px] tabular-nums",
-        known ? "text-text" : "text-subtle-text",
-        align === "right" && "text-right",
-      )}
-    >
-      {known ? format(value) : "—"}
-    </td>
-  );
-}
-
-function PlaceholderFilter({ label }: { label: string }) {
-  // Placeholder filter — not wired up yet. The "coming soon" reason is
-  // exposed via `aria-label` so screen readers announce it instead of
-  // relying on hover-only `title`.
-  return (
-    <button
-      type="button"
-      disabled
-      aria-label={`${label} (filter coming soon)`}
-      className="flex h-9 items-center gap-1.5 rounded-md border border-border bg-panel px-3 text-xs text-muted"
-    >
-      {label}
-      <ChevronDown className="h-3.5 w-3.5" />
-    </button>
-  );
-}
-
-function TopicsSkeleton() {
-  return (
-    <div className="overflow-hidden rounded-xl border border-border bg-panel">
-      {[0, 1, 2, 3, 4, 5].map((i) => (
-        <div
-          key={i}
-          className="flex items-center gap-4 border-t border-border px-4 py-3 first:border-t-0"
-        >
-          <div className="h-3 w-48 animate-pulse rounded bg-subtle" />
-          <div className="h-3 w-20 animate-pulse rounded bg-subtle" />
-          <div className="ml-auto h-3 w-16 animate-pulse rounded bg-subtle" />
-          <div className="h-3 w-16 animate-pulse rounded bg-subtle" />
-        </div>
-      ))}
     </div>
   );
 }
 
-function CreateTopicModal({ cluster, onClose }: { cluster: string; onClose: () => void }) {
-  const qc = useQueryClient();
-  const fmt = useFormatters();
-  const [name, setName] = useState("");
-  const [partitions, setPartitions] = useState(1);
-  const [rf, setRF] = useState(1);
-  const [configRows, setConfigRows] = useState<{ k: string; v: string }[]>([]);
-  const [err, setErr] = useState<string | null>(null);
-
-  const mut = useMutation({
-    mutationFn: async () => {
-      const configs: Record<string, string> = {};
-      for (const { k, v } of configRows) {
-        if (k.trim()) configs[k.trim()] = v;
-      }
-      await createTopic(cluster, {
-        name: name.trim(),
-        partitions,
-        replication_factor: rf,
-        configs: Object.keys(configs).length ? configs : undefined,
-      });
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: topicQueries.list(cluster).queryKey });
-      onClose();
-    },
-    onError: (e: Error) => setErr(e.message),
-  });
-
-  const disabled = !name.trim() || mut.isPending;
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      size="lg"
-      title={
-        <span className="flex flex-col">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-            Create topic on
-          </span>
-          <span className="font-mono text-[13px] font-semibold">{cluster}</span>
-        </span>
-      }
-      actions={
-        <>
-          <span className="mr-auto text-xs text-muted">
-            {partitions} × {fmt.number(partitions)} · RF {rf}
-          </span>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            disabled={disabled}
-            onClick={() => {
-              setErr(null);
-              mut.mutate();
-            }}
-          >
-            {mut.isPending ? "Creating…" : "Create"}
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted">Name</span>
-          <Input
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="my-topic"
-            className="mt-1 font-mono"
-          />
-        </label>
-        <div className="grid grid-cols-2 gap-4">
-          <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Partitions
-            </span>
-            <Input
-              type="number"
-              min={1}
-              value={partitions}
-              onChange={(e) => setPartitions(Math.max(1, Number(e.target.value)))}
-              className="mt-1"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Replication factor
-            </span>
-            <Input
-              type="number"
-              min={1}
-              value={rf}
-              onChange={(e) => setRF(Math.max(1, Number(e.target.value)))}
-              className="mt-1"
-            />
-          </label>
-        </div>
-        <div>
-          <div className="mb-1 flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Configs (optional)
-            </span>
-            <button
-              type="button"
-              onClick={() => setConfigRows((r) => [...r, { k: "", v: "" }])}
-              className="text-xs text-muted transition-colors hover:text-text"
-            >
-              + add
-            </button>
-          </div>
-          {configRows.length === 0 ? (
-            <div className="rounded-md border border-dashed border-border p-2 text-center text-xs text-subtle-text">
-              no overrides (broker defaults apply)
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              {configRows.map((row, i) => (
-                <div key={i} className="flex gap-2">
-                  <Input
-                    value={row.k}
-                    onChange={(e) =>
-                      setConfigRows((rs) =>
-                        rs.map((r, idx) => (idx === i ? { ...r, k: e.target.value } : r)),
-                      )
-                    }
-                    placeholder="retention.ms"
-                    className="w-1/2 font-mono"
-                  />
-                  <Input
-                    value={row.v}
-                    onChange={(e) =>
-                      setConfigRows((rs) =>
-                        rs.map((r, idx) => (idx === i ? { ...r, v: e.target.value } : r)),
-                      )
-                    }
-                    placeholder="604800000"
-                    className="flex-1 font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setConfigRows((rs) => rs.filter((_, idx) => idx !== i))}
-                    className="px-2 text-xs text-subtle-text transition-colors hover:text-danger"
-                    aria-label={`Remove config row ${i + 1}`}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        {err && <Notice intent="danger">{err}</Notice>}
-      </div>
-    </Modal>
-  );
+/** "18.4 GB" → ["18.4", "GB"], so the KPI shows the unit next to the number. */
+function splitUnit(formatted: string): [string, string | undefined] {
+  const i = formatted.lastIndexOf(" ");
+  return i < 0 ? [formatted, undefined] : [formatted.slice(0, i), formatted.slice(i + 1)];
 }
