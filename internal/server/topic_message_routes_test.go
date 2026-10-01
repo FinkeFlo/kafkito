@@ -173,7 +173,7 @@ func topicMessageCases(t *testing.T) []handlerCase {
 		{name: "consumers", method: "GET", path: topic + "/consumers", wantStatus: 200},
 		// copyMessages
 		{name: "copy", method: "POST", path: topic + "/copy", contentType: jsonCT, body: `{"dest_cluster":"kf","dest_topic":"copy-dest","limit":6}`, wantStatus: 200, wantBody: `"done":true`, wantHeader: map[string]string{
-			"Content-Type": "text/event-stream", "Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Content-Length": "",
+			"Content-Type": "text/event-stream", "Cache-Control": "no-store", "X-Accel-Buffering": "no", "Content-Length": "",
 		}},
 		{name: "copy reached the destination", method: "GET", path: base + "/copy-dest/messages?from=start&limit=6", wantStatus: 200, wantBody: `"value":"hello world"`},
 		{name: "copy missing dest topic", method: "POST", path: topic + "/copy", contentType: jsonCT, body: `{"dest_cluster":"kf"}`, wantStatus: 400, wantBody: `request body \"/dest_topic\": is required`},

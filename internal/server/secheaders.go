@@ -62,3 +62,14 @@ func securityHeadersMiddleware(frameAncestors string) func(http.Handler) http.Ha
 		})
 	}
 }
+
+// noStoreMiddleware tells browsers and proxies not to store API responses:
+// they carry cluster data, records and the caller's permissions. It wraps
+// the /api router, its 404 and 405 responses and the copy event stream
+// included. The SPA shell and its assets keep their own caching.
+func noStoreMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
+	})
+}

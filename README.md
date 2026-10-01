@@ -254,6 +254,11 @@ X-Frame-Options: DENY
 Private-cluster credentials are kept in the browser's localStorage, so the
 policy allows no inline scripts or styles and no third-party origins.
 
+API responses (`/api/...`, errors and the copy event stream included) also
+carry `Cache-Control: no-store`, so neither the browser nor a proxy keeps a
+copy of cluster data. The UI keeps its own caching: hashed files under
+`/assets/` are cached for a year, `index.html` is revalidated (`no-cache`).
+
 - **Embedding in an iframe** (e.g. an SAP BTP launchpad): set
   `KAFKITO_SERVER_FRAME_ANCESTORS` (YAML `server.frame_ancestors`) to a
   space-separated CSP source list, e.g. `'self' https://*.launchpad.example.com`.

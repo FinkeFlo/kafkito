@@ -55,6 +55,8 @@ endpoints that back the web UI — stable, documented, scriptable.
   listed in the README under
   [Security headers](https://github.com/FinkeFlo/kafkito/blob/main/README.md#security-headers),
   including a strict `Content-Security-Policy`.
+- Every `/api` response, errors and the copy event stream included, carries
+  `Cache-Control: no-store`.
 
 ## Private clusters
 

@@ -51,6 +51,8 @@ info:
       optionally with a machine-readable `code`.
     - Every response carries an `X-Request-Id` header (see
       `components.headers.RequestId`).
+    - Every `/api` response, errors and the copy event stream included,
+      carries `Cache-Control: no-store`.
 servers:
   - url: /
 security:

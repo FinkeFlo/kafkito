@@ -180,7 +180,8 @@ supports OpenAPI 3.1 (including `type: [T, "null"]` and `const`).
   - The job runs in a goroutine and writes its events into an `io.Pipe`.
     The read side of the pipe is the response body. The event format
     (`data: {json}` plus a blank line) is unchanged, and the response
-    wrapper adds `Cache-Control: no-cache` and `X-Accel-Buffering: no`.
+    wrapper adds `X-Accel-Buffering: no`; `Cache-Control: no-store` comes
+    from the middleware that marks every `/api` response.
     The stream has no `Content-Length`.
   - The job context is `context.WithoutCancel(ctx)` with a 4 h ceiling, so
     the 30 s `middleware.Timeout` deadline does not end a copy.

@@ -208,13 +208,14 @@ func (s copyStream) Close() error {
 
 // copyStreamResponse streams the copy progress as text/event-stream. The
 // generated 200 response writes Content-Type, reads the body in chunks and
-// flushes after each one; this wrapper adds the caching headers.
+// flushes after each one; this wrapper asks proxies not to buffer the
+// stream. Cache-Control comes from noStoreMiddleware like on every /api
+// response.
 type copyStreamResponse struct {
 	body copyStream
 }
 
 func (c copyStreamResponse) VisitCopyMessagesResponse(w http.ResponseWriter) error {
-	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("X-Accel-Buffering", "no")
 	// The only error is a failed write to a client that went away. The
 	// status is already sent, the job is stopped by the body's Close, and
