@@ -33,15 +33,25 @@ export async function expectTheme(page: Page, theme: Theme): Promise<void> {
  * Runs axe against the current page state and fails on any `moderate`,
  * `serious` or `critical` violation. The full result is attached to the test so the
  * HTML report (and the CI artifact) shows every finding, blocking or not.
+ * `scope` limits the scan to one element, e.g. a non-modal popover whose
+ * page underneath is already scanned on its own.
  */
 export async function expectNoBlockingA11yViolations(
   page: Page,
   testInfo: TestInfo,
   name: string,
+  scope?: string,
 ): Promise<void> {
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"])
-    .analyze();
+  let builder = new AxeBuilder({ page }).withTags([
+    "wcag2a",
+    "wcag2aa",
+    "wcag21a",
+    "wcag21aa",
+    "wcag22aa",
+    "best-practice",
+  ]);
+  if (scope) builder = builder.include(scope);
+  const results = await builder.analyze();
 
   await testInfo.attach(`axe-${name}.json`, {
     body: JSON.stringify(results.violations, null, 2),
