@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { Modal } from "./Modal";
 
 const nextFrame = () =>
@@ -27,5 +28,27 @@ describe("Modal initial focus", () => {
     );
     await nextFrame();
     expect(screen.getByLabelText("second")).toHaveFocus();
+  });
+});
+
+describe("Modal as a form", () => {
+  it("submits from Enter in a field and from the submit button in actions", async () => {
+    const onSubmit = vi.fn();
+    render(
+      <Modal
+        open
+        onClose={() => {}}
+        title="t"
+        onSubmit={onSubmit}
+        actions={<button type="submit">Save</button>}
+      >
+        <input aria-label="first" />
+        <input aria-label="second" />
+      </Modal>,
+    );
+    await userEvent.type(screen.getByLabelText("second"), "x{Enter}");
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onSubmit).toHaveBeenCalledTimes(2);
   });
 });

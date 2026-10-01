@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, type FormEvent, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export type ModalSize = "sm" | "md" | "lg";
@@ -15,6 +15,12 @@ export interface ModalProps {
   ariaDescribedBy?: string;
   /** Override the panel className (e.g. extra padding). */
   className?: string;
+  /**
+   * Turns body and footer into one `<form>`, so Enter in a field submits
+   * and an `actions` button with `type="submit"` is its submit button.
+   * The handler receives the event with default submission already prevented.
+   */
+  onSubmit?: (e: FormEvent<HTMLFormElement>) => void;
 }
 
 const sizeMap: Record<ModalSize, string> = {
@@ -79,6 +85,7 @@ export function Modal({
   size = "md",
   ariaDescribedBy,
   className,
+  onSubmit,
 }: ModalProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -193,6 +200,19 @@ export function Modal({
 
   if (!open) return null;
 
+  const body = (
+    <>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 text-sm text-text">
+        {children}
+      </div>
+      {actions ? (
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-3">
+          {actions}
+        </div>
+      ) : null}
+    </>
+  );
+
   return (
     <div className="fixed inset-0 z-40">
       <div aria-hidden="true" className="fixed inset-0 z-40 bg-overlay" onClick={onBackdropClick} />
@@ -222,14 +242,20 @@ export function Modal({
             {title}
           </h2>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 text-sm text-text">
-          {children}
-        </div>
-        {actions ? (
-          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-3">
-            {actions}
-          </div>
-        ) : null}
+        {onSubmit ? (
+          <form
+            noValidate
+            className="flex min-h-0 flex-1 flex-col"
+            onSubmit={(e) => {
+              e.preventDefault();
+              onSubmit(e);
+            }}
+          >
+            {body}
+          </form>
+        ) : (
+          body
+        )}
       </div>
     </div>
   );
