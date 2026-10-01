@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -22,6 +23,7 @@ import (
 	"github.com/FinkeFlo/kafkito/internal/config"
 	"github.com/FinkeFlo/kafkito/internal/connerr"
 	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
+	gen "github.com/FinkeFlo/kafkito/internal/server/api"
 )
 
 // syncBuffer is a goroutine-safe log sink: the kafka client logs from its own
@@ -45,28 +47,68 @@ func (b *syncBuffer) String() string {
 
 const leakPassword = "Sup3r-Secret-Leak-Canary"
 
+// The Schema Registry credentials of credentialedCluster differ from its
+// SASL credentials, so a failing check names the one it found.
+const (
+	leakSRUser     = "sr-canary-user"
+	leakSRPassword = "Sr-Secret-Canary-Value"
+)
+
+// credentialedCluster is a private cluster definition with SASL/PLAIN over
+// TLS and a Schema Registry with basic auth. Neither broker nor registry
+// answers.
+func credentialedCluster(broker string) config.ClusterConfig {
+	return config.ClusterConfig{
+		Name:    "canary-probe",
+		Brokers: []string{broker},
+		Auth:    config.AuthConfig{Type: "plain", Username: "leak-user", Password: leakPassword},
+		TLS:     config.TLSConfig{Enabled: true},
+		SchemaRegistry: config.SchemaRegistryConfig{
+			URL: "https://10.255.255.1:1", Username: leakSRUser, Password: leakSRPassword,
+		},
+	}
+}
+
+// assertNoPrivateSecrets fails when the response body or the logs contain
+// a credential of credentialedCluster, the X-Kafkito-Cluster header value or
+// a registry name. echoed is a registry name the client itself put in the
+// path: the 404 repeats it like any unknown cluster name.
+func assertNoPrivateSecrets(t *testing.T, body, logs, header, echoed string) {
+	t.Helper()
+	require.Contains(t, logs, "http request", "the request log line must have been captured")
+	for what, s := range map[string]string{
+		"SASL user":                "leak-user",
+		"SASL password":            leakPassword,
+		"Schema Registry user":     leakSRUser,
+		"Schema Registry password": leakSRPassword,
+		"X-Kafkito-Cluster header": header,
+	} {
+		if s == "" {
+			continue
+		}
+		assert.NotContains(t, body, s, "%s in the response", what)
+		assert.NotContains(t, logs, s, "%s in the logs", what)
+	}
+	if echoed != "" {
+		body = strings.ReplaceAll(body, echoed, "")
+	}
+	assert.NotContains(t, body, config.AdhocClusterPrefix, "registry name in the response")
+	assert.NotContains(t, logs, config.AdhocClusterPrefix, "registry name in the logs")
+}
+
 // Private-cluster credentials travel in X-Kafkito-Cluster on every request.
-// Neither the password nor the raw header value may show up in a response
-// body or in any log line (request log, handler logs, kafka client logs) —
-// for malformed headers, SSRF-rejected configs and well-formed configs whose
-// brokers are unreachable.
+// Neither a password nor the raw header value may show up in a response
+// body or in any log line (request log, handler logs, kafka client logs) of
+// either log format, and neither may a registry name — for malformed
+// headers, SSRF-rejected configs and well-formed configs whose brokers are
+// unreachable.
 //
 // encodeHeader produces the same format as the frontend's
 // encodePrivateClusterHeader: base64 of the JSON ClusterConfig.
 func TestPrivateClusterHeader_NeverLeaksCredentials(t *testing.T) {
 	t.Parallel()
 
-	sasl := config.AuthConfig{Type: "plain", Username: "leak-user", Password: leakPassword}
-	tls := config.TLSConfig{Enabled: true}
-	unreachable := encodeHeader(t, config.ClusterConfig{
-		Name:    "leak-probe",
-		Brokers: []string{unreachableBroker},
-		Auth:    sasl,
-		TLS:     tls,
-		SchemaRegistry: config.SchemaRegistryConfig{
-			URL: "http://192.0.2.1:8081", Username: "sr-user", Password: leakPassword,
-		},
-	})
+	unreachable := encodeHeader(t, credentialedCluster(unreachableBroker))
 
 	cases := []struct {
 		name     string
@@ -101,9 +143,7 @@ func TestPrivateClusterHeader_NeverLeaksCredentials(t *testing.T) {
 		},
 		{
 			name: "SSRF-blocked broker", method: http.MethodGet, path: "/api/v1/clusters/__private__/topics",
-			header: encodeHeader(t, config.ClusterConfig{
-				Brokers: []string{"127.0.0.1:9092"}, Auth: sasl, TLS: tls,
-			}),
+			header:   encodeHeader(t, credentialedCluster("127.0.0.1:9092")),
 			wantCode: http.StatusBadRequest,
 		},
 		{
@@ -116,41 +156,219 @@ func TestPrivateClusterHeader_NeverLeaksCredentials(t *testing.T) {
 			path: "/api/v1/clusters/_test", header: unreachable, wantCode: http.StatusOK,
 		},
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
+	headerField := map[string]string{"json": `"` + PrivateClusterHeader + `":`, "text": PrivateClusterHeader + "="}
+	for _, format := range privateLogFormats {
+		for _, tc := range cases {
+			t.Run(format.name+"/"+tc.name, func(t *testing.T) {
+				t.Parallel()
 
-			logs := &syncBuffer{}
-			logger := slog.New(slog.NewJSONHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
-			reg := kafkapkg.NewRegistry(nil, logger)
-			cfg := config.Defaults()
-			cfg.Server.TestConnectionTimeout = 300 * time.Millisecond
-			h := New(Options{Version: "x", Logger: logger, Registry: reg, Config: cfg})
+				logs := &syncBuffer{}
+				logger := slog.New(format.handler(logs))
+				reg := kafkapkg.NewRegistry(nil, logger)
+				cfg := config.Defaults()
+				cfg.Server.TestConnectionTimeout = 300 * time.Millisecond
+				h := New(Options{Version: "x", Logger: logger, Registry: reg, Config: cfg})
 
-			req := httptest.NewRequest(tc.method, tc.path, nil)
-			req.Header.Set(PrivateClusterHeader, tc.header)
-			if tc.timeout > 0 {
-				ctx, cancel := context.WithTimeout(req.Context(), tc.timeout)
+				req := httptest.NewRequest(tc.method, tc.path, nil)
+				req.Header.Set(PrivateClusterHeader, tc.header)
+				if tc.timeout > 0 {
+					ctx, cancel := context.WithTimeout(req.Context(), tc.timeout)
+					defer cancel()
+					req = req.WithContext(ctx)
+				}
+				rec := httptest.NewRecorder()
+
+				h.ServeHTTP(rec, req)
+				// Closing the registry waits for the kafka client goroutines, so
+				// their log lines are in the buffer before it is inspected.
+				reg.Close()
+
+				require.Equal(t, tc.wantCode, rec.Code, rec.Body.String())
+				logged := logs.String()
+				assertNoPrivateSecrets(t, rec.Body.String(), logged, tc.header, "")
+				require.Contains(t, headerField, format.name)
+				assert.NotContains(t, logged, headerField[format.name],
+					"the header must never be logged as a field")
+			})
+		}
+	}
+}
+
+// For a private cluster with SASL and Schema Registry credentials, no
+// response and no log line of either log format contains a credential, the
+// X-Kafkito-Cluster header value or a registry name: Schema Registry calls,
+// a search whose JS filter fails, produce, the delete endpoints, a handler
+// panic and a registry name in the path.
+func TestPrivateClusterRequests_NoCredentialsInResponsesOrLogs(t *testing.T) {
+	t.Parallel()
+
+	const (
+		priv = "/api/v1/clusters/__private__"
+		// registrySegment in a path stands for the cluster's registry name.
+		registrySegment = "{registry}"
+		aclFilter       = `{"principal":"User:app","host":"*","resource_type":"TOPIC","resource_name":"orders","pattern_type":"LITERAL","operation":"READ","permission_type":"ALLOW"}`
+	)
+	cluster := credentialedCluster(unreachableBroker)
+	header := encodeHeader(t, cluster)
+	cases := []struct {
+		name, method, path, body string
+		// noHeader sends the request without X-Kafkito-Cluster.
+		noHeader bool
+		// panics makes every handler panic.
+		panics   bool
+		wantCode int
+		// wantLog is a message the request must have logged.
+		wantLog string
+	}{
+		{
+			name: "schema registry: list subjects", method: http.MethodGet, path: priv + "/schemas/subjects",
+			wantCode: http.StatusBadGateway, wantLog: "upstream kafka error",
+		},
+		{
+			name: "schema registry: get schema", method: http.MethodGet, path: priv + "/schemas/subjects/orders-value/versions/latest",
+			wantCode: http.StatusBadGateway, wantLog: "upstream kafka error",
+		},
+		{
+			name: "schema registry: register schema", method: http.MethodPost, path: priv + "/schemas/subjects/orders-value/versions",
+			body: `{"schema":"\"string\""}`, wantCode: http.StatusBadGateway, wantLog: "upstream kafka error",
+		},
+		{
+			name: "search: JS filter does not compile", method: http.MethodPost, path: priv + "/topics/orders/messages/search",
+			body: `{"mode":"js","value":"value.includes("}`, wantCode: http.StatusBadRequest, wantLog: "http request",
+		},
+		{
+			name: "search: JS filter throws", method: http.MethodPost, path: priv + "/topics/orders/messages/search",
+			body: `{"mode":"js","value":"throw new Error('filter failed'); return true"}`, wantCode: http.StatusBadGateway, wantLog: "upstream kafka error",
+		},
+		{
+			name: "produce", method: http.MethodPost, path: priv + "/topics/orders/messages",
+			body: `{"key":"k","value":"v"}`, wantCode: http.StatusBadGateway, wantLog: "upstream kafka error",
+		},
+		{
+			name: "delete topic", method: http.MethodDelete, path: priv + "/topics/orders",
+			wantCode: http.StatusBadGateway, wantLog: "upstream kafka error",
+		},
+		{
+			name: "delete records", method: http.MethodDelete, path: priv + "/topics/orders/records",
+			body: `{"partitions":{"0":-1}}`, wantCode: http.StatusBadGateway, wantLog: "upstream kafka error",
+		},
+		{
+			name: "delete group", method: http.MethodDelete, path: priv + "/groups/billing",
+			wantCode: http.StatusBadGateway, wantLog: "upstream kafka error",
+		},
+		{
+			name: "delete schema subject", method: http.MethodDelete, path: priv + "/schemas/subjects/orders-value",
+			wantCode: http.StatusBadGateway, wantLog: "upstream kafka error",
+		},
+		{
+			name: "delete ACLs", method: http.MethodDelete, path: priv + "/acls",
+			body: aclFilter, wantCode: http.StatusBadGateway, wantLog: "upstream kafka error",
+		},
+		{
+			name: "delete SCRAM user", method: http.MethodDelete, path: priv + "/users/app?mechanism=SCRAM-SHA-256",
+			wantCode: http.StatusBadGateway, wantLog: "upstream kafka error",
+		},
+		{
+			name: "handler panic", method: http.MethodGet, path: priv + "/topics",
+			panics: true, wantCode: http.StatusInternalServerError, wantLog: "panic recovered",
+		},
+		{
+			name: "registry name in the path", method: http.MethodGet, path: "/api/v1/clusters/" + registrySegment + "/topics",
+			noHeader: true, wantCode: http.StatusNotFound, wantLog: "http request",
+		},
+		{
+			name: "unregistered registry name in the path", method: http.MethodGet, path: "/api/v1/clusters/" + unregisteredAdhocName + "/topics",
+			wantCode: http.StatusNotFound, wantLog: "http request",
+		},
+	}
+	for _, format := range privateLogFormats {
+		for _, tc := range cases {
+			t.Run(format.name+"/"+tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				logs := &syncBuffer{}
+				logger := slog.New(format.handler(logs))
+				reg := kafkapkg.NewRegistry(nil, logger)
+				internal, err := reg.UseAdhoc(cluster)
+				require.NoError(t, err)
+				opts := Options{Version: "x", Logger: logger, Registry: reg, Config: config.Defaults()}
+				if tc.panics {
+					opts.strictMiddlewares = []gen.StrictMiddlewareFunc{panicInHandler}
+				}
+				h := New(opts)
+
+				path, echoed := tc.path, ""
+				switch {
+				case strings.Contains(path, registrySegment):
+					path, echoed = strings.Replace(path, registrySegment, internal, 1), internal
+				case strings.Contains(path, unregisteredAdhocName):
+					echoed = unregisteredAdhocName
+				}
+				var body io.Reader = http.NoBody
+				if tc.body != "" {
+					body = strings.NewReader(tc.body)
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 				defer cancel()
-				req = req.WithContext(ctx)
-			}
-			rec := httptest.NewRecorder()
+				req := httptest.NewRequestWithContext(ctx, tc.method, path, body)
+				if tc.body != "" {
+					req.Header.Set("Content-Type", "application/json")
+				}
+				if !tc.noHeader {
+					req.Header.Set(PrivateClusterHeader, header)
+				}
+				rec := httptest.NewRecorder()
+				h.ServeHTTP(rec, req)
+				reg.Close()
 
+				require.Equal(t, tc.wantCode, rec.Code, rec.Body.String())
+				logged := logs.String()
+				assert.NotEmpty(t, logLinesWith(logged, tc.wantLog), "no %q line in:\n%s", tc.wantLog, logged)
+				assertNoPrivateSecrets(t, rec.Body.String(), logged, header, echoed)
+			})
+		}
+	}
+}
+
+// A copy from a private source into a dest_cluster_config, both with SASL
+// and Schema Registry credentials, that ends when the client goes away:
+// neither the stream nor a log line of either log format contains a
+// credential, the X-Kafkito-Cluster header value or a registry name.
+// Sequential: the job holds a copy slot.
+func TestCopyStream_PrivateClustersNoCredentialsInStreamOrLogs(t *testing.T) {
+	source := credentialedCluster(unreachableBroker)
+	header := encodeHeader(t, source)
+	body, err := json.Marshal(map[string]any{
+		"dest_cluster_config": credentialedCluster("192.0.2.2:9092"),
+		"dest_topic":          "orders2",
+		"limit":               1,
+	})
+	require.NoError(t, err)
+	for _, format := range privateLogFormats {
+		t.Run(format.name, func(t *testing.T) {
+			logs := &syncBuffer{}
+			logger := slog.New(format.handler(logs))
+			reg := kafkapkg.NewRegistry(nil, logger)
+			h := New(Options{Version: "x", Logger: logger, Registry: reg, Config: config.Defaults()})
+
+			// The client goes away while the job waits for the brokers.
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			stop := time.AfterFunc(300*time.Millisecond, cancel)
+			defer stop.Stop()
+			req := newCopyRequest("/api/v1/clusters/__private__/topics/orders/copy", string(body)).WithContext(ctx)
+			req.Header.Set(PrivateClusterHeader, header)
+			rec := httptest.NewRecorder()
 			h.ServeHTTP(rec, req)
-			// Closing the registry waits for the kafka client goroutines, so
-			// their log lines are in the buffer before it is inspected.
+			require.Eventually(t, func() bool { return len(copySlots) == 0 }, 5*time.Second, 10*time.Millisecond,
+				"the copy job releases its slot")
 			reg.Close()
 
-			require.Equal(t, tc.wantCode, rec.Code, rec.Body.String())
-			body := rec.Body.String()
+			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+			require.Contains(t, rec.Body.String(), "data: ", "the stream must have been captured")
 			logged := logs.String()
-			require.NotEmpty(t, logged, "the request log line must have been captured")
-			for what, secret := range map[string]string{"password": leakPassword, "raw header": tc.header} {
-				assert.NotContains(t, body, secret, "%s leaked into the response body", what)
-				assert.NotContains(t, logged, secret, "%s leaked into the logs", what)
-			}
-			assert.NotContains(t, logged, PrivateClusterHeader+"\":",
-				"the header must never be logged as a field")
+			assert.NotEmpty(t, logLinesWith(logged, "copy: destination pre-flight check skipped"), logged)
+			assertNoPrivateSecrets(t, rec.Body.String(), logged, header, "")
 		})
 	}
 }
