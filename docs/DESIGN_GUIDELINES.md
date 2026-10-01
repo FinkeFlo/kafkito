@@ -299,11 +299,12 @@ Every entry lives in `src/components/ui/<Name>.tsx`, except `<Shell>`
 | `<StatusDot>` | 2×2 status mark, shape-coded per intent (filled disc = healthy, bold × = unreachable, ring = warning, small ring = unknown) with an `aria-label` |
 | `<StatusIcon>` / `<StatusBox>` | Labelled lucide outcome icon (✓ circle / triangle / ⊗ / info) and the compact result box built on it; use for submit results and load errors |
 | `<StateBadge>` | Consumer-group state pill |
-| `<DataTable>` | Styled `<table>` with built-in `<thead>` / row styles, sort headers, and skeleton/empty body states |
+| `<DataTable>` | Styled `<table>` with built-in `<thead>` / row styles, sort headers, and skeleton/empty body states. `sort` + `onSortChange` make the sort controlled (e.g. kept in the URL); `clickableRows` forwards row clicks to a `data-row-primary` control the cell renders itself, such as a `<Link>` |
 | `<Toolbar>` | Filter / action row: `search?` (left), `filters?` (centre), `actions?` (right, `ml-auto`). Replaces hand-rolled `flex flex-wrap items-center gap-2` blocks |
+| `<FilterSelect>` | Toolbar filter dropdown ("Label: Value ▾") on a native `<select>`; strong border while a non-default value is active; `disabledReason?` disables it and wires the reason via `aria-describedby` |
 | `<EmptyState>` | `icon?` + `title` + `description?` + `action?` |
 | `<ErrorState>` | `title` + `detail?` + `onRetry?` (renders the retry `<Button>`) |
-| `<Modal>` | `open` + `onClose` + `title` + `children` + `actions?` + `size?` (`sm \| md \| lg`) + `ariaDescribedBy?`; centered panel with backdrop, focus-trap, body-scroll lock, Escape-to-close, focus-restore |
+| `<Modal>` | `open` + `onClose` + `title` + `children` + `actions?` + `size?` (`sm \| md \| lg`) + `ariaDescribedBy?` + `onSubmit?`; centered panel with backdrop, focus-trap, body-scroll lock, Escape-to-close, focus-restore. With `onSubmit`, body and footer become one `<form>`: Enter in a field submits, and a `type="submit"` button in `actions` is its submit button |
 | `<Notice>` | `intent="info" \| "success" \| "warning" \| "danger"` + `title?` + `children` + `icon?` + `actions?`; tinted callout for degraded-capability banners and inline explanations. Always pairs colour with an icon |
 | `<Button>` | `variant="primary" \| "secondary" \| "danger" \| "ghost"` + `size="sm" \| "md"` + `leadingIcon?` / `trailingIcon?` + `loading?` |
 | `<Input>` | `h-9` text input + `invalid?` (sets `aria-invalid="true"` and switches border to `border-danger`) + `leadingIcon?` / `trailingIcon?`. Does **not** set `outline-none`; the global `:focus-visible` rule is the focus indicator |
@@ -473,7 +474,12 @@ unless each has been implemented and visually checked.
    `<Notice>` at the top of the view explaining which permission is
    missing and how to fix it. This is a kafkito-specific pattern — see
    the existing `limited` code paths in `clusters.$cluster.groups.index.tsx`
-   and `clusters.index.tsx` for precedent.
+   and `clusters.index.tsx` for precedent. Kept deviation: when the
+   missing permission only costs one column (the topic list without
+   `DESCRIBE_CONFIGS` loses retention), show a single warning toast per
+   cluster and session (`claimOncePerSession`) instead of a permanent
+   banner; the column shows "—" and its filter is disabled with the
+   reason in `aria-describedby`.
 5. **Populated.** The happy path.
 
 ---
@@ -717,6 +723,7 @@ a review, treat it as drift and bring it in line.
 | 2026-09-26 | Frontend layout: primitives move to `components/ui/`, domain components to `features/<domain>/` (groups, messages, shell); PascalCase component files enforced by Biome `useFilenamingConvention`; MessageRow and RangePicker extracted from the messages route | (this PR — link added by author) |
 | 2026-09-26 | Docs sync: cluster lives in the URL path, full `components/ui` inventory, route and `lib/` paths updated, `routeTree.gen.ts` is not committed | (this PR — link added by author) |
 | 2026-09-28 | Accessibility follow-ups: clickable table rows keep role row with a real link/button in the primary cell; `useFieldError` wires `aria-invalid` + `aria-describedby`; no skipped heading levels; axe gate raised to `moderate` | (this PR — link added by author) |
+| 2026-10-01 | Topic list polish: new `<FilterSelect>` primitive; `<DataTable>` gains controlled `sort` and `clickableRows`; `<Modal>` gains `onSubmit`. Kept deviation from § 8.4: a permission gap that only costs one column is a one-time toast, not a banner | (this PR — link added by author) |
 
 Add a row on every change. Small tweaks to tokens or primitives are
 fine; major shifts (new visual language, new nav model) require a design
