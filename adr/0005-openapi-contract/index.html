@@ -1,0 +1,1506 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Public documentation for kafkito">
+      
+      
+      
+      
+        <link rel="prev" href="../0004-xsuaa-build-tag/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/branding/icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>ADR-0005 - kafkito</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-0005-openapi-31-as-the-http-contract" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="kafkito" class="md-header__button md-logo" aria-label="kafkito" data-md-component="logo">
+      
+  <img src="../../assets/branding/icon.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            kafkito
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-0005
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/FinkeFlo/kafkito" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../ui/getting-started-ui/" class="md-tabs__link">
+          
+  
+  
+  UI Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../API/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../data-masking/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Data Masking
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../architecture/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Architecture
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../DESIGN_GUIDELINES/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Design Guidelines
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../0001-greenfield-apache2/" class="md-tabs__link">
+          
+  
+  
+  Architecture Decisions
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="kafkito" class="md-nav__button md-logo" aria-label="kafkito" data-md-component="logo">
+      
+  <img src="../../assets/branding/icon.svg" alt="logo">
+
+    </a>
+    kafkito
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/FinkeFlo/kafkito" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    UI Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ui/getting-started-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ui/add-cluster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Cluster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ui/features-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ui/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../API/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../data-masking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Masking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../DESIGN_GUIDELINES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Guidelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Decisions
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture Decisions
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../0001-greenfield-apache2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0001
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../0002-tech-stack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0002
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../0003-cloud-foundry-readiness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0003
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../0004-xsuaa-build-tag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0004
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0005
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0005
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generated-strict-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generated strict server
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-an-endpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding an endpoint
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consequences
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alternatives considered
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generated-strict-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generated strict server
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-an-endpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding an endpoint
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consequences
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alternatives considered
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/FinkeFlo/kafkito/edit/main/docs/adr/0005-openapi-contract.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="adr-0005-openapi-31-as-the-http-contract">ADR-0005: OpenAPI 3.1 as the HTTP contract<a class="headerlink" href="#adr-0005-openapi-31-as-the-http-contract" title="Permanent link">&para;</a></h1>
+<ul>
+<li><strong>Status:</strong> Accepted</li>
+<li><strong>Date:</strong> 2026-09-25</li>
+<li><strong>Supersedes:</strong> the "RPC layer" row of <a href="../0002-tech-stack/">ADR-0002</a></li>
+</ul>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>ADR-0002 chose Connect-RPC with <code>buf</code> (protobuf-first) as the RPC layer.
+In practice only one procedure, <code>InfoService.GetInfo</code>, was ever built on it.
+It duplicated <code>GET /api/v1/info</code>, and nothing called <code>/rpc</code>. All real
+functionality (about 40 routes) is hand-written chi REST handlers.</p>
+<p>That left three unsynchronised descriptions of the same payloads:
+1. Go DTO structs in <code>internal/kafka</code> and <code>internal/server</code> (the actual
+   behaviour),
+2. a hand-maintained <code>openapi.yaml</code> served at <code>/api/v1/openapi.yaml</code>, which
+   covered 27 of the paths and had drifted in field names, envelopes, status
+   codes and error shapes,
+3. hand-written TypeScript interfaces in <code>frontend/src/lib/api.ts</code>.</p>
+<p>The API mainly serves the kafkito UI. The secondary consumers are operators
+scripting with <code>curl</code>/<code>jq</code>, so a plain HTTP/JSON surface matters more than
+RPC features such as bidirectional streaming.</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Remove Connect-RPC.</strong> Delete <code>proto/</code>, <code>buf.yaml</code>, <code>buf.gen.yaml</code>, the
+  generated <code>pkg/proto</code> code and the <code>/rpc</code> mount. <code>/rpc</code> stays a reserved
+  backend prefix so that stale clients get a JSON 404 instead of the SPA
+  shell.</li>
+<li><strong>The spec is the contract.</strong> An OpenAPI 3.1 document at
+  <code>api/openapi.yaml</code>, maintained by hand, is the single source of truth for
+  the HTTP contract. The Go handlers remain the source of truth for
+  behaviour; when the two disagree, the spec is corrected (or the handler
+  fixed deliberately). The <code>api</code> Go package embeds the file, and it is served
+  at <code>GET /api/v1/openapi.yaml</code>.</li>
+<li><strong>Generated frontend types.</strong> <code>openapi-typescript</code> generates
+  <code>frontend/src/lib/api.gen.ts</code> (<code>bun run api:generate</code> /
+  <code>make api-generate</code>). The file is committed and excluded from Biome.
+  <code>api.ts</code> keeps its fetch wrappers and exported type names, but these are
+  now aliases of the generated schemas. The wrappers call a typed
+  <code>openapi-fetch</code> client (<code>api-client.ts</code>) built on the same types, so paths,
+  parameters and bodies are checked against the spec at compile time.</li>
+<li><strong>Gates.</strong></li>
+<li>Redocly lint of the spec (<code>make api-lint</code>, CI).</li>
+<li>A drift check: regenerate the types and <code>git diff --exit-code</code>
+    (<code>make api-check</code>, CI).</li>
+<li>A Go test (<code>internal/server/openapi_contract_test.go</code>). It validates the
+    spec with kin-openapi and asserts that every chi route has a matching
+    path and method in the spec, and the reverse.</li>
+<li>An <code>oasdiff</code> breaking-change check on pull requests, which fails on
+    ERR-level changes.</li>
+<li><strong>Generated Go server.</strong> See <a href="#generated-strict-server">Generated strict server</a>
+  below. It was added after the initial decision.</li>
+</ul>
+<h2 id="generated-strict-server">Generated strict server<a class="headerlink" href="#generated-strict-server" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Status:</strong> Accepted</li>
+<li><strong>Date:</strong> 2026-09-25</li>
+</ul>
+<p>The Go side is generated from the same spec with oapi-codegen v2.8.0, which
+supports OpenAPI 3.1 (including <code>type: [T, "null"]</code> and <code>const</code>).</p>
+<ul>
+<li><strong>Codegen.</strong> The tool is pinned as a Go tool dependency
+  (<code>go get -tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen</code>)
+  and runs as <code>go tool oapi-codegen</code>. <code>api/oapi-codegen.yaml</code> generates
+  models, the <code>chi-server</code> wrapper and the <code>strict-server</code> interface into
+  <code>internal/server/api/server.gen.go</code>. <code>make api-generate</code> regenerates both
+  the TypeScript types and this file, and <code>make api-check</code> fails on drift
+  in either one. The generated file is excluded from golangci-lint by path.</li>
+<li><strong>Overlay.</strong> <code>api/oapi-codegen.overlay.yaml</code> is applied only by
+  oapi-codegen, so the published spec does not carry Go extensions. It maps
+  spec schemas onto the existing domain types (<code>config.ClusterConfig</code>,
+  <code>kafka.ClusterInfo</code>, ...), which means the generated server serialises
+  exactly what the hand-written handlers returned. It also drops the
+  <code>X-Request-Id</code> response headers, because the request log middleware
+  already sets them.</li>
+<li><strong>Migration complete.</strong> The operations were migrated in steps; the
+  codegen config listed the migrated ones in
+  <code>output-options.include-operation-ids</code>. Every operation of the spec is
+  now generated and served by the strict server, so the list is gone and
+  no chi route is written by hand. Two tests keep it that way:
+  <code>TestSpecOperations_AllGeneratedAndMounted</code> checks that every operation
+  id has a strict method and a route wrapper and that a request to its
+  path reaches the generated binding of that operation (the SSE
+  <code>copyMessages</code> included), and <code>TestRouter_EveryRouteIsASpecOperation</code>
+  walks the chi router and fails on any route that is not a spec
+  operation served by its generated binding, and on any operation without
+  a route.</li>
+<li><strong>Per-group registration.</strong> The generated <code>HandlerWithOptions</code> would put
+  every operation on one router behind one middleware chain. Instead, each
+  generated <code>ServerInterfaceWrapper</code> method is registered individually on
+  the chi group it belonged to before (<code>internal/server/api_routes.go</code>):
+  the probes have no auth, the meta endpoints run behind auth, and the
+  cluster routes also run the private-cluster, RBAC and
+  private-cluster-param middleware. The relative paths keep the chi route
+  patterns unchanged, because RBAC resolves permissions from those patterns.
+  A test asserts the pattern, chain and permission of every operation.</li>
+<li><strong>Path parameters are read as the binding reads them.</strong> chi routes on
+  <code>r.URL.RawPath</code> when it is set, so its parameters may still be
+  percent-encoded; the generated wrappers then decode them once with
+  <code>url.PathUnescape</code>. Middleware that acts on a path parameter (RBAC, the
+  private-cluster rewrite, the request log) reads it through <code>pathParam</code>,
+  which applies the same rule, so it sees exactly the name the handler
+  gets. RBAC answers <code>400</code> for a parameter that does not decode instead of
+  deciding on it. <code>TestGeneratedBinding_PathParamRule</code> fails if a codegen
+  upgrade changes the binding's rule.</li>
+<li><strong>Request validation.</strong> Each generated route runs
+  <code>github.com/oapi-codegen/nethttp-middleware</code> (kin-openapi) after its group
+  middleware, so every operation is validated. The rules
+  live in the spec only (enum, pattern, minItems, required, ...), and the
+  duplicated hand-written input checks were removed. The options are:</li>
+<li><code>AuthenticationFunc = openapi3filter.NoopAuthenticationFunc</code>:
+    authentication and RBAC stay in the existing middleware. <code>bearerAuth</code>
+    in the spec is documentation only.</li>
+<li><code>DoNotValidateServers</code>: the server URL differs per deployment.</li>
+<li><code>SkipSettingDefaults</code>: the validator must not rewrite requests.</li>
+<li>Order: a body limit (<code>http.MaxBytesReader</code>) runs before the validator,
+    because kin-openapi buffers the whole body. Routes without a request
+    body get an empty body.</li>
+<li>The validator sees a cleaned URL path, so <code>/api//v1/info</code> behaves as
+    chi routes it.</li>
+<li><strong>Central error mapping.</strong> <code>internal/server/apierror.go</code> defines one error
+  type, <code>apiError{Status, Code, Message}</code>, and one <code>writeError</code>. It maps
+  sentinel errors (<code>kafka.ErrUnknownCluster</code>, <code>kafka.ErrNotAuthorized</code>,
+  <code>kafka.ErrGroupExists</code>, ...), parameter-binding errors and validation
+  errors to status codes through <code>errors.As</code>/<code>errors.Is</code>. The strict
+  handler's <code>RequestErrorHandlerFunc</code> and <code>ResponseErrorHandlerFunc</code>, the
+  wrapper's parameter-binding error handler and the validator's
+  <code>ErrorHandlerWithOpts</code> all use it. The JSON body is still the <code>Error</code>
+  schema (<code>{"error": ..., "code": ...}</code>). Only 5xx errors are logged, and
+  the cause stays in the log.</li>
+<li><strong>No value echo.</strong> kin-openapi's messages can contain submitted values,
+  for example the base64 <code>X-Kafkito-Cluster</code> header including a password.
+  Validation errors are therefore rebuilt from the error structure: the
+  location (parameter name or body JSON pointer) plus the violated rule,
+  taken only from the schema (type, pattern, bound, required names). A
+  test sends invalid requests that carry a password and asserts that
+  neither the response nor the log contains it.</li>
+<li><strong>Two schema validators.</strong> For 3.1 documents kin-openapi validates
+  schemas with a JSON Schema 2020-12 validator. Schemas that contain
+  <code>$ref</code>, such as <code>ClusterConfig</code>, fail to compile there, and kin-openapi
+  silently falls back to its built-in validator. The fallback also handles
+  <code>type: [T, "null"]</code> and <code>const</code>. The error sanitiser handles both error
+  forms and gives the same rule text for both. Tests send real requests
+  through the real validator, against the embedded spec and a small
+  <code>$ref</code>-free 3.1 spec, and pin the exact texts for enum, type, bounds,
+  <code>minItems</code>, required, <code>const</code> and nullable fields. A kin-openapi upgrade
+  that changes its messages therefore fails CI.</li>
+<li><strong>Rules that stay in Go.</strong> Only rules the spec can express live in the
+  spec. Blank broker addresses, the SSRF policy and the credentials a
+  SASL mechanism needs are checked in <code>validateClusterPolicy</code>, for both
+  the <code>_test</code> body and the <code>X-Kafkito-Cluster</code> header. The header is
+  decoded by <code>privateClusterMiddleware</code> and is not schema-validated.</li>
+<li><strong>Body limits before body readers.</strong> Every body is capped before
+  anything reads it. JSON bodies (create topic, alter configs, delete
+  records, create group, reset offsets) are capped at 1 MiB, search at
+  1 MiB, register schema at 2 MiB, copy at 32 KiB and the ACL and SCRAM
+  user bodies (the ACL delete body included) at 16 KiB, each with its
+  previous 400 message. Produce has its own middleware in front of
+  the validator. It caps the wire bytes, decompresses a
+  <code>Content-Encoding: gzip</code> body, caps the decompressed JSON at 15 MiB (413)
+  and hands the validator and the handler the plain body. The RBAC
+  middleware reads the create-topic and create-group bodies to find the
+  topic or group name before any route runs. That read is capped at the
+  same 1 MiB, and the bytes it read become the body again for the
+  validator and the handler.</li>
+<li><strong>Streaming (topic copy).</strong> oapi-codegen v2.8.0 streams
+  <code>text/event-stream</code> responses natively. The generated response writes
+  <code>Content-Type: text/event-stream</code>, reads the <code>io.Reader</code> body in 4 KiB
+  chunks, calls <code>http.Flusher.Flush</code> after each one and closes the body if
+  it is an <code>io.ReadCloser</code>. The request log middleware forwards <code>Flush</code>.
+  <code>CopyMessages</code> uses this as follows:</li>
+<li>Everything that can fail is checked before the stream opens, so the
+    failure is still a JSON error with its status. That covers body rules,
+    destination resolution, production confirmation, destination RBAC,
+    the concurrency slot (429 <code>copy_concurrency_limit</code>) and the destination
+    topic.</li>
+<li>The job runs in a goroutine and writes its events into an <code>io.Pipe</code>.
+    The read side of the pipe is the response body. The event format
+    (<code>data: {json}</code> plus a blank line) is unchanged, and the response
+    wrapper adds <code>Cache-Control: no-cache</code> and <code>X-Accel-Buffering: no</code>.
+    The stream has no <code>Content-Length</code>.</li>
+<li>The job context is <code>context.WithoutCancel(ctx)</code> with a 4 h ceiling, so
+    the 30 s <code>middleware.Timeout</code> deadline does not end a copy.
+    <code>context.AfterFunc</code> wires only a real cancellation back in, which is
+    how net/http reports a client disconnect.</li>
+<li>After the deadline has fired, a disconnect shows up only as a failed
+    write. The generated writer then stops reading and closes the body.
+    The body's <code>Close</code> cancels the job, and the job's next pipe write
+    returns <code>io.ErrClosedPipe</code>.</li>
+<li>The goroutine closes the pipe and releases the concurrency slot in its
+    deferred calls, so every way out frees the slot. If the handler
+    returns before the goroutine starts, it releases the slot itself.</li>
+<li>Tests use an <code>httptest</code> server and a registry fake that blocks the job.
+    They cover the first events arriving while the job still runs, a
+    client abort ending the goroutine and freeing the slot, a failed write
+    after the deadline stopping the job, the job outliving the deadline,
+    the headers, and events matching <code>CopyProgressEvent</code>.</li>
+</ul>
+<h2 id="adding-an-endpoint">Adding an endpoint<a class="headerlink" href="#adding-an-endpoint" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Describe the operation in <code>api/openapi.yaml</code>: path, <code>operationId</code>,
+   parameters, request body and every response, with the rules the input
+   must meet (enum, pattern, bounds, required, <code>additionalProperties</code>).
+   Map schemas onto existing Go types in <code>api/oapi-codegen.overlay.yaml</code>
+   where they exist.</li>
+<li>Run <code>make api-generate</code>. It regenerates <code>internal/server/api/server.gen.go</code>
+   and <code>frontend/src/lib/api.gen.ts</code>.</li>
+<li>Implement the new <code>StrictServerInterface</code> method on <code>apiServer</code> in the
+   file for its resource (<code>topics.go</code>, <code>groups.go</code>, ...). Return the
+   generated response types, and errors as <code>apiError</code> or through
+   <code>upstreamError</code>/<code>clusterError</code>. Handlers reach Kafka only through the
+   narrow store interfaces in <code>internal/server/stores.go</code>; a new Kafka
+   operation goes on its service in <code>internal/kafka</code> (<code>Topics</code>, <code>Groups</code>,
+   <code>Messages</code>, <code>Security</code>, <code>Clusters</code>) and on the matching store interface.</li>
+<li>Mount the generated wrapper method in <code>internal/server/api_routes.go</code> on
+   the right group, with <code>noRequestBody</code> or a body limit
+   (<code>limitRequestBody</code>/<code>limitRequestBodyMsg</code>) in front of <code>g.validate</code>. If
+   the route needs a permission, add its pattern to <code>resolvePermission</code>.</li>
+<li>Add the operation to <code>apiOps</code> in
+   <code>internal/server/generated_routes_test.go</code> and give it at least one
+   successful request in <code>TestAPIOps_Requests</code>. The contract, router,
+   RBAC, private-cluster and response validation tests then cover it; they
+   fail until steps 3–5 are done.</li>
+</ol>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<p><strong>Positive</strong>
+- One contract instead of three drifting copies. The frontend compiler now
+  flags spec changes that affect the UI.
+- The new route/spec parity test fails CI when a route is added without a
+  spec update. Breaking changes to clients are visible in PRs.
+- Dependencies shrink: no <code>connectrpc.com/connect</code>, no protobuf runtime and
+  no <code>buf</code> toolchain.
+- The API stays <code>curl</code>-friendly, and the spec works with standard OpenAPI
+  tooling.</p>
+<p><strong>Negative</strong>
+- The spec is still hand-written. Every operation is guarded by the
+  generated interface, request validation and response validation in the
+  contract tests.
+- Moving validation into the spec makes some errors stricter or reworded:
+  JSON request bodies need <code>Content-Type: application/json</code>, and
+  validation errors have the code <code>invalid_request</code> with generated
+  messages. <code>POST /api/v1/clusters/_test</code> bodies must use the documented
+  lowercase <code>auth.type</code> values: <code>PLAIN</code> or <code>" plain "</code> used to be
+  normalised and now returns <code>400</code> <code>invalid_request</code>. The frontend
+  always sends the lowercase values. The <code>X-Kafkito-Cluster</code> header is
+  unchanged and still accepts <code>auth.type</code> case-insensitively and trimmed,
+  so private clusters stored by older versions keep working.
+- The spec stays the contract. It is not loosened to match lenient
+  server behaviour, and <code>api-breaking</code> (oasdiff) runs without an ignore
+  list.
+- <code>openapi-typescript</code> needs the TypeScript 5 JS API, which the project's
+  TypeScript 7 does not provide. It therefore runs through a pinned <code>bunx</code>
+  instead of as a devDependency.
+- Contributors must edit YAML and regenerate types when they change the API.</p>
+<h2 id="alternatives-considered">Alternatives considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Full Connect-RPC migration</strong> (move every REST handler to protobuf
+  services). Rejected: weeks of work, and a less <code>curl</code>-friendly API.
+  Server streaming in browsers is limited compared with the existing SSE
+  endpoints.</li>
+<li><strong>Code-first OpenAPI generation</strong> (e.g. <code>huma</code>, which generates the spec
+  from Go handlers). Not chosen for now: it means rewriting every handler
+  against a new framework. The spec-first approach can later be completed
+  with oapi-codegen without changing the contract.</li>
+<li><strong>Keep the status quo</strong> (hand-written TypeScript plus an unchecked spec).
+  Rejected: the drift found while reconciling the spec (wrong field names,
+  missing envelopes, wrong status codes, five undocumented routes) showed
+  the cost.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
