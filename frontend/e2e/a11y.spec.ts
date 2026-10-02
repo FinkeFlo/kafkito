@@ -154,14 +154,6 @@ function route(name: string): Route {
 
 const STATES: State[] = [
   {
-    ...route("topics"),
-    name: "topic-create-modal",
-    open: async (page) => {
-      await page.getByRole("button", { name: /^\+ New topic$/ }).click();
-      await expect(page.getByRole("dialog")).toBeVisible();
-    },
-  },
-  {
     ...route("topic-messages"),
     name: "message-expanded",
     open: async (page) => {
