@@ -1,10 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Boxes, Check, X } from "lucide-react";
 import { toast } from "sonner";
-import { can, type TopicInfo } from "@/lib/api";
-import { useAuth } from "@/auth/hooks";
+import type { TopicInfo } from "@/lib/api";
 import { useCluster } from "@/lib/use-cluster";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -15,7 +14,6 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Toolbar } from "@/components/ui/Toolbar";
-import { CreateTopicModal } from "@/features/topics/CreateTopicModal";
 import { TopicsTable } from "@/features/topics/TopicsTable";
 import {
   filterTopics,
@@ -60,9 +58,7 @@ function TopicsPage() {
   const { cluster, clusters } = useCluster();
   const clusterInfo = useMemo(() => clusters?.find((c) => c.name === cluster), [clusters, cluster]);
   const caps = clusterInfo?.capabilities;
-  const { me } = useAuth();
   const fmt = useFormatters();
-  const [createOpen, setCreateOpen] = useState(false);
 
   const topicsQuery = useQuery({
     ...topicQueries.list(cluster!),
@@ -73,14 +69,6 @@ function TopicsPage() {
   // Re-parse the merged state so defaults ("", false, "any") drop out of the URL.
   const setSearch = (patch: Partial<Record<keyof TopicListSearch, unknown>>) =>
     navigate({ search: (prev) => parseTopicListSearch({ ...prev, ...patch }), replace: true });
-
-  const createDisabledReason = !cluster
-    ? "select a cluster"
-    : !can(me, cluster, "topic", "edit")
-      ? "forbidden by RBAC policy"
-      : caps?.create_topic === false
-        ? (caps?.errors?.create_topic ?? "CREATE on TOPIC required")
-        : undefined;
 
   // Missing DESCRIBE_CONFIGS only costs the retention column, so it gets a
   // single toast per cluster and session instead of a permanent banner.
@@ -160,23 +148,18 @@ function TopicsPage() {
       description={
         !search.internal && internalCount > 0
           ? `${internalCount} internal ${internalCount === 1 ? "topic is" : "topics are"} hidden.`
-          : "Create a topic to get started."
+          : "This cluster has no topics."
       }
       action={
         !search.internal && internalCount > 0 ? (
           <Button variant="secondary" size="sm" onClick={() => setSearch({ internal: true })}>
             Show internal
           </Button>
-        ) : !createDisabledReason ? (
-          <Button variant="secondary" size="sm" onClick={() => setCreateOpen(true)}>
-            + New topic
-          </Button>
         ) : undefined
       }
     />
   );
 
-  const createReasonId = "topics-create-disabled-reason";
   return (
     <div className="space-y-5 p-6">
       <PageHeader
@@ -187,25 +170,7 @@ function TopicsPage() {
           </>
         }
         title="Topics"
-        subtitle="Browse, filter and create topics in this cluster."
-        actions={
-          <>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setCreateOpen(true)}
-              disabled={!!createDisabledReason}
-              aria-describedby={createDisabledReason ? createReasonId : undefined}
-            >
-              + New topic
-            </Button>
-            {createDisabledReason ? (
-              <span id={createReasonId} className="sr-only">
-                {createDisabledReason}
-              </span>
-            ) : null}
-          </>
-        }
+        subtitle="Browse and filter the topics in this cluster."
       />
 
       {!cluster && (
@@ -369,14 +334,6 @@ function TopicsPage() {
             />
           )}
         </>
-      )}
-
-      {createOpen && cluster && (
-        <CreateTopicModal
-          cluster={cluster}
-          brokers={clusterInfo?.brokers}
-          onClose={() => setCreateOpen(false)}
-        />
       )}
     </div>
   );

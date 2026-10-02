@@ -5,7 +5,7 @@ This overview maps UI capabilities by area. For endpoint-level details, use the 
 | Area | What do I see? | What can I do? | When should I use it? |
 | --- | --- | --- | --- |
 | **Clusters / Fleet overview** | Cluster list with reachability, security tags (`TLS`, `SR`, `PRIVATE`, `PROD`, `LIMITED`), and KPI cards | Select clusters, compare status, and open detail areas | Start-of-day checks and multi-cluster status review |
-| **Topics** | Filterable topic table with partitions, RF, messages, rate, lag | Search topics, open topic detail, create topics (if allowed) | Topic-level producer/consumer analysis |
+| **Topics** | Filterable topic table with partitions, RF, messages, rate, lag | Search, filter and sort topics, open topic detail | Topic-level producer/consumer analysis |
 | **Topic detail** | Tabs: Overview, Messages, Timeline, Produce, Configs, Consumers, Schema | Browse/search messages, inspect time trends, produce test messages, view consumers (with production confirmation when cluster is marked PROD) | Operational analysis of a single topic |
 | **Consumer groups** | Group list with state, members, topics, lag, plus detail panel with members/offsets | Check lag, understand partition offsets, reset offsets, delete group (Empty/Dead only) | Consumer troubleshooting, rebalance analysis, backlog triage |
 | **Schemas** | Subject list, version status, schema detail with references/compatibility | Browse subjects, inspect versions, soft-delete subject | Validate payload structures and registry status |
