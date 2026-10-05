@@ -17,7 +17,7 @@ require (
 	github.com/lestrrat-go/jwx/v3 v3.3.0
 	github.com/oapi-codegen/nethttp-middleware v1.2.0
 	github.com/oapi-codegen/runtime v1.7.0
-	github.com/ohler55/ojg v1.28.6
+	github.com/ohler55/ojg v1.28.7
 	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go/modules/kafka v0.44.0
 	github.com/twmb/franz-go v1.22.1
