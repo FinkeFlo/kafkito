@@ -59,6 +59,7 @@ interface FormState {
   srUsername: string;
   srPassword: string;
   srInsecure: boolean;
+  rememberPassword: boolean;
 }
 
 const emptyForm: FormState = {
@@ -74,6 +75,7 @@ const emptyForm: FormState = {
   srUsername: "",
   srPassword: "",
   srInsecure: false,
+  rememberPassword: false,
 };
 
 function toPrivateCluster(
@@ -102,6 +104,7 @@ function toPrivateCluster(
           insecure_skip_verify: f.srInsecure,
         }
       : undefined,
+    remember_credentials: f.rememberPassword,
   };
 }
 
@@ -120,6 +123,7 @@ function fromPrivateCluster(c: PrivateCluster): FormState {
     srUsername: c.schema_registry?.username ?? "",
     srPassword: c.schema_registry?.password ?? "",
     srInsecure: !!c.schema_registry?.insecure_skip_verify,
+    rememberPassword: c.remember_credentials !== false,
   };
 }
 
@@ -600,8 +604,9 @@ function ClusterForm({
       }
     >
       <p className="text-sm text-muted">
-        Credentials are stored unencrypted in this browser's localStorage. Exports are encrypted
-        with a passphrase you choose; use Export/Import to move clusters between devices.
+        Passwords are kept only in this tab unless you choose to remember them; remembered passwords
+        are stored unencrypted in this browser's localStorage. Exports are encrypted with a
+        passphrase you choose; use Export/Import to move clusters between devices.
       </p>
       {unavailableId && (
         <PrivateClustersNotice id={unavailableId} mode={privateAccess.mode} className="mt-4" />
@@ -741,6 +746,24 @@ function ClusterForm({
             </div>
           )}
         </div>
+
+        {(f.authType !== "none" || (f.srURL && f.srUsername)) && (
+          <div>
+            <label className="inline-flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={f.rememberPassword}
+                onChange={(e) => set("rememberPassword", e.target.checked)}
+              />
+              Remember passwords in this browser
+            </label>
+            <p className="mt-1 text-xs text-muted">
+              {f.rememberPassword
+                ? "Stored unencrypted in this browser's localStorage."
+                : "Kept in this tab only; a new tab asks for them again."}
+            </p>
+          </div>
+        )}
       </div>
 
       {testing && testElapsed >= 3 && (

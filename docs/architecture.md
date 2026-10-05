@@ -207,7 +207,16 @@ network path can read them. Run kafkito only behind TLS:
 ## Private clusters
 
 - Clusters a user adds in the UI live only in that browser's localStorage,
-  under `kafkito.private-clusters.v1`, **credentials in plaintext**.
+  under `kafkito.private-clusters.v1`. By default their SASL and Schema
+  Registry passwords are not stored there: the tab keeps them in memory, and
+  another tab asks for them before it sends a request for the cluster. With
+  **Remember passwords in this browser** (`remember_credentials`) they are
+  stored **in plaintext** in localStorage, as are the passwords of entries
+  saved before the setting existed. A password a tab holds is bound to the
+  settings it was entered for and dropped when brokers, auth, TLS or Schema
+  Registry settings change; exports leave it out. No variant protects a
+  password from script running in the page; the CSP is the defence against
+  that.
 - The SPA sends the definition base64-encoded in `X-Kafkito-Cluster` on every
   request for the path segment `__private__`. The server validates it and
   persists nothing. It keeps the definition, its Kafka client and what it
