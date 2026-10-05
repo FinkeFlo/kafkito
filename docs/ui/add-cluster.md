@@ -15,7 +15,7 @@ Under **Settings → Private clusters**, you get a table of browser-local cluste
 1. Open **Add cluster**.  
 2. Enter `Name` and `Brokers (comma-separated)`, at most 50 brokers.  
 3. Choose `Auth type` (`none`, `SASL/PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`).  
-4. For auth types other than `none`, provide username/password.  
+4. For auth types other than `none`, provide username/password. By default the browser does not remember the passwords: they stay in this tab, and a new tab asks for them when you open the cluster. Tick **Remember passwords in this browser** to store them.  
 5. Optionally mark the cluster as **Production**.  
 6. `TLS` is on by default. The form warns when it is off (all data, and with `SASL/PLAIN` also the username and password, travels in cleartext) and when `Skip verify` turns off the broker certificate check. Keep TLS on for `SASL/PLAIN`: kafkito rejects SASL/PLAIN without TLS for private clusters (**Test connection** shows `HTTP 400: SASL/PLAIN requires TLS for private clusters`) unless the operator allows it (`private_clusters.allow_plain_without_tls`). You can still save such an entry.  
 7. Optionally configure **Schema Registry** (URL + optional credentials/TLS).  
@@ -63,7 +63,7 @@ Use this when connectivity behaves unexpectedly or a newly added cluster is not 
 
 ## Security note
 
-Private-cluster credentials are stored unencrypted in your browser's localStorage and sent to backend only for requests targeting the selected private cluster. Export files include the same data, encrypted with the passphrase you choose.
+Private-cluster definitions are stored in your browser's localStorage. Passwords are kept only in the open tab unless you tick **Remember passwords in this browser**; remembered passwords are stored unencrypted. Credentials are sent to the backend only for requests targeting the selected private cluster. Export files include the definitions and the remembered passwords, encrypted with the passphrase you choose; passwords that are not remembered are left out. A password kept in a tab is dropped when the cluster's brokers, auth, TLS or Schema Registry settings change.
 
 The credentials travel in a request header, so only add a private cluster when kafkito is served over HTTPS (see [Running behind TLS](../architecture.md#running-behind-tls)).
 

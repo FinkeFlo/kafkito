@@ -244,10 +244,45 @@ describe("private cluster transport security", () => {
     expect(stored()).toEqual([
       expect.objectContaining({
         name: "cleartext",
-        auth: { type: "plain", username: "alice", password: "secret" },
+        auth: { type: "plain", username: "alice" },
         tls: { enabled: false, insecure_skip_verify: false },
+        remember_credentials: false,
       }),
     ]);
+  });
+
+  it("keeps passwords out of localStorage unless the user remembers them", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+    let form = await openAddForm(user);
+    await user.type(within(form).getByPlaceholderText("my-dev-cluster"), "session");
+    await user.type(within(form).getByPlaceholderText("host1:9092, host2:9092"), "10.0.0.1:9092");
+    await user.selectOptions(within(form).getByLabelText("Auth type"), "scram-sha-512");
+    await user.type(within(form).getByLabelText(/^Username/), "alice");
+    await user.type(within(form).getByLabelText(/^Password/), "secret");
+    const remember = within(form).getByLabelText("Remember passwords in this browser");
+    expect(remember).not.toBeChecked();
+    expect(form).toHaveTextContent("Kept in this tab only; a new tab asks for them again.");
+    await user.click(within(form).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(JSON.stringify(stored())).not.toContain("secret");
+
+    form = await openAddForm(user);
+    await user.type(within(form).getByPlaceholderText("my-dev-cluster"), "remembered");
+    await user.type(within(form).getByPlaceholderText("host1:9092, host2:9092"), "10.0.0.2:9092");
+    await user.selectOptions(within(form).getByLabelText("Auth type"), "scram-sha-512");
+    await user.type(within(form).getByLabelText(/^Username/), "bob");
+    await user.type(within(form).getByLabelText(/^Password/), "kept");
+    await user.click(within(form).getByLabelText("Remember passwords in this browser"));
+    expect(form).toHaveTextContent("Stored unencrypted in this browser's localStorage.");
+    await user.click(within(form).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(stored().find((c) => c.name === "remembered")).toEqual(
+      expect.objectContaining({
+        auth: { type: "scram-sha-512", username: "bob", password: "kept" },
+        remember_credentials: true,
+      }),
+    );
   });
 
   // Clicking the nested Skip verify checkbox is not exercised here: happy-dom
@@ -399,12 +434,12 @@ describe("private cluster export and import", () => {
     });
   });
 
-  it("says that stored credentials are unencrypted and exports are encrypted", async () => {
+  it("says that remembered passwords are unencrypted and exports are encrypted", async () => {
     const user = userEvent.setup();
     renderSettings();
     const form = await openAddForm(user);
     expect(form).toHaveTextContent(
-      "Credentials are stored unencrypted in this browser's localStorage. Exports are encrypted with a passphrase you choose",
+      "Passwords are kept only in this tab unless you choose to remember them; remembered passwords are stored unencrypted in this browser's localStorage. Exports are encrypted with a passphrase you choose",
     );
   });
 });

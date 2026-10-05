@@ -251,8 +251,9 @@ Cross-Origin-Opener-Policy: same-origin
 X-Frame-Options: DENY
 ```
 
-Private-cluster credentials are kept in the browser's localStorage, so the
-policy allows no inline scripts or styles and no third-party origins.
+Private-cluster credentials are kept in the browser (remembered passwords in
+localStorage, the others in the open tab), so the policy allows no inline
+scripts or styles and no third-party origins.
 
 API responses (`/api/...`, errors and the copy event stream included) also
 carry `Cache-Control: no-store`, so neither the browser nor a proxy keeps a

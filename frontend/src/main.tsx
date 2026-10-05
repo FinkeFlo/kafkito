@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { routeTree } from "./routeTree.gen";
 import { AuthProvider } from "./auth/AuthProvider";
 import { SessionExpiredError } from "./auth/api";
+import { PasswordRequiredError } from "./lib/private-clusters";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -15,7 +16,12 @@ const queryClient = new QueryClient({
       // apiFetch's 401 path navigates to '/' and throws SessionExpiredError.
       // Without this guard TanStack Query retries the throw 3x, flooding the
       // app with auth-loss errors before the navigation kicks in.
-      retry: (failureCount, error) => !(error instanceof SessionExpiredError) && failureCount < 3,
+      // A private cluster whose password this tab lacks fails the same way
+      // until the user enters it; ClusterLayout asks for it.
+      retry: (failureCount, error) =>
+        !(error instanceof SessionExpiredError) &&
+        !(error instanceof PasswordRequiredError) &&
+        failureCount < 3,
     },
   },
 });

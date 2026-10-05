@@ -33,8 +33,9 @@ func contentSecurityPolicy(frameAncestors string) string {
 
 // securityHeadersMiddleware sets browser hardening headers on every response
 // (API, SPA shell and static assets). Private-cluster credentials live in
-// the browser's localStorage, so a strict CSP is the main defence against an
-// XSS turning into a credential leak.
+// the browser (in localStorage when remembered, else in the tab's memory),
+// so a strict CSP is the main defence against an XSS turning into a
+// credential leak.
 //
 // HSTS is deliberately not set: TLS is terminated by the upstream proxy,
 // which owns that header.

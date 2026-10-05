@@ -34,3 +34,13 @@ function isPrivateClusterKey(part: unknown, id: string): boolean {
 export function removePrivateClusterQueries(qc: QueryClient, id: string): void {
   qc.removeQueries({ predicate: (q) => q.queryKey.some((part) => isPrivateClusterKey(part, id)) });
 }
+
+/**
+ * Refetches every query of the private cluster `id`, for example once the
+ * user entered its passwords and the earlier attempts failed without them.
+ */
+export function invalidatePrivateClusterQueries(qc: QueryClient, id: string): Promise<void> {
+  return qc.invalidateQueries({
+    predicate: (q) => q.queryKey.some((part) => isPrivateClusterKey(part, id)),
+  });
+}

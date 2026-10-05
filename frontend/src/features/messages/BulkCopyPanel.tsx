@@ -12,7 +12,11 @@ import { Input } from "@/components/ui/Input";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TopicCombobox } from "./TopicCombobox";
 import { StatusBox } from "@/components/ui/StatusIcon";
-import { getPrivateClusterByName, toBackendClusterConfig } from "@/lib/private-clusters";
+import {
+  getPrivateClusterByName,
+  needsPasswords,
+  toBackendClusterConfig,
+} from "@/lib/private-clusters";
 import { topicQueries } from "@/lib/queries/topics";
 
 interface BulkCopyPanelProps {
@@ -87,6 +91,18 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
 
   const startCopy = (confirmedProd: boolean) => {
     if (!effectiveCluster || !destTopic.trim() || running) return;
+    // Destination cluster: if it's a private cluster, embed config in body.
+    // Its passwords may only be known to the tab that has opened it.
+    const priv = getPrivateClusterByName(effectiveCluster);
+    if (priv && needsPasswords(priv)) {
+      setStopped(false);
+      setProgress({
+        copied: 0,
+        done: true,
+        error: `Open "${priv.name}" in this tab and enter its password, then copy again.`,
+      });
+      return;
+    }
     setRunning(true);
     setProgress(null);
     setStopped(false);
@@ -96,8 +112,6 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
       preserve_partition: preservePartition,
     };
 
-    // Destination cluster: if it's a private cluster, embed config in body.
-    const priv = getPrivateClusterByName(effectiveCluster);
     if (priv) {
       req.dest_cluster_config = toBackendClusterConfig(priv);
     } else {

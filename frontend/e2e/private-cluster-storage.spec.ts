@@ -160,4 +160,52 @@ test.describe("Private-cluster storage v1", () => {
       payload,
     );
   });
+
+  test("a connection that does not remember its password asks for it in a new tab", async ({
+    page,
+  }) => {
+    const broker = privateClusterBroker();
+    const name = "e2e-session";
+    const srPassword = "e2e-session-sr-secret-pw";
+    const payload = JSON.stringify([
+      {
+        id: "pc_5e55104e5e55104e",
+        name,
+        brokers: [broker],
+        auth: { type: "none" },
+        tls: { enabled: false, insecure_skip_verify: false },
+        schema_registry: {
+          url: "http://10.255.255.1:8081",
+          username: "sr-user",
+          credential_required: true,
+        },
+        remember_credentials: false,
+        created_at: 1767261600000,
+        updated_at: 1767261600000,
+      },
+    ]);
+    await seed(page, payload);
+
+    await page.goto(`/clusters/${name}/topics`);
+    const dialog = page.getByRole("dialog", { name: `Connect to ${name}` });
+    await expect(dialog).toBeVisible();
+
+    const topicsRequest = page.waitForRequest(
+      (req) =>
+        req.method() === "GET" &&
+        new URL(req.url()).pathname === "/api/v1/clusters/__private__/topics" &&
+        !!req.headers()["x-kafkito-cluster"],
+    );
+    await dialog.getByLabel("Schema Registry password for sr-user").fill(srPassword);
+    await dialog.getByRole("button", { name: "Connect" }).click();
+
+    const sent = JSON.parse(atob((await topicsRequest).headers()["x-kafkito-cluster"])) as {
+      schema_registry: { password?: string };
+    };
+    expect(sent.schema_registry.password).toBe(srPassword);
+    await expect(page.getByRole("row", { name: new RegExp(FIXTURE_TOPIC) })).toBeVisible();
+    expect(await page.evaluate((key) => window.localStorage.getItem(key), STORAGE_KEY)).toBe(
+      payload,
+    );
+  });
 });

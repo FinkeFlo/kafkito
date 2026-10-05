@@ -61,6 +61,8 @@ test.describe("Content-Security-Policy", () => {
     await dialog.getByLabel("Auth type").selectOption("plain");
     await dialog.getByLabel(/^Username/).fill("e2e-user");
     await dialog.getByLabel(/^Password/).fill(PASSWORD);
+    // Remembered, so the password survives the reload below.
+    await dialog.getByLabel("Remember passwords in this browser").check();
     await dialog.getByRole("button", { name: "Save" }).click();
 
     // sonner's stylesheet ships as a file, not an injected <style>; if it

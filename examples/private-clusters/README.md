@@ -100,5 +100,7 @@ Confluent Cloud console, etc.) when the file is no longer needed. Once imported,
 JSON** writes an encrypted copy (passphrase of at least 12 characters, AES-256-GCM); keep
 that instead of a plaintext bundle with real secrets.
 
-The browser side has the same constraint — `localStorage` stores them in plaintext too.
-That trade-off is documented in `frontend/src/lib/private-clusters.ts`.
+In the browser, an imported cluster keeps the remember setting it was exported with; entries
+without one store their passwords in plaintext in `localStorage`. Clusters that do not
+remember their passwords keep them in the open tab only. See
+`frontend/src/lib/private-clusters.ts`.
