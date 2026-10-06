@@ -51,6 +51,55 @@ export const MAX_CHANGELOG_DESCRIPTION_LENGTH = 160;
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.3.0",
+    date: "2026-10-06",
+    items: [
+      {
+        type: "feature",
+        title: "Private cluster passwords stay in the tab unless you remember them",
+        description:
+          "New private clusters no longer store their passwords in the browser. Tick Remember passwords to keep them; otherwise a new tab asks for them.",
+      },
+      {
+        type: "feature",
+        title: "Encrypted export of private clusters",
+        description:
+          "Export asks for a passphrase and encrypts the file. Files from earlier versions still import.",
+      },
+      {
+        type: "feature",
+        title: "Operators can turn private clusters off or limit them to a role",
+      },
+      {
+        type: "feature",
+        title: "Sign-in with any OpenID Connect provider",
+      },
+      {
+        type: "feature",
+        title: "Test connection checks every broker the cluster advertises",
+      },
+      {
+        type: "feature",
+        title: "Topic list filters by partitions and retention",
+        description: "Topics are no longer created from the UI; the API still allows it.",
+      },
+      {
+        type: "security",
+        title: "Hardened handling of private clusters",
+        description:
+          "SASL/PLAIN requires TLS, connection errors name no hosts, and API responses are not cached.",
+      },
+      {
+        type: "fix",
+        title: "Raw download decodes Schema Registry values",
+      },
+      {
+        type: "fix",
+        title: "Search continues reliably across pages and partitions",
+      },
+    ],
+  },
+  {
     version: "1.2.0",
     date: "2026-09-29",
     items: [
