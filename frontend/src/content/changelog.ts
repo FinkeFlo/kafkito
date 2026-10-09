@@ -51,6 +51,18 @@ export const MAX_CHANGELOG_DESCRIPTION_LENGTH = 160;
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.3.1",
+    date: "2026-10-09",
+    items: [
+      {
+        type: "fix",
+        title: "Sortable table headers are uppercase again",
+        description:
+          "Sortable headers in the topic, consumer group, consumer and SCRAM user lists showed in normal case next to uppercase ones. All headers are uppercase now.",
+      },
+    ],
+  },
+  {
     version: "1.3.0",
     date: "2026-10-06",
     items: [
