@@ -255,7 +255,10 @@ function DataTableColumnView<Row>({
                         type="button"
                         onClick={() => toggleSort(col)}
                         className={cn(
-                          "inline-flex items-center gap-1 transition-colors",
+                          // Browsers reset text-transform on <button> and the
+                          // preflight does not inherit it, so restate the
+                          // header's uppercase.
+                          "inline-flex items-center gap-1 uppercase transition-colors",
                           active ? "text-text" : "hover:text-text",
                         )}
                       >

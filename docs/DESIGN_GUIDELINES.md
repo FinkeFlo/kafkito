@@ -724,6 +724,7 @@ a review, treat it as drift and bring it in line.
 | 2026-09-26 | Docs sync: cluster lives in the URL path, full `components/ui` inventory, route and `lib/` paths updated, `routeTree.gen.ts` is not committed | (this PR — link added by author) |
 | 2026-09-28 | Accessibility follow-ups: clickable table rows keep role row with a real link/button in the primary cell; `useFieldError` wires `aria-invalid` + `aria-describedby`; no skipped heading levels; axe gate raised to `moderate` | (this PR — link added by author) |
 | 2026-10-01 | Topic list polish: new `<FilterSelect>` primitive; `<DataTable>` gains controlled `sort` and `clickableRows`; `<Modal>` gains `onSubmit`. Kept deviation from § 8.4: a permission gap that only costs one column is a one-time toast, not a banner | (this PR — link added by author) |
+| 2026-10-09 | `<DataTable>` sortable column headers stay uppercase like the rest of the header row: the sort `<button>` restates `uppercase`, which browsers reset on buttons (#159) | (this PR — link added by author) |
 
 Add a row on every change. Small tweaks to tokens or primitives are
 fine; major shifts (new visual language, new nav model) require a design
