@@ -132,6 +132,12 @@ describe("DataTable controlled sort", () => {
     expect(screen.getByRole("columnheader", { name: /id/i })).toHaveAttribute("aria-sort", "none");
   });
 
+  it("keeps sortable headers uppercase like the rest of the header row", () => {
+    // happy-dom applies no user-agent styles, so check the class that restates it.
+    render(<DataTable<Row> columns={columns} rows={rows} rowKey={(r) => r.id} />);
+    expect(screen.getByRole("button", { name: /state/i })).toHaveClass("uppercase");
+  });
+
   it("reports the next sort state instead of keeping its own", () => {
     const onSortChange = vi.fn();
     const { rerender } = render(
