@@ -51,13 +51,19 @@ deploy/local/
 .playwright-mcp/
 .venv/
 
-# Claude Code config — local only, not part of the OSS repo.
-.claude/
+# AI coding agents. Shared configuration is committed: AGENTS.md, CLAUDE.md,
+# .claude/settings.json, .claude/hooks/, .claude/skills/, .claude/agents/ and
+# .mcp.json (see CONTRIBUTING.md, "AI coding agents"). Personal and
+# session-local files stay out.
+.claude/settings.local.json
+.claude/worktrees/
+CLAUDE.local.md
 NEXT_STEPS.md
 .superpowers/
 .followups-ledger.md
 
-# GitHub Copilot CLI instructions and session exports — local only.
+# GitHub Copilot (coding agent, CLI and Chat) reads AGENTS.md, so the repo
+# ships no copilot-instructions.md; a local one and session exports stay out.
 .github/copilot-instructions.md
 copilot-session-*.md
 
