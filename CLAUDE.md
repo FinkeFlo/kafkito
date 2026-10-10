@@ -64,5 +64,6 @@ private clusters and error handling, `api-contract-reviewer` for
 `.mcp.json` registers Context7 (`https://mcp.context7.com/mcp`, no key) for
 current library documentation: TanStack Router and Query, Tailwind v4, Biome,
 Vitest, Playwright, chi, franz-go, oapi-codegen. Use it before relying on
-memory for an API. A personal API key belongs in your local MCP scope, not in
-the repository.
+memory for an API. `.claude/settings.json` pre-approves it
+(`enabledMcpjsonServers`), which takes effect once you trust the folder. A
+personal API key belongs in your local MCP scope, not in the repository.
