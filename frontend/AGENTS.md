@@ -106,9 +106,8 @@ Sources: `src/index.css`, DESIGN_GUIDELINES § 2 to § 9 and § 12.
 3. Note in the PR that the design-system artifact must be re-synced. It is a
    snapshot; never edit it from the repository.
 
-Known deviation: DESIGN_GUIDELINES § 4.3 gives `rounded-sm` as 2 px; Tailwind
-v4 renders 4 px and the code and the artifact follow Tailwind. Leave the code
-as it is and flag it under § 13 rather than "fixing" either side in passing.
+`rounded-sm` is 4 px (Tailwind v4); the code and the design-system artifact
+use that value, and DESIGN_GUIDELINES § 4.3 records it.
 
 ## Design-system artifact (optional)
 
