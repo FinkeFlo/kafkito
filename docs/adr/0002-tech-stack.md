@@ -21,7 +21,7 @@ kafkito is a single-binary Kafka management UI (see ADR-0001). We need a stack t
 |---|---|---|
 | Language | **Go 1.26+** | Single-binary, static linking, strong stdlib, mature Kafka client ecosystem. |
 | HTTP router | **`go-chi/chi` v5** | Idiomatic, stdlib-compatible, excellent middleware story. |
-| RPC layer | **Connect-RPC with `buf`** (protobuf-first) | HTTP/1.1, HTTP/2, gRPC-compatible, generated TypeScript client, API contract versioning. |
+| RPC layer | ~~**Connect-RPC with `buf`** (protobuf-first)~~ superseded, see Amendments 2026-09-25 and [ADR-0005](0005-openapi-contract.md) | HTTP/1.1, HTTP/2, gRPC-compatible, generated TypeScript client, API contract versioning. |
 | Kafka client | **`twmb/franz-go`** + **`kadm`** + **`kmsg`** + **`sr`** | Best-of-breed pure-Go Kafka client; supports KIPs promptly; wire-protocol-first. |
 | Scripting | **`dop251/goja`** | Sandboxed JS engine for message-filter DSL. |
 | Config | **`knadh/koanf`** | YAML + env + VCAP_SERVICES layering. |
@@ -36,8 +36,8 @@ kafkito is a single-binary Kafka management UI (see ADR-0001). We need a stack t
 | Framework | **React 19** | Mainstream, large talent pool, stable ecosystem. |
 | Build | **Vite** | Fast dev server, lean production bundles. |
 | Routing | **TanStack Router** | Type-safe, data-loading built in, no server-side rendering required. |
-| UI kit | **shadcn/ui** + **Tailwind CSS** | Copy-in component library (no vendor lock-in), accessible defaults. |
-| State / data | **TanStack Query** + Connect-RPC generated client | Declarative data-fetching; protobuf types end-to-end. |
+| UI kit | ~~**shadcn/ui**~~ (superseded, see Amendments 2026-09-26) + **Tailwind CSS** | Copy-in component library (no vendor lock-in), accessible defaults. |
+| State / data | **TanStack Query** + ~~Connect-RPC generated client~~ (superseded, see Amendments 2026-09-25 and [ADR-0005](0005-openapi-contract.md)) | Declarative data-fetching; protobuf types end-to-end. |
 
 ### Distribution
 

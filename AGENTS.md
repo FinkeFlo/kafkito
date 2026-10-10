@@ -159,8 +159,9 @@ credential first.
 ## When sources disagree
 
 Code and tests, then ADRs in `docs/adr/` (newest wins; read the amendments:
-ADR-0002 still lists Connect-RPC and shadcn in its original tables, both
-superseded), then `docs/DESIGN_GUIDELINES.md`, then `README.md`. Fix the
+ADR-0002's tables strike through Connect-RPC and shadcn and point to the
+amendments and ADR-0005), then `docs/DESIGN_GUIDELINES.md`, then
+`README.md`. Fix the
 stale document in the same PR when it is small, otherwise list it in the PR.
 
 ## Never
