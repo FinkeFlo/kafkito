@@ -200,8 +200,10 @@ function MyPage() {
 |---|---|
 | Card / table / panel | `rounded-xl` (12 px) |
 | Button / input / dropdown | `rounded-md` (6 px) |
-| Pill / tag / tint cell | `rounded-sm` (2 px) |
+| Pill / tag / tint cell | `rounded-sm` (4 px) |
 | Status dot / avatar | `rounded-full` |
+
+`rounded-sm` is 4 px because Tailwind v4 sets `--radius-sm: 0.25rem`; this table said 2 px until 2026-10-10. Per § 13 the code wins here: `<Tag>`, `<Skeleton>` and `<StateBadge>` rely on 4 px and the design-system artifact was extracted from the code (§ 14).
 
 `rounded-md` is the canonical button radius — `<Button>`, `<IconButton>`, `<Input>`, and `<Notice>` all consume it. Do not introduce `rounded-lg` or `rounded-2xl` on these primitives.
 
@@ -384,7 +386,7 @@ alone".
 ### 6.6 Iconography
 
 - Always import from `lucide-react`.
-- Icon size: `h-4 w-4` inline with text, `h-5 w-5` standalone, never larger unless for empty-state illustrations.
+- Icon size: `h-4 w-4` inline with text, `h-5 w-5` standalone, `h-3.5 w-3.5` (14 px) for status glyphs (`<StatusIcon>`), the shell nav tabs and glyphs inside controls (`<SearchInput>`, `<FilterSelect>`), never larger unless for empty-state illustrations.
 - Strokes inherit `currentColor`; set color via the parent's `text-*` utility.
 - Never mix emoji into UI chrome. Unicode glyphs (`›`, `·`, `⌕`) are fine for separators and inline hints.
 
@@ -585,8 +587,8 @@ Where a component goes:
 - Otherwise keep it in the route file. Extract into `features/` when a
   route grows large, a component is reused, or it needs its own test.
 
-Tests sit next to the component they cover (`Button.tsx` +
-`Button.test.tsx`).
+Tests sit next to the component they cover (`ConfirmDialog.tsx` +
+`ConfirmDialog.test.tsx`).
 
 **Never** create `styles/`, `hooks/` (put hooks in `lib/`), `types/`
 (types live next to the code that owns them or in `lib/api.ts`; the
@@ -731,6 +733,7 @@ a review, treat it as drift and bring it in line.
 | 2026-10-09 | `<DataTable>` sortable column headers stay uppercase like the rest of the header row: the sort `<button>` restates `uppercase`, which browsers reset on buttons (#159) | (this PR — link added by author) |
 | 2026-10-10 | Token utilities everywhere: every arbitrary `[var(--color-*)]` class replaced by its utility (`bg-panel`, `text-muted`), guarded by `tokens.test.ts`; transitional aliases removed from `index.css`; hover borders on controls move from `border-strong` to `border-hover` (§ 2.1) | (this PR — link added by author) |
 | 2026-10-10 | Topic configs tab on the primitives: `<Card>`, `<Button>` for Edit / Close / Apply, the edit dialog is a `<Modal>` (focus trap, Escape, `bg-overlay` scrim) with labelled `<Input>`s; a read-only Edit names its reason in visible text wired via `aria-describedby` instead of `title=` | (this PR — link added by author) |
+| 2026-10-10 | Docs sync with the code: `rounded-sm` is 4 px (Tailwind v4), decided per § 13 in favour of the code (§ 4.3); `h-3.5 w-3.5` icon size for status glyphs, nav tabs and glyphs inside controls (§ 6.6); the colocated-test example names an existing pair, `ConfirmDialog.tsx` + `ConfirmDialog.test.tsx` (§ 10.1) | (this PR — link added by author) |
 
 Add a row on every change. Small tweaks to tokens or primitives are
 fine; major shifts (new visual language, new nav model) require a design
