@@ -1,0 +1,149 @@
+{
+  "$schema": "https://www.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(make check)",
+      "Bash(make test *)",
+      "Bash(make lint *)",
+      "Bash(make lint-install)",
+      "Bash(make lint-version-check)",
+      "Bash(make actionlint)",
+      "Bash(make api-generate)",
+      "Bash(make api-lint)",
+      "Bash(make api-check)",
+      "Bash(make frontend-install)",
+      "Bash(make frontend-check)",
+      "Bash(make frontend-build)",
+      "Bash(make build *)",
+      "Bash(make build-go *)",
+      "Bash(make release-check *)",
+      "Bash(make worktree-init)",
+      "Bash(make tidy)",
+      "Bash(make help)",
+      "Bash(go build *)",
+      "Bash(go test *)",
+      "Bash(go vet *)",
+      "Bash(go list *)",
+      "Bash(go env *)",
+      "Bash(go version)",
+      "Bash(go mod tidy)",
+      "Bash(go mod download)",
+      "Bash(bin/golangci-lint *)",
+      "Bash(./bin/golangci-lint *)",
+      "Bash(bun install *)",
+      "Bash(bun run lint)",
+      "Bash(bun run typecheck)",
+      "Bash(bun run knip)",
+      "Bash(bun run build)",
+      "Bash(bun run test *)",
+      "Bash(bun run routes:generate)",
+      "Bash(bun run api:generate)",
+      "Bash(bun --version)",
+      "Bash(node_modules/.bin/biome *)",
+      "Bash(frontend/node_modules/.bin/biome *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git blame *)",
+      "Bash(git branch)",
+      "Bash(git branch --show-current)",
+      "Bash(git branch -a)",
+      "Bash(git describe *)",
+      "Bash(git rev-parse *)",
+      "Bash(git ls-files *)",
+      "Bash(git remote -v)",
+      "Bash(git stash list)",
+      "Bash(git fetch *)",
+      "Bash(jq *)",
+      "Bash(shellcheck *)"
+    ],
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(*.local.yaml)",
+      "Read(*.local.yml)",
+      "Read(*.pem)",
+      "Read(*.key)",
+      "Read(./.local/**)",
+      "Read(./deploy/local/**)",
+      "Edit(**/*.gen.go)",
+      "Edit(./frontend/src/lib/api.gen.ts)",
+      "Edit(./frontend/src/routeTree.gen.ts)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git push --force-with-lease *)",
+      "Bash(git push * --force)",
+      "Bash(git push * --force *)",
+      "Bash(git push * -f)",
+      "Bash(git push * -f *)",
+      "Bash(git push * --force-with-lease)",
+      "Bash(git push * --force-with-lease *)",
+      "Bash(git push --tags *)",
+      "Bash(git push * --tags)",
+      "Bash(git push * --tags *)",
+      "Bash(git push * tag *)",
+      "Bash(git push * refs/tags/*)",
+      "Bash(git push * v*)",
+      "Bash(git commit --no-verify *)",
+      "Bash(git commit * --no-verify)",
+      "Bash(git commit * --no-verify *)",
+      "Bash(git push --no-verify *)",
+      "Bash(git push * --no-verify)",
+      "Bash(git push * --no-verify *)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect-paths.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git *)",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-git.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format-file.sh",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/design-token-guard.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
