@@ -45,7 +45,7 @@ export function SearchRunBar({
           id="search-direction"
           value={direction}
           onChange={(e) => setDirection(e.target.value as SearchDirection)}
-          className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1"
+          className="rounded border border-border bg-panel px-2 py-1"
         >
           <option value="newest_first">new → old</option>
           <option value="oldest_first">old → new</option>
@@ -72,7 +72,7 @@ export function SearchRunBar({
       <div className="flex items-center gap-1.5">
         <label
           htmlFor="search-budget"
-          className={`font-medium ${budgetUnlimited ? "text-[var(--color-text-subtle)]" : ""}`}
+          className={`font-medium ${budgetUnlimited ? "text-subtle-text" : ""}`}
         >
           Max messages to scan
         </label>
@@ -87,7 +87,7 @@ export function SearchRunBar({
           placeholder="50000"
           title="Max number of messages to scan per search. Enable 'Scan whole topic' to scan everything."
           onChange={(e) => setBudget(e.target.value === "" ? 0 : Number(e.target.value) || 0)}
-          className="w-24 rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1 disabled:opacity-50"
+          className="w-24 rounded border border-border bg-panel px-2 py-1 disabled:opacity-50"
         />
       </div>
       <button
@@ -98,7 +98,7 @@ export function SearchRunBar({
           (mode === "js" && needle.trim() === "") ||
           (mode !== "contains" && mode !== "js" && path.trim() === "")
         }
-        className="rounded bg-accent px-3 py-1 font-semibold text-[var(--color-text-on-accent)] hover:bg-accent-hover disabled:opacity-50"
+        className="rounded bg-accent px-3 py-1 font-semibold text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
       >
         {searching ? "Searching…" : "Search"}
       </button>
@@ -106,7 +106,7 @@ export function SearchRunBar({
         <button
           type="button"
           onClick={onStop}
-          className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1 hover:border-[var(--color-border-strong)]"
+          className="rounded border border-border bg-panel px-2 py-1 hover:border-border-hover"
         >
           Stop
         </button>
@@ -115,7 +115,7 @@ export function SearchRunBar({
         <button
           type="button"
           onClick={onClear}
-          className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1 hover:border-[var(--color-border-strong)]"
+          className="rounded border border-border bg-panel px-2 py-1 hover:border-border-hover"
         >
           Clear result
         </button>

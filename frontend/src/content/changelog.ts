@@ -51,6 +51,18 @@ export const MAX_CHANGELOG_DESCRIPTION_LENGTH = 160;
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.3.2",
+    date: "2026-10-10",
+    items: [
+      {
+        type: "fix",
+        title: "Topic config edit dialog closes with Escape and keeps focus",
+        description:
+          "The edit dialog traps focus, closes with Escape and returns focus to Edit. A read-only topic shows why Edit is disabled.",
+      },
+    ],
+  },
+  {
     version: "1.3.1",
     date: "2026-10-09",
     items: [

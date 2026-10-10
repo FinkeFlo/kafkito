@@ -2,9 +2,11 @@
 # PostToolUse hook (Edit|Write) for files under frontend/src. Two groups of
 # checks on the one file Claude just changed:
 #
-#   1. The rule of frontend/src/__checks__/tokens.test.ts: every
-#      var(--color-X) must be declared in frontend/src/index.css. The test
-#      (part of `bun run test` and `make check`) fails otherwise.
+#   1. The rules of frontend/src/__checks__/tokens.test.ts: every
+#      var(--color-X) must be declared in frontend/src/index.css, and a token
+#      is used through its utility, never as an arbitrary [var(--color-X)]
+#      class. The test (part of `bun run test` and `make check`) fails
+#      otherwise.
 #   2. For .tsx files, design-guideline rules that no automated gate catches,
 #      each cited from docs/DESIGN_GUIDELINES.md: colour literals (§ 12.1),
 #      default Tailwind palette classes, which generate no CSS because the
@@ -55,6 +57,12 @@ if [ -f "$css" ]; then
       findings+=("$rel:$line: var($token) is not declared in frontend/src/index.css; src/__checks__/tokens.test.ts fails on it")
     fi
   done < <(grep -onE 'var\(--color-[a-z0-9-]+' "$file" || true)
+  # Second rule of the same test: a token is used through its utility
+  # (bg-panel), never as an arbitrary value ([var(--color-panel)]).
+  while IFS=: read -r line match; do
+    [ -n "$match" ] || continue
+    findings+=("$rel:$line: $match uses an arbitrary var(--color-*) value; use the token utility (bg-panel, text-muted); src/__checks__/tokens.test.ts fails on it")
+  done < <(grep -onE '[^[:space:]]*\[var\(--color-[a-z0-9-]+\)\][^[:space:]]*' "$file" || true)
 fi
 
 # 2. Guideline rules for component code. Comment lines are skipped; $3 is an

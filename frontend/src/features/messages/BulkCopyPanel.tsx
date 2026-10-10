@@ -264,7 +264,7 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
                 type="button"
                 onClick={() => applyPreset(key)}
                 disabled={running}
-                className="rounded border border-border px-2 py-0.5 text-[11px] hover:border-border-strong disabled:opacity-50"
+                className="rounded border border-border px-2 py-0.5 text-[11px] hover:border-border-hover disabled:opacity-50"
               >
                 Last {key}
               </button>
@@ -276,7 +276,7 @@ export function BulkCopyPanel({ srcCluster, srcTopic, partitions }: BulkCopyPane
                 setToTs("");
               }}
               disabled={running}
-              className="rounded border border-border px-2 py-0.5 text-[11px] hover:border-border-strong disabled:opacity-50"
+              className="rounded border border-border px-2 py-0.5 text-[11px] hover:border-border-hover disabled:opacity-50"
             >
               Clear
             </button>

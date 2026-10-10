@@ -36,7 +36,7 @@ export function MonoId({
 
   if (!value) {
     return (
-      <span className={cn("text-[var(--color-text-subtle)]", className)} {...rest}>
+      <span className={cn("text-subtle-text", className)} {...rest}>
         {placeholder}
       </span>
     );
@@ -65,7 +65,7 @@ export function MonoId({
       <span
         className={cn(
           "group inline-flex min-w-0 max-w-full items-center align-middle font-mono",
-          muted ? "text-[var(--color-text-muted)]" : undefined,
+          muted ? "text-muted" : undefined,
           className,
         )}
         {...rest}
@@ -78,16 +78,12 @@ export function MonoId({
             onClick={onCopy}
             aria-label={copied ? "Copied" : `Copy to clipboard ${value}`}
             className={cn(
-              "ml-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-[var(--color-text-subtle)]",
+              "ml-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-subtle-text",
               "opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100",
-              "hover:text-[var(--color-text)]",
+              "hover:text-text",
             )}
           >
-            {copied ? (
-              <Check className="h-3 w-3 text-[var(--color-success)]" />
-            ) : (
-              <Copy className="h-3 w-3" />
-            )}
+            {copied ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
           </button>
         ) : null}
       </span>

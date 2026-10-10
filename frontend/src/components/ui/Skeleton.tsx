@@ -21,13 +21,7 @@ export function Skeleton({
   return (
     <div
       aria-hidden="true"
-      className={cn(
-        "animate-pulse bg-[var(--color-surface-subtle)]",
-        height,
-        width,
-        radius[rounded],
-        className,
-      )}
+      className={cn("animate-pulse bg-subtle", height, width, radius[rounded], className)}
       {...rest}
     />
   );

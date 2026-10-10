@@ -44,9 +44,9 @@ export function StatusIcon({
 }
 
 const boxByIntent: Record<OutcomeIntent, string> = {
-  success: "border-success/30 bg-success-subtle text-success",
-  warning: "border-warning/30 bg-warning-subtle text-warning",
-  danger: "border-danger/30 bg-danger-subtle text-danger",
+  success: "border-success/30 bg-tint-green-bg text-success",
+  warning: "border-warning/30 bg-tint-amber-bg text-warning",
+  danger: "border-danger/30 bg-tint-red-bg text-danger",
   info: "border-accent/30 bg-accent-subtle text-accent",
 };
 

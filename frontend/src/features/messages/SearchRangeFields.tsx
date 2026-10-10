@@ -24,7 +24,7 @@ export function SearchRangeFields({ range }: { range: TimeRangeState }) {
         id="search-range"
         value={rangeMode}
         onChange={(e) => setRangeMode(e.target.value as typeof rangeMode)}
-        className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1"
+        className="rounded border border-border bg-panel px-2 py-1"
       >
         <option value="off">off</option>
         <option value="preset">Preset</option>
@@ -40,7 +40,7 @@ export function SearchRangeFields({ range }: { range: TimeRangeState }) {
               className={`rounded border px-2 py-1 ${
                 preset === p
                   ? "border-accent bg-accent-subtle text-accent"
-                  : "border-[var(--color-border)] bg-[var(--color-surface-raised)] hover:border-[var(--color-border-strong)]"
+                  : "border-border bg-panel hover:border-border-hover"
               }`}
             >
               {p === "today" ? "Today" : p === "yesterday" ? "Yesterday" : `Last ${p}`}
@@ -55,7 +55,7 @@ export function SearchRangeFields({ range }: { range: TimeRangeState }) {
             aria-label="Search range from"
             value={customFrom}
             onChange={(e) => setCustomFrom(e.target.value)}
-            className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1"
+            className="rounded border border-border bg-panel px-2 py-1"
           />
           <span>→</span>
           <input
@@ -63,7 +63,7 @@ export function SearchRangeFields({ range }: { range: TimeRangeState }) {
             aria-label="Search range to"
             value={customTo}
             onChange={(e) => setCustomTo(e.target.value)}
-            className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1"
+            className="rounded border border-border bg-panel px-2 py-1"
           />
         </>
       )}

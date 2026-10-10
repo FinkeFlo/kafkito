@@ -8,12 +8,15 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -595,6 +598,7 @@ func TestPrivateClusterMessages_RepeatNoSubmittedValue(t *testing.T) {
 // failure, not the dial error with the address the server tried.
 func TestTestCluster_ConnectionFailureNamesNoAddress(t *testing.T) {
 	t.Parallel()
+	skipIfDialRefused(t, unreachableBroker)
 
 	cfg := config.ClusterConfig{Brokers: []string{unreachableBroker}}
 	body, err := json.Marshal(cfg)
@@ -629,5 +633,21 @@ func TestTestCluster_ConnectionFailureNamesNoAddress(t *testing.T) {
 				assert.NotContains(t, rec.Body.String(), s)
 			}
 		})
+	}
+}
+
+// skipIfDialRefused skips the test when the network answers a dial to the
+// TEST-NET address addr with an immediate refusal instead of letting it time
+// out. Some sandboxes and corporate egress filters do this, and a test of the
+// timeout path cannot exercise it there.
+func skipIfDialRefused(t *testing.T, addr string) {
+	t.Helper()
+	conn, err := net.DialTimeout("tcp", addr, time.Second)
+	if err == nil {
+		_ = conn.Close()
+		return
+	}
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		t.Skipf("this network refuses dials to the unroutable address %s instead of letting them time out", addr)
 	}
 }

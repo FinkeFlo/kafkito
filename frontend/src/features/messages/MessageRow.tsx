@@ -62,23 +62,20 @@ export function MessageRow({
   };
 
   return (
-    <div
-      data-testid="message-row"
-      className="px-4 py-2 text-xs transition-colors hover:bg-[var(--color-surface-hover)]"
-    >
+    <div data-testid="message-row" className="px-4 py-2 text-xs transition-colors hover:bg-hover">
       <button
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         className="flex w-full cursor-pointer flex-wrap items-center gap-2 text-left"
       >
-        <span className="font-mono text-[var(--color-text-subtle)]" aria-hidden="true">
+        <span className="font-mono text-subtle-text" aria-hidden="true">
           {open ? "▾" : "▸"}
         </span>
-        <span className="rounded bg-[var(--color-surface-subtle)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--color-text-muted)]">
+        <span className="rounded bg-subtle px-1.5 py-0.5 font-mono text-[10px] text-muted">
           p{m.partition}
         </span>
-        <span className="rounded bg-[var(--color-surface-subtle)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--color-text-muted)]">
+        <span className="rounded bg-subtle px-1.5 py-0.5 font-mono text-[10px] text-muted">
           #{fmt.number(m.offset)}
         </span>
         <EncodingBadge enc={m.value_encoding} />
@@ -96,21 +93,19 @@ export function MessageRow({
         {m.value_truncated && (
           <span
             title={`Value truncated to 64 KB preview. Original size: ${m.value_size_bytes ? fmt.bytes(m.value_size_bytes) : "unknown"}`}
-            className="rounded bg-[var(--color-surface-subtle)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]"
+            className="rounded bg-subtle px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted"
           >
             preview
           </span>
         )}
-        <Timestamp value={m.timestamp_ms} className="text-[10px] text-[var(--color-text-subtle)]" />
+        <Timestamp value={m.timestamp_ms} className="text-[10px] text-subtle-text" />
         {m.key && (
-          <span className="font-mono text-[var(--color-text-muted)]">
-            <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-subtle)]">
-              key
-            </span>{" "}
+          <span className="font-mono text-muted">
+            <span className="text-[10px] uppercase tracking-wider text-subtle-text">key</span>{" "}
             {m.key.length > 40 ? m.key.slice(0, 40) + "…" : m.key}
           </span>
         )}
-        <span className="flex-1 truncate font-mono text-[var(--color-text)]">{preview}</span>
+        <span className="flex-1 truncate font-mono text-text">{preview}</span>
       </button>
       {open && (
         <div className="mt-3 space-y-3">
@@ -154,7 +149,7 @@ export function MessageRow({
                     e.stopPropagation();
                     setReplayOpen(true);
                   }}
-                  className="rounded border border-[var(--color-border)] px-2 py-1 text-[11px] hover:border-[var(--color-border-strong)]"
+                  className="rounded border border-border px-2 py-1 text-[11px] hover:border-border-hover"
                   title="Replay to another cluster/topic"
                 >
                   Replay to…
@@ -162,7 +157,7 @@ export function MessageRow({
                 <button
                   type="button"
                   onClick={copyValue}
-                  className="rounded border border-[var(--color-border)] px-2 py-1 text-[11px] hover:border-[var(--color-border-strong)]"
+                  className="rounded border border-border px-2 py-1 text-[11px] hover:border-border-hover"
                   title="Copy value to clipboard"
                 >
                   {copied ? "Copied!" : "Copy value"}
@@ -173,13 +168,13 @@ export function MessageRow({
                       type="button"
                       disabled
                       aria-describedby={`download-masked-${m.partition}-${m.offset}`}
-                      className="rounded border border-[var(--color-border)] px-2 py-1 text-[11px] disabled:opacity-50"
+                      className="rounded border border-border px-2 py-1 text-[11px] disabled:opacity-50"
                     >
                       Download full value
                     </button>
                     <span
                       id={`download-masked-${m.partition}-${m.offset}`}
-                      className="text-[11px] text-[var(--color-text-muted)]"
+                      className="text-[11px] text-muted"
                     >
                       Masked values can&apos;t be downloaded.
                     </span>
@@ -190,14 +185,14 @@ export function MessageRow({
                     type="button"
                     onClick={downloadFull}
                     disabled={downloading}
-                    className="rounded border border-[var(--color-border)] px-2 py-1 text-[11px] hover:border-[var(--color-border-strong)] disabled:opacity-50"
+                    className="rounded border border-border px-2 py-1 text-[11px] hover:border-border-hover disabled:opacity-50"
                     title={`Download full value (${m.value_size_bytes ? fmt.bytes(m.value_size_bytes) : "unknown size"})`}
                   >
                     {downloading ? "Downloading…" : "Download full value"}
                   </button>
                 )}
                 {downloadError && (
-                  <span className="inline-flex items-center gap-1 text-[11px] text-[var(--color-danger)]">
+                  <span className="inline-flex items-center gap-1 text-[11px] text-danger">
                     <StatusIcon intent="danger" className="h-3 w-3" />
                     {downloadError}
                   </span>
@@ -234,7 +229,7 @@ function DetailSection({
   return (
     <div>
       <div className="mb-1 flex items-center justify-between gap-2">
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-subtle-text">
           {label}
         </div>
         {action}
@@ -242,18 +237,14 @@ function DetailSection({
       {typeof body === "string" ? (
         <pre
           className={
-            "max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-md bg-[var(--color-surface-subtle)] p-3 font-mono text-[11px] leading-relaxed " +
-            (empty ? "italic text-[var(--color-text-subtle)]" : "text-[var(--color-text)]")
+            "max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-md bg-subtle p-3 font-mono text-[11px] leading-relaxed " +
+            (empty ? "italic text-subtle-text" : "text-text")
           }
         >
           {body}
         </pre>
       ) : (
-        <div
-          className={empty ? "italic text-[var(--color-text-subtle)]" : "text-[var(--color-text)]"}
-        >
-          {body}
-        </div>
+        <div className={empty ? "italic text-subtle-text" : "text-text"}>{body}</div>
       )}
     </div>
   );
@@ -268,7 +259,7 @@ function HeaderLines({
   masked: Set<string>;
 }) {
   return (
-    <ul className="max-h-96 space-y-0.5 overflow-auto rounded-md bg-[var(--color-surface-subtle)] p-3 font-mono text-[11px] leading-relaxed">
+    <ul className="max-h-96 space-y-0.5 overflow-auto rounded-md bg-subtle p-3 font-mono text-[11px] leading-relaxed">
       {Object.entries(headers).map(([k, v]) => (
         <li key={k} data-testid="header-line" className="break-all whitespace-pre-wrap">
           {`${k}: ${v}`}
@@ -286,19 +277,19 @@ function HeaderLines({
 
 function EncodingBadge({ enc }: { enc: string }) {
   const styles: Record<string, string> = {
-    json: "bg-[var(--color-success-subtle)] text-[var(--color-success)]",
-    xml: "bg-[var(--color-success-subtle)] text-[var(--color-success)]",
-    text: "bg-[var(--color-surface-subtle)] text-[var(--color-text)]",
-    binary: "bg-[var(--color-warning-subtle)] text-[var(--color-warning)]",
-    null: "bg-[var(--color-surface-subtle)] text-[var(--color-text-subtle)]",
-    empty: "bg-[var(--color-surface-subtle)] text-[var(--color-text-subtle)]",
-    avro: "bg-[var(--color-info-subtle)] text-[var(--color-info)]",
-    protobuf: "bg-[var(--color-info-subtle)] text-[var(--color-info)]",
-    json_schema: "bg-[var(--color-info-subtle)] text-[var(--color-info)]",
+    json: "bg-tint-green-bg text-success",
+    xml: "bg-tint-green-bg text-success",
+    text: "bg-subtle text-text",
+    binary: "bg-tint-amber-bg text-warning",
+    null: "bg-subtle text-subtle-text",
+    empty: "bg-subtle text-subtle-text",
+    avro: "bg-accent-subtle text-accent",
+    protobuf: "bg-accent-subtle text-accent",
+    json_schema: "bg-accent-subtle text-accent",
   };
   return (
     <span
-      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${styles[enc] || "bg-[var(--color-surface-subtle)] text-[var(--color-text)]"}`}
+      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${styles[enc] || "bg-subtle text-text"}`}
     >
       {enc}
     </span>
@@ -321,7 +312,7 @@ function SRBadge({
   return (
     <span
       title={title}
-      className="rounded bg-[var(--color-info-subtle)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--color-info)]"
+      className="rounded bg-accent-subtle px-1.5 py-0.5 font-mono text-[10px] text-accent"
     >
       sr · {label}
     </span>

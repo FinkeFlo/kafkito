@@ -55,8 +55,11 @@ Sources: `src/index.css`, DESIGN_GUIDELINES § 2 to § 9 and § 12.
   (amber, red likewise). No hex, `rgb()`, `hsl()` or `oklch()` in components;
   no default palette classes (`bg-slate-50`, `text-white`): the palette is
   disabled in `@theme`, so they generate no CSS.
-- Canonical token names, not the transitional aliases `color-surface-*`,
-  `color-text-muted`, `color-text-subtle`, `color-text-on-accent`.
+- Canonical token names only. The transitional aliases (`color-surface-*`,
+  `color-text-muted`, `color-text-subtle`, `color-text-on-accent`) were
+  removed from `index.css`; do not reintroduce them, and never write a
+  token as an arbitrary class (`[var(--color-panel)]`): `tokens.test.ts`
+  fails on both.
 - One accent. `text-accent-foreground` on `bg-accent` and `bg-danger`, never
   white (it turns near-black in dark mode). `border-border-strong` marks
   focused or selected state only; hover uses `border-border-hover`.

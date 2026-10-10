@@ -93,41 +93,41 @@ export function RangePicker({
         className={`rounded border px-2 py-1 text-xs ${
           active
             ? "border-accent bg-accent-subtle text-accent"
-            : "border-[var(--color-border)] hover:border-[var(--color-border-strong)]"
+            : "border-border hover:border-border-hover"
         } disabled:cursor-not-allowed disabled:opacity-50`}
         title="Filter messages by timestamp"
         aria-haspopup="dialog"
         aria-expanded={open}
       >
         {label}
-        <span className="ml-1 text-[var(--color-text-muted)]">▾</span>
+        <span className="ml-1 text-muted">▾</span>
       </button>
       {open && (
         <div
           role="dialog"
           aria-label="Time range picker"
-          className="absolute left-0 top-full z-30 mt-1 grid w-[480px] grid-cols-2 gap-4 rounded-md border border-[var(--color-border)] bg-[var(--color-panel)] p-3 shadow-lg"
+          className="absolute left-0 top-full z-30 mt-1 grid w-[480px] grid-cols-2 gap-4 rounded-md border border-border bg-panel p-3 shadow-lg"
         >
           <div className="flex flex-col gap-2">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted">
               Absolute time range
             </div>
-            <label className="flex flex-col gap-1 text-xs text-[var(--color-text-muted)]">
+            <label className="flex flex-col gap-1 text-xs text-muted">
               From
               <input
                 type="datetime-local"
                 value={draftFrom}
                 onChange={(e) => setDraftFrom(e.target.value)}
-                className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[var(--color-text)]"
+                className="rounded border border-border bg-bg px-2 py-1 text-text"
               />
             </label>
-            <label className="flex flex-col gap-1 text-xs text-[var(--color-text-muted)]">
+            <label className="flex flex-col gap-1 text-xs text-muted">
               To
               <input
                 type="datetime-local"
                 value={draftTo}
                 onChange={(e) => setDraftTo(e.target.value)}
-                className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[var(--color-text)]"
+                className="rounded border border-border bg-bg px-2 py-1 text-text"
               />
             </label>
             <Button
@@ -143,14 +143,14 @@ export function RangePicker({
               <button
                 type="button"
                 onClick={clear}
-                className="rounded border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-text-muted)] hover:border-[var(--color-border-strong)]"
+                className="rounded border border-border px-2 py-1 text-xs text-muted hover:border-border-hover"
               >
                 Any time (clear)
               </button>
             )}
           </div>
           <div className="flex flex-col gap-0.5">
-            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted">
               Quick ranges
             </div>
             {PRESETS.map((p) => (
@@ -161,7 +161,7 @@ export function RangePicker({
                 className={`rounded px-2 py-1 text-left text-xs ${
                   mode === "preset" && preset === p.key
                     ? "bg-accent-subtle text-accent"
-                    : "text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]"
+                    : "text-text hover:bg-hover"
                 }`}
               >
                 {p.label}

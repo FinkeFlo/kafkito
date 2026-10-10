@@ -24,9 +24,10 @@ anything or run builds. Use Bash only for read-only git commands such as
 ## Checklist
 
 - Tokens: only `@theme` utilities; no hex, `rgb()`, `hsl()`, `oklch()`, no
-  default palette classes (they generate no CSS), no transitional aliases
-  (`color-surface-*`, `color-text-muted`, `color-text-subtle`,
-  `color-text-on-accent`), every `var(--color-*)` declared in `index.css`.
+  default palette classes (they generate no CSS), none of the removed
+  transitional aliases (`color-surface-*`, `color-text-muted`,
+  `color-text-subtle`, `color-text-on-accent`), no arbitrary
+  `[var(--color-*)]` classes, every `var(--color-*)` declared in `index.css`.
 - One accent; `text-accent-foreground` on `bg-accent`/`bg-danger`;
   `border-border-strong` only for focused or selected, `border-border-hover`
   for hover.

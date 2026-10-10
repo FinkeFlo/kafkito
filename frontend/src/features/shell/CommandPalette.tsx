@@ -340,19 +340,15 @@ export function CommandPalette() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh]">
-      <div
-        aria-hidden="true"
-        className="fixed inset-0 bg-[var(--color-text)]/50"
-        onClick={() => setOpen(false)}
-      />
+      <div aria-hidden="true" className="fixed inset-0 bg-text/50" onClick={() => setOpen(false)} />
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
-        className="relative w-full max-w-xl overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-2xl"
+        className="relative w-full max-w-xl overflow-hidden rounded-xl border border-border bg-panel shadow-2xl"
       >
-        <div className="flex items-center gap-2 border-b border-[var(--color-border)] px-3 py-2">
-          <Search className="h-4 w-4 text-[var(--color-text-subtle)]" />
+        <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+          <Search className="h-4 w-4 text-subtle-text" />
           <input
             ref={inputRef}
             aria-label="Find anything"
@@ -374,15 +370,13 @@ export function CommandPalette() {
             placeholder="Find anything: topic, group, broker, subject, user, cluster…"
             className="flex-1 bg-transparent text-sm"
           />
-          <kbd className="rounded border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--color-text-muted)]">
+          <kbd className="rounded border border-border bg-subtle px-1.5 py-0.5 font-mono text-[10px] text-muted">
             Esc
           </kbd>
         </div>
         <div className="max-h-[60vh] overflow-y-auto py-1">
           {renderItems.length === 0 && (
-            <div className="p-6 text-center text-sm text-[var(--color-text-muted)]">
-              No results.
-            </div>
+            <div className="p-6 text-center text-sm text-muted">No results.</div>
           )}
           {renderItems.map((it, i) => (
             <button
@@ -392,68 +386,53 @@ export function CommandPalette() {
               onClick={() => pick(it)}
               className={[
                 "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm",
-                i === sel
-                  ? "bg-[var(--color-surface-subtle)]"
-                  : "hover:bg-[var(--color-surface-subtle)]",
+                i === sel ? "bg-subtle" : "hover:bg-subtle",
               ].join(" ")}
             >
-              <span className="w-16 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+              <span className="w-16 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-subtle-text">
                 {CATEGORY_LABELS[it.kind]}
               </span>
               {it.kind === "nav" && it.icon}
-              {it.kind === "group" && (
-                <Users className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />
-              )}
-              {it.kind === "broker" && (
-                <Server className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />
-              )}
-              {it.kind === "subject" && (
-                <FileJson className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />
-              )}
-              {it.kind === "user" && (
-                <UserCog className="h-3.5 w-3.5 text-[var(--color-text-subtle)]" />
-              )}
+              {it.kind === "group" && <Users className="h-3.5 w-3.5 text-subtle-text" />}
+              {it.kind === "broker" && <Server className="h-3.5 w-3.5 text-subtle-text" />}
+              {it.kind === "subject" && <FileJson className="h-3.5 w-3.5 text-subtle-text" />}
+              {it.kind === "user" && <UserCog className="h-3.5 w-3.5 text-subtle-text" />}
               <span className="font-mono">{it.label}</span>
               {it.kind === "cluster" && !it.reachable && (
-                <span className="ml-auto text-[10px] text-[var(--color-danger)]">unreachable</span>
+                <span className="ml-auto text-[10px] text-danger">unreachable</span>
               )}
               {it.kind === "topic" && (
-                <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">
-                  on {it.cluster}
-                </span>
+                <span className="ml-auto text-[10px] text-subtle-text">on {it.cluster}</span>
               )}
               {it.kind === "group" && (
-                <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">
-                  {it.state}
-                </span>
+                <span className="ml-auto text-[10px] text-subtle-text">{it.state}</span>
               )}
               {it.kind === "broker" && (
-                <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">
+                <span className="ml-auto text-[10px] text-subtle-text">
                   {`${it.host}:${it.port}`}
                 </span>
               )}
               {it.kind === "subject" && (
-                <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">
+                <span className="ml-auto text-[10px] text-subtle-text">
                   {`v${it.latest} · ${it.versions} versions`}
                 </span>
               )}
               {it.kind === "user" && (
-                <span className="ml-auto text-[10px] text-[var(--color-text-subtle)]">
+                <span className="ml-auto text-[10px] text-subtle-text">
                   {it.mechanisms || "no mechanism"}
                 </span>
               )}
             </button>
           ))}
         </div>
-        <div className="flex items-center justify-between border-t border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-1.5 text-[10px] text-[var(--color-text-muted)]">
+        <div className="flex items-center justify-between border-t border-border bg-subtle px-3 py-1.5 text-[10px] text-muted">
           <span>
-            <kbd className="rounded bg-[var(--color-surface-raised)] px-1 font-mono">↑↓</kbd>{" "}
-            Navigate ·{" "}
-            <kbd className="rounded bg-[var(--color-surface-raised)] px-1 font-mono">↵</kbd> Open
+            <kbd className="rounded bg-panel px-1 font-mono">↑↓</kbd> Navigate ·{" "}
+            <kbd className="rounded bg-panel px-1 font-mono">↵</kbd> Open
           </span>
           <span>
-            <kbd className="rounded bg-[var(--color-surface-raised)] px-1 font-mono">⌘K</kbd> /{" "}
-            <kbd className="rounded bg-[var(--color-surface-raised)] px-1 font-mono">Ctrl-K</kbd>
+            <kbd className="rounded bg-panel px-1 font-mono">⌘K</kbd> /{" "}
+            <kbd className="rounded bg-panel px-1 font-mono">Ctrl-K</kbd>
           </span>
         </div>
       </div>

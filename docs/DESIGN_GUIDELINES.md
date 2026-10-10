@@ -77,7 +77,7 @@ See `src/index.css` for the canonical values. Category summary:
 
 Notes:
 
-- `text-text-on-accent` is a transitional alias of `text-accent-foreground`. Treat `accent-foreground` as canonical; the alias may be removed in a future release.
+- The transitional aliases (`surface-*`, `text-muted`, `text-subtle`, `text-on-accent`, `*-subtle`, `info`) are gone. Use the canonical names in this table: `bg`, `panel`, `subtle`, `hover`, `muted`, `subtle-text`, `accent-foreground`, `tint-{green,amber,red}-bg`, `accent-subtle`, `accent`.
 - `border-strong` is **never** used for hover affordances any more — that role belongs to `border-hover`. Custom `focus:border-…` rules on inputs are an anti-pattern (see § 9 — let the global `:focus-visible` rule handle it).
 - `focus-on-accent` is consumed by `<Button variant="primary">` and `<Button variant="danger">` to override `outline-color` so the focus indicator stays AA-legible against saturated fills.
 - `overlay` is markedly darker in light mode than the original Direction-A spec. The 2026-04 sweep moved the light value into the modern modal-dimmer range to fix a dark-mode invisible-scrim regression; the heavier scrim is intentional in both modes.
@@ -101,6 +101,8 @@ Notes:
 <div style={{ background: "#ffffff", borderColor: "#e5e7eb" }}>
 // ❌ inline style with var() when a utility exists
 <div style={{ background: "var(--color-panel)" }}>
+// ❌ arbitrary var() class when a utility exists
+<div className="bg-[var(--color-panel)] text-[var(--color-muted)]">
 ```
 
 The only case where `style={{ color: "var(--color-xxx)" }}` is acceptable
@@ -518,7 +520,7 @@ unless each has been implemented and visually checked.
   - ✅ Selected rows get a check mark or bold text, not just a tint.
   - ❌ `<span className="h-2 w-2 rounded-full bg-danger" />` next to a
     name, with a green twin for "OK".
-  - ❌ `<div className="bg-success-subtle text-success">{message}</div>`
+  - ❌ `<div className="bg-tint-green-bg text-success">{message}</div>`
     vs. the same box in `danger` for failures.
   - ❌ `+`/`−` prefixes that mean "good"/"bad" rather than a real
     increase or decrease.
@@ -682,6 +684,8 @@ mutations, SCRAM rotate). Setup + scope: `frontend/e2e/README.md`.
 1. ❌ Hard-coded hex values, rgb(), or hsl() in component code.
 2. ❌ Default Tailwind palette classes (`bg-slate-*`, `text-gray-*`,
    `border-zinc-*`). They are disabled in `@theme` and generate no CSS.
+   Arbitrary token values (`bg-[var(--color-panel)]`) are out too: use the
+   utility (`bg-panel`). `src/__checks__/tokens.test.ts` fails on them.
 3. ❌ `max-w-6xl` on data-dense pages.
 4. ❌ Per-page cluster picker.
 5. ❌ Adding a dependency without discussion.
@@ -729,6 +733,8 @@ a review, treat it as drift and bring it in line.
 | 2026-09-28 | Accessibility follow-ups: clickable table rows keep role row with a real link/button in the primary cell; `useFieldError` wires `aria-invalid` + `aria-describedby`; no skipped heading levels; axe gate raised to `moderate` | (this PR — link added by author) |
 | 2026-10-01 | Topic list polish: new `<FilterSelect>` primitive; `<DataTable>` gains controlled `sort` and `clickableRows`; `<Modal>` gains `onSubmit`. Kept deviation from § 8.4: a permission gap that only costs one column is a one-time toast, not a banner | (this PR — link added by author) |
 | 2026-10-09 | `<DataTable>` sortable column headers stay uppercase like the rest of the header row: the sort `<button>` restates `uppercase`, which browsers reset on buttons (#159) | (this PR — link added by author) |
+| 2026-10-10 | Token utilities everywhere: every arbitrary `[var(--color-*)]` class replaced by its utility (`bg-panel`, `text-muted`), guarded by `tokens.test.ts`; transitional aliases removed from `index.css`; hover borders on controls move from `border-strong` to `border-hover` (§ 2.1) | (this PR — link added by author) |
+| 2026-10-10 | Topic configs tab on the primitives: `<Card>`, `<Button>` for Edit / Close / Apply, the edit dialog is a `<Modal>` (focus trap, Escape, `bg-overlay` scrim) with labelled `<Input>`s; a read-only Edit names its reason in visible text wired via `aria-describedby` instead of `title=` | (this PR — link added by author) |
 | 2026-10-10 | Docs only: § 0 points coding agents to `frontend/AGENTS.md`, a distilled copy of these rules; this file stays canonical | (this PR — link added by author) |
 
 Add a row on every change. Small tweaks to tokens or primitives are

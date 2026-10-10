@@ -1,8 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { alterTopicConfigs, can, type Capabilities, type TopicConfigEntry } from "@/lib/api";
 import { useAuth } from "@/auth/hooks";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
 import { Notice } from "@/components/ui/Notice";
 import { StatusBox, StatusIcon } from "@/components/ui/StatusIcon";
 import { clusterQueries } from "@/lib/queries/clusters";
@@ -29,7 +33,7 @@ function ConfigsTab() {
   });
 
   if (detailQuery.isLoading && cluster) {
-    return <div className="text-sm text-[var(--color-text-muted)]">Loading…</div>;
+    return <div className="text-sm text-muted">Loading…</div>;
   }
 
   if (!detailQuery.data) return null;
@@ -84,18 +88,12 @@ function ConfigsTable({
   const alterReason = !rbacAllowsEdit
     ? "forbidden by RBAC policy"
     : (caps?.errors?.alter_configs ?? "ALTER_CONFIGS on TOPIC required");
+  const editBlocked = !disabled && !canAlter;
+  const editReasonId = useId();
 
   return (
-    <div
-      className={[
-        "rounded-lg border shadow-sm transition",
-        disabled
-          ? "border-[var(--color-border)] bg-[var(--color-surface-subtle)] opacity-75"
-          : "border-[var(--color-border)] bg-[var(--color-surface-raised)]",
-      ].join(" ")}
-      aria-disabled={disabled}
-    >
-      <div className="flex items-center justify-between border-b border-[var(--color-border)] p-3">
+    <Card flush className={disabled ? "bg-subtle opacity-75" : undefined} aria-disabled={disabled}>
+      <div className="flex items-center justify-between border-b border-border p-3">
         <div className="flex items-center gap-2 text-sm font-semibold">
           Configuration
           {disabled && (
@@ -114,7 +112,7 @@ function ConfigsTable({
         <div className="flex items-center gap-3">
           <label
             className={[
-              "flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]",
+              "flex items-center gap-1.5 text-xs text-muted",
               disabled ? "pointer-events-none opacity-50" : "",
             ].join(" ")}
           >
@@ -127,31 +125,36 @@ function ConfigsTable({
             />
             Show defaults ({configs.length})
           </label>
-          <button
-            type="button"
+          {editBlocked && (
+            <span id={editReasonId} className="text-xs text-muted">
+              Read-only: {alterReason}
+            </span>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setEditOpen(true)}
             disabled={disabled || !canAlter}
-            title={!canAlter && !disabled ? alterReason : undefined}
-            className="rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] px-2 py-1 text-xs hover:border-[var(--color-border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+            aria-describedby={editBlocked ? editReasonId : undefined}
           >
             Edit…
-          </button>
+          </Button>
         </div>
       </div>
       {disabled ? (
-        <div className="p-6 text-center text-sm text-[var(--color-text-muted)]">
+        <div className="p-6 text-center text-sm text-muted">
           Topic configuration is hidden because the configured Kafka user lacks the{" "}
           <code className="font-mono text-xs">DESCRIBE_CONFIGS</code> permission on topics on this
           cluster.
           {caps?.errors?.describe_configs && (
-            <div className="mt-2 font-mono text-[11px] text-[var(--color-text-subtle)]">
+            <div className="mt-2 font-mono text-[11px] text-subtle-text">
               {caps.errors.describe_configs}
             </div>
           )}
         </div>
       ) : (
         <table className="w-full text-sm">
-          <thead className="border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-left text-xs uppercase tracking-wider text-[var(--color-text-muted)]">
+          <thead className="border-b border-border bg-subtle text-left text-xs uppercase tracking-wider text-muted">
             <tr>
               <th className="px-4 py-2 font-semibold">Key</th>
               <th className="px-4 py-2 font-semibold">Value</th>
@@ -161,22 +164,18 @@ function ConfigsTable({
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={3} className="px-4 py-8 text-center text-[var(--color-text-subtle)]">
+                <td colSpan={3} className="px-4 py-8 text-center text-subtle-text">
                   {showDefaults ? "No configs." : "No non-default overrides."}
                 </td>
               </tr>
             ) : (
               filtered.map((c) => (
-                <tr key={c.name} className="border-b border-[var(--color-border)] last:border-0">
+                <tr key={c.name} className="border-b border-border last:border-0">
                   <td className="px-4 py-2 font-mono text-xs">{c.name}</td>
                   <td className="px-4 py-2 font-mono text-xs">
-                    {c.sensitive ? (
-                      <span className="text-[var(--color-text-subtle)]">•••</span>
-                    ) : (
-                      c.value
-                    )}
+                    {c.sensitive ? <span className="text-subtle-text">•••</span> : c.value}
                   </td>
-                  <td className="px-4 py-2 text-xs text-[var(--color-text-muted)]">
+                  <td className="px-4 py-2 text-xs text-muted">
                     {c.source || (c.is_default ? "default" : "override")}
                   </td>
                 </tr>
@@ -193,7 +192,7 @@ function ConfigsTable({
           onClose={() => setEditOpen(false)}
         />
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -244,145 +243,138 @@ function EditConfigsModal({
   const hasChanges = rows.some((r) => r.op !== "keep") || (newKey.trim() !== "" && newValue !== "");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-[var(--color-accent)]/40 p-6">
-      <div className="w-full max-w-3xl rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-xl">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Edit configuration — {topic}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-[var(--color-text-subtle)] hover:text-[var(--color-text)]"
-          >
-            ✕
-          </button>
-        </div>
-        <div className="space-y-2">
-          <div className="text-xs font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
-            Current overrides
-          </div>
-          {rows.length === 0 ? (
-            <div className="text-sm text-[var(--color-text-muted)]">No non-default overrides.</div>
-          ) : (
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-[var(--color-border)]">
-                {rows.map((r, i) => (
-                  <tr key={r.name}>
-                    <td className="py-1 pr-2 font-mono text-xs">{r.name}</td>
-                    <td className="py-1 pr-2">
-                      <input
-                        type="text"
-                        value={r.value}
-                        disabled={r.op === "delete"}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setRows((prev) => {
-                            const next = [...prev];
-                            next[i] = {
-                              ...next[i],
-                              value: v,
-                              op: v !== overrides[i].value ? "set" : "keep",
-                            };
-                            return next;
-                          });
-                        }}
-                        className="w-full rounded border border-[var(--color-border)] px-2 py-1 font-mono text-xs disabled:bg-[var(--color-surface-subtle)]"
-                      />
-                    </td>
-                    <td className="py-1 pr-2 text-xs">
-                      <select
-                        value={r.op}
-                        onChange={(e) =>
-                          setRows((prev) => {
-                            const next = [...prev];
-                            next[i] = {
-                              ...next[i],
-                              op: e.target.value as "set" | "delete" | "keep",
-                            };
-                            return next;
-                          })
-                        }
-                        className="rounded border border-[var(--color-border)] px-1.5 py-0.5 text-xs"
-                      >
-                        <option value="keep">keep</option>
-                        <option value="set">set</option>
-                        <option value="delete">delete (reset)</option>
-                      </select>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          <div className="mt-4 text-xs font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
-            Add / override key
-          </div>
-          <div className="flex gap-2">
-            <input
-              placeholder="key (e.g. retention.ms)"
-              value={newKey}
-              onChange={(e) => setNewKey(e.target.value)}
-              className="flex-1 rounded border border-[var(--color-border)] px-2 py-1 font-mono text-xs"
-            />
-            <input
-              placeholder="value"
-              value={newValue}
-              onChange={(e) => setNewValue(e.target.value)}
-              className="flex-1 rounded border border-[var(--color-border)] px-2 py-1 font-mono text-xs"
-            />
-          </div>
-        </div>
-
-        {mut.error && (
-          <StatusBox intent="danger" className="mt-3 px-3 py-2">
-            {(mut.error as Error).message}
-          </StatusBox>
-        )}
-        {results && (
-          <div className="mt-3">
-            <div className="text-xs font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
-              Results
-            </div>
-            <ul className="mt-1 space-y-0.5 text-sm">
-              {results.map((r, i) => (
-                <li key={i} className="flex items-center justify-between">
-                  <span className="font-mono text-xs">
-                    {r.op} {r.name}
-                  </span>
-                  {r.error ? (
-                    <span className="inline-flex items-center gap-1 text-xs text-[var(--color-danger)]">
-                      <StatusIcon intent="danger" className="h-3 w-3" />
-                      {r.error}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-xs text-[var(--color-success)]">
-                      <StatusIcon intent="success" className="h-3 w-3" />
-                      ok
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] px-3 py-1.5 text-sm hover:border-[var(--color-border-strong)]"
-          >
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      title={
+        <>
+          Edit configuration — <span className="font-mono">{topic}</span>
+        </>
+      }
+      onSubmit={() => {
+        if (hasChanges && !mut.isPending) mut.mutate();
+      }}
+      actions={
+        <>
+          <Button variant="secondary" onClick={onClose}>
             Close
-          </button>
-          <button
-            type="button"
-            onClick={() => mut.mutate()}
-            disabled={!hasChanges || mut.isPending}
-            className="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-sm text-[var(--color-text-on-accent)] disabled:opacity-50"
-          >
+          </Button>
+          <Button type="submit" disabled={!hasChanges} loading={mut.isPending}>
             {mut.isPending ? "Applying…" : "Apply"}
-          </button>
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-2">
+        <div className="text-xs font-medium uppercase tracking-wider text-muted">
+          Current overrides
+        </div>
+        {rows.length === 0 ? (
+          <div className="text-sm text-muted">No non-default overrides.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <tbody className="divide-y divide-border">
+              {rows.map((r, i) => (
+                <tr key={r.name}>
+                  <td className="py-1 pr-2 font-mono text-xs">{r.name}</td>
+                  <td className="py-1 pr-2">
+                    <Input
+                      aria-label={`Value for ${r.name}`}
+                      value={r.value}
+                      disabled={r.op === "delete"}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setRows((prev) => {
+                          const next = [...prev];
+                          next[i] = {
+                            ...next[i],
+                            value: v,
+                            op: v !== overrides[i].value ? "set" : "keep",
+                          };
+                          return next;
+                        });
+                      }}
+                      className="h-8 px-2 font-mono text-xs"
+                    />
+                  </td>
+                  <td className="py-1 pr-2 text-xs">
+                    <select
+                      aria-label={`Change for ${r.name}`}
+                      value={r.op}
+                      onChange={(e) =>
+                        setRows((prev) => {
+                          const next = [...prev];
+                          next[i] = {
+                            ...next[i],
+                            op: e.target.value as "set" | "delete" | "keep",
+                          };
+                          return next;
+                        })
+                      }
+                      className="h-8 rounded-md border border-border bg-panel px-2 text-xs text-text hover:border-border-hover"
+                    >
+                      <option value="keep">keep</option>
+                      <option value="set">set</option>
+                      <option value="delete">delete (reset)</option>
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <div className="mt-4 text-xs font-medium uppercase tracking-wider text-muted">
+          Add / override key
+        </div>
+        <div className="flex gap-2">
+          <Input
+            aria-label="New config key"
+            placeholder="key (e.g. retention.ms)"
+            value={newKey}
+            onChange={(e) => setNewKey(e.target.value)}
+            className="h-8 px-2 font-mono text-xs"
+          />
+          <Input
+            aria-label="New config value"
+            placeholder="value"
+            value={newValue}
+            onChange={(e) => setNewValue(e.target.value)}
+            className="h-8 px-2 font-mono text-xs"
+          />
         </div>
       </div>
-    </div>
+
+      {mut.error && (
+        <StatusBox intent="danger" className="mt-3 px-3 py-2">
+          {(mut.error as Error).message}
+        </StatusBox>
+      )}
+      {results && (
+        <div className="mt-3">
+          <div className="text-xs font-medium uppercase tracking-wider text-muted">Results</div>
+          <ul className="mt-1 space-y-0.5 text-sm">
+            {results.map((r, i) => (
+              <li key={i} className="flex items-center justify-between">
+                <span className="font-mono text-xs">
+                  {r.op} {r.name}
+                </span>
+                {r.error ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-danger">
+                    <StatusIcon intent="danger" className="h-3 w-3" />
+                    {r.error}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs text-success">
+                    <StatusIcon intent="success" className="h-3 w-3" />
+                    ok
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Modal>
   );
 }
