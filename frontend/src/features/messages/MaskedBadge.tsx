@@ -8,7 +8,7 @@ export function MaskedBadge({ label = "masked", title }: { label?: string; title
   return (
     <span
       title={title}
-      className="inline-flex items-center gap-1 rounded bg-[var(--color-warning-subtle)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-warning)]"
+      className="inline-flex items-center gap-1 rounded bg-tint-amber-bg px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-warning"
     >
       <EyeOff aria-hidden="true" className="h-3 w-3 shrink-0" />
       {label}

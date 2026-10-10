@@ -83,10 +83,7 @@ export function MessageRangeCountPreview({
       : "Approximate message count for the selected range. Live traffic may shift this slightly.";
 
   return (
-    <div
-      ref={wrapRef}
-      className="relative flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]"
-    >
+    <div ref={wrapRef} className="relative flex items-center gap-1.5 text-xs text-muted">
       <span className={labelClass} title={tooltip}>
         {label}
       </span>

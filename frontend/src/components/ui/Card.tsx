@@ -12,7 +12,7 @@ export function Card({ className, hero, flush, children, ...rest }: CardProps) {
   return (
     <div
       className={cn(
-        "rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)]",
+        "rounded-xl border border-border bg-panel",
         !flush && (hero ? "p-5" : "p-4"),
         className,
       )}

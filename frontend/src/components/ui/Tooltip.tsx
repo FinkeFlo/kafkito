@@ -44,14 +44,14 @@ export function Tooltip({
           sideOffset={6}
           collisionPadding={8}
           className={cn(
-            "z-50 max-w-[min(90vw,560px)] rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2.5 py-1.5 text-xs text-[var(--color-text)] shadow-lg",
+            "z-50 max-w-[min(90vw,560px)] rounded-md border border-border bg-panel px-2.5 py-1.5 text-xs text-text shadow-lg",
             "data-[state=delayed-open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=delayed-open]:fade-in-0",
             "select-text",
             contentClassName,
           )}
         >
           {content}
-          <RadixTooltip.Arrow className="fill-[var(--color-surface-raised)]" />
+          <RadixTooltip.Arrow className="fill-panel" />
         </RadixTooltip.Content>
       </RadixTooltip.Portal>
     </RadixTooltip.Root>

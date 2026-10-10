@@ -11,7 +11,7 @@ export function MessageList({
   onPick: (trail: Token[], leafValue: unknown) => void;
 }) {
   return (
-    <div className="divide-y divide-[var(--color-border)]">
+    <div className="divide-y divide-border">
       {messages.map((m) => (
         <MessageRow key={`${m.partition}-${m.offset}`} m={m} onPick={onPick} />
       ))}

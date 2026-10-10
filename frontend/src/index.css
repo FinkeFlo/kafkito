@@ -42,12 +42,12 @@
    * `--color-accent-hover`. Pure white passes 4.5:1 against both light-
    * mode accent values; the dark-mode override below pins a near-black
    * value for the lighter dark accent. Primitives (`<Button>`) consume
-   * this token instead of `--color-text-on-accent`. */
+   * this token. */
   --color-accent-foreground: oklch(1 0 0);
 
   /* Semantic — light values lifted from 0.72/0.62/0.58 so they clear
-   * 4.5:1 against `*-subtle` tinted surfaces. Dark variants are
-   * untouched (already pass on dark `*-subtle`). Note: non-text uses (`bg-success` / `bg-warning` / `bg-danger` swatches
+   * 4.5:1 against the `tint-*-bg` surfaces. Dark variants are
+   * untouched (already pass on the dark `tint-*-bg`). Note: non-text uses (`bg-success` / `bg-warning` / `bg-danger` swatches
    * in `StatusDot.tsx`) now sit
    * on darker fills than before; if they read visually dim, switch
    * those callsites to a brighter shade or, longer-term, introduce
@@ -69,23 +69,8 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
-  /*
-   * Transitional aliases. Older components still reference these names
-   * via `var(--color-surface)` / `text-[var(--color-text-muted)]`.
-   * Remove after every file has been migrated to Direction A utilities.
-   */
-  --color-surface:          var(--color-bg);
-  --color-surface-raised:   var(--color-panel);
-  --color-surface-subtle:   var(--color-subtle);
-  --color-surface-hover:    var(--color-hover);
-  --color-text-muted:       var(--color-muted);
-  --color-text-subtle:      var(--color-subtle-text);
-  --color-text-on-accent:   var(--color-accent-foreground);
-  --color-danger-subtle:    var(--color-tint-red-bg);
-  --color-success-subtle:   var(--color-tint-green-bg);
-  --color-warning-subtle:   var(--color-tint-amber-bg);
-  --color-info-subtle:      var(--color-accent-subtle);
-  --color-info:             var(--color-accent);
+  /* Focus ring. Follows the accent; primary and danger buttons switch
+   * to `--color-focus-on-accent` so the ring stays visible on the fill. */
   --color-focus:            var(--color-accent);
   --color-focus-on-accent:  var(--color-accent-foreground);
   /* Light-mode overlay was `oklch(0.18 0.02 250 / 0.45)` (≈40% black).
@@ -117,7 +102,7 @@ html.dark {
    * therefore has to be dark, not white — `oklch(0.18 …)` clears
    * 6.92:1 against `--color-accent` and 8.12:1 against
    * `--color-accent-hover`. Components must consume `text-accent-foreground`
-   * (or the alias `text-text-on-accent`) on `bg-accent` surfaces; using
+   * on `bg-accent` surfaces; using
    * `text-text` there fails AA (callsite bug, see allow-list). */
   --color-accent-foreground: oklch(0.18 0.02 252);
   --color-success:        oklch(0.72  0.16  152);

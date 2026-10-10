@@ -5,9 +5,9 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 // Every `var(--color-X)` reference in src must point to a `--color-X` token
-// declared in src/index.css (either the @theme block or the html.dark block).
-// Tailwind emits arbitrary values such as `bg-[var(...)]` verbatim, so a
-// typo there silently renders nothing.
+// declared in src/index.css (either the @theme block or the html.dark block);
+// a typo there silently renders nothing. Class names use the token utilities
+// (`bg-panel`, `text-muted`), never an arbitrary `bg-[var(...)]` value.
 
 const SRC_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 const INDEX_CSS = join(SRC_DIR, "index.css");
@@ -47,5 +47,18 @@ describe("color tokens", () => {
         });
     }
     expect(unknown).toEqual([]);
+  });
+
+  it("no class uses an arbitrary var(--color-*) value instead of the token utility", () => {
+    const arbitrary: string[] = [];
+    for (const file of sourceFiles()) {
+      readFileSync(file, "utf8")
+        .split("\n")
+        .forEach((line, i) => {
+          for (const m of line.matchAll(/\S*\[var\(--color-[a-z0-9-]+\)\]\S*/g))
+            arbitrary.push(`src/${file.slice(SRC_DIR.length + 1)}:${i + 1}: ${m[0]}`);
+        });
+    }
+    expect(arbitrary).toEqual([]);
   });
 });

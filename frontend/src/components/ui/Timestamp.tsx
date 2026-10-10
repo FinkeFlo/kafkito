@@ -23,7 +23,7 @@ export function Timestamp({ value, zone, className }: TimestampProps) {
     <time
       dateTime={iso === "—" ? undefined : iso}
       title={iso === "—" ? undefined : iso}
-      className={cn("font-mono text-xs text-[var(--color-text)]", className)}
+      className={cn("font-mono text-xs text-text", className)}
     >
       {text}
     </time>

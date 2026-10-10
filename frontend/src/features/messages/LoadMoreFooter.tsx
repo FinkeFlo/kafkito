@@ -16,12 +16,12 @@ export function LoadMoreFooter({
         type="button"
         onClick={onLoadMore}
         disabled={loading}
-        className="rounded-md border border-[var(--color-border)] bg-[var(--color-panel)] px-4 py-2 text-sm font-medium text-[var(--color-text)] transition-colors hover:border-[var(--color-border-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+        className="rounded-md border border-border bg-panel px-4 py-2 text-sm font-medium text-text transition-colors hover:border-border-hover disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loading ? "Loading…" : "Load more"}
       </button>
       {error && (
-        <div className="flex items-center gap-1 text-xs text-[var(--color-danger)]">
+        <div className="flex items-center gap-1 text-xs text-danger">
           <StatusIcon intent="danger" />
           {error}
         </div>

@@ -81,13 +81,13 @@ function TopicTimelinePage() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4">
+      <div className="rounded-lg border border-border bg-panel p-4">
         <div className="flex flex-wrap items-end gap-3">
-          <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+          <div className="flex items-center gap-1.5 text-xs text-muted">
             <span id="timeline-range">Range</span>
             <fieldset
               aria-labelledby="timeline-range"
-              className="inline-flex min-w-0 overflow-hidden rounded border border-[var(--color-border)]"
+              className="inline-flex min-w-0 overflow-hidden rounded border border-border"
             >
               {PRESET_OPTIONS.map((p, i) => (
                 <button
@@ -99,10 +99,8 @@ function TopicTimelinePage() {
                   }}
                   aria-pressed={preset === p.key}
                   title={`Time slots: ${p.key === "24h" ? "hourly" : "daily"}`}
-                  className={`px-2 py-1 text-xs ${i > 0 ? "border-l border-[var(--color-border)]" : ""} ${
-                    preset === p.key
-                      ? "bg-accent-subtle text-accent"
-                      : "text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]"
+                  className={`px-2 py-1 text-xs ${i > 0 ? "border-l border-border" : ""} ${
+                    preset === p.key ? "bg-accent-subtle text-accent" : "text-text hover:bg-hover"
                   }`}
                 >
                   {p.label}
@@ -110,7 +108,7 @@ function TopicTimelinePage() {
               ))}
             </fieldset>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+          <div className="flex items-center gap-1.5 text-xs text-muted">
             <label htmlFor="timeline-partition">Partition</label>
             <select
               id="timeline-partition"
@@ -119,7 +117,7 @@ function TopicTimelinePage() {
                 setPartition(Number(e.target.value));
                 setSelected(null);
               }}
-              className="rounded border border-[var(--color-border)] px-2 py-1 text-xs"
+              className="rounded border border-border px-2 py-1 text-xs"
             >
               <option value={-1}>all</option>
               {topicQuery.data?.partitions.map((p) => (
@@ -129,17 +127,16 @@ function TopicTimelinePage() {
               ))}
             </select>
           </div>
-          <div className="ml-auto text-sm text-[var(--color-text-muted)]">
+          <div className="ml-auto text-sm text-muted">
             {timelineQuery.isLoading && "Loading…"}
             {timelineQuery.isError && (
-              <span className="text-[var(--color-danger)]">
+              <span className="text-danger">
                 Failed to load: {(timelineQuery.error as Error).message}
               </span>
             )}
             {!timelineQuery.isLoading && !timelineQuery.isError && (
               <>
-                approx total:{" "}
-                <span className="font-semibold text-[var(--color-text)]">{fmt.number(total)}</span>
+                approx total: <span className="font-semibold text-text">{fmt.number(total)}</span>
               </>
             )}
           </div>
@@ -147,14 +144,12 @@ function TopicTimelinePage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start">
-        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4">
+        <div className="rounded-lg border border-border bg-panel p-4">
           {timelineQuery.isLoading && (
-            <div className="py-8 text-center text-sm text-[var(--color-text-muted)]">
-              Loading timeline…
-            </div>
+            <div className="py-8 text-center text-sm text-muted">Loading timeline…</div>
           )}
           {!timelineQuery.isLoading && slots.length === 0 && !timelineQuery.isError && (
-            <div className="py-8 text-center text-sm text-[var(--color-text-muted)]">
+            <div className="py-8 text-center text-sm text-muted">
               No data in the selected range.
             </div>
           )}
@@ -290,7 +285,7 @@ function TimelineBarChart({
                   y={chartH + 14}
                   textAnchor="middle"
                   fontSize={9}
-                  fill="var(--color-text-muted)"
+                  fill="var(--color-muted)"
                 >
                   {slotLabel(b, preset, zone).slice(-5)}
                 </text>
@@ -305,13 +300,11 @@ function TimelineBarChart({
           const x = hovered * (barW + barGap) + barW / 2;
           return (
             <div
-              className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1 text-xs text-[var(--color-text)] shadow-md"
+              className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-md border border-border bg-panel px-2 py-1 text-xs text-text shadow-md"
               style={{ left: x, top: chartH / 2 }}
             >
               <div className="font-medium">{slotLabel(b, preset, zone)}</div>
-              <div className="text-[var(--color-text-muted)]">
-                {fmt.number(b.approx_count)} messages
-              </div>
+              <div className="text-muted">{fmt.number(b.approx_count)} messages</div>
             </div>
           );
         })()}
@@ -330,13 +323,13 @@ function TimelineDetailTable({
 }) {
   const fmt = useFormatters();
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4">
-      <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+    <div className="rounded-lg border border-border bg-panel p-4">
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
         Time grid
       </div>
       <div className="max-h-64 overflow-x-auto overflow-y-auto">
         <table className="w-full table-fixed font-mono text-xs">
-          <thead className="sticky top-0 bg-[var(--color-surface-raised)] text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
+          <thead className="sticky top-0 bg-panel text-[10px] uppercase tracking-wider text-muted">
             <tr>
               <th className="w-2/3 text-left">from</th>
               <th className="w-1/3 pl-3 text-right">≈ count</th>
@@ -350,9 +343,7 @@ function TimelineDetailTable({
                 title={`${b.from_ts_ms} – ${b.to_ts_ms}`}
                 className={
                   "cursor-pointer " +
-                  (highlighted === i
-                    ? "bg-[var(--color-surface-subtle)] font-semibold"
-                    : "hover:bg-[var(--color-surface-subtle)]")
+                  (highlighted === i ? "bg-subtle font-semibold" : "hover:bg-subtle")
                 }
               >
                 <td className="truncate">

@@ -16,13 +16,9 @@ export function Section({ title, description, actions, className, children }: Se
         <header className="flex items-end justify-between gap-4">
           <div className="space-y-1">
             {title ? (
-              <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--color-text-muted)]">
-                {title}
-              </h2>
+              <h2 className="text-xs font-medium uppercase tracking-wide text-muted">{title}</h2>
             ) : null}
-            {description ? (
-              <p className="text-sm text-[var(--color-text-muted)]">{description}</p>
-            ) : null}
+            {description ? <p className="text-sm text-muted">{description}</p> : null}
           </div>
           {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
         </header>
