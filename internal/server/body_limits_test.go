@@ -28,13 +28,22 @@ func padJSON(t *testing.T, obj string, n int) string {
 	return s
 }
 
+// sendBodyTimeout bounds one sendBody request. It only guards against a hung
+// handler; a passing request ends well before it. The clock starts before the
+// handler reads the body, so it also covers validating and decoding a body at
+// the 15 MiB produce limit, which takes several seconds under -race on a small
+// machine. A tighter bound expires the produce context derived from it and
+// turns that slowness into a spurious 502. The handlers' own timeouts start
+// after the body is decoded and are not affected.
+const sendBodyTimeout = 60 * time.Second
+
 func sendBody(h http.Handler, method, path string, body io.Reader, header map[string]string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, path, body)
 	req.Header.Set("Content-Type", "application/json")
 	for k, v := range header {
 		req.Header.Set(k, v)
 	}
-	ctx, cancel := context.WithTimeout(req.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(req.Context(), sendBodyTimeout)
 	defer cancel()
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req.WithContext(ctx))
