@@ -730,6 +730,7 @@ a review, treat it as drift and bring it in line.
 | 2026-10-01 | Topic list polish: new `<FilterSelect>` primitive; `<DataTable>` gains controlled `sort` and `clickableRows`; `<Modal>` gains `onSubmit`. Kept deviation from § 8.4: a permission gap that only costs one column is a one-time toast, not a banner | (this PR — link added by author) |
 | 2026-10-09 | `<DataTable>` sortable column headers stay uppercase like the rest of the header row: the sort `<button>` restates `uppercase`, which browsers reset on buttons (#159) | (this PR — link added by author) |
 | 2026-10-10 | Token utilities everywhere: every arbitrary `[var(--color-*)]` class replaced by its utility (`bg-panel`, `text-muted`), guarded by `tokens.test.ts`; transitional aliases removed from `index.css`; hover borders on controls move from `border-strong` to `border-hover` (§ 2.1) | (this PR — link added by author) |
+| 2026-10-10 | Topic configs tab on the primitives: `<Card>`, `<Button>` for Edit / Close / Apply, the edit dialog is a `<Modal>` (focus trap, Escape, `bg-overlay` scrim) with labelled `<Input>`s; a read-only Edit names its reason in visible text wired via `aria-describedby` instead of `title=` | (this PR — link added by author) |
 
 Add a row on every change. Small tweaks to tokens or primitives are
 fine; major shifts (new visual language, new nav model) require a design
