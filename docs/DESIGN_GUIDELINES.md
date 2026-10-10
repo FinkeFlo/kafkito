@@ -27,6 +27,10 @@ Before writing any frontend code, do these five things:
 5. Never fabricate backend data. If a field does not exist on the API
    type, render `"—"` and add a `// TODO(backend): …` comment.
 
+`frontend/AGENTS.md` carries a distilled version of these rules for coding
+agents, with the commands and file layout. This document stays canonical;
+when the two disagree, follow this one and fix `frontend/AGENTS.md`.
+
 ---
 
 ## 1 · Stack (immutable)
@@ -734,6 +738,7 @@ a review, treat it as drift and bring it in line.
 | 2026-10-10 | Token utilities everywhere: every arbitrary `[var(--color-*)]` class replaced by its utility (`bg-panel`, `text-muted`), guarded by `tokens.test.ts`; transitional aliases removed from `index.css`; hover borders on controls move from `border-strong` to `border-hover` (§ 2.1) | (this PR — link added by author) |
 | 2026-10-10 | Topic configs tab on the primitives: `<Card>`, `<Button>` for Edit / Close / Apply, the edit dialog is a `<Modal>` (focus trap, Escape, `bg-overlay` scrim) with labelled `<Input>`s; a read-only Edit names its reason in visible text wired via `aria-describedby` instead of `title=` | (this PR — link added by author) |
 | 2026-10-10 | Docs sync with the code: `rounded-sm` is 4 px (Tailwind v4), decided per § 13 in favour of the code (§ 4.3); `h-3.5 w-3.5` icon size for status glyphs, nav tabs and glyphs inside controls (§ 6.6); the colocated-test example names an existing pair, `ConfirmDialog.tsx` + `ConfirmDialog.test.tsx` (§ 10.1) | (this PR — link added by author) |
+| 2026-10-10 | Docs only: § 0 points coding agents to `frontend/AGENTS.md`, a distilled copy of these rules; this file stays canonical | (this PR — link added by author) |
 
 Add a row on every change. Small tweaks to tokens or primitives are
 fine; major shifts (new visual language, new nav model) require a design
