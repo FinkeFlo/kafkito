@@ -27,6 +27,10 @@ Before writing any frontend code, do these five things:
 5. Never fabricate backend data. If a field does not exist on the API
    type, render `"—"` and add a `// TODO(backend): …` comment.
 
+`frontend/AGENTS.md` carries a distilled version of these rules for coding
+agents, with the commands and file layout. This document stays canonical;
+when the two disagree, follow this one and fix `frontend/AGENTS.md`.
+
 ---
 
 ## 1 · Stack (immutable)
@@ -725,6 +729,7 @@ a review, treat it as drift and bring it in line.
 | 2026-09-28 | Accessibility follow-ups: clickable table rows keep role row with a real link/button in the primary cell; `useFieldError` wires `aria-invalid` + `aria-describedby`; no skipped heading levels; axe gate raised to `moderate` | (this PR — link added by author) |
 | 2026-10-01 | Topic list polish: new `<FilterSelect>` primitive; `<DataTable>` gains controlled `sort` and `clickableRows`; `<Modal>` gains `onSubmit`. Kept deviation from § 8.4: a permission gap that only costs one column is a one-time toast, not a banner | (this PR — link added by author) |
 | 2026-10-09 | `<DataTable>` sortable column headers stay uppercase like the rest of the header row: the sort `<button>` restates `uppercase`, which browsers reset on buttons (#159) | (this PR — link added by author) |
+| 2026-10-10 | Docs only: § 0 points coding agents to `frontend/AGENTS.md`, a distilled copy of these rules; this file stays canonical | (this PR — link added by author) |
 
 Add a row on every change. Small tweaks to tokens or primitives are
 fine; major shifts (new visual language, new nav model) require a design

@@ -83,6 +83,20 @@ stage the changes, then commit again. `make check` and CI remain the gate.
 - Frontend layout: primitives in `frontend/src/components/ui/`, domain components in `frontend/src/features/<domain>/`, PascalCase component files (enforced by Biome). See `docs/DESIGN_GUIDELINES.md` § 10.
 - UI strings and code comments are English only. No emojis in UI chrome, logs, or commit messages.
 
+## AI coding agents
+
+`AGENTS.md` and `frontend/AGENTS.md` are the instructions for coding agents
+(Claude Code, Codex, Cursor, Copilot); `CLAUDE.md` and `frontend/CLAUDE.md`
+import them and add what is specific to Claude Code. The shared Claude Code
+configuration is committed: `.claude/settings.json` (permissions and hooks),
+`.claude/hooks/`, `.claude/skills/`, `.claude/agents/` and `.mcp.json`.
+Personal settings belong in `.claude/settings.local.json` and
+`CLAUDE.local.md`, which are gitignored. Agents follow the rules above (DCO
+sign-off, `make check`, no edits to generated files) and open pull requests
+as drafts, because `.github/workflows/auto-merge-from-owner.yml` enables
+auto-merge for every non-draft PR by the owner. When you change a command, a
+path or a convention these files mention, update them in the same PR.
+
 ## Releasing
 
 Releases are cut manually by pushing a signed `v*` tag; everything else is
