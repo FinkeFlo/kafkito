@@ -27,7 +27,7 @@ export function SearchQueryFields({
           id="search-mode"
           value={mode}
           onChange={(e) => setMode(e.target.value as SearchMode)}
-          className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1"
+          className="rounded border border-border bg-panel px-2 py-1"
         >
           <option value="contains">Text contains</option>
           <option value="jsonpath">JSONPath</option>
@@ -75,7 +75,7 @@ export function SearchQueryFields({
               id="search-operator"
               value={op}
               onChange={(e) => setOp(e.target.value as SearchOp)}
-              className="rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1"
+              className="rounded border border-border bg-panel px-2 py-1"
             >
               <option value="exists">exists</option>
               <option value="eq">=</option>
@@ -101,7 +101,7 @@ export function SearchQueryFields({
             value={needle}
             onChange={(e) => setNeedle(e.target.value)}
             placeholder={'parsed && parsed.amount > 1000 && key.startsWith("ord-")'}
-            className="min-h-[2.2rem] w-full flex-1 rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1 font-mono"
+            className="min-h-[2.2rem] w-full flex-1 rounded border border-border bg-panel px-2 py-1 font-mono"
             rows={2}
           />
         ) : (
@@ -116,7 +116,7 @@ export function SearchQueryFields({
                   ? "(ignored)"
                   : "e.g. 42 / shipped / ^A.*"
             }
-            className="w-56 rounded border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1 font-mono"
+            className="w-56 rounded border border-border bg-panel px-2 py-1 font-mono"
             disabled={mode !== "contains" && op === "exists"}
           />
         )}

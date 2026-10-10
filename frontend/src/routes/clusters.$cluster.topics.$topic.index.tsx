@@ -19,12 +19,12 @@ function OverviewTab() {
   });
 
   if (detailQuery.isLoading && cluster) {
-    return <div className="text-sm text-[var(--color-text-muted)]">Loading…</div>;
+    return <div className="text-sm text-muted">Loading…</div>;
   }
 
   if (detailQuery.error) {
     return (
-      <div className="rounded-md border border-[var(--color-danger)]/30 bg-[var(--color-danger-subtle)] p-3 text-sm text-[var(--color-danger)]">
+      <div className="rounded-md border border-danger/30 bg-tint-red-bg p-3 text-sm text-danger">
         Failed to load topic: {(detailQuery.error as Error).message}
       </div>
     );
@@ -61,13 +61,8 @@ function SummaryCards({
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {items.map((i) => (
-        <div
-          key={i.label}
-          className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-3"
-        >
-          <div className="text-xs uppercase tracking-wider text-[var(--color-text-muted)]">
-            {i.label}
-          </div>
+        <div key={i.label} className="rounded-lg border border-border bg-panel p-3">
+          <div className="text-xs uppercase tracking-wider text-muted">{i.label}</div>
           <div className="mt-1 font-mono text-lg tabular-nums">{i.value}</div>
         </div>
       ))}
@@ -77,12 +72,10 @@ function SummaryCards({
 
 function PartitionsTable({ partitions, fmt }: { partitions: PartitionInfo[]; fmt: Formatters }) {
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm">
-      <div className="border-b border-[var(--color-border)] p-3 text-sm font-semibold">
-        Partitions
-      </div>
+    <div className="rounded-lg border border-border bg-panel shadow-sm">
+      <div className="border-b border-border p-3 text-sm font-semibold">Partitions</div>
       <table className="w-full text-sm">
-        <thead className="border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-left text-xs uppercase tracking-wider text-[var(--color-text-muted)]">
+        <thead className="border-b border-border bg-subtle text-left text-xs uppercase tracking-wider text-muted">
           <tr>
             <th className="px-4 py-2 font-semibold">#</th>
             <th className="px-4 py-2 font-semibold">Leader</th>
@@ -95,15 +88,11 @@ function PartitionsTable({ partitions, fmt }: { partitions: PartitionInfo[]; fmt
         </thead>
         <tbody>
           {partitions.map((p) => (
-            <tr key={p.partition} className="border-b border-[var(--color-border)] last:border-0">
+            <tr key={p.partition} className="border-b border-border last:border-0">
               <td className="px-4 py-2 font-mono tabular-nums">{p.partition}</td>
               <td className="px-4 py-2 tabular-nums">{p.leader}</td>
-              <td className="px-4 py-2 font-mono text-xs text-[var(--color-text-muted)]">
-                {p.replicas.join(", ")}
-              </td>
-              <td className="px-4 py-2 font-mono text-xs text-[var(--color-text-muted)]">
-                {p.isr.join(", ")}
-              </td>
+              <td className="px-4 py-2 font-mono text-xs text-muted">{p.replicas.join(", ")}</td>
+              <td className="px-4 py-2 font-mono text-xs text-muted">{p.isr.join(", ")}</td>
               <td className="px-4 py-2 tabular-nums">{p.start_offset}</td>
               <td className="px-4 py-2 tabular-nums">{p.end_offset}</td>
               <td className="px-4 py-2 tabular-nums">{fmt.number(p.messages)}</td>

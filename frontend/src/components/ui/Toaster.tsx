@@ -21,9 +21,8 @@ export function Toaster() {
       offset={24}
       toastOptions={{
         classNames: {
-          toast:
-            "rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-text)] shadow-lg",
-          description: "text-[var(--color-text-muted)]",
+          toast: "rounded-xl border border-border bg-panel text-text shadow-lg",
+          description: "text-muted",
         },
       }}
     />

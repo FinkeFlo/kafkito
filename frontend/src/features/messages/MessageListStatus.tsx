@@ -40,22 +40,20 @@ export function MessageListStatus({
       )}
 
       {empty && searching && (
-        <div className="p-8 text-center text-sm text-[var(--color-text-subtle)]">
+        <div className="p-8 text-center text-sm text-subtle-text">
           Searching… {fmt.number(scanned)} scanned, no match yet.
         </div>
       )}
 
       {empty && !searching && loading && (
-        <div className="p-8 text-center text-sm text-[var(--color-text-subtle)]">
-          Loading messages…
-        </div>
+        <div className="p-8 text-center text-sm text-subtle-text">Loading messages…</div>
       )}
 
       {/* `isLoading` (not `isPending`) is the right guard: the query is
           disabled while a search result is on screen, and a disabled query
           stays `pending` forever — which would hide the "No matches." state. */}
       {empty && !searching && !loading && (
-        <div className="p-8 text-center text-sm text-[var(--color-text-subtle)]">
+        <div className="p-8 text-center text-sm text-subtle-text">
           {hasResult ? "No matches." : "No messages."}
         </div>
       )}

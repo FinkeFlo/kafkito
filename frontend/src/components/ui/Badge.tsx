@@ -9,15 +9,11 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 const variantMap: Record<BadgeVariant, string> = {
-  success:
-    "bg-[var(--color-success-subtle)] text-[var(--color-success)] ring-[var(--color-success)]/30",
-  warning:
-    "bg-[var(--color-warning-subtle)] text-[var(--color-warning)] ring-[var(--color-warning)]/30",
-  danger:
-    "bg-[var(--color-danger-subtle)] text-[var(--color-danger)] ring-[var(--color-danger)]/30",
-  neutral:
-    "bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)] ring-[var(--color-border)]",
-  info: "bg-[var(--color-info-subtle)] text-[var(--color-info)] ring-[var(--color-info)]/30",
+  success: "bg-tint-green-bg text-success ring-success/30",
+  warning: "bg-tint-amber-bg text-warning ring-warning/30",
+  danger: "bg-tint-red-bg text-danger ring-danger/30",
+  neutral: "bg-subtle text-muted ring-border",
+  info: "bg-accent-subtle text-accent ring-accent/30",
 };
 
 export function Badge({

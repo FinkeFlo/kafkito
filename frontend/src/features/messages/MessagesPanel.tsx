@@ -87,7 +87,7 @@ export function MessagesPanel({
   const coachmark = useJsonCoachmark(displayMessages);
 
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm">
+    <div className="rounded-lg border border-border bg-panel shadow-sm">
       <BrowseToolbar
         cluster={cluster}
         topic={topic}

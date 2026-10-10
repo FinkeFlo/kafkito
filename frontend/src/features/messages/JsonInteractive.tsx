@@ -171,7 +171,7 @@ function ArrayNode({
         <button
           type="button"
           onClick={() => setExpanded(true)}
-          className="rounded border border-border bg-panel px-2 py-0.5 text-xs hover:border-border-strong"
+          className="rounded border border-border bg-panel px-2 py-0.5 text-xs hover:border-border-hover"
         >
           {`Show all ${arr.length} items`}
         </button>

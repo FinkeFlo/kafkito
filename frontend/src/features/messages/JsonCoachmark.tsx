@@ -6,7 +6,7 @@ export function JsonCoachmark({ onDismiss }: { onDismiss: () => void }) {
       <button
         type="button"
         onClick={onDismiss}
-        className="ml-auto rounded border border-border px-2 py-0.5 hover:border-border-strong"
+        className="ml-auto rounded border border-border px-2 py-0.5 hover:border-border-hover"
       >
         Got it
       </button>

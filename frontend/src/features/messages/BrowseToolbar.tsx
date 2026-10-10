@@ -67,14 +67,14 @@ export function BrowseToolbar({
   } = useNumberDraft(limit, clampLimit, setLimit);
 
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] p-3">
-      <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+    <div className="flex flex-wrap items-center gap-3 border-b border-border p-3">
+      <div className="flex items-center gap-1.5 text-xs text-muted">
         <label htmlFor="browse-partition">Partition</label>
         <select
           id="browse-partition"
           value={partition}
           onChange={(e) => setPartition(Number(e.target.value))}
-          className="rounded border border-[var(--color-border)] px-2 py-1 text-xs"
+          className="rounded border border-border px-2 py-1 text-xs"
         >
           <option value={-1}>all</option>
           {partitions.map((p) => (
@@ -93,7 +93,7 @@ export function BrowseToolbar({
         onMsgOffsetChange={setMsgOffset}
         disabled={locked}
       />
-      <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+      <div className="flex items-center gap-1.5 text-xs text-muted">
         <label htmlFor="browse-limit">Limit</label>
         <input
           id="browse-limit"
@@ -109,12 +109,12 @@ export function BrowseToolbar({
             }
           }}
           onBlur={commitLimit}
-          className="w-20 rounded border border-[var(--color-border)] px-2 py-1 text-xs"
+          className="w-20 rounded border border-border px-2 py-1 text-xs"
         />
       </div>
       <fieldset
         aria-labelledby="browse-range"
-        className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--color-text-muted)]"
+        className="flex min-w-0 items-center gap-1.5 text-xs text-muted"
       >
         <span id="browse-range">Range</span>
         <RangePicker
@@ -139,20 +139,20 @@ export function BrowseToolbar({
         to_ts_ms={resolvedRange.to_ts_ms}
         live={live}
       />
-      <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+      <div className="flex items-center gap-1.5 text-xs text-muted">
         <label htmlFor="browse-sort">Sort</label>
         <select
           id="browse-sort"
           value={sortOrder}
           onChange={(e) => onSortOrderChange(e.target.value as SortOrder)}
-          className="rounded border border-[var(--color-border)] px-2 py-1 text-xs"
+          className="rounded border border-border px-2 py-1 text-xs"
           title="Order of displayed messages"
         >
           <option value="newest">newest first</option>
           <option value="oldest">oldest first</option>
         </select>
       </div>
-      <label className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+      <label className="flex items-center gap-1.5 text-xs text-muted">
         <input
           type="checkbox"
           checked={live}
@@ -168,7 +168,7 @@ export function BrowseToolbar({
         className={`rounded border px-2 py-1 text-xs ${
           searchOpen
             ? "border-accent bg-accent-subtle text-accent"
-            : "border-[var(--color-border)] hover:border-[var(--color-border-strong)]"
+            : "border-border hover:border-border-hover"
         }`}
       >
         {searchOpen ? "Close search" : "Search"}
@@ -176,12 +176,12 @@ export function BrowseToolbar({
       <button
         type="button"
         onClick={onRefresh}
-        className="ml-auto rounded border border-[var(--color-border)] px-2 py-1 text-xs hover:border-[var(--color-border-strong)]"
+        className="ml-auto rounded border border-border px-2 py-1 text-xs hover:border-border-hover"
         disabled={locked}
       >
         Refresh
       </button>
-      <span data-testid="messages-count" className="text-xs text-[var(--color-text-muted)]">
+      <span data-testid="messages-count" className="text-xs text-muted">
         {count.inSearchMode ? fmt.number(count.matched) : fmt.number(count.shown)}
         {!count.inSearchMode && count.fetching && " · fetching…"}
         {count.searching && ` · ${fmt.number(count.scanned)} scanned · searching…`}

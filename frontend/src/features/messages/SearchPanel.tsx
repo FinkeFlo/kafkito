@@ -27,14 +27,14 @@ export function SearchPanel({
   const { searching, searchResult, searchError, searchStopReason } = search;
 
   return (
-    <div className="space-y-3 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3">
+    <div className="space-y-3 border-b border-border bg-subtle p-3">
       {showUndo && (
         <div className="flex items-center gap-3 rounded border border-border bg-panel p-2 text-xs">
           <span>Path replaced by click.</span>
           <button
             type="button"
             onClick={onUndo}
-            className="rounded border border-border px-2 py-0.5 hover:border-border-strong"
+            className="rounded border border-border px-2 py-0.5 hover:border-border-hover"
           >
             Undo
           </button>

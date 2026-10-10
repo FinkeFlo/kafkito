@@ -37,13 +37,13 @@ export function BrowseFromControl({
   } = useNumberDraft(msgOffset, (raw) => clampOffset(raw, offsetBounds), onMsgOffsetChange);
 
   return (
-    <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+    <div className="flex items-center gap-1.5 text-xs text-muted">
       <label htmlFor="browse-from">From</label>
       <select
         id="browse-from"
         value={from}
         onChange={(e) => onFromChange(e.target.value as BrowseFrom)}
-        className="rounded border border-[var(--color-border)] px-2 py-1 text-xs"
+        className="rounded border border-border px-2 py-1 text-xs"
         disabled={disabled}
       >
         <option value="end">latest</option>
@@ -64,7 +64,7 @@ export function BrowseFromControl({
             }}
             onBlur={commitOffset}
             inputMode="numeric"
-            className="w-20 rounded border border-[var(--color-border)] px-2 py-1 text-xs font-mono"
+            className="w-20 rounded border border-border px-2 py-1 text-xs font-mono"
             placeholder="0"
             disabled={disabled}
             title={
@@ -76,7 +76,7 @@ export function BrowseFromControl({
             }
           />
           {offsetBounds && (
-            <span className="text-[var(--color-text-subtle)]">
+            <span className="text-subtle-text">
               {partition < 0 ? "all · " : ""}
               {fmt.number(offsetBounds.min)}–{fmt.number(offsetBounds.max)}
             </span>

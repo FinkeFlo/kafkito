@@ -38,7 +38,7 @@ function MessagesTab() {
   });
 
   if (!detailQuery.data) {
-    return <div className="text-sm text-[var(--color-text-muted)]">Loading…</div>;
+    return <div className="text-sm text-muted">Loading…</div>;
   }
 
   const partitionNumbers = detailQuery.data.partitions.map((p) => p.partition);
