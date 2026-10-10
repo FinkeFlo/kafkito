@@ -50,6 +50,12 @@ private clusters and error handling, `api-contract-reviewer` for
 - Everything else in `make check` runs. The SessionStart hook prints what is
   ready. Its golangci-lint step falls back to the verified release archive
   when the egress proxy refuses the install script's tag lookup.
+- Two tests in `internal/server` are environment-sensitive here and pass in
+  CI: `TestTestCluster_ConnectionFailureNamesNoAddress` expects a dial to
+  `192.0.2.1` to time out, but the sandbox refuses the connection at once;
+  `TestProduceMessage_BodyLimits` can exceed its produce deadline when the
+  whole suite runs under `-race` (re-run it alone: it passes). Report them as
+  such in the PR; do not change the tests to make them pass here.
 - You act with the repository owner's GitHub identity: open PRs as drafts and
   leave them drafts (see AGENTS.md, "Commits and pull requests").
 
