@@ -63,7 +63,7 @@ Header (one header by its key):
 
 Record key: Mode `Record key`, then an operator and a value, for example `regex` and `^ord-`.
 
-From a message: expand it and use **Search by key** next to the key, or **Search by value** and **Search by header** next to a header line. The search panel opens filled in; **Undo** restores what you had typed before.
+From a message: expand it and click the key, or a header's key (records carrying that header) or value (that exact value), the same way you click a field in the JSON view. A masked header value is not clickable. The search panel opens filled in; **Undo** restores what you had typed before.
 
 Notes:
 - JSONPath filters select nodes; use `exists` to match messages where the expression finds at least one node.
