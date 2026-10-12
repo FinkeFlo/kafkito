@@ -51,14 +51,32 @@ afterEach(() => {
 });
 
 describe("compare selection flow", () => {
-  it("selects a message and shows it in the bar", async () => {
+  it("selects a message, keeps focus on its button and announces it", async () => {
     renderApp(A);
     expect(screen.queryByTestId("compare-tray")).toBeNull();
-    await userEvent.click(await screen.findByRole("button", { name: "Select for compare" }));
+    const button = await screen.findByRole("button", { name: "Select for compare" });
+    await userEvent.click(button);
     expect(getCompareSelection()).toBe("local/orders/0/42");
     const tray = screen.getByRole("complementary", { name: "Message selected for compare" });
     expect(tray).toHaveTextContent("Selected for compare: local / orders · p0 · #42");
     expect(screen.getByText("Selected for compare", { selector: "span" })).toBeVisible();
+    // The same button, now clearing the selection, still has focus.
+    expect(document.activeElement).toBe(button);
+    expect(button).toHaveAccessibleName("Clear selection");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Selected for compare: local / orders · p0 · #42.",
+    );
+  });
+
+  it("clears the selection from the message's own button", async () => {
+    act(() => setCompareSelection(A));
+    renderApp(A);
+    const button = await screen.findByRole("button", { name: "Clear selection" });
+    await userEvent.click(button);
+    expect(getCompareSelection()).toBeNull();
+    expect(document.activeElement).toBe(button);
+    expect(button).toHaveAccessibleName("Select for compare");
+    expect(screen.getByRole("status")).toHaveTextContent("Compare selection cleared.");
   });
 
   it("compares another message with the selected one, remembering where it came from", async () => {
@@ -75,11 +93,14 @@ describe("compare selection flow", () => {
     expect(screen.queryByTestId("compare-tray")).toBeNull();
   });
 
-  it("lets another message replace the selection", async () => {
+  it("lets another message replace the selection, keeping focus", async () => {
     act(() => setCompareSelection(A));
     renderApp(B);
-    await userEvent.click(await screen.findByRole("button", { name: "Select this instead" }));
+    const button = await screen.findByRole("button", { name: "Select this instead" });
+    await userEvent.click(button);
     expect(getCompareSelection()).toBe("other/orders-copy/1/7");
+    expect(document.activeElement).toBe(button);
+    expect(screen.queryByRole("button", { name: "Compare with selected" })).toBeNull();
   });
 
   it("opens the compare page with only message A from the bar", async () => {
@@ -90,12 +111,25 @@ describe("compare selection flow", () => {
     expect(router.state.location.search).toEqual({ a: "local/orders/0/42" });
   });
 
-  it("clears the selection from the bar", async () => {
+  it("clears the selection from the bar and hands focus to the message", async () => {
     act(() => setCompareSelection(A));
-    renderApp(B);
+    renderApp(A);
     await userEvent.click(await screen.findByRole("button", { name: "Clear" }));
     expect(getCompareSelection()).toBeNull();
     expect(screen.queryByTestId("compare-tray")).toBeNull();
-    expect(screen.getByRole("button", { name: "Select for compare" })).toBeVisible();
+    const button = screen.getByRole("button", { name: "Select for compare" });
+    expect(document.activeElement).toBe(button);
+  });
+
+  it("keeps toasts and focused controls clear of the bar", async () => {
+    act(() => setCompareSelection(A));
+    renderApp(B);
+    await screen.findByTestId("compare-tray");
+    const root = document.documentElement;
+    expect(root.style.getPropertyValue("--compare-bar-height")).toMatch(/px$/);
+    expect(root.style.scrollPaddingBottom).toMatch(/px$/);
+    act(() => setCompareSelection(null));
+    expect(root.style.getPropertyValue("--compare-bar-height")).toBe("");
+    expect(root.style.scrollPaddingBottom).toBe("");
   });
 });

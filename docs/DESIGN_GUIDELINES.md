@@ -247,7 +247,11 @@ bypass it.
 - Header with logo and version, cluster pill, ⌘K search, "What's new",
   theme toggle and user menu (timezone and other preferences)
 - Underlined tab bar for primary nav
-- `<Outlet />` for the active route
+- `<Outlet />` for the active route, inside `<main id="main-content">`
+  (focusable, the fallback focus target when a focused control goes away)
+- The compare bar (`features/messages/compare/CompareTray.tsx`) below the
+  outlet while a message is selected for compare, with an always-mounted
+  polite live region for selection changes
 - Manages theme (light/dark) via `useTheme()` in `src/lib/use-theme.ts`
   (re-exported from `src/lib/theme.ts`)
 - Reads the active cluster from the URL path (`/clusters/$cluster/…`) via
@@ -452,7 +456,10 @@ const m = useMutation({
 - Ephemeral state (modal open, unsubmitted form values): `useState`.
 - Cross-route state that doesn't belong in the URL: `localStorage`
   under the namespace `kafkito.*` (e.g. `kafkito.theme`,
-  `kafkito.tailBuffer`). Never unnamespaced keys.
+  `kafkito.tailBuffer`). Never unnamespaced keys. State that belongs to
+  one task in one tab uses `sessionStorage` under the same namespace
+  (`kafkito.compareSelection`, `kafkito.once.*`), with an in-memory
+  fallback when storage throws.
 
 ### 7.4 Missing backend data
 
@@ -567,7 +574,7 @@ src/
 │   └── ui/                  ← generic, domain-free primitives (Button, Modal, DataTable, …)
 ├── features/                ← components that belong to one domain
 │   ├── groups/              ← consumer groups: LagBadge, StateBadge, reset/create modals
-│   ├── messages/            ← message browser: MessageRow, RangePicker, ValueBody, replay, bulk copy; compare/ (message compare page)
+│   ├── messages/            ← message browser: MessageRow, RangePicker, ValueBody, replay, bulk copy; compare/ (compare page, select-for-compare action, compare bar)
 │   └── shell/               ← app chrome rendered by __root: Shell, CommandPalette, ClusterPill, UserMenu, What's new
 ├── lib/
 │   ├── api.ts               ← endpoint functions; don't touch without a backend reason
@@ -745,7 +752,7 @@ a review, treat it as drift and bring it in line.
 | 2026-10-10 | Docs sync with the code: `rounded-sm` is 4 px (Tailwind v4), decided per § 13 in favour of the code (§ 4.3); `h-3.5 w-3.5` icon size for status glyphs, nav tabs and glyphs inside controls (§ 6.6); the colocated-test example names an existing pair, `ConfirmDialog.tsx` + `ConfirmDialog.test.tsx` (§ 10.1) | (this PR — link added by author) |
 | 2026-10-10 | Docs only: § 0 points coding agents to `frontend/AGENTS.md`, a distilled copy of these rules; this file stays canonical | (this PR — link added by author) |
 | 2026-10-12 | Message compare page (`/compare`): `<SegmentedControl>` moves from the user menu to `components/ui/` and marks the selected option with a `border-border-strong` border (§ 6.1); diff lines carry "−" / "+" markers and a spoken "Removed" / "Added", the changed stretch of a line is underlined, so a change never shows by colour alone; contrast pairs for text on the diff tints. § 5.3 and § 12 #4 now allow a form field that names a cluster for its data (Replay, topic copy, compare), the active cluster still changes only through the header pill. Kept deviations: the diff is a hand-built `<table>` in a `rounded-md` code block like the message detail view, not a `<DataTable>`; the new compare actions of a message row match the existing hand-styled message row buttons until that strip moves to `<Button>` | (this PR — link added by author) |
-| 2026-10-12 | Message compare flow: "Select for compare" and "Compare with selected" replace the copy-and-paste start; the message-level actions (Replay to…, compare) move to the head of the expanded message, "Copy value" and "Download" stay with the value; a sticky compare bar (`border-t bg-panel`, no shadow, not a new primitive) shows the selection on every page but `/compare`; the compare page gets a Close button that returns to the page it was opened from | (this PR — link added by author) |
+| 2026-10-12 | Message compare flow: "Select for compare" and "Compare with selected" replace the copy-and-paste start; the message-level actions (Replay to…, compare) move to the head of the expanded message, "Copy value" and "Download" stay with the value; a sticky compare bar (`border-t bg-panel`, no shadow, not a new primitive) shows the selection on every page but `/compare`; the compare page gets a Close button that returns to the page it was opened from. Accessibility: the select / clear button keeps its place, and focus, across states; the bar's live region announces changes; Clear hands focus to the message's own button or `#main-content`; while the bar is shown, `scroll-padding-bottom` and the toaster offset keep focused controls and toasts clear of it, and it has no z-index so in-page popovers stay on top | (this PR — link added by author) |
 
 Add a row on every change. Small tweaks to tokens or primitives are
 fine; major shifts (new visual language, new nav model) require a design

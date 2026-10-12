@@ -189,7 +189,8 @@ export function Shell() {
           )}
         </nav>
       </header>
-      <main className="flex-1">
+      {/* Focus target when a control that had focus goes away (compare bar Clear). */}
+      <main id="main-content" tabIndex={-1} className="flex-1">
         <Outlet />
       </main>
       <CompareTray />

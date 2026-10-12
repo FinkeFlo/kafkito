@@ -18,7 +18,9 @@ export function Toaster() {
       closeButton
       duration={4000}
       visibleToasts={3}
-      offset={24}
+      // Clear of the compare bar while it is shown (it sets the variable).
+      offset={{ right: 24, bottom: "calc(24px + var(--compare-bar-height, 0px))" }}
+      mobileOffset={{ bottom: "calc(16px + var(--compare-bar-height, 0px))" }}
       toastOptions={{
         classNames: {
           toast: "rounded-xl border border-border bg-panel text-text shadow-lg",

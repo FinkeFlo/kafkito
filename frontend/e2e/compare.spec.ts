@@ -35,7 +35,9 @@ test("selects a message, compares another one with it and closes", async ({ page
   await page.goto(listPath);
   const first = await openRow(page, 0);
   await first.getByRole("button", { name: "Select for compare" }).click();
-  await expect(first.getByText("Selected for compare")).toBeVisible();
+  await expect(first.getByRole("button", { name: "Clear selection" })).toBeVisible();
+  // The collapsed row says so too.
+  await expect(first.getByText("selected for compare", { exact: true })).toBeVisible();
   // The list's sort order decides which offset the first row holds.
   await expect(tray(page)).toContainText(`${CLUSTER} / ${SOURCE} · p0 · #`);
 
@@ -88,7 +90,7 @@ test("clears the selection from the compare bar", async ({ page }) => {
 test("closes a compare opened from a link to message A's topic", async ({ page }) => {
   await page.goto(comparePath(ref(SOURCE, 3), ref(SOURCE, 4)));
   await expect(verdict(page)).toHaveText("Different");
-  await expect(page.getByRole("link", { name: "Open in topic" })).toHaveCount(2);
+  await expect(page.getByRole("link", { name: /in its topic$/ })).toHaveCount(2);
   await page.getByRole("button", { name: "Close" }).click();
   await expect(page).toHaveURL(
     new RegExp(`/topics/${SOURCE}/messages\\?.*from=offset.*msgOffset=3`),
