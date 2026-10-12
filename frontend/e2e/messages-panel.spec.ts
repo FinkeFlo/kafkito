@@ -418,6 +418,8 @@ test.describe("Messages panel — search form", () => {
     await expect(mode).toHaveValue("contains");
     await expect(mode.locator("option")).toHaveText([
       "Text contains",
+      "Record key",
+      "Header",
       "JSONPath",
       "XPath",
       "JavaScript",
@@ -437,6 +439,7 @@ test.describe("Messages panel — search form", () => {
     await expect(op).toHaveValue("contains");
     await expect(op.locator("option")).toHaveText([
       "exists",
+      "missing",
       "=",
       "≠",
       "contains",
@@ -463,6 +466,19 @@ test.describe("Messages panel — search form", () => {
 
     await mode.selectOption("xpath");
     await expect(page.getByPlaceholder("//order/@status")).toBeVisible();
+
+    // Record key and Header compare with the operator but take no path; a
+    // header search needs its header key.
+    await mode.selectOption("key");
+    await expect(page.getByLabel("Path", { exact: true })).toHaveCount(0);
+    await expect(op).toBeVisible();
+    await expect(run).toBeEnabled();
+    await mode.selectOption("header");
+    const headerKey = page.getByRole("combobox", { name: "Header key", exact: true });
+    await expect(headerKey).toBeVisible();
+    await expect(run).toBeDisabled();
+    await headerKey.fill("x-e2e");
+    await expect(run).toBeEnabled();
 
     await mode.selectOption("js");
     await expect(page.getByLabel("Path", { exact: true })).toHaveCount(0);
