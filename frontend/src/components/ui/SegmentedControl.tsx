@@ -43,9 +43,12 @@ export function SegmentedControl<T extends string>({
             key={opt.value}
             title={opt.title}
             className={clsx(
-              "inline-flex h-6 cursor-pointer items-center justify-center rounded transition-colors",
+              "inline-flex h-6 cursor-pointer items-center justify-center rounded border transition-colors",
               "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus",
-              active ? "bg-panel text-text" : "text-muted hover:text-text",
+              // The border marks the selected option, not the tint alone (§ 9).
+              active
+                ? "border-border-strong bg-panel text-text"
+                : "border-transparent text-muted hover:text-text",
               itemClassName,
             )}
           >

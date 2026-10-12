@@ -14,6 +14,9 @@ interface TopicComboboxProps {
   disabled?: boolean;
   placeholder?: string;
   className?: string;
+  /** Validation wiring from `useFieldError(...).controlProps`. */
+  "aria-invalid"?: true;
+  "aria-describedby"?: string;
 }
 
 // Caps the rendered suggestion list so a cluster with thousands of topics
@@ -28,6 +31,8 @@ export function TopicCombobox({
   disabled,
   placeholder,
   className,
+  "aria-invalid": ariaInvalid,
+  "aria-describedby": ariaDescribedBy,
 }: TopicComboboxProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const fieldRef = useRef<HTMLDivElement>(null);
@@ -61,6 +66,8 @@ export function TopicCombobox({
         placeholder={placeholder}
         disabled={disabled}
         autoComplete="off"
+        aria-invalid={ariaInvalid}
+        aria-describedby={ariaDescribedBy}
         className={
           className ??
           "w-full rounded-md border border-border bg-panel px-3 py-1.5 text-sm font-mono disabled:opacity-50"

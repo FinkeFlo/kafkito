@@ -131,6 +131,15 @@ const ROUTES: Route[] = [
     },
   },
   {
+    name: "compare",
+    // e2e-copy-source holds "seed-message-1" … at offsets 0 …: a real diff.
+    path: `/compare?a=${c}%2Fe2e-copy-source%2F0%2F0&b=${c}%2Fe2e-copy-source%2F0%2F1`,
+    ready: async (page) => {
+      await h1(page, "Compare messages");
+      await expect(page.getByRole("table", { name: /differences in the value/i })).toBeVisible();
+    },
+  },
+  {
     name: "settings-clusters",
     path: "/settings/clusters",
     ready: (page) => expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible(),

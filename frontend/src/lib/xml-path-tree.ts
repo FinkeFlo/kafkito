@@ -45,7 +45,7 @@ function hasParserError(doc: Document): boolean {
 
 // Parses a raw XML string, returning null for anything that isn't XML or
 // that fails to parse.
-function parseXmlDoc(value: string): Document | null {
+export function parseXmlDoc(value: string): Document | null {
   if (!looksLikeXml(value)) return null;
   let doc: Document;
   try {
