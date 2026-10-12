@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, LogOut, Monitor, Moon, Sun } from "lucide-react";
-import { clsx } from "clsx";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { useAuth } from "@/auth/hooks";
 import { formatNumber } from "@/lib/format";
 import { useTheme, type ThemePreference } from "@/lib/theme";
@@ -307,59 +307,6 @@ function ConfirmDestructiveRow() {
         </select>
       }
     />
-  );
-}
-
-// Native radios (visually hidden) instead of `role="radio"` buttons: the
-// browser provides the arrow-key roving focus a radio group needs, and the
-// focus ring moves to the visible label via `has-[:focus-visible]`.
-function SegmentedControl<T extends string>({
-  label,
-  value,
-  onChange,
-  options,
-  className,
-  itemClassName,
-}: {
-  label: string;
-  value: T;
-  onChange: (value: T) => void;
-  options: { value: T; content: React.ReactNode; title?: string }[];
-  className?: string;
-  itemClassName?: string;
-}) {
-  const name = useId();
-  return (
-    <fieldset
-      aria-label={label}
-      className={clsx("inline-flex rounded-md border border-border bg-bg p-0.5", className)}
-    >
-      {options.map((opt) => {
-        const active = value === opt.value;
-        return (
-          <label
-            key={opt.value}
-            title={opt.title}
-            className={clsx(
-              "inline-flex h-6 cursor-pointer items-center justify-center rounded transition-colors",
-              "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus",
-              active ? "bg-panel text-text" : "text-muted hover:text-text",
-              itemClassName,
-            )}
-          >
-            <input
-              type="radio"
-              name={name}
-              value={opt.value}
-              checked={active}
-              onChange={() => onChange(opt.value)}
-              className="sr-only"
-            />
-            {opt.content}
-          </label>
-        );
-      })}
-    </fieldset>
   );
 }
 
