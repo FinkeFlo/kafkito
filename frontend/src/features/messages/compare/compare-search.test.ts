@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_COMPARE_OPTIONS } from "@/lib/message-compare";
-import { compareOptions, compareView, optionsSearch, parseCompareSearch } from "./compare-search";
+import {
+  compareOptions,
+  compareView,
+  messageListLink,
+  optionsSearch,
+  parseCompareSearch,
+} from "./compare-search";
 
 describe("compare search params", () => {
   it("keeps only valid values", () => {
@@ -33,5 +39,17 @@ describe("compare search params", () => {
     const s = parseCompareSearch(JSON.parse(JSON.stringify(optionsSearch(opts, "exact"))));
     expect(compareOptions(s)).toEqual(opts);
     expect(compareView(s)).toBe("exact");
+  });
+});
+
+describe("messageListLink", () => {
+  it("opens the topic's message list at the message", () => {
+    expect(messageListLink({ cluster: "prod", topic: "orders", partition: 3, offset: 42 })).toEqual(
+      {
+        to: "/clusters/$cluster/topics/$topic/messages",
+        params: { cluster: "prod", topic: "orders" },
+        search: { partition: 3, limit: 50, from: "offset", msgOffset: 42 },
+      },
+    );
   });
 });

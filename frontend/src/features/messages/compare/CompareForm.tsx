@@ -244,8 +244,8 @@ function SideFields({
           {...refField.controlProps}
         />
         <p id={`${id}-ref-hint`} className="mt-1 text-xs text-muted">
-          Paste a reference copied from a message
-          {side === "B" ? ", or a fingerprint to check message A against" : ""}.
+          Paste a reference (cluster/topic/partition/offset)
+          {side === "B" ? " or a fingerprint" : ""}, or fill in the fields below.
         </p>
         {refField.message}
       </div>

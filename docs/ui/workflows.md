@@ -176,12 +176,19 @@ key, value and headers, a line diff, a header table and the metadata of both
 records (timestamp, encodings, schema, size, fingerprint).
 
 **What can I do?**  
-1. Open a message in **Topics → Topic-Name → Messages** and click **Copy reference**.
-   The reference reads `cluster/topic/partition/offset`.
-2. Open the other message (another topic, or the same topic on another cluster)
-   and click **Compare…**. That message becomes message A.
-3. Paste the copied reference into **Reference** of message B, or enter its
-   cluster, topic, partition and offset, then click **Compare**.
+1. Open a message in **Topics → Topic-Name → Messages** and click
+   **Select for compare** at the top of the expanded message. A bar at the
+   bottom of the page shows the selection from now on, also in other topics
+   and clusters.
+2. Open the other message (another offset, another topic, or a topic on
+   another cluster) and click **Compare with selected**. The compare page
+   opens with both messages.
+   Alternatively click **Enter message B** in the bar and type the cluster,
+   topic, partition and offset of message B, or paste a reference
+   (`cluster/topic/partition/offset`, from **Copy reference** in the bar).
+3. **Close** returns to the page you started the compare from; **Open in
+   topic** next to each reference in the metadata table shows the message
+   in its topic. **Clear** in the bar drops the selection.
 4. Pick the view: **Semantic** compares JSON and XML in a canonical form (key
    and attribute order, whitespace, namespace prefixes and number notation
    such as `12.5` vs `12.50` do not count); **Exact** compares the content as
@@ -204,5 +211,7 @@ are ignored unless you untick the option.
 Large values: up to 1 MB everything above applies. Between 1 MB and 4 MB the
 value is compared exactly only (no semantic level, no semantic fingerprint).
 Above 4 MB only the 64 KB preview is compared, and the verdict says so.
+
+![Selecting a message for compare](../assets/screenshots/ui-message-compare-select.png)
 
 ![Message compare view](../assets/screenshots/ui-message-compare.png)

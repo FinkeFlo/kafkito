@@ -1,8 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
 
-// Walks the message compare page: starting from a message in the browser,
-// picking message B by partition and offset, the verdicts, the exact and
-// semantic views, a missing offset and a pasted fingerprint. Read-only.
+// Walks message compare: "Select for compare" on one message and "Compare
+// with selected" on another, the compare bar (enter message B by hand,
+// clear), Close back to where compare was opened, the verdicts, the exact
+// and semantic views, a missing offset and a pasted fingerprint. Read-only.
 //
 // Fixture coupling (seed.sh): e2e-copy-source holds exactly 1500 records
 // "seed-message-1" … "seed-message-1500" at offsets 0 … 1499 on one
@@ -19,25 +20,79 @@ const comparePath = (a: string, b?: string) =>
 const summary = (page: Page) => page.getByTestId("compare-summary");
 const verdict = (page: Page) => summary(page).getByTestId("verdict");
 
-test("starts from a message and compares it with another offset", async ({ page }) => {
-  await page.goto(`/clusters/${c}/topics/${SOURCE}/messages?from=start&limit=5`);
-  const row = page.getByTestId("message-row").first();
-  await row.getByRole("button").first().click();
-  await row.getByRole("link", { name: "Compare…" }).click();
+const listPath = `/clusters/${c}/topics/${SOURCE}/messages?from=start&limit=5`;
+const tray = (page: Page) =>
+  page.getByRole("complementary", { name: "Message selected for compare" });
 
+/** Expands the n-th message row of the list and returns it. */
+async function openRow(page: Page, n: number) {
+  const row = page.getByTestId("message-row").nth(n);
+  await row.getByRole("button").first().click();
+  return row;
+}
+
+test("selects a message, compares another one with it and closes", async ({ page }) => {
+  await page.goto(listPath);
+  const first = await openRow(page, 0);
+  await first.getByRole("button", { name: "Select for compare" }).click();
+  await expect(first.getByText("Selected for compare")).toBeVisible();
+  // The list's sort order decides which offset the first row holds.
+  await expect(tray(page)).toContainText(`${CLUSTER} / ${SOURCE} · p0 · #`);
+
+  const second = await openRow(page, 1);
+  await second.getByRole("button", { name: "Compare with selected" }).click();
   await expect(page).toHaveURL(/\/compare\?/);
   await expect(page.getByRole("heading", { level: 1, name: "Compare messages" })).toBeVisible();
+  await expect(verdict(page)).toHaveText("Different");
+  const diff = page.getByRole("table", { name: /differences in the value/i });
+  await expect(diff.getByText("Removed")).toHaveCount(1);
+  await expect(diff.getByText("Added")).toHaveCount(1);
+  await expect(tray(page)).toHaveCount(0);
+
+  // A second compare adds a history entry; Close still returns to the list.
+  await page.getByLabel("Ignore JSON array order").check();
+  const sideB = page.getByRole("group", { name: "Message B" });
+  await sideB.getByLabel("Offset").fill("2");
+  await page.getByRole("button", { name: "Compare", exact: true }).click();
+  await expect(page).toHaveURL(/b=.*%2F2/);
+  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page).toHaveURL(new RegExp(`/topics/${SOURCE}/messages\\?.*from=start`));
+  // The selection outlives the compare page.
+  await expect(tray(page)).toBeVisible();
+});
+
+test("enters message B by hand from the compare bar", async ({ page }) => {
+  await page.goto(listPath);
+  const first = await openRow(page, 0);
+  await first.getByRole("button", { name: "Select for compare" }).click();
+  await tray(page).getByRole("button", { name: "Enter message B" }).click();
+
   const sideB = page.getByRole("group", { name: "Message B" });
   // B starts on A's cluster and topic; only partition and offset are missing.
   await expect(sideB.getByLabel("Topic")).toHaveValue(SOURCE);
   await sideB.getByLabel("Partition").fill("0");
   await sideB.getByLabel("Offset").fill("1");
   await page.getByRole("button", { name: "Compare", exact: true }).click();
-
   await expect(verdict(page)).toHaveText("Different");
-  const diff = page.getByRole("table", { name: /differences in the value/i });
-  await expect(diff.getByText("Removed")).toHaveCount(1);
-  await expect(diff.getByText("Added")).toHaveCount(1);
+});
+
+test("clears the selection from the compare bar", async ({ page }) => {
+  await page.goto(listPath);
+  const first = await openRow(page, 0);
+  await first.getByRole("button", { name: "Select for compare" }).click();
+  await tray(page).getByRole("button", { name: "Clear" }).click();
+  await expect(tray(page)).toHaveCount(0);
+  await expect(first.getByRole("button", { name: "Select for compare" })).toBeVisible();
+});
+
+test("closes a compare opened from a link to message A's topic", async ({ page }) => {
+  await page.goto(comparePath(ref(SOURCE, 3), ref(SOURCE, 4)));
+  await expect(verdict(page)).toHaveText("Different");
+  await expect(page.getByRole("link", { name: "Open in topic" })).toHaveCount(2);
+  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page).toHaveURL(
+    new RegExp(`/topics/${SOURCE}/messages\\?.*from=offset.*msgOffset=3`),
+  );
 });
 
 test("calls a record identical to itself", async ({ page }) => {

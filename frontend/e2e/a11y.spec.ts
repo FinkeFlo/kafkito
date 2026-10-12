@@ -172,6 +172,20 @@ const STATES: State[] = [
   },
   {
     ...route("topic-messages"),
+    name: "message-compare-selection",
+    open: async (page) => {
+      const rows = page.getByTestId("message-row");
+      await rows.nth(0).getByRole("button").first().click();
+      await rows.nth(0).getByRole("button", { name: "Select for compare" }).click();
+      await rows.nth(1).getByRole("button").first().click();
+      await expect(page.getByRole("button", { name: "Compare with selected" })).toBeVisible();
+      await expect(
+        page.getByRole("complementary", { name: "Message selected for compare" }),
+      ).toBeVisible();
+    },
+  },
+  {
+    ...route("topic-messages"),
     name: "message-search-panel",
     open: async (page) => {
       await page.getByRole("button", { name: "Search", exact: true }).click();

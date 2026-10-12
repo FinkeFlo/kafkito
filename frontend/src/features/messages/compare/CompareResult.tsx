@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { type ReactNode, useMemo } from "react";
 import { Card } from "@/components/ui/Card";
 import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
@@ -16,7 +17,7 @@ import {
 import type { FingerprintOptions, FingerprintResult } from "@/lib/message-fingerprint";
 import { formatMessageRef, type MessageRef } from "@/lib/message-reference";
 import { useFormatters } from "@/lib/use-formatters";
-import type { CompareView } from "./compare-search";
+import { type CompareView, messageListLink } from "./compare-search";
 import { DiffView } from "./DiffView";
 import { HeaderCompareTable } from "./HeaderCompareTable";
 import type { ComparedMessage } from "./use-compared-message";
@@ -199,6 +200,18 @@ function srText(m: Message, which: "key" | "value"): string {
   return `${subject}${sr.format ?? "?"} · id ${sr.schema_id ?? "?"}`;
 }
 
+/** The reference, copyable, with a link to the message in its topic. */
+function ReferenceCell({ target }: { target: MessageRef }) {
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <MonoId value={formatMessageRef(target)} tailChars={16} className="min-w-0" />
+      <Link {...messageListLink(target)} className="shrink-0 text-xs text-accent hover:underline">
+        Open in topic
+      </Link>
+    </div>
+  );
+}
+
 function FingerprintCell({ fp }: { fp: FingerprintResult | undefined }) {
   if (!fp) return <Skeleton height="h-4" width="w-40" />;
   if (!fp.ok) return <span className="text-sm text-muted">— {fp.reason}</span>;
@@ -230,8 +243,8 @@ function MetadataTable({
   const rows: MetaRow[] = [
     {
       label: "Reference",
-      a: <MonoId value={formatMessageRef(refA)} tailChars={16} />,
-      b: <MonoId value={formatMessageRef(refB)} tailChars={16} />,
+      a: <ReferenceCell target={refA} />,
+      b: <ReferenceCell target={refB} />,
       differs: formatMessageRef(refA) !== formatMessageRef(refB),
     },
     {

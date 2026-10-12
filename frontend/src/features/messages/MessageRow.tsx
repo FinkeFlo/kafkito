@@ -1,14 +1,14 @@
-import { getRouteApi, Link } from "@tanstack/react-router";
+import { getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { downloadMessageRaw, RawValueMaskedError, type Message } from "@/lib/api";
 import type { Token } from "@/lib/path-builder";
 import { prettyValue } from "@/lib/format";
-import { formatMessageRef } from "@/lib/message-reference";
 import { useFormatters } from "@/lib/use-formatters";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { StatusIcon } from "@/components/ui/StatusIcon";
 import { ReplayModal } from "@/features/messages/ReplayModal";
+import { CompareAction } from "@/features/messages/compare/CompareAction";
 import { ValueBody } from "@/features/messages/ValueBody";
 import { MaskedBadge } from "@/features/messages/MaskedBadge";
 import type { FieldFilter } from "@/features/messages/use-click-to-filter";
@@ -28,7 +28,6 @@ export function MessageRow({
   const { cluster, topic } = routeApi.useParams();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [refCopied, setRefCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [replayOpen, setReplayOpen] = useState(false);
@@ -46,19 +45,6 @@ export function MessageRow({
       await navigator.clipboard.writeText(m.value ?? "");
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // ignore clipboard errors (permissions, insecure context)
-    }
-  };
-
-  const reference = formatMessageRef({ cluster, topic, partition: m.partition, offset: m.offset });
-
-  const copyReference = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await navigator.clipboard.writeText(reference);
-      setRefCopied(true);
-      setTimeout(() => setRefCopied(false), 1500);
     } catch {
       // ignore clipboard errors (permissions, insecure context)
     }
@@ -127,6 +113,21 @@ export function MessageRow({
       </button>
       {open && (
         <div className="mt-3 space-y-3">
+          {/* Actions on the whole message: key, value and headers. */}
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setReplayOpen(true);
+              }}
+              className="rounded border border-border px-2 py-1 text-[11px] hover:border-border-hover"
+              title="Replay to another cluster/topic"
+            >
+              Replay to…
+            </button>
+            <CompareAction target={{ cluster, topic, partition: m.partition, offset: m.offset }} />
+          </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <DetailSection
               label={`key · ${m.key === undefined ? "none" : m.key_encoding}`}
@@ -163,40 +164,12 @@ export function MessageRow({
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setReplayOpen(true);
-                  }}
-                  className="rounded border border-border px-2 py-1 text-[11px] hover:border-border-hover"
-                  title="Replay to another cluster/topic"
-                >
-                  Replay to…
-                </button>
-                <button
-                  type="button"
                   onClick={copyValue}
                   className="rounded border border-border px-2 py-1 text-[11px] hover:border-border-hover"
                   title="Copy value to clipboard"
                 >
                   {copied ? "Copied!" : "Copy value"}
                 </button>
-                <button
-                  type="button"
-                  onClick={copyReference}
-                  className="rounded border border-border px-2 py-1 text-[11px] hover:border-border-hover"
-                  title={`Copy ${reference} to paste on the compare page`}
-                >
-                  {refCopied ? "Copied!" : "Copy reference"}
-                </button>
-                <Link
-                  to="/compare"
-                  search={{ a: reference }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="rounded border border-border px-2 py-1 text-[11px] text-text hover:border-border-hover"
-                  title="Compare this message with another one"
-                >
-                  Compare…
-                </Link>
                 {m.value_truncated && m.masked && (
                   <>
                     <button
