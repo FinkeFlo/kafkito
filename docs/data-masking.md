@@ -3,7 +3,7 @@
 kafkito can redact parts of Kafka records before they reach a user. Rules are
 configured per cluster under `clusters[].data_masking` in the YAML config and
 apply to every path that returns or derives from record data: consume, the
-path-picker sample, search, raw download, replay and topic copy.
+path-picker sample, search, raw download, replay, topic copy and message compare.
 
 ## Rule reference
 
@@ -65,6 +65,7 @@ clusters[0] (prod): data_masking[1]: targets: unknown target "body" (use value|k
 | Raw download (`GET .../raw`) | `403 value_masked` | Allowed — the body is the value only | Allowed — the body is the value only |
 | Topic copy (`POST .../copy`) | Record skipped (`skipped`) | Record skipped | Record skipped |
 | Replay (UI) | Blocked with the reason shown | Blocked with the reason shown | Blocked with the reason shown |
+| Compare messages (UI) | Compared in masked form; *Not comparable* when only one side is masked; fingerprint over the masked rendering | same | same |
 | PathSense suggestions (UI) | Built from the masked rendering; truncated masked values are not hydrated | Not used | Not used |
 | Count and timeline | Offsets only, no record data | same | same |
 

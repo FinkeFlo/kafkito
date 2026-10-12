@@ -280,6 +280,10 @@ const { cluster } = useCluster();
 **Never** introduce a per-page cluster picker. The pill in the header is
 the only way to change the active cluster.
 
+A form field that names a cluster for its data is not such a picker: the
+destination of the Replay dialog and the topic copy, and both messages of
+the compare page, pick a cluster per field without changing the active one.
+
 ---
 
 ## 6 · Components
@@ -314,6 +318,7 @@ Every entry lives in `src/components/ui/<Name>.tsx`, except `<Shell>`
 | `<ErrorState>` | `title` + `detail?` + `onRetry?` (renders the retry `<Button>`) |
 | `<Modal>` | `open` + `onClose` + `title` + `children` + `actions?` + `size?` (`sm \| md \| lg`) + `ariaDescribedBy?` + `onSubmit?`; centered panel with backdrop, focus-trap, body-scroll lock, Escape-to-close, focus-restore. With `onSubmit`, body and footer become one `<form>`: Enter in a field submits, and a `type="submit"` button in `actions` is its submit button |
 | `<Notice>` | `intent="info" \| "success" \| "warning" \| "danger"` + `title?` + `children` + `icon?` + `actions?`; tinted callout for degraded-capability banners and inline explanations. Always pairs colour with an icon |
+| `<SegmentedControl>` | `label` + `value` + `onChange` + `options` (`value`, `content`, `title?`) + `className?` / `itemClassName?`; single-choice switch on visually hidden native radios, so arrow keys move the choice and the focus ring sits on the visible label; the selected option has a `border-border-strong` border, not only a tint |
 | `<Button>` | `variant="primary" \| "secondary" \| "danger" \| "ghost"` + `size="sm" \| "md"` + `leadingIcon?` / `trailingIcon?` + `loading?` |
 | `<Input>` | `h-9` text input + `invalid?` (sets `aria-invalid="true"` and switches border to `border-danger`) + `leadingIcon?` / `trailingIcon?`. Does **not** set `outline-none`; the global `:focus-visible` rule is the focus indicator |
 | `useFieldError` | `useFieldError(error, describedBy?)` (in `FieldError.tsx`) returns `controlProps` (`aria-invalid` + `aria-describedby` → the error's id) to spread on the control and the `message` — the visible field error, ⊗ icon named "Error" + text — to render below it |
@@ -562,7 +567,7 @@ src/
 │   └── ui/                  ← generic, domain-free primitives (Button, Modal, DataTable, …)
 ├── features/                ← components that belong to one domain
 │   ├── groups/              ← consumer groups: LagBadge, StateBadge, reset/create modals
-│   ├── messages/            ← message browser: MessageRow, RangePicker, ValueBody, replay, bulk copy
+│   ├── messages/            ← message browser: MessageRow, RangePicker, ValueBody, replay, bulk copy; compare/ (message compare page)
 │   └── shell/               ← app chrome rendered by __root: Shell, CommandPalette, ClusterPill, UserMenu, What's new
 ├── lib/
 │   ├── api.ts               ← endpoint functions; don't touch without a backend reason
@@ -689,7 +694,7 @@ mutations, SCRAM rotate). Setup + scope: `frontend/e2e/README.md`.
    Arbitrary token values (`bg-[var(--color-panel)]`) are out too: use the
    utility (`bg-panel`). `src/__checks__/tokens.test.ts` fails on them.
 3. ❌ `max-w-6xl` on data-dense pages.
-4. ❌ Per-page cluster picker.
+4. ❌ Per-page cluster picker (a form field naming a cluster for its data is fine, § 5.3).
 5. ❌ Adding a dependency without discussion.
 6. ❌ Inline `<style>` tags in TSX files.
 7. ❌ Fabricating data to make a design look full.
@@ -739,6 +744,7 @@ a review, treat it as drift and bring it in line.
 | 2026-10-10 | Topic configs tab on the primitives: `<Card>`, `<Button>` for Edit / Close / Apply, the edit dialog is a `<Modal>` (focus trap, Escape, `bg-overlay` scrim) with labelled `<Input>`s; a read-only Edit names its reason in visible text wired via `aria-describedby` instead of `title=` | (this PR — link added by author) |
 | 2026-10-10 | Docs sync with the code: `rounded-sm` is 4 px (Tailwind v4), decided per § 13 in favour of the code (§ 4.3); `h-3.5 w-3.5` icon size for status glyphs, nav tabs and glyphs inside controls (§ 6.6); the colocated-test example names an existing pair, `ConfirmDialog.tsx` + `ConfirmDialog.test.tsx` (§ 10.1) | (this PR — link added by author) |
 | 2026-10-10 | Docs only: § 0 points coding agents to `frontend/AGENTS.md`, a distilled copy of these rules; this file stays canonical | (this PR — link added by author) |
+| 2026-10-12 | Message compare page (`/compare`): `<SegmentedControl>` moves from the user menu to `components/ui/` and marks the selected option with a `border-border-strong` border (§ 6.1); diff lines carry "−" / "+" markers and a spoken "Removed" / "Added", the changed stretch of a line is underlined, so a change never shows by colour alone; contrast pairs for text on the diff tints. § 5.3 and § 12 #4 now allow a form field that names a cluster for its data (Replay, topic copy, compare), the active cluster still changes only through the header pill. Kept deviations: the diff is a hand-built `<table>` in a `rounded-md` code block like the message detail view, not a `<DataTable>`; the new "Copy reference" and "Compare…" row actions match the existing hand-styled message row buttons until that strip moves to `<Button>` | (this PR — link added by author) |
 
 Add a row on every change. Small tweaks to tokens or primitives are
 fine; major shifts (new visual language, new nav model) require a design

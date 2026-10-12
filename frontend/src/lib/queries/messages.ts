@@ -7,6 +7,7 @@ import {
   fetchMessages,
   fetchMessageTimeline,
   fetchSample,
+  type Message,
 } from "../api";
 import { type HydratableEncoding, hydrateTruncatedSampleMessages } from "../hydrate-sample";
 import { clusterKey } from "./cluster-key";
@@ -25,6 +26,31 @@ export const messageQueries = {
     queryOptions({
       queryKey: [...messageKeys.topic(cluster, topic), params] as const,
       queryFn: () => fetchMessages(cluster, topic, params),
+    }),
+  /**
+   * The record at one partition and offset, for the compare page. A page of
+   * one from that offset: when the offset holds no record (compacted away,
+   * deleted, a transaction marker, past the end) `message` is null and
+   * `next` is the next offset that does, if any.
+   */
+  single: (cluster: string, topic: string, partition: number, offset: number) =>
+    queryOptions({
+      queryKey: [...messageKeys.topic(cluster, topic), "single", partition, offset] as const,
+      queryFn: async (): Promise<{ message: Message | null; next: number | null }> => {
+        const page = await fetchMessages(cluster, topic, {
+          partition,
+          from: "offset",
+          offset,
+          limit: 1,
+        });
+        const first = page.messages?.[0];
+        if (first && first.offset === offset && first.partition === partition) {
+          return { message: first, next: null };
+        }
+        return { message: null, next: first?.offset ?? null };
+      },
+      staleTime: 60_000,
+      retry: false,
     }),
   /** Newest record, used by the produce form to offer "copy latest". */
   latestProbe: (cluster: string, topic: string) =>

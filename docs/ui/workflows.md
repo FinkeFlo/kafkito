@@ -165,3 +165,44 @@ Use it to answer “when did traffic increase/decrease?” before digging into i
 You can quickly identify low/high traffic windows and correlate them with lag or incidents.
 
 ![Message timeline view](../assets/screenshots/ui-message-timeline.png)
+
+---
+
+## Workflow 6: Compare two messages across topics or clusters
+
+**What do I see?**  
+The **Compare messages** page puts two records side by side: a verdict for
+key, value and headers, a line diff, a header table and the metadata of both
+records (timestamp, encodings, schema, size, fingerprint).
+
+**What can I do?**  
+1. Open a message in **Topics → Topic-Name → Messages** and click **Copy reference**.
+   The reference reads `cluster/topic/partition/offset`.
+2. Open the other message (another topic, or the same topic on another cluster)
+   and click **Compare…**. That message becomes message A.
+3. Paste the copied reference into **Reference** of message B, or enter its
+   cluster, topic, partition and offset, then click **Compare**.
+4. Pick the view: **Semantic** compares JSON and XML in a canonical form (key
+   and attribute order, whitespace, namespace prefixes and number notation
+   such as `12.5` vs `12.50` do not count); **Exact** compares the content as
+   stored. Optionally ignore JSON array order or XML element order.
+5. Tick **Only differences** to hide unchanged lines, headers and metadata.
+6. To check a message against a fingerprint (`kfp1:…`, from the metadata
+   table of an earlier compare), paste it as message B.
+
+**When should I use this?**  
+Use it to verify that a replicated, copied or transformed record still carries
+the same data, or to find the field that changed between two versions.
+
+**Expected result**  
+The verdict reads *Identical* (byte for byte), *Equivalent* (same data,
+formatting or order differs), *Different* (with the changed lines) or
+*Not comparable* (masking on one side, or only a 64 KB preview available).
+Provenance headers kafkito adds on produce, replay and copy (`X-Kafkito-*`)
+are ignored unless you untick the option.
+
+Large values: up to 1 MB everything above applies. Between 1 MB and 4 MB the
+value is compared exactly only (no semantic level, no semantic fingerprint).
+Above 4 MB only the 64 KB preview is compared, and the verdict says so.
+
+![Message compare view](../assets/screenshots/ui-message-compare.png)
