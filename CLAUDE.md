@@ -31,11 +31,17 @@ private clusters and error handling, `api-contract-reviewer` for
 
 - PreToolUse: edits to generated files and secret files are refused with the
   command to run instead; `git commit` without `-s`, `--no-verify`, force
-  pushes and tag pushes are refused.
+  pushes and tag pushes are refused. A commit message, `gh` command or GitHub
+  MCP write that carries a claude.ai session link (`Claude-Session:` trailer,
+  `claude.ai/code/session…`) is refused (`guard-session-links.sh`); cloud
+  sessions add both by default, leave them out.
 - PostToolUse: the edited file is formatted with the pinned tools
   (`bin/golangci-lint fmt`, `biome check --write`); remaining diagnostics and
   design-token findings for `frontend/src` come back as feedback. Fix them,
   do not argue with them.
+  After a GitHub MCP tool creates a pull request, issue, comment or review,
+  `check-session-footer.sh` asks you to read it back: the connector can append
+  a footer that links the session. Remove such a link at once.
 - SessionStart (cloud sessions only): installs frontend dependencies, Go
   modules and the pinned golangci-lint, and reports what is unavailable.
 - Routine `make`, `go`, `bun run` and read-only `git` commands are

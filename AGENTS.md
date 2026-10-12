@@ -172,6 +172,9 @@ stale document in the same PR when it is small, otherwise list it in the PR.
 - Push tags, force-push, delete remote refs or use `--no-verify`.
 - Touch secret files, or paste credentials, tokens or private-cluster
   definitions anywhere.
+- Put a link to an agent session (a `Claude-Session:` trailer, a
+  `claude.ai/code/session…` URL or the like) into a commit, pull request,
+  issue or comment. The repository is public.
 - Change `GOLANGCI_LINT_VERSION` without the `golangci-lint-action` version in
   `ci.yml` (`make lint-version-check`).
 - Commit `frontend/src/routeTree.gen.ts` or build output.
