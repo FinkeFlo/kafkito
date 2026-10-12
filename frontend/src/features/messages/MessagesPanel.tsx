@@ -7,6 +7,7 @@ import { MessageList } from "./MessageList";
 import { MessageListStatus } from "./MessageListStatus";
 import { SearchPanel } from "./SearchPanel";
 import { orderForDisplay, type SortOrder } from "./display-order";
+import { headerKeyStats } from "./header-keys";
 import { computeTimeRange } from "./time-range";
 import { useBrowseMessages } from "./use-browse-messages";
 import { useClickToFilter } from "./use-click-to-filter";
@@ -50,7 +51,9 @@ export function MessagesPanel({
 
   const suggestions = usePathSuggestions(cluster, topic, form.mode, searchOpen);
 
-  const { showUndo, handlePick, undo } = useClickToFilter(form, () => setSearchOpen(true));
+  const { showUndo, handlePick, handleFilter, undo } = useClickToFilter(form, () =>
+    setSearchOpen(true),
+  );
 
   const browseRange = useMemo(
     () => computeTimeRange(browseRangeMode, browsePreset, browseCustomFrom, browseCustomTo),
@@ -85,6 +88,13 @@ export function MessagesPanel({
   );
 
   const coachmark = useJsonCoachmark(displayMessages);
+
+  // Header-key suggestions come from the messages already loaded, so the
+  // header search needs no extra request.
+  const headerKeys = useMemo(() => {
+    const loaded = [...(msgsQuery.data?.messages ?? []), ...tailMessages];
+    return { stats: headerKeyStats(loaded), total: loaded.length };
+  }, [msgsQuery.data, tailMessages]);
 
   return (
     <div className="rounded-lg border border-border bg-panel shadow-sm">
@@ -122,6 +132,7 @@ export function MessagesPanel({
         <SearchPanel
           form={form}
           suggestions={suggestions}
+          headerKeys={headerKeys}
           search={search}
           limit={limit}
           showUndo={showUndo}
@@ -141,7 +152,7 @@ export function MessagesPanel({
 
       {coachmark.visible && <JsonCoachmark onDismiss={coachmark.dismiss} />}
 
-      <MessageList messages={displayMessages} onPick={handlePick} />
+      <MessageList messages={displayMessages} onPick={handlePick} onFilter={handleFilter} />
 
       {!inSearchMode && tailCursor && !live && (
         <LoadMoreFooter loading={loadingMore} error={loadMoreError} onLoadMore={loadMore} />

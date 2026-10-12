@@ -9,7 +9,7 @@ In the topic **Messages** tab: partition, start-point, limit, range controls, an
 1. Open **Topics → Topic-Name → Messages**.  
 2. Optionally scope partition, set `From` (`latest`, `oldest`, `offset`), and choose a range.  
 3. Open **Search**.  
-4. Use `Mode = Text contains` for quick searches, or switch to `JSONPath`, `XPath`, or `JavaScript`.  
+4. Use `Mode = Text contains` for quick searches, `Record key` or `Header` to compare the key or one header, or switch to `JSONPath`, `XPath`, or `JavaScript`.  
 5. Enter search value and run **Search**.  
 6. Use **Search more →** when scanning larger ranges.
 
@@ -51,6 +51,19 @@ XPath (for XML payloads):
 - Value: `CUST-123`
 
 Use `//customerId` to match the element at any depth, or `/invoice/@status` for an attribute.
+
+Header (one header by its key):
+
+- Mode: Header
+- Header key: `x-correlation-id` (type it, or press ↓ for the header keys of the loaded messages and how many of them carry each)
+- Operator: `=`
+- Value: `abc-123`
+
+`exists` finds the messages that carry the header, `missing` those that do not. The header key matches exactly, case-sensitive.
+
+Record key: Mode `Record key`, then an operator and a value, for example `regex` and `^ord-`.
+
+From a message: expand it and use **Search by key** next to the key, or **Search by value** and **Search by header** next to a header line. The search panel opens filled in; **Undo** restores what you had typed before.
 
 Notes:
 - JSONPath filters select nodes; use `exists` to match messages where the expression finds at least one node.

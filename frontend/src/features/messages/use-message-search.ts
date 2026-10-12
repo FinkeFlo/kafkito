@@ -31,7 +31,7 @@ export function useMessageSearch(
       setSearchResult(null);
       setSearchStopReason(null);
     }
-    const { mode, path, op, needle, range } = form;
+    const { mode, path, headerKey, op, needle, range } = form;
     const { from_ts_ms, to_ts_ms } = computeTimeRange(
       range.mode,
       range.preset,
@@ -44,7 +44,8 @@ export function useMessageSearch(
       direction: form.direction,
       stop_on_limit: form.stopOnLimit,
       mode,
-      path: mode === "contains" || mode === "js" ? "" : path,
+      path: mode === "jsonpath" || mode === "xpath" ? path : "",
+      header_key: mode === "header" ? headerKey : undefined,
       op: mode === "contains" || mode === "js" ? "contains" : op,
       value: needle,
       zones: mode === "contains" ? ["value", "key", "headers"] : ["value"],

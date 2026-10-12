@@ -861,11 +861,11 @@ test.describe("Messages panel — click-to-filter helpers", () => {
     await expect(page.getByPlaceholder("Type or ↓ for top fields")).toHaveValue("$.order");
     await expect(page.getByLabel("Operator", { exact: true })).toHaveValue("eq");
     await expect(page.getByLabel("Value", { exact: true })).toHaveValue("E2E-MASK-1");
-    await expect(page.getByText("Path replaced by click.")).toBeVisible();
+    await expect(page.getByText("Search replaced by click.")).toBeVisible();
 
     await page.getByRole("button", { name: "Undo", exact: true }).click();
-    await expect(page.getByText("Path replaced by click.")).toHaveCount(0);
-    // Undo restores path, operator and value; the mode stays JSONPath.
+    await expect(page.getByText("Search replaced by click.")).toHaveCount(0);
+    // Undo restores mode, path, operator and value; the mode was JSONPath before.
     await expect(page.getByLabel("Mode", { exact: true })).toHaveValue("jsonpath");
     await expect(page.getByPlaceholder("Type or ↓ for top fields")).toHaveValue("");
     await expect(page.getByLabel("Operator", { exact: true })).toHaveValue("contains");
@@ -880,7 +880,7 @@ test.describe("Messages panel — click-to-filter helpers", () => {
 
     await expect(page.getByRole("button", { name: "Close search", exact: true })).toBeVisible();
     await expect(page.getByPlaceholder("Type or ↓ for top fields")).toHaveValue("$.order");
-    await expect(page.getByText("Path replaced by click.")).toHaveCount(0);
+    await expect(page.getByText("Search replaced by click.")).toHaveCount(0);
   });
 
   test("a row expands and collapses with the keyboard", async ({ page }) => {

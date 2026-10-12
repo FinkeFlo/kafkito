@@ -223,6 +223,7 @@ func searchOptions(body *gen.SearchRequest) (kafkapkg.SearchOptions, error) {
 	opts.Direction = kafkapkg.SearchDirection(deref(body.Direction))
 	opts.Mode = kafkapkg.SearchMode(deref(body.Mode))
 	opts.Path = deref(body.Path)
+	opts.HeaderKey = deref(body.HeaderKey)
 	opts.Op = kafkapkg.SearchOp(deref(body.Op))
 	opts.Value = deref(body.Value)
 	opts.FromTS = deref(body.FromTsMs)

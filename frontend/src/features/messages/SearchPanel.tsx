@@ -3,6 +3,7 @@ import { SearchQueryFields } from "./SearchQueryFields";
 import { SearchRangeFields } from "./SearchRangeFields";
 import { SearchResultBanner } from "./SearchResultBanner";
 import { SearchRunBar } from "./SearchRunBar";
+import type { HeaderKeyStat } from "./header-keys";
 import type { MessageSearch } from "./use-message-search";
 import type { PathSuggestions } from "./use-path-suggestions";
 import type { SearchForm } from "./use-search-form";
@@ -11,6 +12,7 @@ import type { SearchForm } from "./use-search-form";
 export function SearchPanel({
   form,
   suggestions,
+  headerKeys,
   search,
   limit,
   showUndo,
@@ -18,6 +20,7 @@ export function SearchPanel({
 }: {
   form: SearchForm;
   suggestions: PathSuggestions;
+  headerKeys: { stats: HeaderKeyStat[]; total: number };
   search: MessageSearch;
   limit: number;
   /** A click-to-filter replaced earlier input and can still be undone. */
@@ -30,7 +33,7 @@ export function SearchPanel({
     <div className="space-y-3 border-b border-border bg-subtle p-3">
       {showUndo && (
         <div className="flex items-center gap-3 rounded border border-border bg-panel p-2 text-xs">
-          <span>Path replaced by click.</span>
+          <span>Search replaced by click.</span>
           <button
             type="button"
             onClick={onUndo}
@@ -40,7 +43,7 @@ export function SearchPanel({
           </button>
         </div>
       )}
-      <SearchQueryFields form={form} suggestions={suggestions} />
+      <SearchQueryFields form={form} suggestions={suggestions} headerKeys={headerKeys} />
 
       <SearchRangeFields range={form.range} />
 

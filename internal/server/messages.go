@@ -191,10 +191,10 @@ func (s *apiServer) SearchMessages(ctx context.Context, req gen.SearchMessagesRe
 		if blocked := blockedAddressError("search messages", err); blocked != nil {
 			return nil, blocked
 		}
-		if msg := err.Error(); !errors.Is(err, kafkapkg.ErrUnknownCluster) && isSearchClientErr(msg) {
+		if errors.Is(err, kafkapkg.ErrInvalidSearch) {
 			// The 400 body uses the raw message without the "kafka: " prefix
 			// the sibling handlers add.
-			return nil, badRequest(msg)
+			return nil, badRequest(err.Error())
 		}
 		return nil, clusterError(req.Cluster, "search messages", err)
 	}
@@ -418,14 +418,4 @@ func isClientProduceErr(msg string) bool {
 // from kgo rather than kafkito.
 func isInvalidPartitionErr(msg string) bool {
 	return strings.Contains(msg, "invalid record partitioning choice")
-}
-
-// isSearchClientErr reports whether a search error originates from bad
-// caller-supplied input (400) rather than a broker-side failure (502).
-// Used by searchMessages.
-func isSearchClientErr(msg string) bool {
-	return strings.Contains(msg, "jsonpath") || strings.Contains(msg, "xpath") ||
-		strings.Contains(msg, "regex") || strings.Contains(msg, "numeric op") ||
-		strings.Contains(msg, "unknown search mode") || strings.Contains(msg, "unknown operator") ||
-		strings.Contains(msg, "js filter")
 }

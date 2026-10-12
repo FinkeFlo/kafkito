@@ -141,3 +141,42 @@ func TestJSMatcher_ClearInterruptGuardsTimerRace(t *testing.T) {
 	require.NoError(t, err, "ClearInterrupt must reset the runtime for reuse")
 	assert.True(t, res.ToBoolean())
 }
+
+// A record without a key or without the header has no value to compare: it
+// matches missing only. A header that is present with an empty value exists
+// and equals the empty string.
+func TestFieldMatchers_AbsentKeyAndHeader(t *testing.T) {
+	t.Parallel()
+
+	bare := &Message{Value: `{"b":1}`}
+	emptyHeader := &Message{Key: "k", Headers: map[string]string{"x-empty": ""}}
+	cases := []struct {
+		name string
+		opts SearchOptions
+		msg  *Message
+		want bool
+	}{
+		{"no key exists", SearchOptions{Mode: SearchModeKey, Op: OpExists}, bare, false},
+		{"no key missing", SearchOptions{Mode: SearchModeKey, Op: OpMissing}, bare, true},
+		{"no key ne", SearchOptions{Mode: SearchModeKey, Op: OpNeq, Value: "k"}, bare, false},
+		{"key missing", SearchOptions{Mode: SearchModeKey, Op: OpMissing}, emptyHeader, false},
+		{"no header missing", SearchOptions{Mode: SearchModeHeader, HeaderKey: "x-empty", Op: OpMissing}, bare, true},
+		{"no header ne", SearchOptions{Mode: SearchModeHeader, HeaderKey: "x-empty", Op: OpNeq, Value: "v"}, bare, false},
+		{"empty header exists", SearchOptions{Mode: SearchModeHeader, HeaderKey: "x-empty", Op: OpExists}, emptyHeader, true},
+		{"empty header eq empty", SearchOptions{Mode: SearchModeHeader, HeaderKey: "x-empty", Op: OpEq}, emptyHeader, true},
+		{"empty header missing", SearchOptions{Mode: SearchModeHeader, HeaderKey: "x-empty", Op: OpMissing}, emptyHeader, false},
+		{"jsonpath missing", SearchOptions{Mode: SearchModeJSONPath, Path: "$.a", Op: OpMissing}, bare, true},
+		{"jsonpath present", SearchOptions{Mode: SearchModeJSONPath, Path: "$.b", Op: OpMissing}, bare, false},
+		{"jsonpath unparsed", SearchOptions{Mode: SearchModeJSONPath, Path: "$.a", Op: OpMissing}, &Message{Value: "plain"}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			mt, err := tc.opts.compile()
+			require.NoError(t, err)
+			got, err := mt.match(tc.msg)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}

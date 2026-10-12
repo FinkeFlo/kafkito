@@ -82,6 +82,9 @@ func topicMessageCases(t *testing.T) []handlerCase {
 	longPath := func(n int) string {
 		return `{"mode":"contains","value":"hello","path":"` + strings.Repeat("a", n) + `"}`
 	}
+	longHeaderKey := func(n int) string {
+		return `{"mode":"header","op":"exists","header_key":"` + strings.Repeat("h", n) + `"}`
+	}
 	cases := []requestCase{
 		// listTopics
 		{name: "topics", method: "GET", path: base, wantStatus: 200, wantBody: `"name":"seeded"`},
@@ -168,6 +171,12 @@ func topicMessageCases(t *testing.T) []handlerCase {
 		{name: "search path above max length", method: "POST", path: topic + "/messages/search", contentType: jsonCT, body: longPath(2049), wantStatus: 400, wantBody: `{"code":"invalid_request","error":"request body \"/path\": is out of range"}`},
 		{name: "search bad mode", method: "POST", path: topic + "/messages/search", contentType: jsonCT, body: `{"mode":"sql"}`, wantStatus: 400, wantBody: `request body \"/mode\": must be one of the allowed values`},
 		{name: "search invalid jsonpath", method: "POST", path: topic + "/messages/search", contentType: jsonCT, body: `{"mode":"jsonpath","path":"$[","op":"exists"}`, wantStatus: 400},
+		{name: "search key hit", method: "POST", path: topic + "/messages/search", contentType: jsonCT, body: `{"mode":"key","op":"eq","value":"k1"}`, wantStatus: 200, wantBody: `"key":"k1"`},
+		{name: "search header hit", method: "POST", path: topic + "/messages/search", contentType: jsonCT, body: `{"mode":"header","header_key":"h","op":"eq","value":"v"}`, wantStatus: 200, wantBody: `"h":"v"}`},
+		{name: "search header without key", method: "POST", path: topic + "/messages/search", contentType: jsonCT, body: `{"mode":"header","op":"exists"}`, wantStatus: 400, wantBody: `"error":"header search requires header_key"`},
+		{name: "search header key at max length", method: "POST", path: topic + "/messages/search", contentType: jsonCT, body: longHeaderKey(1024), wantStatus: 200},
+		{name: "search header key above max length", method: "POST", path: topic + "/messages/search", contentType: jsonCT, body: longHeaderKey(1025), wantStatus: 400, wantBody: `{"code":"invalid_request","error":"request body \"/header_key\": is out of range"}`},
+		{name: "search bad op", method: "POST", path: topic + "/messages/search", contentType: jsonCT, body: `{"mode":"key","op":"absent"}`, wantStatus: 400, wantBody: `request body \"/op\": must be one of the allowed values`},
 		{name: "search malformed JSON", method: "POST", path: topic + "/messages/search", contentType: jsonCT, body: `{"mode":`, wantStatus: 400, wantBody: `{"code":"invalid_request","error":"request body: malformed"}`},
 		// listTopicConsumers
 		{name: "consumers", method: "GET", path: topic + "/consumers", wantStatus: 200},

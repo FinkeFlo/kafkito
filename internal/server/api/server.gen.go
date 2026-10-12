@@ -98,8 +98,10 @@ func (e SearchRequestDirection) Valid() bool {
 // Defines values for SearchRequestMode.
 const (
 	SearchRequestModeContains SearchRequestMode = "contains"
+	SearchRequestModeHeader   SearchRequestMode = "header"
 	SearchRequestModeJs       SearchRequestMode = "js"
 	SearchRequestModeJsonpath SearchRequestMode = "jsonpath"
+	SearchRequestModeKey      SearchRequestMode = "key"
 	SearchRequestModeXpath    SearchRequestMode = "xpath"
 )
 
@@ -108,9 +110,13 @@ func (e SearchRequestMode) Valid() bool {
 	switch e {
 	case SearchRequestModeContains:
 		return true
+	case SearchRequestModeHeader:
+		return true
 	case SearchRequestModeJs:
 		return true
 	case SearchRequestModeJsonpath:
+		return true
+	case SearchRequestModeKey:
 		return true
 	case SearchRequestModeXpath:
 		return true
@@ -128,6 +134,7 @@ const (
 	SearchRequestOpGte      SearchRequestOp = "gte"
 	SearchRequestOpLt       SearchRequestOp = "lt"
 	SearchRequestOpLte      SearchRequestOp = "lte"
+	SearchRequestOpMissing  SearchRequestOp = "missing"
 	SearchRequestOpNe       SearchRequestOp = "ne"
 	SearchRequestOpRegex    SearchRequestOp = "regex"
 )
@@ -148,6 +155,8 @@ func (e SearchRequestOp) Valid() bool {
 	case SearchRequestOpLt:
 		return true
 	case SearchRequestOpLte:
+		return true
+	case SearchRequestOpMissing:
 		return true
 	case SearchRequestOpNe:
 		return true
@@ -816,10 +825,17 @@ type SearchRequest struct {
 	Direction *SearchRequestDirection `json:"direction,omitempty"`
 	FromTsMs  *int64                  `json:"from_ts_ms,omitempty"`
 
+	// HeaderKey Header to compare in mode `header`, matched exactly (case-sensitive). Required in that mode; unused otherwise.
+	HeaderKey *string `json:"header_key,omitempty"`
+
 	// Limit Page size: the maximum number of matches to return. Matches beyond it are not lost; `next_cursors` stops at the first one, so the next call returns it.
-	Limit *int               `json:"limit,omitempty"`
-	Mode  *SearchRequestMode `json:"mode,omitempty"`
-	Op    *SearchRequestOp   `json:"op,omitempty"`
+	Limit *int `json:"limit,omitempty"`
+
+	// Mode `contains` matches a substring in the `zones`; `jsonpath` and `xpath` compare what `path` selects in the value; `js` runs a filter expression. `key` compares the record key and `header` the value of the header named by `header_key`; both use `op` and `value` like the path modes. A record without a key or without that header has no value to compare: it matches `missing` only. Both compare what the message list shows: decoded through the Schema Registry and masked where a rule applies, bytes that are not UTF-8 as `0x` hex (of a key only its first 64 bytes), and of a repeated header its last value.
+	Mode *SearchRequestMode `json:"mode,omitempty"`
+
+	// Op Operator of the modes `jsonpath`, `xpath`, `key` and `header`; defaults to `exists` (see `value` for a blank value). `exists` matches when the path selects something, the record has a non-empty key or the header is present; `missing` is its opposite and, like `exists`, ignores `value`. A JSONPath or XPath record whose value does not parse matches neither.
+	Op *SearchRequestOp `json:"op,omitempty"`
 
 	// Partition Absent or -1 = all partitions.
 	Partition *int32 `json:"partition,omitempty"`
@@ -831,7 +847,7 @@ type SearchRequest struct {
 	StopOnLimit *bool  `json:"stop_on_limit,omitempty"`
 	ToTsMs      *int64 `json:"to_ts_ms,omitempty"`
 
-	// Value Search text for mode `contains`, comparison value for `jsonpath` and `xpath` (not needed with op `exists`), JS filter source for mode `js`.
+	// Value Search text for mode `contains`, comparison value for `jsonpath`, `xpath`, `key` and `header` (not needed with op `exists` or `missing`), JS filter source for mode `js`. Blank (empty or whitespace only) means no filter unless `op` is `exists` or `missing`, except in mode `header`, which compares it as is.
 	Value *string               `json:"value,omitempty"`
 	Zones *[]SearchRequestZones `json:"zones,omitempty"`
 }
@@ -839,10 +855,10 @@ type SearchRequest struct {
 // SearchRequestDirection defines model for SearchRequest.Direction.
 type SearchRequestDirection string
 
-// SearchRequestMode defines model for SearchRequest.Mode.
+// SearchRequestMode `contains` matches a substring in the `zones`; `jsonpath` and `xpath` compare what `path` selects in the value; `js` runs a filter expression. `key` compares the record key and `header` the value of the header named by `header_key`; both use `op` and `value` like the path modes. A record without a key or without that header has no value to compare: it matches `missing` only. Both compare what the message list shows: decoded through the Schema Registry and masked where a rule applies, bytes that are not UTF-8 as `0x` hex (of a key only its first 64 bytes), and of a repeated header its last value.
 type SearchRequestMode string
 
-// SearchRequestOp defines model for SearchRequest.Op.
+// SearchRequestOp Operator of the modes `jsonpath`, `xpath`, `key` and `header`; defaults to `exists` (see `value` for a blank value). `exists` matches when the path selects something, the record has a non-empty key or the header is present; `missing` is its opposite and, like `exists`, ignores `value`. A JSONPath or XPath record whose value does not parse matches neither.
 type SearchRequestOp string
 
 // SearchRequestZones defines model for SearchRequest.Zones.

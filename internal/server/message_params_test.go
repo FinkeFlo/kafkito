@@ -298,6 +298,12 @@ func TestSearchOptions(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, o.StopOnLimit)
 
+	header := gen.SearchRequestMode("header")
+	o, err = searchOptions(&gen.SearchRequest{Mode: &header, HeaderKey: ptr("x-trace-id")})
+	require.NoError(t, err)
+	assert.Equal(t, kafkapkg.SearchMode("header"), o.Mode)
+	assert.Equal(t, "x-trace-id", o.HeaderKey)
+
 	_, err = searchOptions(&gen.SearchRequest{Cursors: &map[string]int64{"x": 1}})
 	assertBadRequest(t, err, `invalid partition key in cursors: "x"`)
 }
