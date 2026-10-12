@@ -7,6 +7,8 @@ import { prettyValue } from "@/lib/format";
 import { useFormatters } from "@/lib/use-formatters";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { StatusIcon } from "@/components/ui/StatusIcon";
+import { Tag } from "@/components/ui/Tag";
+import { sameMessage, useCompareSelection } from "@/lib/compare-selection";
 import { ReplayModal } from "@/features/messages/ReplayModal";
 import { CompareAction } from "@/features/messages/compare/CompareAction";
 import { ValueBody } from "@/features/messages/ValueBody";
@@ -26,6 +28,8 @@ export function MessageRow({
 }) {
   const fmt = useFormatters();
   const { cluster, topic } = routeApi.useParams();
+  const target = { cluster, topic, partition: m.partition, offset: m.offset };
+  const selectedForCompare = sameMessage(useCompareSelection(), target);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -102,6 +106,7 @@ export function MessageRow({
             preview
           </span>
         )}
+        {selectedForCompare && <Tag variant="info">selected for compare</Tag>}
         <Timestamp value={m.timestamp_ms} className="text-[10px] text-subtle-text" />
         {m.key && (
           <span className="font-mono text-muted">
@@ -126,7 +131,7 @@ export function MessageRow({
             >
               Replay to…
             </button>
-            <CompareAction target={{ cluster, topic, partition: m.partition, offset: m.offset }} />
+            <CompareAction target={target} />
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <DetailSection

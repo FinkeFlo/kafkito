@@ -205,7 +205,11 @@ function ReferenceCell({ target }: { target: MessageRef }) {
   return (
     <div className="flex min-w-0 items-center gap-3">
       <MonoId value={formatMessageRef(target)} tailChars={16} className="min-w-0" />
-      <Link {...messageListLink(target)} className="shrink-0 text-xs text-accent hover:underline">
+      <Link
+        {...messageListLink(target)}
+        aria-label={`Open ${formatMessageRef(target)} in its topic`}
+        className="shrink-0 text-xs text-accent hover:underline"
+      >
         Open in topic
       </Link>
     </div>
