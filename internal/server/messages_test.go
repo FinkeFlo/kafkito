@@ -4,34 +4,51 @@
 package server
 
 import (
+	"errors"
+	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	kafkapkg "github.com/FinkeFlo/kafkito/internal/kafka"
 )
 
-func TestIsSearchClientErr(t *testing.T) {
+// A search the options cannot express is a 400 with its text; any other
+// store error is the generic 502, even when its text names a search keyword
+// (a topic name may carry one) next to a broker address.
+func TestSearchMessages_ErrorMapping(t *testing.T) {
 	t.Parallel()
 
-	cases := []struct {
-		name string
-		msg  string
-		want bool
+	const path = "/api/v1/clusters/kf/topics/orders_header_key/messages/search"
+	for _, tc := range []struct {
+		name       string
+		err        error
+		wantStatus int
+		wantBody   string
 	}{
-		{name: "jsonpath keyword", msg: "invalid jsonpath expression: $.[", want: true},
-		{name: "xpath keyword", msg: "xpath compile error", want: true},
-		{name: "regex keyword", msg: "invalid regex: [unclosed", want: true},
-		{name: "numeric op keyword", msg: "numeric op requires a number value", want: true},
-		{name: "unknown search mode", msg: "unknown search mode: fuzzy", want: true},
-		{name: "unknown operator", msg: "unknown operator: between", want: true},
-		{name: "js filter keyword", msg: "js filter compile error", want: true},
-		{name: "broker network error", msg: "dial tcp broker-host:9092: connection refused", want: false},
-		{name: "timeout", msg: "context deadline exceeded", want: false},
-		{name: "topic not found", msg: "topic does not exist", want: false},
-	}
-	for _, tc := range cases {
+		{
+			name:       "invalid search",
+			err:        fmt.Errorf("%w: header search requires header_key", kafkapkg.ErrInvalidSearch),
+			wantStatus: http.StatusBadRequest,
+			wantBody:   `"error":"invalid search: header search requires header_key"`,
+		},
+		{
+			name:       "broker error naming a keyword",
+			err:        errors.New(`fetch metadata for topic "orders_header_key" regex xpath jsonpath: dial tcp broker-1.internal:9092: connection refused`),
+			wantStatus: http.StatusBadGateway,
+			wantBody:   `"code":"kafka_upstream"`,
+		},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tc.want, isSearchClientErr(tc.msg), "isSearchClientErr(%q)", tc.msg)
+			h := fakeServer(t, stores{messages: fakeMessages{search: func(kafkapkg.SearchOptions) (*kafkapkg.SearchResult, error) {
+				return nil, tc.err
+			}}})
+			_, rec := requestCase{method: http.MethodPost, path: path, contentType: "application/json", body: `{"mode":"key","op":"exists"}`}.do(t, h)
+			assert.Equal(t, tc.wantStatus, rec.Code, rec.Body.String())
+			assert.Contains(t, rec.Body.String(), tc.wantBody)
+			assert.NotContains(t, rec.Body.String(), "broker-1.internal")
 		})
 	}
 }

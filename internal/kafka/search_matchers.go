@@ -90,8 +90,12 @@ func (c *containsMatcher) match(m *Message) (bool, error) {
 // stringified results found when applying the expression to value.
 type pathEval func(value string) ([]string, bool, error) // results, parsed OK, err
 
+// fieldEval selects the strings an operator compares from a record: what a
+// path finds in the value, the key, or one header.
+type fieldEval func(m *Message) ([]string, bool, error) // results, parsed OK, err
+
 type pathMatcher struct {
-	eval   pathEval
+	eval   fieldEval
 	op     SearchOp
 	value  string
 	valNum float64
@@ -99,7 +103,34 @@ type pathMatcher struct {
 	rx     *regexp.Regexp
 }
 
+// newPathMatcher compares what a JSONPath or XPath expression finds in the
+// record value.
 func newPathMatcher(ev pathEval, op SearchOp, value string) (*pathMatcher, error) {
+	return newFieldMatcher(func(m *Message) ([]string, bool, error) { return ev(m.Value) }, op, value)
+}
+
+// keyEval yields the record key, or nothing for a record without one (a null
+// or empty key, which the list renders as "no key").
+func keyEval(m *Message) ([]string, bool, error) {
+	if m.Key == "" {
+		return nil, true, nil
+	}
+	return []string{m.Key}, true, nil
+}
+
+// headerEval yields the value of the header named key, matched exactly, or
+// nothing when the record does not carry it.
+func headerEval(key string) fieldEval {
+	return func(m *Message) ([]string, bool, error) {
+		v, ok := m.Headers[key]
+		if !ok {
+			return nil, true, nil
+		}
+		return []string{v}, true, nil
+	}
+}
+
+func newFieldMatcher(ev fieldEval, op SearchOp, value string) (*pathMatcher, error) {
 	if op == "" {
 		op = OpExists
 	}
@@ -118,7 +149,7 @@ func newPathMatcher(ev pathEval, op SearchOp, value string) (*pathMatcher, error
 		}
 		pm.valNum = n
 		pm.numOK = true
-	case OpExists, OpEq, OpNeq, OpContains:
+	case OpExists, OpMissing, OpEq, OpNeq, OpContains:
 	default:
 		return nil, fmt.Errorf("unknown operator: %s", op)
 	}
@@ -126,12 +157,15 @@ func newPathMatcher(ev pathEval, op SearchOp, value string) (*pathMatcher, error
 }
 
 func (p *pathMatcher) match(m *Message) (bool, error) {
-	results, ok, err := p.eval(m.Value)
+	results, ok, err := p.eval(m)
 	if !ok {
 		return false, err // err may be nil (unparseable = skip) or a parse error
 	}
-	if p.op == OpExists {
+	switch p.op {
+	case OpExists:
 		return len(results) > 0, nil
+	case OpMissing:
+		return len(results) == 0, nil
 	}
 	for _, r := range results {
 		if p.compare(r) {

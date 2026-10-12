@@ -1,21 +1,31 @@
 import type { SearchMode, SearchOp } from "@/lib/api";
 import { MAX_HYDRATE_VALUE_BYTES } from "@/lib/hydrate-sample";
 import { useFormatters } from "@/lib/use-formatters";
+import { HeaderKeySense } from "./HeaderKeySense";
 import { PathSense } from "./PathSense";
+import type { HeaderKeyStat } from "./header-keys";
 import type { PathSuggestions } from "./use-path-suggestions";
 import type { SearchForm } from "./use-search-form";
 
-/** Mode, path, operator and value inputs of the search panel. */
+/** Mode, path, header key, operator and value inputs of the search panel. */
 export function SearchQueryFields({
   form,
   suggestions,
+  headerKeys,
 }: {
   form: SearchForm;
   suggestions: PathSuggestions;
+  /** Header keys of the loaded messages and how many messages that is. */
+  headerKeys: { stats: HeaderKeyStat[]; total: number };
 }) {
   const fmt = useFormatters();
-  const { mode, setMode, path, setPath, op, setOp, needle, setNeedle } = form;
+  const { mode, setMode, path, setPath, headerKey, setHeaderKey, op, setOp, needle, setNeedle } =
+    form;
   const { pathTree, xmlPathTree, sampleTooLargeToScan } = suggestions;
+  // Every mode but text and JavaScript compares with an operator; exists and
+  // missing check presence only and need no value.
+  const usesOperator = mode !== "contains" && mode !== "js";
+  const valueIgnored = usesOperator && (op === "exists" || op === "missing");
 
   return (
     <>
@@ -30,12 +40,14 @@ export function SearchQueryFields({
           className="rounded border border-border bg-panel px-2 py-1"
         >
           <option value="contains">Text contains</option>
+          <option value="key">Record key</option>
+          <option value="header">Header</option>
           <option value="jsonpath">JSONPath</option>
           <option value="xpath">XPath</option>
           <option value="js">JavaScript</option>
         </select>
 
-        {mode !== "contains" && mode !== "js" && (
+        {(mode === "jsonpath" || mode === "xpath") && (
           <>
             <label className="font-medium" htmlFor="search-path">
               Path
@@ -68,6 +80,26 @@ export function SearchQueryFields({
                 }}
               />
             </div>
+          </>
+        )}
+        {mode === "header" && (
+          <>
+            <label className="font-medium" htmlFor="search-header-key">
+              Header key
+            </label>
+            <div className="w-56">
+              <HeaderKeySense
+                id="search-header-key"
+                value={headerKey}
+                onChange={setHeaderKey}
+                stats={headerKeys.stats}
+                total={headerKeys.total}
+              />
+            </div>
+          </>
+        )}
+        {usesOperator && (
+          <>
             <label className="font-medium" htmlFor="search-operator">
               Operator
             </label>
@@ -78,6 +110,7 @@ export function SearchQueryFields({
               className="rounded border border-border bg-panel px-2 py-1"
             >
               <option value="exists">exists</option>
+              <option value="missing">missing</option>
               <option value="eq">=</option>
               <option value="ne">≠</option>
               <option value="contains">contains</option>
@@ -112,15 +145,34 @@ export function SearchQueryFields({
             placeholder={
               mode === "contains"
                 ? "Substring"
-                : op === "exists"
+                : valueIgnored
                   ? "(ignored)"
                   : "e.g. 42 / shipped / ^A.*"
             }
             className="w-56 rounded border border-border bg-panel px-2 py-1 font-mono"
-            disabled={mode !== "contains" && op === "exists"}
+            disabled={valueIgnored}
+            aria-describedby={valueIgnored ? "search-value-ignored" : undefined}
           />
         )}
+        {valueIgnored && (
+          <span id="search-value-ignored" className="sr-only">
+            Not needed: {op} checks presence only.
+          </span>
+        )}
       </div>
+      {mode === "key" && (
+        <div className="rounded border border-border bg-panel p-2 text-[11px] text-muted">
+          Compares the record key as the list shows it. <code className="font-mono">exists</code>{" "}
+          finds records with a key. <SearchDocsLink />
+        </div>
+      )}
+      {mode === "header" && (
+        <div className="rounded border border-border bg-panel p-2 text-[11px] text-muted">
+          Compares the value of one header. The header key matches exactly, case-sensitive; a record
+          without the header matches <code className="font-mono">missing</code> only.{" "}
+          <SearchDocsLink />
+        </div>
+      )}
       {mode === "jsonpath" && (
         <div className="rounded border border-border bg-panel p-2 text-[11px] text-muted">
           Example: <code className="font-mono">$.order.orderNumber</code>. <SearchDocsLink />

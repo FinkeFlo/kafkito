@@ -337,6 +337,23 @@ func TestConsume_MasksSchemaRegistryDecodedKey(t *testing.T) {
 	assert.Contains(t, m.Key, `"name":"***"`)
 }
 
+// Key mode compares the decoded key after masking, like the list shows it.
+func TestSearch_KeyModeMatchesMaskedSchemaRegistryKey(t *testing.T) {
+	t.Parallel()
+	srURL := startFakeSchemaRegistry(t)
+	env := newKfakeEnv(t, "users", 1, func(c *config.ClusterConfig) {
+		c.SchemaRegistry = config.SchemaRegistryConfig{URL: srURL}
+		c.DataMasking = []config.MaskingRule{{Targets: []string{config.MaskTargetKey}, Fields: []string{"$.name"}}}
+	})
+	env.produce(t, &kgo.Record{Key: avroUserFrame(t, 1, "alice"), Value: []byte("v")})
+
+	miss := searchTopic(t, env, SearchOptions{Partition: -1, Mode: SearchModeKey, Op: OpContains, Value: "alice"})
+	assert.Empty(t, miss.Messages, "the clear-text name is not searchable")
+	hit := searchTopic(t, env, SearchOptions{Partition: -1, Mode: SearchModeKey, Op: OpContains, Value: `"name":"***"`})
+	require.Len(t, hit.Messages, 1)
+	assert.True(t, hit.Messages[0].KeyMasked)
+}
+
 func TestSearch_MatchesOnlyMaskedKeysAndHeaders(t *testing.T) {
 	t.Parallel()
 	env := newKfakeEnv(t, customersTopic, 1, keyHeaderRules)
@@ -350,6 +367,14 @@ func TestSearch_MatchesOnlyMaskedKeysAndHeaders(t *testing.T) {
 		{Value: "Bearer", Zones: []SearchZone{ZoneHeaders}},
 		{Mode: SearchModeJS, Value: `key.includes("s3cr3t") || key.includes("1001")`},
 		{Mode: SearchModeJS, Value: `Object.values(headers || {}).some(v => v.includes("s3cr3t") || v.includes("Bearer"))`},
+		{Mode: SearchModeKey, Op: OpContains, Value: "s3cr3t"},
+		{Mode: SearchModeKey, Op: OpRegex, Value: "1001"},
+		{Mode: SearchModeHeader, HeaderKey: "authorization", Op: OpContains, Value: "Bearer"},
+		{Mode: SearchModeHeader, HeaderKey: "authorization", Op: OpRegex, Value: "^B"},
+		{Mode: SearchModeHeader, HeaderKey: "x-secret-bin", Op: OpContains, Value: "7333"},
+		{Mode: SearchModeKey, Op: OpContains, Value: "7333"},
+		{Mode: SearchModeKey, Op: OpEq, Value: "cust-1001s3cr3t"},
+		{Mode: SearchModeHeader, HeaderKey: "authorization", Op: OpEq, Value: "Bearer s3cr3t-token"},
 	}
 	for _, opts := range noHits {
 		opts.Partition = -1
@@ -363,6 +388,8 @@ func TestSearch_MatchesOnlyMaskedKeysAndHeaders(t *testing.T) {
 		"masked header":  {Value: "[redacted]", Zones: []SearchZone{ZoneHeaders}},
 		"visible header": {Value: "trace-visible", Zones: []SearchZone{ZoneHeaders}},
 		"js masked key":  {Mode: SearchModeJS, Value: `key === "cust-***"`},
+		"key mode":       {Mode: SearchModeKey, Op: OpEq, Value: "cust-***"},
+		"header mode":    {Mode: SearchModeHeader, HeaderKey: "authorization", Op: OpEq, Value: "[redacted]"},
 	}
 	for name, opts := range hits {
 		opts.Partition = -1
@@ -374,6 +401,26 @@ func TestSearch_MatchesOnlyMaskedKeysAndHeaders(t *testing.T) {
 			assert.True(t, m.KeyMasked, "%s: offset %d", name, m.Offset)
 		}
 	}
+}
+
+// Header keys are never masked and every response shows them, so exists and
+// missing reveal nothing beyond what the list shows.
+func TestSearch_HeaderPresenceOnMaskedHeaders(t *testing.T) {
+	t.Parallel()
+	env := newKfakeEnv(t, customersTopic, 1, keyHeaderRules)
+	env.produce(t, keyHeaderRecords()...)
+
+	offsets := func(op SearchOp) []int64 {
+		res := searchTopic(t, env, SearchOptions{Partition: -1, Direction: DirOldestFirst, Mode: SearchModeHeader, HeaderKey: "authorization", Op: op})
+		out := []int64{}
+		for _, m := range res.Messages {
+			assertNoKeyHeaderLeak(t, m)
+			out = append(out, m.Offset)
+		}
+		return out
+	}
+	assert.Equal(t, []int64{0}, offsets(OpExists))
+	assert.Equal(t, []int64{1, 2}, offsets(OpMissing))
 }
 
 // JS errors can quote the key or a header; a topic with only key/header

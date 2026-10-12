@@ -418,6 +418,8 @@ test.describe("Messages panel — search form", () => {
     await expect(mode).toHaveValue("contains");
     await expect(mode.locator("option")).toHaveText([
       "Text contains",
+      "Record key",
+      "Header",
       "JSONPath",
       "XPath",
       "JavaScript",
@@ -437,6 +439,7 @@ test.describe("Messages panel — search form", () => {
     await expect(op).toHaveValue("contains");
     await expect(op.locator("option")).toHaveText([
       "exists",
+      "missing",
       "=",
       "≠",
       "contains",
@@ -463,6 +466,19 @@ test.describe("Messages panel — search form", () => {
 
     await mode.selectOption("xpath");
     await expect(page.getByPlaceholder("//order/@status")).toBeVisible();
+
+    // Record key and Header compare with the operator but take no path; a
+    // header search needs its header key.
+    await mode.selectOption("key");
+    await expect(page.getByLabel("Path", { exact: true })).toHaveCount(0);
+    await expect(op).toBeVisible();
+    await expect(run).toBeEnabled();
+    await mode.selectOption("header");
+    const headerKey = page.getByRole("combobox", { name: "Header key", exact: true });
+    await expect(headerKey).toBeVisible();
+    await expect(run).toBeDisabled();
+    await headerKey.fill("x-e2e");
+    await expect(run).toBeEnabled();
 
     await mode.selectOption("js");
     await expect(page.getByLabel("Path", { exact: true })).toHaveCount(0);
@@ -861,11 +877,11 @@ test.describe("Messages panel — click-to-filter helpers", () => {
     await expect(page.getByPlaceholder("Type or ↓ for top fields")).toHaveValue("$.order");
     await expect(page.getByLabel("Operator", { exact: true })).toHaveValue("eq");
     await expect(page.getByLabel("Value", { exact: true })).toHaveValue("E2E-MASK-1");
-    await expect(page.getByText("Path replaced by click.")).toBeVisible();
+    await expect(page.getByText("Search replaced by click.")).toBeVisible();
 
     await page.getByRole("button", { name: "Undo", exact: true }).click();
-    await expect(page.getByText("Path replaced by click.")).toHaveCount(0);
-    // Undo restores path, operator and value; the mode stays JSONPath.
+    await expect(page.getByText("Search replaced by click.")).toHaveCount(0);
+    // Undo restores mode, path, operator and value; the mode was JSONPath before.
     await expect(page.getByLabel("Mode", { exact: true })).toHaveValue("jsonpath");
     await expect(page.getByPlaceholder("Type or ↓ for top fields")).toHaveValue("");
     await expect(page.getByLabel("Operator", { exact: true })).toHaveValue("contains");
@@ -880,7 +896,7 @@ test.describe("Messages panel — click-to-filter helpers", () => {
 
     await expect(page.getByRole("button", { name: "Close search", exact: true })).toBeVisible();
     await expect(page.getByPlaceholder("Type or ↓ for top fields")).toHaveValue("$.order");
-    await expect(page.getByText("Path replaced by click.")).toHaveCount(0);
+    await expect(page.getByText("Search replaced by click.")).toHaveCount(0);
   });
 
   test("a row expands and collapses with the keyboard", async ({ page }) => {

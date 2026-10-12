@@ -24,6 +24,7 @@ export function SearchRunBar({
   const {
     mode,
     path,
+    headerKey,
     needle,
     direction,
     setDirection,
@@ -96,7 +97,8 @@ export function SearchRunBar({
         disabled={
           searching ||
           (mode === "js" && needle.trim() === "") ||
-          (mode !== "contains" && mode !== "js" && path.trim() === "")
+          ((mode === "jsonpath" || mode === "xpath") && path.trim() === "") ||
+          (mode === "header" && headerKey === "")
         }
         className="rounded bg-accent px-3 py-1 font-semibold text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
       >

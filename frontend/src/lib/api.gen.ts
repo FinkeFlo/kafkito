@@ -1354,13 +1354,21 @@ export interface components {
              * @default true
              */
             stop_on_limit?: boolean;
-            /** @enum {string} */
-            mode?: "contains" | "jsonpath" | "xpath" | "js";
+            /**
+             * @description `contains` matches a substring in the `zones`; `jsonpath` and `xpath` compare what `path` selects in the value; `js` runs a filter expression. `key` compares the record key and `header` the value of the header named by `header_key`; both use `op` and `value` like the path modes. A record without a key or without that header has no value to compare: it matches `missing` only. Both compare what the message list shows: decoded through the Schema Registry and masked where a rule applies, bytes that are not UTF-8 as `0x` hex (of a key only its first 64 bytes), and of a repeated header its last value.
+             * @enum {string}
+             */
+            mode?: "contains" | "jsonpath" | "xpath" | "js" | "key" | "header";
             /** @description JSONPath or XPath expression for modes `jsonpath` and `xpath`; unused otherwise. */
             path?: string;
-            /** @enum {string} */
-            op?: "exists" | "eq" | "ne" | "contains" | "regex" | "gt" | "lt" | "gte" | "lte";
-            /** @description Search text for mode `contains`, comparison value for `jsonpath` and `xpath` (not needed with op `exists`), JS filter source for mode `js`. */
+            /** @description Header to compare in mode `header`, matched exactly (case-sensitive). Required in that mode; unused otherwise. */
+            header_key?: string;
+            /**
+             * @description Operator of the modes `jsonpath`, `xpath`, `key` and `header`; defaults to `exists` (see `value` for a blank value). `exists` matches when the path selects something, the record has a non-empty key or the header is present; `missing` is its opposite and, like `exists`, ignores `value`. A JSONPath or XPath record whose value does not parse matches neither.
+             * @enum {string}
+             */
+            op?: "exists" | "missing" | "eq" | "ne" | "contains" | "regex" | "gt" | "lt" | "gte" | "lte";
+            /** @description Search text for mode `contains`, comparison value for `jsonpath`, `xpath`, `key` and `header` (not needed with op `exists` or `missing`), JS filter source for mode `js`. Blank (empty or whitespace only) means no filter unless `op` is `exists` or `missing`, except in mode `header`, which compares it as is. */
             value?: string;
             zones?: ("value" | "key" | "headers")[];
             /** Format: int64 */
