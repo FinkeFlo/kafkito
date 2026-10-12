@@ -410,9 +410,10 @@ curl -s -o /dev/null -w '%{http_code}\n' \
 
 Bounded content search with a scan budget. The body is a `SearchRequest`
 (see the spec). Common fields: `mode` (`contains` | `jsonpath` | `xpath` |
-`js`), `path` (the JSONPath or XPath expression), `op` (`exists` | `eq` |
-`contains` | `regex` | …), `value` (the needle, or the JS predicate in `js`
-mode), `zones` (e.g. `["value","headers","key"]`), `direction`
+`js` | `key` | `header`), `path` (the JSONPath or XPath expression),
+`header_key` (the header `header` mode compares), `op` (`exists` | `missing` |
+`eq` | `contains` | `regex` | …), `value` (the needle, or the JS predicate in
+`js` mode), `zones` (e.g. `["value","headers","key"]`), `direction`
 (`newest_first` | `oldest_first`), `limit` (matches per call) and `budget`
 (records a call reads at most). The response carries the matches in `messages`
 and the scan statistics in `search`; pass `search.next_cursors` back as
@@ -462,12 +463,27 @@ curl -sS -X POST "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/search" 
   | jq '.search, (.messages[] | {p:.partition, off:.offset})'
 ```
 
+Header and key: compare one header or the record key with the same operators
+
+```bash
+# Records whose header x-correlation-id is abc-123
+curl -sS -X POST "$BASE/api/v1/clusters/$CLUSTER/topics/$TOPIC/messages/search" \
+  -H 'content-type: application/json' \
+  -d '{"mode":"header","header_key":"x-correlation-id","op":"eq","value":"abc-123","limit":20}' \
+  | jq '.search, (.messages[] | {p:.partition, off:.offset})'
+
+# Other bodies: records without a tenant header, records whose key starts with ord-
+#   {"mode":"header","header_key":"x-tenant","op":"missing"}
+#   {"mode":"key","op":"regex","value":"^ord-"}
+```
+
 Notes:
 - JSONPath filters return nodes; use `op=exists` to treat any match as a hit.
+- `header` mode matches `header_key` exactly (case-sensitive). `exists` finds records that carry the header, `missing` those that do not; the other operators compare the header value and never match a record without the header. In `key` mode, `exists` and `missing` ask whether the record has a non-empty key.
 - JS mode receives a parsed JSON object as `parsed` and can express arbitrarily complex predicates. The server enforces a short per-message timeout for JS filters.
 - Use `zones` to control where the scanner looks (`value`, `headers`, `key`).
 - Matching runs against each record's full, untruncated content, so `contains`/`jsonpath`/`xpath`/`js` all find hits anywhere in large values (there is no size limit on what is *searched*). Only the message previews in the response stay capped at 64 KB per value, same as `GET .../messages` — use the raw-download endpoint to fetch a full value for a hit.
-- On topics with a `data_masking` rule, the value is matched in its **masked** form — the same rendering `GET .../messages` returns — so masked content is not searchable in clear text. The same holds for keys and header values on topics with a `key` or `headers` rule (the `contains` key/headers zones and `key`/`headers` in `js`); header keys are not masked and are matched as they are. Parse errors on such topics report `value could not be evaluated (details withheld: data masking applies to this topic)` in `parse_error_offsets[].error` instead of the parser's message, which can quote the value.
+- On topics with a `data_masking` rule, the value is matched in its **masked** form — the same rendering `GET .../messages` returns — so masked content is not searchable in clear text. The same holds for keys and header values on topics with a `key` or `headers` rule (the `contains` key/headers zones, the `key` and `header` modes, and `key`/`headers` in `js`); header keys are not masked and are matched as they are. Parse errors on such topics report `value could not be evaluated (details withheld: data masking applies to this topic)` in `parse_error_offsets[].error` instead of the parser's message, which can quote the value.
 - The server log gets one warning per search that skipped records: the count per error kind (`json_parse_error`, `xml_parse_error`, `js_error`, `js_timeout`) and the partition and offset of the first skipped record. Error texts are never logged, on any cluster, because they can quote record content.
 
 ### Produce

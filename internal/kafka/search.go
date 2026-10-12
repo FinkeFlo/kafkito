@@ -29,14 +29,18 @@ const (
 	SearchModeJSONPath SearchMode = "jsonpath"
 	SearchModeXPath    SearchMode = "xpath"
 	SearchModeJS       SearchMode = "js"
+	SearchModeKey      SearchMode = "key"
+	SearchModeHeader   SearchMode = "header"
 )
 
-// SearchOp enumerates the comparison operators for path modes.
+// SearchOp enumerates the comparison operators of the path, key and header
+// modes.
 type SearchOp string
 
 // Supported search operators.
 const (
 	OpExists   SearchOp = "exists"
+	OpMissing  SearchOp = "missing"
 	OpEq       SearchOp = "eq"
 	OpNeq      SearchOp = "ne"
 	OpContains SearchOp = "contains"
@@ -48,7 +52,8 @@ const (
 )
 
 // SearchZone names the record part to consider for contains-mode matching.
-// Path modes always operate on the record value.
+// Path modes always operate on the record value, the key and header modes on
+// the key and on one header.
 type SearchZone string
 
 // Search zones.
@@ -79,6 +84,8 @@ type SearchOptions struct {
 	Op    SearchOp
 	Value string
 	Zones []SearchZone
+	// HeaderKey names the header SearchModeHeader compares, matched exactly.
+	HeaderKey string
 
 	// FromTS/ToTS are UNIX millis. Zero means "not set"; zero lower bound defaults
 	// to the partition start, zero upper bound to the partition end.
@@ -148,6 +155,22 @@ type PartitionRange struct {
 	End   int64 `json:"end"`
 }
 
+// ErrInvalidSearch marks a search its options cannot express: an unknown
+// mode or operator, a missing header key, or an expression, regex or number
+// that does not compile. SearchMessages raises it before it contacts a
+// broker, so the error never carries a broker address.
+var ErrInvalidSearch = errors.New("invalid search")
+
+// invalidSearchError keeps the text of a compile error and matches
+// ErrInvalidSearch.
+type invalidSearchError struct{ err error }
+
+func (e *invalidSearchError) Error() string { return e.err.Error() }
+
+func (e *invalidSearchError) Unwrap() error { return e.err }
+
+func (e *invalidSearchError) Is(target error) bool { return target == ErrInvalidSearch }
+
 // SearchResult is the value returned by SearchMessages.
 type SearchResult struct {
 	Messages []Message   `json:"messages"`
@@ -156,8 +179,10 @@ type SearchResult struct {
 
 // compile turns the options into a matcher. Nil matcher means "pass all".
 func (o SearchOptions) compile() (matcher, error) {
-	if strings.TrimSpace(o.Value) == "" && o.Op != OpExists {
-		// Empty needle with no predicate = no filter.
+	// Empty needle with no predicate = no filter. In header mode the header
+	// key is the predicate, so an empty value compares against an empty
+	// header value instead.
+	if strings.TrimSpace(o.Value) == "" && o.Op != OpExists && o.Op != OpMissing && o.Mode != SearchModeHeader {
 		return passAllMatcher{}, nil
 	}
 	zones := o.Zones
@@ -178,8 +203,8 @@ func (o SearchOptions) compile() (matcher, error) {
 		// pattern), not user data spliced into a privileged expression -
 		// there is no base query for it to escape, and the antchfx/xpath
 		// engine used here has no variable-binding API to parameterize
-		// against anyway. Length/complexity is bounded by the caller
-		// (see maxSearchPathLen in internal/server) to guard against
+		// against anyway. Its length is bounded by the API contract
+		// (`maxLength` of `path` in api/openapi.yaml) to guard against
 		// pathological expressions.
 		expr, err := xpath.Compile(o.Path)
 		if err != nil {
@@ -188,6 +213,13 @@ func (o SearchOptions) compile() (matcher, error) {
 		return newPathMatcher(xmlPathEval(expr), o.Op, o.Value)
 	case SearchModeJS:
 		return newJSMatcher(o.Value)
+	case SearchModeKey:
+		return newFieldMatcher(keyEval, o.Op, o.Value)
+	case SearchModeHeader:
+		if o.HeaderKey == "" {
+			return nil, errors.New("header search requires header_key")
+		}
+		return newFieldMatcher(headerEval(o.HeaderKey), o.Op, o.Value)
 	default:
 		return nil, fmt.Errorf("unknown search mode: %s", o.Mode)
 	}
@@ -240,7 +272,7 @@ func (r *Messages) SearchMessages(ctx context.Context, cluster, topic string, op
 	opts = opts.withDefaults()
 	mt, err := opts.compile()
 	if err != nil {
-		return nil, err
+		return nil, &invalidSearchError{err: err}
 	}
 
 	// Partitions are not validated: an unknown partition resolves to an

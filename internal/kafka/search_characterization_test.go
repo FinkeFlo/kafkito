@@ -215,6 +215,46 @@ func TestSearchCharacterization_JavaScript(t *testing.T) {
 	assert.Len(t, broken.Stats.ParseErrorOffsets, 24)
 }
 
+// The key and header modes compare the record key and one header, matched
+// by its exact key, with the operators of the path modes.
+func TestSearchCharacterization_KeyAndHeaderModes(t *testing.T) {
+	t.Parallel()
+	env, _ := newOrdersEnv(t)
+	oldest := func(opts SearchOptions) []int {
+		opts.Partition = -1
+		opts.Limit = 500
+		opts.Direction = DirOldestFirst
+		res := searchTopic(t, env, opts)
+		assert.Equal(t, 24, res.Stats.Scanned)
+		assert.Equal(t, len(res.Messages), res.Stats.Matched)
+		return seqs(t, res.Messages)
+	}
+	key := func(op SearchOp, value string) []int {
+		return oldest(SearchOptions{Mode: SearchModeKey, Op: op, Value: value})
+	}
+	header := func(name string, op SearchOp, value string) []int {
+		return oldest(SearchOptions{Mode: SearchModeHeader, HeaderKey: name, Op: op, Value: value})
+	}
+
+	assert.Equal(t, []int{7}, key(OpEq, "k-7"))
+	assert.Equal(t, []int{2, 20, 21, 22, 23}, key(OpContains, "k-2"))
+	assert.Equal(t, []int{3, 13, 23}, key(OpRegex, "3$"))
+	assert.Len(t, key(OpNeq, "k-7"), 23)
+	assert.Len(t, key(OpExists, ""), 24)
+	assert.Empty(t, key(OpMissing, ""))
+	assert.Len(t, key(OpEq, ""), 24, "an empty value is no filter in key mode")
+
+	assert.Equal(t, []int{7}, header("seq", OpEq, "7"))
+	assert.Equal(t, []int{7, 17}, header("seq", OpContains, "7"))
+	assert.Equal(t, []int{21, 22, 23}, header("seq", OpGt, "20"))
+	assert.Len(t, header("seq", OpExists, ""), 24)
+	assert.Empty(t, header("seq", OpMissing, ""))
+	assert.Empty(t, header("SEQ", OpExists, ""), "header keys match case-sensitively")
+	assert.Len(t, header("trace-id", OpMissing, ""), 24)
+	assert.Empty(t, header("trace-id", OpNeq, "x"), "an absent header has no value to compare")
+	assert.Empty(t, header("seq", OpEq, ""), "an empty value compares against the header value")
+}
+
 func TestSearchCharacterization_InvalidQueriesAndUnknownCluster(t *testing.T) {
 	t.Parallel()
 	env, _ := newOrdersEnv(t)
@@ -226,9 +266,12 @@ func TestSearchCharacterization_InvalidQueriesAndUnknownCluster(t *testing.T) {
 		{Mode: SearchModeXPath, Path: "//[", Value: "x"},
 		{Mode: SearchModeJS, Value: "return ("},
 		{Mode: SearchModeJSONPath, Path: "$.a", Op: OpGt, Value: "abc"},
+		{Mode: SearchModeHeader, Op: OpExists},
+		{Mode: SearchModeKey, Op: OpRegex, Value: "["},
+		{Mode: SearchModeKey, Op: "between", Value: "x"},
 	} {
 		_, err := env.reg.SearchMessages(ctx, kfakeCluster, env.topic, opts)
-		require.Error(t, err, "%+v", opts)
+		require.ErrorIs(t, err, ErrInvalidSearch, "%+v", opts)
 	}
 
 	_, err := env.reg.SearchMessages(ctx, "nope", env.topic, SearchOptions{})

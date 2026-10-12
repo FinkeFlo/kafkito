@@ -10,15 +10,18 @@ import { StatusIcon } from "@/components/ui/StatusIcon";
 import { ReplayModal } from "@/features/messages/ReplayModal";
 import { ValueBody } from "@/features/messages/ValueBody";
 import { MaskedBadge } from "@/features/messages/MaskedBadge";
+import type { FieldFilter } from "@/features/messages/use-click-to-filter";
 
 const routeApi = getRouteApi("/clusters/$cluster/topics/$topic/messages");
 
 export function MessageRow({
   m,
   onPick,
+  onFilter,
 }: {
   m: Message;
   onPick: (trail: Token[], leafValue: unknown) => void;
+  onFilter: (filter: FieldFilter) => void;
 }) {
   const fmt = useFormatters();
   const { cluster, topic } = routeApi.useParams();
@@ -115,8 +118,14 @@ export function MessageRow({
               body={m.key === undefined ? "(no key)" : prettyValue(m.key, m.key_encoding)}
               empty={m.key === undefined}
               action={
-                m.key_masked && (
+                m.key_masked ? (
                   <MaskedBadge title="Key modified by a data_masking rule" label="masked" />
+                ) : (
+                  m.key && (
+                    <FilterButton onClick={() => onFilter({ kind: "key", value: m.key ?? "" })}>
+                      Search by key
+                    </FilterButton>
+                  )
                 )
               }
             />
@@ -124,13 +133,7 @@ export function MessageRow({
               label={`headers${m.headers ? ` · ${fmt.number(Object.keys(m.headers).length)}` : ""}`}
               body={
                 m.headers && Object.keys(m.headers).length > 0 ? (
-                  maskedHeaders.size > 0 ? (
-                    <HeaderLines headers={m.headers} masked={maskedHeaders} />
-                  ) : (
-                    Object.entries(m.headers)
-                      .map(([k, v]) => `${k}: ${v}`)
-                      .join("\n")
-                  )
+                  <HeaderLines headers={m.headers} masked={maskedHeaders} onFilter={onFilter} />
                 ) : (
                   "(no headers)"
                 )
@@ -250,28 +253,74 @@ function DetailSection({
   );
 }
 
-/** Header lines with a masked marker on the values masking redacted. */
+/**
+ * Header lines with a masked marker on the values masking redacted, and
+ * actions that search for the header or its value. A masked value offers
+ * the header search only: its redacted form would match every masked record.
+ */
 function HeaderLines({
   headers,
   masked,
+  onFilter,
 }: {
   headers: Record<string, string>;
   masked: Set<string>;
+  onFilter: (filter: FieldFilter) => void;
 }) {
   return (
     <ul className="max-h-96 space-y-0.5 overflow-auto rounded-md bg-subtle p-3 font-mono text-[11px] leading-relaxed">
       {Object.entries(headers).map(([k, v]) => (
-        <li key={k} data-testid="header-line" className="break-all whitespace-pre-wrap">
-          {`${k}: ${v}`}
-          {masked.has(k) && (
-            <>
-              {" "}
-              <MaskedBadge title="Header value modified by a data_masking rule" />
-            </>
-          )}
+        <li key={k} data-testid="header-line" className="flex items-start gap-2">
+          <span className="min-w-0 flex-1 break-all whitespace-pre-wrap">
+            {`${k}: ${v}`}
+            {masked.has(k) && (
+              <>
+                {" "}
+                <MaskedBadge title="Header value modified by a data_masking rule" />
+              </>
+            )}
+          </span>
+          <span className="flex shrink-0 select-none gap-1">
+            {!masked.has(k) && (
+              <FilterButton
+                aria-label={`Search by value of header ${k}`}
+                onClick={() => onFilter({ kind: "header", key: k, value: v })}
+              >
+                Search by value
+              </FilterButton>
+            )}
+            <FilterButton
+              aria-label={`Search by header ${k}`}
+              onClick={() => onFilter({ kind: "header", key: k })}
+            >
+              Search by header
+            </FilterButton>
+          </span>
         </li>
       ))}
     </ul>
+  );
+}
+
+/** A small action that turns the key or a header into a search. */
+function FilterButton({
+  children,
+  onClick,
+  "aria-label": ariaLabel,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  "aria-label"?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      className="rounded border border-border px-2 py-1 font-sans text-[11px] text-muted hover:border-border-hover hover:text-text"
+    >
+      {children}
+    </button>
   );
 }
 

@@ -6,16 +6,17 @@ import { useTimeRangeState } from "./use-time-range-state";
 /**
  * Inputs of the search panel. `topic` scopes the manual-mode flag: once the
  * user picks a mode for a topic, `preselectMode` leaves it alone until
- * another topic is shown. A path or value already typed also keeps the
- * current mode, so reopening the panel never reinterprets it.
+ * another topic is shown. A path, header key or value already typed also
+ * keeps the current mode, so reopening the panel never reinterprets it.
  */
 export function useSearchForm(topic: string) {
   const [mode, setModeState] = useState<SearchMode>("contains");
   const [path, setPath] = useState("");
+  const [headerKey, setHeaderKey] = useState("");
   const [op, setOp] = useState<SearchOp>("contains");
   const [needle, setNeedle] = useState("");
   const [modeTouchedFor, setModeTouchedFor] = useState<string | null>(null);
-  const modeTouched = modeTouchedFor === topic || path !== "" || needle !== "";
+  const modeTouched = modeTouchedFor === topic || path !== "" || headerKey !== "" || needle !== "";
   const setMode = useCallback(
     (next: SearchMode) => {
       setModeTouchedFor(topic);
@@ -42,6 +43,8 @@ export function useSearchForm(topic: string) {
     preselectMode,
     path,
     setPath,
+    headerKey,
+    setHeaderKey,
     op,
     setOp,
     needle,
