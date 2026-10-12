@@ -1,6 +1,7 @@
 import { Link, Outlet } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Boxes, FileJson, Moon, Search, Server, Shield, Sun, Users } from "lucide-react";
+import { CompareTray } from "@/features/messages/compare/CompareTray";
 import { ClusterPill } from "./ClusterPill";
 import { openCommandPalette } from "./CommandPalette";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -191,6 +192,7 @@ export function Shell() {
       <main className="flex-1">
         <Outlet />
       </main>
+      <CompareTray />
     </div>
   );
 }

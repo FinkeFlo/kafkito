@@ -1,4 +1,16 @@
 import { type CompareOptions, DEFAULT_COMPARE_OPTIONS } from "@/lib/message-compare";
+import type { MessageRef } from "@/lib/message-reference";
+
+declare module "@tanstack/history" {
+  interface HistoryState {
+    /**
+     * History index of the page the compare page was opened from; its Close
+     * button goes back there. Set when navigating to /compare, carried over
+     * by every navigation on it.
+     */
+    compareOrigin?: number;
+  }
+}
 
 export type CompareView = "exact" | "semantic";
 
@@ -55,4 +67,13 @@ export function optionsSearch(
     anyElementOrder: opts.ignoreChildOrder ? true : undefined,
     kafkitoHeaders: opts.ignoreKafkitoHeaders ? undefined : true,
   };
+}
+
+/** Link props for the message list of `ref`'s topic, starting at its offset. */
+export function messageListLink(ref: MessageRef) {
+  return {
+    to: "/clusters/$cluster/topics/$topic/messages",
+    params: { cluster: ref.cluster, topic: ref.topic },
+    search: { partition: ref.partition, limit: 50, from: "offset", msgOffset: ref.offset },
+  } as const;
 }

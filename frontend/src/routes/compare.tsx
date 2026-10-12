@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { GitCompareArrows } from "lucide-react";
+import { createFileRoute, useRouter, useRouterState } from "@tanstack/react-router";
+import { GitCompareArrows, X } from "lucide-react";
 import { useMemo } from "react";
+import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
@@ -12,6 +13,7 @@ import {
   type CompareView,
   compareOptions,
   compareView,
+  messageListLink,
   optionsSearch,
   parseCompareSearch,
 } from "@/features/messages/compare/compare-search";
@@ -33,6 +35,8 @@ const VIEW_OPTIONS: { value: CompareView; content: string; title: string }[] = [
 function ComparePage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
+  const router = useRouter();
+  const historyState = useRouterState({ select: (s) => s.location.state });
   const view = compareView(search);
   const { anyArrayOrder, anyElementOrder, kafkitoHeaders } = search;
   // Stable across renders so the comparison is only recomputed on a change.
@@ -45,8 +49,26 @@ function ComparePage() {
   const refB = parseMessageRef(search.b ?? "");
   const fingerprintB = refB ? null : parseFingerprint(search.b ?? "");
 
-  const update = (patch: Partial<CompareSearch>) =>
-    void navigate({ search: (prev: CompareSearch) => ({ ...prev, ...patch }), replace: true });
+  // Every navigation on this page keeps the index of the page it was
+  // opened from, so Close can return there after any number of compares.
+  const update = (patch: Partial<CompareSearch>, replace = true) =>
+    void navigate({
+      search: (prev: CompareSearch) => ({ ...prev, ...patch }),
+      replace,
+      state: (prev) => ({ compareOrigin: prev.compareOrigin }),
+    });
+  const close = () => {
+    const origin = historyState.compareOrigin;
+    const current = historyState.__TSR_index;
+    if (origin !== undefined && current > origin) {
+      router.history.go(origin - current);
+    } else if (refA) {
+      // Opened from a bookmark or a pasted link: nothing in this tab to go back to.
+      void navigate(messageListLink(refA));
+    } else {
+      void navigate({ to: "/clusters", search: { cluster: undefined } });
+    }
+  };
   const setOptions = (next: CompareOptions, nextView: CompareView = view) =>
     update(optionsSearch(next, nextView));
   const takeOffset = (side: "A" | "B", offset: number) => {
@@ -62,13 +84,23 @@ function ComparePage() {
         eyebrow="Messages"
         title="Compare messages"
         subtitle="Check whether two records match: exactly as stored, or semantically, with JSON key order and XML attribute order ignored."
+        actions={
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={close}
+            leadingIcon={<X className="h-4 w-4" />}
+          >
+            Close
+          </Button>
+        }
       />
 
       <CompareForm
         key={`${search.a ?? ""}|${search.b ?? ""}`}
         a={search.a}
         b={search.b}
-        onSubmit={(a, b) => void navigate({ search: (prev: CompareSearch) => ({ ...prev, a, b }) })}
+        onSubmit={(a, b) => update({ a, b }, false)}
       />
 
       {fingerprintB ? (
@@ -117,7 +149,7 @@ function ComparePage() {
         <EmptyState
           icon={GitCompareArrows}
           title="Pick two messages"
-          description="Use Compare… on a message in a topic, or enter a cluster, topic, partition and offset for each side above. Copy reference on a message gives you a reference to paste."
+          description="Open a message in a topic and choose Select for compare, then Compare with selected on another message. Or enter a cluster, topic, partition and offset for each side above."
         />
       ) : fingerprintB ? (
         <FingerprintPanel
