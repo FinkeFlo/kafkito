@@ -125,6 +125,28 @@
             "if": "Bash(git *)",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-git.sh",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "if": "Bash(git *)",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-session-links.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "if": "Bash(gh *)",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-session-links.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__github__(create_.*|update_.*|add_.*|push_files|issue_write|sub_issue_write|pull_request_review_write|merge_pull_request|delete_file)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-session-links.sh",
+            "timeout": 10
           }
         ]
       }
@@ -141,6 +163,16 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/design-token-guard.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__github__(create_pull_request|add_issue_comment|add_reply_to_pull_request_comment|add_comment_to_pending_review|pull_request_review_write|issue_write)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check-session-footer.sh",
             "timeout": 10
           }
         ]
