@@ -3,8 +3,8 @@ module github.com/FinkeFlo/kafkito
 go 1.26.0
 
 require (
-	github.com/antchfx/xmlquery v1.5.1
-	github.com/antchfx/xpath v1.3.8
+	github.com/antchfx/xmlquery v1.5.2
+	github.com/antchfx/xpath v1.3.9
 	github.com/dop251/goja v0.0.0-20260719185829-0fc1d42c1dc9
 	github.com/getkin/kin-openapi v0.149.0
 	github.com/go-chi/chi/v5 v5.3.2
@@ -13,7 +13,7 @@ require (
 	github.com/knadh/koanf/providers/env v1.1.0
 	github.com/knadh/koanf/providers/file v1.2.1
 	github.com/knadh/koanf/providers/structs v1.0.1
-	github.com/knadh/koanf/v2 v2.3.7
+	github.com/knadh/koanf/v2 v2.3.8
 	github.com/lestrrat-go/jwx/v3 v3.3.0
 	github.com/oapi-codegen/nethttp-middleware v1.2.0
 	github.com/oapi-codegen/runtime v1.7.0
@@ -24,7 +24,7 @@ require (
 	github.com/twmb/franz-go/pkg/kadm v1.19.0
 	github.com/twmb/franz-go/pkg/kfake v0.0.0-20260812145205-b8814509d953
 	github.com/twmb/franz-go/pkg/kmsg v1.14.0
-	golang.org/x/sync v0.23.0
+	golang.org/x/sync v0.24.0
 )
 
 require (
