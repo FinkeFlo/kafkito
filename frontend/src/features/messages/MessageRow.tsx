@@ -14,6 +14,7 @@ import { CompareAction } from "@/features/messages/compare/CompareAction";
 import { AuditSnapshotAction } from "@/features/messages/AuditSnapshotAction";
 import { ValueBody } from "@/features/messages/ValueBody";
 import { MaskedBadge } from "@/features/messages/MaskedBadge";
+import { HeaderLines, RecordKey } from "@/features/messages/FilterableFields";
 import type { FieldFilter } from "@/features/messages/use-click-to-filter";
 
 const routeApi = getRouteApi("/clusters/$cluster/topics/$topic/messages");
@@ -138,17 +139,23 @@ export function MessageRow({
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <DetailSection
               label={`key · ${m.key === undefined ? "none" : m.key_encoding}`}
-              body={m.key === undefined ? "(no key)" : prettyValue(m.key, m.key_encoding)}
+              body={
+                m.key === undefined ? (
+                  "(no key)"
+                ) : m.key_masked ? (
+                  prettyValue(m.key, m.key_encoding)
+                ) : (
+                  <RecordKey
+                    display={prettyValue(m.key, m.key_encoding)}
+                    value={m.key}
+                    onFilter={onFilter}
+                  />
+                )
+              }
               empty={m.key === undefined}
               action={
-                m.key_masked ? (
+                m.key_masked && (
                   <MaskedBadge title="Key modified by a data_masking rule" label="masked" />
-                ) : (
-                  m.key && (
-                    <FilterButton onClick={() => onFilter({ kind: "key", value: m.key ?? "" })}>
-                      Search by key
-                    </FilterButton>
-                  )
                 )
               }
             />
@@ -156,6 +163,7 @@ export function MessageRow({
               headers={m.headers}
               masked={maskedHeaders}
               id={`headers-${m.partition}-${m.offset}`}
+              onFilter={onFilter}
             />
           </div>
           <DetailSection
@@ -261,16 +269,19 @@ function DetailSection({
 
 /**
  * The headers of a message, collapsed to a one-line toggle until the user
- * opens them: they often outnumber and outsize the key.
+ * opens them: they often outnumber and outsize the key. Open, a header's key
+ * and value start a search when clicked.
  */
 function HeadersSection({
   headers,
   masked,
   id,
+  onFilter,
 }: {
   headers: Record<string, string> | undefined;
   masked: Set<string>;
   id: string;
+  onFilter: (filter: FieldFilter) => void;
 }) {
   const fmt = useFormatters();
   const [open, setOpen] = useState(false);
@@ -290,38 +301,8 @@ function HeadersSection({
         </span>
         headers · <span className="tabular-nums">{fmt.number(entries.length)}</span>
       </button>
-      {open && (
-        <ul
-          id={id}
-          className="max-h-96 space-y-0.5 overflow-auto rounded-md bg-subtle p-3 font-mono text-[11px] leading-relaxed text-text"
-        >
-          {entries.map(([k, v]) => (
-            <li key={k} data-testid="header-line" className="break-all whitespace-pre-wrap">
-              {`${k}: ${v}`}
-              {masked.has(k) && (
-                <>
-                  {" "}
-                  <MaskedBadge title="Header value modified by a data_masking rule" />
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      {open && <HeaderLines id={id} headers={headers ?? {}} masked={masked} onFilter={onFilter} />}
     </div>
-  );
-}
-
-/** A small action that turns the key into a search. */
-function FilterButton({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded border border-border px-2 py-1 font-sans text-[11px] text-muted hover:border-border-hover hover:text-text"
-    >
-      {children}
-    </button>
   );
 }
 

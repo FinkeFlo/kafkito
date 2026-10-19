@@ -171,6 +171,22 @@ const STATES: State[] = [
     },
   },
   {
+    // One record with a masked key and two headers, one of them masked: axe
+    // sees the clickable header keys and values stacked in the expanded row.
+    name: "message-headers-expanded",
+    path: `/clusters/${c}/topics/e2e-masked-kh/messages`,
+    ready: async (page) => {
+      await h1(page, "e2e-masked-kh");
+      await expect(page.getByTestId("message-row")).toHaveCount(1);
+    },
+    open: async (page) => {
+      const row = page.getByTestId("message-row");
+      await row.getByRole("button").first().click();
+      await row.getByRole("button", { name: /headers · / }).click();
+      await expect(page.getByTestId("header-line").first()).toBeVisible();
+    },
+  },
+  {
     ...route("topic-messages"),
     name: "message-compare-selection",
     open: async (page) => {

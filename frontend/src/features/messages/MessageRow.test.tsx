@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-router";
 import type { Message } from "@/lib/api";
 import { MessageRow } from "./MessageRow";
+import type { FieldFilter } from "./use-click-to-filter";
 
 const message: Message = {
   partition: 0,
@@ -24,12 +25,12 @@ const message: Message = {
   masked_headers: ["authorization"],
 } as Message;
 
-function renderRow(m: Message = message) {
+function renderRow(m: Message = message, onFilter: (f: FieldFilter) => void = () => {}) {
   const root = createRootRoute();
   const page = createRoute({
     getParentRoute: () => root,
     path: "/clusters/$cluster/topics/$topic/messages",
-    component: () => <MessageRow m={m} onPick={() => {}} onFilter={() => {}} />,
+    component: () => <MessageRow m={m} onPick={() => {}} onFilter={onFilter} />,
   });
   const router = createRouter({
     routeTree: root.addChildren([page]),
@@ -73,15 +74,20 @@ describe("MessageRow headers", () => {
     expect(within(lines[1]).getByText("masked")).toBeVisible();
   });
 
-  it("offers no per-header search buttons", async () => {
-    renderRow();
+  it("searches by a header's key or value once the headers are open", async () => {
+    const onFilter = vi.fn();
+    renderRow(message, onFilter);
     const row = await screen.findByTestId("message-row");
     await userEvent.click(within(row).getAllByRole("button")[0]);
-    await userEvent.click(within(row).getByRole("button", { name: /headers · 2/ }));
+    expect(within(row).queryByRole("button", { name: "Search by header trace-id" })).toBeNull();
 
-    expect(within(row).queryByRole("button", { name: /search by header/i })).toBeNull();
-    expect(within(row).queryByRole("button", { name: /search by value/i })).toBeNull();
-    expect(within(row).getByRole("button", { name: "Search by key" })).toBeVisible();
+    await userEvent.click(within(row).getByRole("button", { name: /headers · 2/ }));
+    await userEvent.click(within(row).getByRole("button", { name: "Search by header trace-id" }));
+    await userEvent.click(within(row).getByRole("button", { name: "Search by trace-id = t-1" }));
+
+    expect(onFilter).toHaveBeenNthCalledWith(1, { kind: "header", key: "trace-id" });
+    expect(onFilter).toHaveBeenNthCalledWith(2, { kind: "header", key: "trace-id", value: "t-1" });
+    expect(within(row).queryByRole("button", { name: /^Search by authorization =/ })).toBeNull();
   });
 
   it("says when a message has no headers", async () => {

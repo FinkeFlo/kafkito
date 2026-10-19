@@ -23,13 +23,37 @@ const fields = ({ form }: ReturnType<typeof setup>["result"]["current"]) => ({
 afterEach(cleanup);
 
 describe("useClickToFilter", () => {
-  it("turns the record key into a key search and opens the panel", () => {
+  it("turns a header value into a header search and opens the panel", () => {
     const { result, openSearch } = setup();
-    act(() => result.current.click.handleFilter({ kind: "key", value: "ord-77" }));
+    act(() => result.current.click.handleFilter({ kind: "header", key: "x-trace", value: "t-1" }));
 
     expect(openSearch).toHaveBeenCalled();
-    expect(fields(result.current)).toMatchObject({ mode: "key", op: "eq", needle: "ord-77" });
+    expect(fields(result.current)).toMatchObject({
+      mode: "header",
+      headerKey: "x-trace",
+      op: "eq",
+      needle: "t-1",
+    });
     expect(result.current.click.showUndo).toBe(false);
+  });
+
+  it("searches for the header's presence without a value", () => {
+    const { result } = setup();
+    act(() => result.current.click.handleFilter({ kind: "header", key: "x-trace" }));
+
+    expect(fields(result.current)).toMatchObject({
+      mode: "header",
+      headerKey: "x-trace",
+      op: "exists",
+      needle: "",
+    });
+  });
+
+  it("turns the record key into a key search", () => {
+    const { result } = setup();
+    act(() => result.current.click.handleFilter({ kind: "key", value: "ord-77" }));
+
+    expect(fields(result.current)).toMatchObject({ mode: "key", op: "eq", needle: "ord-77" });
   });
 
   it("offers undo when it replaced typed input, and undo restores the mode too", () => {
@@ -42,7 +66,7 @@ describe("useClickToFilter", () => {
     });
     const before = fields(result.current);
 
-    act(() => result.current.click.handleFilter({ kind: "key", value: "ord-77" }));
+    act(() => result.current.click.handleFilter({ kind: "header", key: "x-trace", value: "t-1" }));
     expect(result.current.click.showUndo).toBe(true);
 
     act(() => result.current.click.undo());
