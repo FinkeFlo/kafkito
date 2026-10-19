@@ -105,7 +105,7 @@ func TestRequestValidator_RuleTexts_JSONSchema2020(t *testing.T) {
 			}
 			assert.Equal(t, http.StatusBadRequest, rec.Code)
 			assert.JSONEq(t, `{"code":"invalid_request","error":`+jsonString(t, tc.want)+`}`, rec.Body.String())
-			assert.Empty(t, schemaFieldOf(t, doc, "/rules", tc.body),
+			assert.False(t, fromBuiltinValidator(t, doc, "/rules", tc.body),
 				"the 2020-12 validator (message-string errors) must produce this error")
 		})
 	}
@@ -143,17 +143,18 @@ func TestRequestValidator_RuleTexts_EmbeddedSpec(t *testing.T) {
 			h.ServeHTTP(rec, req)
 			assert.Equal(t, http.StatusBadRequest, rec.Code)
 			assert.JSONEq(t, `{"code":"invalid_request","error":`+jsonString(t, tc.want)+`}`, rec.Body.String())
-			assert.NotEmpty(t, schemaFieldOf(t, doc, "/api/v1/clusters/_test", tc.body),
+			assert.True(t, fromBuiltinValidator(t, doc, "/api/v1/clusters/_test", tc.body),
 				"the built-in validator (structured errors) must produce this error")
 		})
 	}
 	assert.NotContains(t, logs.String(), ruleValue)
 }
 
-// schemaFieldOf validates a JSON POST body against doc directly and returns
-// the SchemaField of the innermost schema error, which is empty for errors of
-// the JSON Schema 2020-12 validator.
-func schemaFieldOf(t *testing.T, doc *openapi3.T, path, body string) string {
+// fromBuiltinValidator validates a JSON POST body against doc directly and
+// reports whether the innermost schema error carries its schema, which only
+// errors of the built-in (OpenAPI 3.0) validator do; those of the JSON Schema
+// 2020-12 validator carry a message only.
+func fromBuiltinValidator(t *testing.T, doc *openapi3.T, path, body string) bool {
 	t.Helper()
 	cp := *doc
 	cp.Servers = nil
@@ -169,7 +170,7 @@ func schemaFieldOf(t *testing.T, doc *openapi3.T, path, body string) string {
 	})
 	var se *openapi3.SchemaError
 	require.ErrorAs(t, err, &se)
-	return innermostSchemaError(se).SchemaField
+	return innermostSchemaError(se).Schema != nil
 }
 
 func jsonString(t *testing.T, s string) string {
