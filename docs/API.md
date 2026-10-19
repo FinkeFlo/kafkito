@@ -24,7 +24,7 @@ endpoints that back the web UI — stable, documented, scriptable.
   (including `401` until the signing keys load) and the rules a token must
   meet (`alg`, `kid`, `exp`, `sub`, `iss`, `aud`, and optionally `typ` and
   `azp` in mode `oidc`) are listed in the README
-  under [Auth modes](https://github.com/FinkeFlo/kafkito/blob/main/README.md#auth-modes).
+  under [Auth modes](configuration.md#auth-modes).
 - The verified JWT principal is the RBAC identity. The identity header
   (`X-Kafkito-User` by default, configurable via `rbac.identity.header`) is
   only consulted when no principal is present on the request; a
@@ -53,7 +53,7 @@ endpoints that back the web UI — stable, documented, scriptable.
   arrays, so new fields can be added without breaking clients.
 - Every response (API, UI and static files) carries the security headers
   listed in the README under
-  [Security headers](https://github.com/FinkeFlo/kafkito/blob/main/README.md#security-headers),
+  [Security headers](configuration.md#security-headers),
   including a strict `Content-Security-Policy`.
 - Every `/api` response, errors and the copy event stream included, carries
   `Cache-Control: no-store`.

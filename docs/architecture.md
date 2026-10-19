@@ -37,7 +37,7 @@ mounts each generated operation on the middleware chain it needs.
   OpenID Connect discovery unless it is configured, and a failed discovery
   stops startup (`internal/auth/oidc_discovery.go`). The modes, their startup
   and IdP-outage behaviour and the token rules are listed in the README under
-  [Auth modes](https://github.com/FinkeFlo/kafkito/blob/main/README.md#auth-modes);
+  [Auth modes](configuration.md#auth-modes);
   see also the [API reference](API.md#base-url-and-auth).
 - **RBAC** (`internal/rbac`, `internal/server/rbac.go`) maps the matched
   route pattern and method to a `type:action` permission and checks the
@@ -182,7 +182,7 @@ inline scripts or styles), `X-Content-Type-Options`, `Referrer-Policy`,
 `Cross-Origin-Opener-Policy` and, unless framing is allowed,
 `X-Frame-Options` (`internal/server/secheaders.go`). The exact values and the
 `frame_ancestors` setting are in the
-[README](https://github.com/FinkeFlo/kafkito/blob/main/README.md#security-headers).
+[Configuration](configuration.md#security-headers).
 Responses under `/api`, errors and the copy event stream included, also
 carry `Cache-Control: no-store` (`noStoreMiddleware` on the `/api` router);
 the SPA shell and its assets keep their own caching.
