@@ -64,6 +64,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         type: "feature",
         title: "Message headers start collapsed and open on demand",
       },
+      {
+        type: "fix",
+        title: "Click a message's key, header key or header value to search by it",
+      },
     ],
   },
   {
