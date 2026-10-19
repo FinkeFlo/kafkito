@@ -246,13 +246,15 @@ func describeRequestError(re *openapi3filter.RequestError) string {
 // description of the violated rule, derived from the schema only.
 //
 // OpenAPI 3.1 documents are validated with a JSON Schema 2020-12 validator
-// whose errors carry nothing but a message of the form
-// `error at "<pointer>": <detail>`, with nested causes as a MultiError.
-// The detail embeds the offending value, so only its keyword is recognised
-// and the rule is rebuilt from the parts that stem from the schema.
+// whose errors carry no schema, only a message (see splitSchemaReason),
+// with nested causes as a MultiError. Since kin-openapi 0.151 they also name
+// the failing keyword in SchemaField, so the missing Schema is what tells
+// them apart from the built-in validator's errors. The detail embeds the
+// offending value, so only its keyword is recognised and the rule is rebuilt
+// from the parts that stem from the schema.
 func describeSchemaError(se *openapi3.SchemaError) (string, string) {
 	se = innermostSchemaError(se)
-	if se.SchemaField != "" {
+	if se.SchemaField != "" && se.Schema != nil {
 		return jsonPointer(se.JSONPointer()), describeSchemaField(se)
 	}
 	ptr, detail := splitSchemaReason(se.Reason)
@@ -285,7 +287,17 @@ func innermostSchemaError(se *openapi3.SchemaError) *openapi3.SchemaError {
 //
 //	error at "<pointer>": at '<pointer>': <detail>
 //	at '': <detail>
+//
+// kin-openapi 0.151 and later report the validator's own output instead,
+// whose first cause line is used:
+//
+//	jsonschema validation failed with '<schema>'
+//	- at '<pointer>': <detail>
 func splitSchemaReason(reason string) (string, string) {
+	if head, causes, ok := strings.Cut(reason, "\n"); ok && strings.HasPrefix(head, "jsonschema validation failed") {
+		first, _, _ := strings.Cut(causes, "\n")
+		reason = strings.TrimPrefix(strings.TrimSpace(first), "- ")
+	}
 	ptr := ""
 	if rest, ok := strings.CutPrefix(reason, `error at "`); ok {
 		if end := strings.Index(rest, `": `); end >= 0 {
