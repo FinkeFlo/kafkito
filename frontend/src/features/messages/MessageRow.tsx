@@ -11,6 +11,7 @@ import { Tag } from "@/components/ui/Tag";
 import { sameMessage, useCompareSelection } from "@/lib/compare-selection";
 import { ReplayModal } from "@/features/messages/ReplayModal";
 import { CompareAction } from "@/features/messages/compare/CompareAction";
+import { AuditSnapshotAction } from "@/features/messages/AuditSnapshotAction";
 import { ValueBody } from "@/features/messages/ValueBody";
 import { MaskedBadge } from "@/features/messages/MaskedBadge";
 import { HeaderLines, RecordKey } from "@/features/messages/FilterableFields";
@@ -133,6 +134,7 @@ export function MessageRow({
               Replay to…
             </button>
             <CompareAction target={target} />
+            <AuditSnapshotAction m={m} cluster={cluster} topic={topic} />
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <DetailSection
@@ -157,16 +159,11 @@ export function MessageRow({
                 )
               }
             />
-            <DetailSection
-              label={`headers${m.headers ? ` · ${fmt.number(Object.keys(m.headers).length)}` : ""}`}
-              body={
-                m.headers && Object.keys(m.headers).length > 0 ? (
-                  <HeaderLines headers={m.headers} masked={maskedHeaders} onFilter={onFilter} />
-                ) : (
-                  "(no headers)"
-                )
-              }
-              empty={!m.headers || Object.keys(m.headers).length === 0}
+            <HeadersSection
+              headers={m.headers}
+              masked={maskedHeaders}
+              id={`headers-${m.partition}-${m.offset}`}
+              onFilter={onFilter}
             />
           </div>
           <DetailSection
@@ -235,6 +232,8 @@ export function MessageRow({
   );
 }
 
+const SECTION_LABEL = "text-[10px] font-semibold uppercase tracking-wider text-subtle-text";
+
 function DetailSection({
   label,
   body,
@@ -249,9 +248,7 @@ function DetailSection({
   return (
     <div>
       <div className="mb-1 flex items-center justify-between gap-2">
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-subtle-text">
-          {label}
-        </div>
+        <div className={SECTION_LABEL}>{label}</div>
         {action}
       </div>
       {typeof body === "string" ? (
@@ -266,6 +263,45 @@ function DetailSection({
       ) : (
         <div className={empty ? "italic text-subtle-text" : "text-text"}>{body}</div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The headers of a message, collapsed to a one-line toggle until the user
+ * opens them: they often outnumber and outsize the key. Open, a header's key
+ * and value start a search when clicked.
+ */
+function HeadersSection({
+  headers,
+  masked,
+  id,
+  onFilter,
+}: {
+  headers: Record<string, string> | undefined;
+  masked: Set<string>;
+  id: string;
+  onFilter: (filter: FieldFilter) => void;
+}) {
+  const fmt = useFormatters();
+  const [open, setOpen] = useState(false);
+  const entries = Object.entries(headers ?? {});
+  if (entries.length === 0) return <DetailSection label="headers" body="(no headers)" empty />;
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls={id}
+        className={`mb-1 inline-flex cursor-pointer items-center gap-1 ${SECTION_LABEL} hover:text-text`}
+      >
+        <span className="font-mono" aria-hidden="true">
+          {open ? "▾" : "▸"}
+        </span>
+        headers · <span className="tabular-nums">{fmt.number(entries.length)}</span>
+      </button>
+      {open && <HeaderLines id={id} headers={headers ?? {}} masked={masked} onFilter={onFilter} />}
     </div>
   );
 }

@@ -180,7 +180,9 @@ const STATES: State[] = [
       await expect(page.getByTestId("message-row")).toHaveCount(1);
     },
     open: async (page) => {
-      await page.getByTestId("message-row").getByRole("button").first().click();
+      const row = page.getByTestId("message-row");
+      await row.getByRole("button").first().click();
+      await row.getByRole("button", { name: /headers · / }).click();
       await expect(page.getByTestId("header-line").first()).toBeVisible();
     },
   },

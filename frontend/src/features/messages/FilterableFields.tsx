@@ -14,16 +14,21 @@ const pickable = "min-w-6 cursor-pointer rounded px-0.5 py-1 text-left hover:bg-
  * masked record.
  */
 export function HeaderLines({
+  id,
   headers,
   masked,
   onFilter,
 }: {
+  id?: string;
   headers: Record<string, string>;
   masked: Set<string>;
   onFilter: (filter: FieldFilter) => void;
 }) {
   return (
-    <ul className="max-h-96 space-y-0.5 overflow-auto rounded-md bg-subtle p-3 font-mono text-[11px] leading-relaxed">
+    <ul
+      id={id}
+      className="max-h-96 space-y-0.5 overflow-auto rounded-md bg-subtle p-3 font-mono text-[11px] leading-relaxed text-text"
+    >
       {Object.entries(headers).map(([k, v]) => (
         <li key={k} data-testid="header-line" className="break-all whitespace-pre-wrap">
           <button

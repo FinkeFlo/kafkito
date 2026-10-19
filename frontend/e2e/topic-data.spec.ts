@@ -74,7 +74,10 @@ test.describe("Topic data (produce, search, raw download, bulk copy)", () => {
     await page.goto(topicPath(PRODUCE_TOPIC, "messages"));
     const row = page.getByTestId("message-row").filter({ hasText: needle });
     await row.getByRole("button").first().click();
-    await expect(row.getByText("headers · 3")).toBeVisible();
+    // Headers start collapsed; the toggle names their count.
+    const headersToggle = row.getByRole("button", { name: /headers · 3/ });
+    await expect(headersToggle).toHaveAttribute("aria-expanded", "false");
+    await headersToggle.click();
     await expect(row).toContainText("X-Kafkito-Source: true");
     await expect(row).toContainText(`e2e-trace: ${needle}`);
     await expect(row).toContainText("X-Kafkito-User: ");
