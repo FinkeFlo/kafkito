@@ -1,0 +1,1717 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Public documentation for kafkito">
+      
+      
+      
+      
+        <link rel="prev" href="../ui/workflows/">
+      
+      
+        <link rel="next" href="../API/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/branding/icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Configuration - kafkito</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#configuration" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="kafkito" class="md-header__button md-logo" aria-label="kafkito" data-md-component="logo">
+      
+  <img src="../assets/branding/icon.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            kafkito
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Configuration
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/FinkeFlo/kafkito" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../ui/getting-started-ui/" class="md-tabs__link">
+          
+  
+  
+  UI Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Configuration
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../API/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../data-masking/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Data Masking
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../architecture/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Architecture
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../DESIGN_GUIDELINES/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Design Guidelines
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../adr/0001-greenfield-apache2/" class="md-tabs__link">
+          
+  
+  
+  Architecture Decisions
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="kafkito" class="md-nav__button md-logo" aria-label="kafkito" data-md-component="logo">
+      
+  <img src="../assets/branding/icon.svg" alt="logo">
+
+    </a>
+    kafkito
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/FinkeFlo/kafkito" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    UI Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ui/getting-started-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ui/add-cluster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Cluster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ui/features-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ui/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Settings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Server
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clusters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clusters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#log-level-and-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log level and format
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#auth-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auth modes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Auth modes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        off
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mock
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#oidc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        oidc
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#xsuaa" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        xsuaa
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-loading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key loading
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#token-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Token rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-headers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security headers
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../API/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-masking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Masking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DESIGN_GUIDELINES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Guidelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Decisions
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture Decisions
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0001-greenfield-apache2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0001
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0002-tech-stack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0002
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0003-cloud-foundry-readiness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0003
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0004-xsuaa-build-tag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0004
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0005-openapi-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0005
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Settings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Server
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clusters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clusters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#log-level-and-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log level and format
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#auth-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auth modes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Auth modes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        off
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mock
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#oidc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        oidc
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#xsuaa" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        xsuaa
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-loading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key loading
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#token-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Token rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-headers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security headers
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/FinkeFlo/kafkito/edit/main/docs/configuration.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h1>
+<p>kafkito reads an optional YAML file (<code>--config</code> or <code>KAFKITO_CONFIG</code>) and
+<code>KAFKITO_*</code> environment variables. Later sources win:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>built-in defaults → YAML file → KAFKITO_* variables → $PORT
+</code></pre></div>
+<p>Every setting is checked at startup; an invalid value logs the reason and
+exits with code 2. An invalid listen address (for example <code>PORT=abc</code>) fails
+the same way.</p>
+<p>Per-cluster data masking rules (<code>clusters[].data_masking</code>, for record values,
+keys and headers) are described in <a href="../data-masking/">Data Masking</a>.</p>
+<h2 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">&para;</a></h2>
+<p>Each setting names the environment variable, then its YAML key and default.</p>
+<h3 id="server">Server<a class="headerlink" href="#server" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>KAFKITO_SERVER_ADDR</code></strong> (YAML <code>server.addr</code>, default <code>:37421</code>)<br />
+  Listen address.</li>
+<li><strong><code>PORT</code></strong><br />
+  If set and non-empty, overrides <code>server.addr</code> with <code>:$PORT</code> (Cloud Foundry, Heroku). Environment only.</li>
+<li><strong><code>KAFKITO_TEST_CONNECTION_TIMEOUT</code></strong> (YAML <code>server.test_connection_timeout</code>, default <code>15s</code>)<br />
+  Go duration (<code>30s</code>, <code>2m</code>) for the private-cluster <strong>Test connection</strong> probe. <code>0</code> means the default; invalid or negative values fail startup.</li>
+<li><strong><code>KAFKITO_SERVER_FRAME_ANCESTORS</code></strong> (YAML <code>server.frame_ancestors</code>, default <code>'none'</code>)<br />
+  CSP <code>frame-ancestors</code> source list, see <a href="#security-headers">Security headers</a>.</li>
+</ul>
+<h3 id="clusters">Clusters<a class="headerlink" href="#clusters" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>KAFKITO_KAFKA_BROKERS</code></strong><br />
+  Shortcut when no <code>clusters</code> are configured: defines one cluster named <code>local</code> from a comma-separated broker list. Environment only.</li>
+<li><strong><code>KAFKITO_PRIVATE_CLUSTERS</code></strong> (YAML <code>private_clusters.mode</code>, default <code>on</code>)<br />
+  Who may use <a href="../architecture/#private-clusters">private clusters</a>: <code>on</code> (every user), <code>off</code> (nobody) or <code>role</code> (RBAC subjects with the permission <code>private_cluster:use</code>; needs <code>rbac.enabled</code>). Case-insensitive; a YAML boolean counts as <code>on</code>/<code>off</code>. Other values fail startup.</li>
+<li><strong><code>KAFKITO_PRIVATE_CLUSTERS_ALLOW_PLAIN_WITHOUT_TLS</code></strong> (YAML <code>private_clusters.allow_plain_without_tls</code>, default <code>false</code>)<br />
+<code>true</code> lets private clusters use SASL/PLAIN without TLS, which sends the password in clear text; by default such a definition gets <code>400 plain_without_tls</code>. Meant for local development brokers. Configured clusters are not affected; kafkito logs a startup warning for each configured cluster with SASL/PLAIN without TLS or <code>insecure_skip_verify</code>. Values other than a boolean fail startup.</li>
+</ul>
+<h3 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>KAFKITO_AUTH_MODE</code></strong> (YAML <code>auth.mode</code>, default <code>off</code>)<br />
+<code>oidc</code> or <code>mock</code> (every build), <code>xsuaa</code> (<code>-btp</code> build) or <code>off</code> (only <code>-tags devauth</code> builds such as the <code>-local</code> image). A mode the build cannot serve fails startup, so the default and <code>-btp</code> builds need this set. See <a href="#auth-modes">Auth modes</a>.</li>
+<li><strong><code>KAFKITO_AUTH_OIDC_ISSUER_URL</code></strong> (YAML <code>auth.oidc.issuer_url</code>)<br />
+  Mode <code>oidc</code>, required: the exact <code>iss</code> of accepted tokens and the base for discovery. <code>https</code> (plain <code>http</code> only on a loopback host), no query or fragment.</li>
+<li><strong><code>KAFKITO_AUTH_OIDC_AUDIENCE</code></strong> (YAML <code>auth.oidc.audience</code>)<br />
+  Mode <code>oidc</code>, required: a value the token's <code>aud</code> must contain. Use the identifier of the kafkito API, not the client ID of the auth proxy.</li>
+<li><strong><code>KAFKITO_AUTH_OIDC_JWKS_URL</code></strong> (YAML <code>auth.oidc.jwks_url</code>)<br />
+  Mode <code>oidc</code>: the signing-key (JWKS) URL. Empty means discovery at startup. Same URL rule as the issuer.</li>
+<li><strong><code>KAFKITO_AUTH_OIDC_REQUIRED_TYP</code></strong> (YAML <code>auth.oidc.required_typ</code>)<br />
+  Mode <code>oidc</code>: when set (for example <code>at+jwt</code>), tokens must carry this <code>typ</code> header.</li>
+<li><strong><code>KAFKITO_AUTH_OIDC_ALLOWED_AZP</code></strong> (YAML <code>auth.oidc.allowed_azp</code>)<br />
+  Mode <code>oidc</code>: when set, a comma-separated list (YAML: a list) of accepted <code>azp</code> values; tokens without <code>azp</code> are rejected.</li>
+<li><strong><code>KAFKITO_INSECURE_AUTH_OFF</code></strong><br />
+<code>true</code> allows mode <code>off</code> on a non-loopback address. Ignored on Cloud Foundry, where <code>off</code> always fails startup. Environment only.</li>
+</ul>
+<h3 id="log-level-and-format">Log level and format<a class="headerlink" href="#log-level-and-format" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>KAFKITO_LOG_LEVEL</code></strong> (YAML <code>log.level</code>, default <code>info</code>)<br />
+<code>debug</code>, <code>info</code>, <code>warn</code> or <code>error</code>.</li>
+<li><strong><code>KAFKITO_LOG_FORMAT</code></strong> (YAML <code>log.format</code>, default <code>json</code>)<br />
+<code>json</code> or <code>text</code>; <code>make dev</code> uses <code>text</code>.</li>
+</ul>
+<h2 id="auth-modes">Auth modes<a class="headerlink" href="#auth-modes" title="Permanent link">&para;</a></h2>
+<p><code>KAFKITO_AUTH_MODE</code> (YAML <code>auth.mode</code>, case-sensitive, default <code>off</code>) picks
+how kafkito checks the bearer token on <code>/api/v1/*</code>; <code>/healthz</code> and <code>/readyz</code>
+are never authenticated. kafkito builds the validator before it listens and
+then logs <code>auth initialised</code> with the mode. An unknown mode, or one the build
+cannot serve, logs <code>auth init failed</code> at <code>error</code> and exits with code 2.</p>
+<p>kafkito has no login flow of its own: an auth proxy in front of it (for
+example oauth2-proxy, or the SAP approuter) handles the login and forwards
+the bearer token.</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Builds</th>
+<th>Use it for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>off</code></td>
+<td><code>-tags devauth</code> builds (<code>-local</code> image)</td>
+<td>Local evaluation and development</td>
+</tr>
+<tr>
+<td><code>mock</code></td>
+<td>every build</td>
+<td>Smoke-testing an image; every API request gets <code>401</code></td>
+</tr>
+<tr>
+<td><code>oidc</code></td>
+<td>every build</td>
+<td>Any OpenID Connect identity provider</td>
+</tr>
+<tr>
+<td><code>xsuaa</code></td>
+<td><code>-btp</code> builds</td>
+<td>SAP BTP with an XSUAA service binding</td>
+</tr>
+</tbody>
+</table>
+<h3 id="off"><code>off</code><a class="headerlink" href="#off" title="Permanent link">&para;</a></h3>
+<p>Every request gets the synthetic principal <code>dev-user</code>; no IdP is involved.
+Other builds exit with code 2. Startup also exits with code 2
+(<code>insecure auth configuration</code>) always on Cloud Foundry (<code>VCAP_APPLICATION</code>
+set), and on a non-loopback address unless <code>KAFKITO_INSECURE_AUTH_OFF=true</code>.</p>
+<h3 id="mock"><code>mock</code><a class="headerlink" href="#mock" title="Permanent link">&para;</a></h3>
+<p>Starts an issuer on a random <code>127.0.0.1</code> port with a signing key created at
+startup and loads its keys. No client can get a token, so every API request
+gets <code>401</code>. The issuer runs inside the process, so there is no external IdP
+that could fail.</p>
+<h3 id="oidc"><code>oidc</code><a class="headerlink" href="#oidc" title="Permanent link">&para;</a></h3>
+<p><strong>Startup.</strong> Needs <code>KAFKITO_AUTH_OIDC_ISSUER_URL</code> and
+<code>KAFKITO_AUTH_OIDC_AUDIENCE</code>; a missing value, or an issuer or JWKS URL that
+is not <code>https</code> (plain <code>http</code> only on a loopback host), exits with code 2.</p>
+<p>Without <code>KAFKITO_AUTH_OIDC_JWKS_URL</code>, kafkito reads
+<code>&lt;issuer&gt;/.well-known/openid-configuration</code> (10 s timeout, 1 MB limit, at
+most 5 redirects, none from <code>https</code> to <code>http</code>, each target following the same
+URL rule). Its <code>issuer</code> must equal the configured issuer exactly and its
+<code>jwks_uri</code> must follow the same URL rule (and be <code>https</code> when the issuer is).
+If that fails, kafkito logs <code>auth init failed</code> and exits with code 2.</p>
+<p>Then it loads the keys, waiting at most 5 s, and logs <code>auth initialised</code>
+with issuer, audience and JWKS URL.</p>
+<p><strong>IdP outage.</strong> At startup, failed discovery exits with code 2 (see above).
+When the keys do not load (with <code>KAFKITO_AUTH_OIDC_JWKS_URL</code> set, or after a
+successful discovery), kafkito logs <code>auth: JWKS warm-up failed; startup
+continues</code> at <code>warn</code> and serves; API requests get <code>401</code> until the keys load,
+and <code>/readyz</code> does not change. Later, requests keep working with the keys
+already loaded; a token signed with a new key gets <code>401</code> until the IdP
+answers again.</p>
+<h3 id="xsuaa"><code>xsuaa</code><a class="headerlink" href="#xsuaa" title="Permanent link">&para;</a></h3>
+<p><strong>Startup.</strong> Reads the first <code>xsuaa</code> binding from <code>VCAP_SERVICES</code>. A missing
+variable or binding, invalid JSON, or a binding without <code>url</code>, <code>uaadomain</code> or
+<code>xsappname</code> (or with a scheme or port in <code>uaadomain</code>) exits with code 2
+(<code>auth init failed</code>). Then it loads the keys from <code>&lt;url&gt;/token_keys</code>,
+waiting at most 5 s.</p>
+<p><strong>IdP outage.</strong> At startup, kafkito logs <code>auth: JWKS warm-up failed; startup
+continues</code> at <code>warn</code> (also when <code>&lt;url&gt;/token_keys</code> breaks the <code>jku</code> rules
+below) and serves; API requests get <code>401</code> until the keys load, and <code>/readyz</code>
+does not change. Later, requests keep working with the keys already loaded;
+a token signed with a new key, or naming a <code>jku</code> first seen during the
+outage, gets <code>401</code> until the IdP answers again.</p>
+<p>See <a href="../adr/0004-xsuaa-build-tag/">ADR-0004</a> for the build-tag rationale.</p>
+<h3 id="key-loading">Key loading<a class="headerlink" href="#key-loading" title="Permanent link">&para;</a></h3>
+<p>How <code>mock</code>, <code>oidc</code> and <code>xsuaa</code> load keys:</p>
+<ul>
+<li>One load per key URL runs at a time and all requests share it. A request
+  waits at most 5 s for it and then gets <code>401</code>; the load itself may take up
+  to 10 s, so a slow IdP still fills the cache for later requests.</li>
+<li>A load starts at most once per minute per URL: for the first keys, when a
+  token names a <code>kid</code> the cached keys lack (key rotation), or in the
+  background on the first request after the keys are 15 min old. Once that
+  load has ended, requests in the rest of the minute do not wait: without
+  keys they get <code>401</code> at once, and a token with an unknown <code>kid</code> is checked
+  against the cached keys and rejected.</li>
+<li>Nothing retries on a timer: after a failed start the next load begins with
+  the first API request at least a minute later.</li>
+<li>A failed load logs <code>jwks fetch failed</code> at <code>warn</code> and keeps the previous
+  keys. The URL is logged for the configured key URL only; key URLs taken
+  from a token (<code>xsuaa</code>) are not.</li>
+<li>A rejected token is logged only at <code>debug</code> (<code>auth validate failed</code>, with
+  the rule that failed and no claim values); the <code>401</code> itself appears in the
+  request log at <code>info</code>.</li>
+</ul>
+<h3 id="token-rules">Token rules<a class="headerlink" href="#token-rules" title="Permanent link">&para;</a></h3>
+<p>Tokens (<code>mock</code>, <code>oidc</code> and <code>xsuaa</code>) must meet all of these:</p>
+<ul>
+<li>A compact JWS with exactly one signature, a <code>kid</code> header and a JSON claim
+  set as payload.</li>
+<li>Header <code>alg</code> is one of <code>RS256</code>, <code>RS384</code>, <code>RS512</code>, <code>PS256</code>, <code>PS384</code>,
+  <code>PS512</code>, <code>ES256</code>, <code>ES384</code>, <code>ES512</code> or <code>EdDSA</code> (HMAC and <code>none</code> are always
+  rejected) and equals the key's <code>alg</code> when the key has one.</li>
+<li><code>exp</code> is present and not past; <code>nbf</code> and <code>iat</code>, when present, are checked
+  too, with 60 s clock skew allowed.</li>
+<li><code>sub</code> is a non-empty string and <code>aud</code> is present.</li>
+<li><code>mock</code>: <code>iss</code> equals the embedded issuer URL exactly, <code>aud</code> contains
+  <code>mock-client</code>.</li>
+<li><code>oidc</code>: <code>iss</code> equals <code>KAFKITO_AUTH_OIDC_ISSUER_URL</code> exactly (no
+  normalization, so a trailing slash counts), and <code>aud</code> contains
+  <code>KAFKITO_AUTH_OIDC_AUDIENCE</code>. With <code>KAFKITO_AUTH_OIDC_REQUIRED_TYP</code> set,
+  the <code>typ</code> header must match it (case-insensitive, an <code>application/</code> prefix
+  is ignored); with <code>KAFKITO_AUTH_OIDC_ALLOWED_AZP</code> set, <code>azp</code> must be one of
+  the listed values. Both are off by default. Set the audience to the
+  identifier of the kafkito API rather than the client ID of the auth proxy:
+  many IdPs put the client ID into the <code>aud</code> of ID tokens, and <code>required_typ</code>
+  (<code>at+jwt</code> for RFC 9068 access tokens) keeps ID tokens out where the IdP
+  sets <code>typ</code>. The RBAC identity is <code>user_name</code>, else <code>preferred_username</code>,
+  else <code>sub</code>; check that your IdP does not let users change the claim you
+  map RBAC subjects to.</li>
+<li><code>xsuaa</code>: <code>iss</code> is the binding <code>url</code> or a path below it, <code>aud</code> contains the
+  binding <code>clientid</code> or <code>xsappname</code>, <code>zid</code> equals the binding
+  <code>identityzoneid</code> when that is set, and the <code>jku</code> header is
+  <code>https://&lt;uaadomain or a subdomain&gt;/token_keys</code> (a DNS name, no port other
+  than 443, no user info, query or fragment). At most 16 different <code>jku</code>
+  URLs, the binding's own included, are accepted per process; tokens naming
+  further ones get <code>401</code>.</li>
+</ul>
+<h2 id="logging">Logging<a class="headerlink" href="#logging" title="Permanent link">&para;</a></h2>
+<p>kafkito logs to stdout via <code>log/slog</code>, one line per event; level and format
+are set under <a href="#log-level-and-format">Settings → Log level and format</a>.</p>
+<p>Every API request gets a request id (from <code>X-Vcap-Request-Id</code>,
+<code>traceparent</code> or <code>X-Request-Id</code>, else generated), echoed in the
+<code>X-Request-Id</code> response header and attached to its log lines. Server errors
+(5xx) log at <code>warn</code>, client errors (4xx) and requests slower than 2s at
+<code>info</code>, all other requests at <code>debug</code>; health probes and static assets are not
+logged, and query strings, headers and bodies never are.</p>
+<p>Warnings and errors can name the broker and Schema Registry addresses of the
+clusters involved, private clusters included (see
+<a href="../architecture/#private-clusters">Private clusters</a>); restrict who can
+read the logs accordingly.</p>
+<p>To see every request on SAP BTP Cloud Foundry temporarily:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>cf<span class="w"> </span>set-env<span class="w"> </span>&lt;app&gt;<span class="w"> </span><span class="nv">KAFKITO_LOG_LEVEL</span><span class="o">=</span>debug<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cf<span class="w"> </span>restart<span class="w"> </span>&lt;app&gt;
+</code></pre></div>
+<h2 id="security-headers">Security headers<a class="headerlink" href="#security-headers" title="Permanent link">&para;</a></h2>
+<p>Every response (API, UI and static files) carries:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>X-Content-Type-Options: nosniff
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>Referrer-Policy: no-referrer
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>Cross-Origin-Opener-Policy: same-origin
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>X-Frame-Options: DENY
+</code></pre></div>
+<p>Private-cluster credentials are kept in the browser (remembered passwords in
+localStorage, the others in the open tab), so the policy allows no inline
+scripts or styles and no third-party origins.</p>
+<p>API responses (<code>/api/...</code>, errors and the copy event stream included) also
+carry <code>Cache-Control: no-store</code>, so neither the browser nor a proxy keeps a
+copy of cluster data. The UI keeps its own caching: hashed files under
+<code>/assets/</code> are cached for a year, <code>index.html</code> is revalidated (<code>no-cache</code>).</p>
+<ul>
+<li><strong>Embedding in an iframe</strong> (e.g. an SAP BTP launchpad): set
+  <code>KAFKITO_SERVER_FRAME_ANCESTORS</code> (YAML <code>server.frame_ancestors</code>) to a
+  space-separated CSP source list, e.g. <code>'self' https://*.launchpad.example.com</code>.
+  <code>X-Frame-Options: DENY</code> is only sent while the value is <code>'none'</code>, because it
+  cannot express an allow-list.</li>
+<li><strong>HSTS</strong> is not set by kafkito: TLS is terminated by the upstream proxy or
+  router, which should send <code>Strict-Transport-Security</code> (see
+  <a href="../architecture/#running-behind-tls">Running behind TLS</a>).</li>
+<li><strong><code>make dev</code></strong> serves the UI through Vite, which sets none of these headers;
+  the policy only applies when the Go binary serves the UI (<code>make build</code>,
+  images, <code>make e2e</code>).</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

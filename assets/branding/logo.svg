@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 250" width="100%" height="100%">
+  <defs>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00E5FF" />
+      <stop offset="100%" stop-color="#007BFF" />
+    </linearGradient>
+
+    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF9100" />
+      <stop offset="100%" stop-color="#FF3D00" />
+    </linearGradient>
+
+    <style>
+      .logo-text {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-weight: 800;
+        font-size: 96px;
+        fill: #1E293B;
+      }
+      .logo-subtext {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-weight: 600;
+        font-size: 15px;
+        fill: #64748B;
+        letter-spacing: 4px;
+      }
+    </style>
+  </defs>
+
+  <g transform="translate(50, 40)">
+    <line x1="30" y1="20" x2="30" y2="150" stroke="url(#cyanGrad)" stroke-width="28" stroke-linecap="round" />
+    <line x1="45" y1="85" x2="120" y2="20" stroke="url(#orangeGrad)" stroke-width="28" stroke-linecap="round" />
+    <line x1="55" y1="80" x2="130" y2="150" stroke="url(#cyanGrad)" stroke-width="28" stroke-linecap="round" />
+
+    <circle cx="50" cy="85" r="22" fill="#1E293B" />
+    <circle cx="50" cy="85" r="8" fill="#FFFFFF" />
+  </g>
+
+  <text x="230" y="140" class="logo-text">kafkito</text>
+  <text x="235" y="180" class="logo-subtext">MONITORING &#8226; TESTING &#8226; MANAGING</text>
+</svg>
