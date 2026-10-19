@@ -3,28 +3,28 @@ module github.com/FinkeFlo/kafkito
 go 1.26.0
 
 require (
-	github.com/antchfx/xmlquery v1.5.1
-	github.com/antchfx/xpath v1.3.8
+	github.com/antchfx/xmlquery v1.5.2
+	github.com/antchfx/xpath v1.3.9
 	github.com/dop251/goja v0.0.0-20260719185829-0fc1d42c1dc9
-	github.com/getkin/kin-openapi v0.149.0
-	github.com/go-chi/chi/v5 v5.3.2
+	github.com/getkin/kin-openapi v0.151.0
+	github.com/go-chi/chi/v5 v5.5.0
 	github.com/hamba/avro/v2 v2.31.0
 	github.com/knadh/koanf/parsers/yaml v1.1.1
 	github.com/knadh/koanf/providers/env v1.1.0
 	github.com/knadh/koanf/providers/file v1.2.1
 	github.com/knadh/koanf/providers/structs v1.0.1
-	github.com/knadh/koanf/v2 v2.3.7
+	github.com/knadh/koanf/v2 v2.3.8
 	github.com/lestrrat-go/jwx/v3 v3.3.0
 	github.com/oapi-codegen/nethttp-middleware v1.2.0
 	github.com/oapi-codegen/runtime v1.7.0
 	github.com/ohler55/ojg v1.28.7
 	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go/modules/kafka v0.44.0
-	github.com/twmb/franz-go v1.22.1
+	github.com/twmb/franz-go v1.22.2
 	github.com/twmb/franz-go/pkg/kadm v1.19.0
 	github.com/twmb/franz-go/pkg/kfake v0.0.0-20260812145205-b8814509d953
-	github.com/twmb/franz-go/pkg/kmsg v1.14.0
-	golang.org/x/sync v0.23.0
+	github.com/twmb/franz-go/pkg/kmsg v1.15.0
+	golang.org/x/sync v0.24.0
 )
 
 require (
@@ -61,7 +61,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.20.0 // indirect
+	github.com/klauspost/compress v1.20.3 // indirect
 	github.com/knadh/koanf/maps v0.1.2 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.4 // indirect
 	github.com/lestrrat-go/dsig v1.4.0 // indirect
@@ -89,7 +89,7 @@ require (
 	github.com/oasdiff/yaml3 v0.0.14 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
-	github.com/pierrec/lz4/v4 v4.1.30 // indirect
+	github.com/pierrec/lz4/v4 v4.1.33 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
 	github.com/segmentio/asm v1.2.1 // indirect
