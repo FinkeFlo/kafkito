@@ -54,6 +54,30 @@ Pure formatting commits are listed in `.git-blame-ignore-revs`. GitHub skips
 them in blame views; locally run
 `git config blame.ignoreRevsFile .git-blame-ignore-revs` once per clone.
 
+## Local development
+
+Requires Go 1.26+, Bun 1.4+, and Docker.
+
+```sh
+make worktree-init    # writes .env.dev with a free port pair
+make dev              # Compose + backend (air) + frontend (Vite), one command
+```
+
+Open the Vite URL printed in the `[frontend]` stream
+(default `http://localhost:37422`). Backend changes under `cmd/`,
+`internal/`, or `api/` rebuild automatically; frontend changes hot-reload
+through Vite. Press Ctrl-C in the `make dev` terminal to stop both
+processes (the Compose stack stays up — tear it down with `make dev-down`).
+The backend listens on `127.0.0.1` only, because auth mode `off` requires a
+loopback address; Vite proxies `/api` to it.
+
+Multiple git worktrees can run `make dev` in parallel; each calls
+`make worktree-init` once to claim a free port pair, and they share the
+same Compose-backed Kafka and Schema Registry.
+
+From an IDE, running `air` directly works too — `.air.toml` loads
+`.env.dev` itself, as long as you've run `make worktree-init` once.
+
 ## Pre-commit hooks
 
 Optional. `.pre-commit-config.yaml` defines lean hooks that only look at

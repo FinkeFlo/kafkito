@@ -44,8 +44,8 @@ edit `internal/server/api/server.gen.go` or `frontend/src/lib/api.gen.ts`.
    in `frontend/src/lib/queries/<resource>.ts` keyed with
    `clusterKey(cluster)`; writes use `useMutation` and invalidate the
    factory keys. `cd frontend && bun run lint && bun run test`.
-7. **Docs.** `docs/API.md` for user-facing operations; the README
-   configuration table for a new setting.
+7. **Docs.** `docs/API.md` for user-facing operations; the settings
+   tables in `docs/configuration.md` for a new setting.
 
 Finish with `make check`, and run the `api-contract-reviewer` subagent on the
 diff.

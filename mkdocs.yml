@@ -58,6 +58,7 @@ nav:
       - Add Cluster: ui/add-cluster.md
       - Features Overview: ui/features-overview.md
       - Workflows: ui/workflows.md
+  - Configuration: configuration.md
   - API: API.md
   - Data Masking: data-masking.md
   - Architecture: architecture.md

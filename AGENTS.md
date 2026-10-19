@@ -102,7 +102,7 @@ prefer additive changes and call out intentional breaks in the PR.
   or credentials; private-cluster addresses are logged on purpose, the raw
   `X-Kafkito-Cluster` header never.
 - New settings go through `internal/config` with startup validation and a
-  row in the README configuration table.
+  row in the settings tables of `docs/configuration.md`.
 
 ## Security invariants (details in `docs/architecture.md`)
 

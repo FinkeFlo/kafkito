@@ -65,7 +65,7 @@ Record key: Mode `Record key`, then an operator and a value, for example `regex`
 
 From a message: expand it and click the key, or open its headers (**Headers · n**, collapsed by default) and click a header's key (records carrying that header) or value (that exact value), the same way you click a field in the JSON view. A masked header value is not clickable. The search panel opens filled in; **Undo** restores what you had typed before.
 
-Test evidence: **Audit snapshot** on an expanded message downloads a PNG with the capture date and time, the signed-in user and email, the cluster name (tagged `[PROD]` for production clusters), topic, partition, offset, record time, key, the exact `kfp1` fingerprint (paste it into Compare to check a record against it) and the value. Masked parts stay masked; a truncated value is shown as its 64 KB preview with a note.
+Test evidence: **Audit snapshot** on an expanded message downloads a PNG of the record with date, time, user, cluster and topic; see [Workflow 7](#workflow-7-capture-a-message-as-test-evidence-audit-snapshot).
 
 Notes:
 - JSONPath filters select nodes; use `exists` to match messages where the expression finds at least one node.
@@ -217,3 +217,83 @@ Above 4 MB only the 64 KB preview is compared, and the verdict says so.
 ![Selecting a message for compare](../assets/screenshots/ui-message-compare-select.png)
 
 ![Message compare view](../assets/screenshots/ui-message-compare.png)
+
+---
+
+## Workflow 7: Capture a message as test evidence (Audit snapshot)
+
+**What do I see?**
+
+An expanded message in **Topics → Topic-Name → Messages** has an
+**Audit snapshot** button in its action bar, next to **Replay to…** and
+**Select for compare**.
+
+![Audit snapshot button on an expanded message](../assets/screenshots/ui-audit-snapshot-action.png)
+
+**What can I do?**
+
+1. Pick the cluster in the cluster switcher and open
+   **Topics → Topic-Name → Messages**.
+2. Find the record: set partition, `From` and range, or use **Search**
+   (see [Workflow 1](#workflow-1-find-a-message-in-a-topic)).
+3. Click the row to expand the message.
+4. Click **Audit snapshot**. The browser downloads a PNG; nothing is stored
+   on the server.
+5. Attach the PNG to the test case, ticket or audit record.
+
+The file is named
+`kafkito-audit-<cluster>-<topic>-p<partition>-o<offset>-<YYYYMMDDTHHMMSS>.png`,
+for example `kafkito-audit-local-demo.orders-p0-o4-20261019T194059.png`, so
+several snapshots sort by cluster, topic and time in a folder.
+
+**What is in the snapshot?**  
+
+![Example of an Audit snapshot PNG](../assets/screenshots/ui-audit-snapshot-example.png)
+
+| Field | Content |
+|---|---|
+| **Captured** | Date and time of the click, with milliseconds and UTC offset |
+| **Captured by** | User name and email of the signed-in user, `—` without authentication |
+| **Cluster** | Cluster name as shown in kafkito, followed by `[PROD]` for production clusters. Broker addresses are never shown |
+| **Topic**, **Partition**, **Offset** | Where the record is stored; together they identify it uniquely |
+| **Record time** | Kafka timestamp of the record, with UTC offset |
+| **Key** | Record key, `(no key)` if it has none |
+| **Fingerprint** | `kfp1:x:<sha256>` over key, value and headers |
+| **Note** | Only when it applies: masking, or a value shown as a preview |
+| **Value** | The value, pretty-printed for JSON and XML |
+
+Headers are not part of the image; they are covered by the fingerprint.
+
+**Checking a snapshot later**
+
+The fingerprint makes the image verifiable. Open **Compare** with the record
+as message A (**Select for compare**, then **Enter message B**) and paste the
+`kfp1:…` value from the image as message B. *Identical* confirms that the
+record in Kafka still matches the snapshot byte for byte (see
+[Workflow 6](#workflow-6-compare-two-messages-across-topics-or-clusters)).
+
+**Good to know**
+
+- The image is always light, also in dark mode, so it prints and files well.
+- Times follow the **Timezone** setting in the user menu (`Local` or `UTC`);
+  the UTC offset is always printed. The time in the file name is the
+  browser's local time.
+- The snapshot holds what the message row shows. Values changed by a
+  `data_masking` rule stay masked and get a note. A value above 64 KB is
+  shown as its preview with a note and the full size; the fingerprint then
+  reads `— (reason)`, because it needs the complete value.
+- Long values are wrapped at 120 characters and cut after 1500 lines; the
+  image says how many lines are left out. Use **Copy value** or
+  **Download raw** for the complete value.
+- The fingerprint is computed in the browser and needs a secure context:
+  kafkito served over HTTPS or on `localhost`.
+
+**When should I use this?**  
+Use it whenever a test, an acceptance or an audit needs proof that a
+specific record was in a specific topic on a specific cluster at a given
+time, for example as evidence for an auditor or for a test protocol.
+
+**Expected result**  
+A self-contained PNG that names cluster, topic, position, time and the
+person who captured it, shows the value and carries a fingerprint to check it
+against the live record.
