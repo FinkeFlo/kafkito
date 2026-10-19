@@ -51,6 +51,22 @@ export const MAX_CHANGELOG_DESCRIPTION_LENGTH = 160;
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.4.0",
+    date: "2026-10-19",
+    items: [
+      {
+        type: "feature",
+        title: "Audit snapshot: download a message as PNG for test evidence",
+        description:
+          "Shows capture time, user, cluster, topic, offset, fingerprint and the value. Masked values stay masked.",
+      },
+      {
+        type: "feature",
+        title: "Message headers start collapsed and open on demand",
+      },
+    ],
+  },
+  {
     version: "1.3.2",
     date: "2026-10-10",
     items: [
