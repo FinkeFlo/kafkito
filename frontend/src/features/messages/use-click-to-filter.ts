@@ -3,14 +3,8 @@ import type { SearchMode, SearchOp } from "@/lib/api";
 import { buildJsonPath, wildcardArrayIndices, type Token } from "@/lib/path-builder";
 import type { SearchForm } from "./use-search-form";
 
-/**
- * A click on the key or a header of a message: search for that key, for a
- * header with that value, or (without a value) for records carrying the
- * header.
- */
-export type FieldFilter =
-  | { kind: "key"; value: string }
-  | { kind: "header"; key: string; value?: string };
+/** A click on the key of a message: search for records with that key. */
+export type FieldFilter = { kind: "key"; value: string };
 
 type UndoToast = {
   previous: { mode: SearchMode; path: string; headerKey: string; op: SearchOp; needle: string };
@@ -19,7 +13,7 @@ type UndoToast = {
 
 /**
  * Click-to-filter: a click on a value in a message turns it into a JSONPath
- * search, a click on the key or a header into a key or header search, with a
+ * search, a click on the key into a key search, with a
  * short-lived undo when it replaced earlier input.
  */
 export function useClickToFilter(form: SearchForm, openSearch: () => void) {
@@ -65,14 +59,8 @@ export function useClickToFilter(form: SearchForm, openSearch: () => void) {
   const handleFilter = (f: FieldFilter) =>
     replace(() => {
       setMode(f.kind);
-      if (f.kind === "header") setHeaderKey(f.key);
-      if (f.value !== undefined) {
-        setOp("eq");
-        setNeedle(f.value);
-      } else {
-        setOp("exists");
-        setNeedle("");
-      }
+      setOp("eq");
+      setNeedle(f.value);
     });
 
   const undo = () => {

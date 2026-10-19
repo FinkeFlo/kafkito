@@ -63,7 +63,9 @@ Header (one header by its key):
 
 Record key: Mode `Record key`, then an operator and a value, for example `regex` and `^ord-`.
 
-From a message: expand it and use **Search by key** next to the key, or **Search by value** and **Search by header** next to a header line. The search panel opens filled in; **Undo** restores what you had typed before.
+From a message: expand it and use **Search by key** next to the key, or click a field in a JSON value. The search panel opens filled in; **Undo** restores what you had typed before. An expanded message shows its headers collapsed; click **Headers · n** to open them.
+
+Test evidence: **Audit snapshot** on an expanded message downloads a PNG with the capture date and time, the signed-in user and email, the cluster name (tagged `[PROD]` for production clusters), topic, partition, offset, record time, key, the exact `kfp1` fingerprint (paste it into Compare to check a record against it) and the value. Masked parts stay masked; a truncated value is shown as its 64 KB preview with a note.
 
 Notes:
 - JSONPath filters select nodes; use `exists` to match messages where the expression finds at least one node.

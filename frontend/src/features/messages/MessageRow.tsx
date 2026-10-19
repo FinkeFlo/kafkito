@@ -11,6 +11,7 @@ import { Tag } from "@/components/ui/Tag";
 import { sameMessage, useCompareSelection } from "@/lib/compare-selection";
 import { ReplayModal } from "@/features/messages/ReplayModal";
 import { CompareAction } from "@/features/messages/compare/CompareAction";
+import { AuditSnapshotAction } from "@/features/messages/AuditSnapshotAction";
 import { ValueBody } from "@/features/messages/ValueBody";
 import { MaskedBadge } from "@/features/messages/MaskedBadge";
 import type { FieldFilter } from "@/features/messages/use-click-to-filter";
@@ -132,6 +133,7 @@ export function MessageRow({
               Replay to…
             </button>
             <CompareAction target={target} />
+            <AuditSnapshotAction m={m} cluster={cluster} topic={topic} />
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <DetailSection
@@ -150,16 +152,10 @@ export function MessageRow({
                 )
               }
             />
-            <DetailSection
-              label={`headers${m.headers ? ` · ${fmt.number(Object.keys(m.headers).length)}` : ""}`}
-              body={
-                m.headers && Object.keys(m.headers).length > 0 ? (
-                  <HeaderLines headers={m.headers} masked={maskedHeaders} onFilter={onFilter} />
-                ) : (
-                  "(no headers)"
-                )
-              }
-              empty={!m.headers || Object.keys(m.headers).length === 0}
+            <HeadersSection
+              headers={m.headers}
+              masked={maskedHeaders}
+              id={`headers-${m.partition}-${m.offset}`}
             />
           </div>
           <DetailSection
@@ -228,6 +224,8 @@ export function MessageRow({
   );
 }
 
+const SECTION_LABEL = "text-[10px] font-semibold uppercase tracking-wider text-subtle-text";
+
 function DetailSection({
   label,
   body,
@@ -242,9 +240,7 @@ function DetailSection({
   return (
     <div>
       <div className="mb-1 flex items-center justify-between gap-2">
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-subtle-text">
-          {label}
-        </div>
+        <div className={SECTION_LABEL}>{label}</div>
         {action}
       </div>
       {typeof body === "string" ? (
@@ -264,69 +260,64 @@ function DetailSection({
 }
 
 /**
- * Header lines with a masked marker on the values masking redacted, and
- * actions that search for the header or its value. A masked value offers
- * the header search only: its redacted form would match every masked record.
+ * The headers of a message, collapsed to a one-line toggle until the user
+ * opens them: they often outnumber and outsize the key.
  */
-function HeaderLines({
+function HeadersSection({
   headers,
   masked,
-  onFilter,
+  id,
 }: {
-  headers: Record<string, string>;
+  headers: Record<string, string> | undefined;
   masked: Set<string>;
-  onFilter: (filter: FieldFilter) => void;
+  id: string;
 }) {
+  const fmt = useFormatters();
+  const [open, setOpen] = useState(false);
+  const entries = Object.entries(headers ?? {});
+  if (entries.length === 0) return <DetailSection label="headers" body="(no headers)" empty />;
   return (
-    <ul className="max-h-96 space-y-0.5 overflow-auto rounded-md bg-subtle p-3 font-mono text-[11px] leading-relaxed">
-      {Object.entries(headers).map(([k, v]) => (
-        <li key={k} data-testid="header-line" className="flex items-start gap-2">
-          <span className="min-w-0 flex-1 break-all whitespace-pre-wrap">
-            {`${k}: ${v}`}
-            {masked.has(k) && (
-              <>
-                {" "}
-                <MaskedBadge title="Header value modified by a data_masking rule" />
-              </>
-            )}
-          </span>
-          <span className="flex shrink-0 select-none gap-1">
-            {!masked.has(k) && (
-              <FilterButton
-                aria-label={`Search by value of header ${k}`}
-                onClick={() => onFilter({ kind: "header", key: k, value: v })}
-              >
-                Search by value
-              </FilterButton>
-            )}
-            <FilterButton
-              aria-label={`Search by header ${k}`}
-              onClick={() => onFilter({ kind: "header", key: k })}
-            >
-              Search by header
-            </FilterButton>
-          </span>
-        </li>
-      ))}
-    </ul>
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls={id}
+        className={`mb-1 inline-flex cursor-pointer items-center gap-1 ${SECTION_LABEL} hover:text-text`}
+      >
+        <span className="font-mono" aria-hidden="true">
+          {open ? "▾" : "▸"}
+        </span>
+        headers · <span className="tabular-nums">{fmt.number(entries.length)}</span>
+      </button>
+      {open && (
+        <ul
+          id={id}
+          className="max-h-96 space-y-0.5 overflow-auto rounded-md bg-subtle p-3 font-mono text-[11px] leading-relaxed text-text"
+        >
+          {entries.map(([k, v]) => (
+            <li key={k} data-testid="header-line" className="break-all whitespace-pre-wrap">
+              {`${k}: ${v}`}
+              {masked.has(k) && (
+                <>
+                  {" "}
+                  <MaskedBadge title="Header value modified by a data_masking rule" />
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
-/** A small action that turns the key or a header into a search. */
-function FilterButton({
-  children,
-  onClick,
-  "aria-label": ariaLabel,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  "aria-label"?: string;
-}) {
+/** A small action that turns the key into a search. */
+function FilterButton({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={ariaLabel}
       className="rounded border border-border px-2 py-1 font-sans text-[11px] text-muted hover:border-border-hover hover:text-text"
     >
       {children}

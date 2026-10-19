@@ -129,6 +129,7 @@ test.describe("Data masking", () => {
     await expect(row).toContainText("cust-***");
 
     await row.getByRole("button").first().click();
+    await row.getByRole("button", { name: /headers · / }).click();
     const lines = row.getByTestId("header-line");
     const auth = lines.filter({ hasText: "authorization:" });
     const trace = lines.filter({ hasText: "trace-id:" });
