@@ -18,33 +18,36 @@ test.describe("Reset Offsets walk (idle group fixture)", () => {
     const modal = page.getByRole("dialog", { name: /reset offsets/i });
     await expect(modal).toBeVisible();
 
-    const commitButton = modal.getByRole("button", { name: /commit reset/i });
-    // All partitions are selected by default, so commit is enabled up-front.
-    await expect(commitButton).toBeEnabled();
+    const reviewButton = modal.getByRole("button", { name: /review reset/i });
+    // All partitions are selected by default, so review is enabled up-front.
+    await expect(reviewButton).toBeEnabled();
 
     // Deselecting every partition re-enables the guard.
     await modal.getByRole("button", { name: /^none$/ }).click();
-    await expect(commitButton).toBeDisabled();
+    await expect(reviewButton).toBeDisabled();
     await expect(modal).toContainText(/pick at least one partition/i);
 
     // Re-select all partitions to proceed.
     await modal.getByRole("button", { name: /^all$/ }).click();
-    await expect(commitButton).toBeEnabled();
+    await expect(reviewButton).toBeEnabled();
 
-    await commitButton.click();
+    await reviewButton.click();
 
-    const confirm = page.getByRole("dialog", { name: /commit new offsets/i });
-    await expect(confirm).toBeVisible();
-    const confirmCommit = confirm.getByRole("button", { name: /commit reset/i });
+    // The review replaces the form inside the same dialog.
+    const confirmCommit = modal.getByRole("button", { name: /commit reset/i });
     await expect(confirmCommit).toBeDisabled();
 
-    const phraseInput = confirm.getByRole("textbox");
+    const phraseInput = modal.getByRole("textbox", { name: /type the group name/i });
     await phraseInput.fill(GROUP.slice(0, 5));
     await expect(confirmCommit).toBeDisabled();
     await phraseInput.fill(GROUP);
     await expect(confirmCommit).toBeEnabled();
 
+    // Escape steps back to the configuration; a second Escape closes the dialog.
     await page.keyboard.press("Escape");
-    await expect(confirm).toBeHidden();
+    await expect(phraseInput).toBeHidden();
+    await expect(reviewButton).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(modal).toBeHidden();
   });
 });

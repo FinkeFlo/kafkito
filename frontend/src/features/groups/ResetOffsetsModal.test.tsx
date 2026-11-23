@@ -69,14 +69,70 @@ describe("ResetOffsetsModal partition picker a11y", () => {
     expect(checkbox).not.toHaveClass("hidden");
   });
 
-  it("selects every partition by default and enables Commit reset", () => {
+  it("selects every partition by default and enables Review reset", () => {
     renderModal([0, 1, 2]);
 
     for (const p of [0, 1, 2]) {
       expect(screen.getByRole("checkbox", { name: new RegExp(`^p${p}$`) })).toBeChecked();
     }
     expect(screen.getByText(/3 of 3 selected/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /commit reset/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /review reset/i })).toBeEnabled();
+  });
+});
+
+describe("ResetOffsetsModal review step", () => {
+  beforeEach(() => {
+    resetGroupOffsets.mockReset();
+    resetGroupOffsets.mockImplementation((_c, _g, body: { dry_run: boolean }) =>
+      Promise.resolve({
+        group: "g1",
+        topic: "t1",
+        dry_run: body.dry_run,
+        results: [{ partition: 0, old_offset: 10, new_offset: 0, end_offset: 100 }],
+      }),
+    );
+  });
+
+  it("swaps the body for a summary in the same dialog and gates commit on the group name", async () => {
+    const user = userEvent.setup();
+    renderModal([0, 1]);
+
+    await user.click(screen.getByRole("button", { name: /review reset/i }));
+
+    // One dialog only: the review replaces the form instead of stacking a second modal.
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(screen.queryByRole("combobox", { name: /strategy/i })).not.toBeInTheDocument();
+    expect(screen.getByText("p0, p1")).toBeInTheDocument();
+
+    const input = screen.getByRole("textbox", { name: /type the group name/i });
+    await waitFor(() => expect(input).toHaveFocus());
+    const commit = screen.getByRole("button", { name: /commit reset/i });
+    expect(commit).toBeDisabled();
+    await user.type(input, "g");
+    expect(commit).toBeDisabled();
+    await user.type(input, "1");
+    expect(commit).toBeEnabled();
+
+    await user.click(commit);
+    const done = await screen.findByRole("button", { name: "Done" });
+    expect(done).toHaveAccessibleDescription(/offsets committed for 1 partition/i);
+    const body = resetGroupOffsets.mock.calls.at(-1)?.[2];
+    expect(body?.dry_run).toBe(false);
+    expect(body?.partitions).toEqual([0, 1]);
+  });
+
+  it("Escape and Back return to the configuration with the inputs kept", async () => {
+    const user = userEvent.setup();
+    renderModal([0, 1]);
+
+    await user.selectOptions(screen.getByRole("combobox", { name: /strategy/i }), "latest");
+    await user.click(screen.getByRole("button", { name: /review reset/i }));
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("combobox", { name: /strategy/i })).toHaveValue("latest");
+
+    await user.click(screen.getByRole("button", { name: /review reset/i }));
+    await user.click(screen.getByRole("button", { name: /back/i }));
+    expect(screen.getByRole("combobox", { name: /strategy/i })).toHaveValue("latest");
   });
 });
 

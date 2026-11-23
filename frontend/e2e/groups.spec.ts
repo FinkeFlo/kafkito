@@ -37,13 +37,11 @@ test.describe("Consumer group lifecycle", () => {
     const modal = page.getByRole("dialog", { name: /reset offsets/i });
     await expect(modal).toBeVisible();
     await modal.getByRole("combobox", { name: "Strategy" }).selectOption("latest");
+    await modal.getByRole("button", { name: /review reset/i }).click();
+    await modal.getByRole("textbox", { name: /type the group name/i }).fill(group);
     await modal.getByRole("button", { name: /commit reset/i }).click();
-    const confirm = page.getByRole("dialog", { name: /commit new offsets/i });
-    await expect(confirm).toBeVisible();
-    await confirm.getByRole("textbox").fill(group);
-    await confirm.getByRole("button", { name: /commit reset/i }).click();
     await expect(modal.getByText("Committed", { exact: true })).toBeVisible();
-    await modal.getByRole("button", { name: "Close" }).first().click();
+    await modal.getByRole("button", { name: "Done" }).click();
     await expect(modal).toBeHidden();
 
     // Delete the group.
