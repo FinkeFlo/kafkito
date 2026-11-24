@@ -136,8 +136,10 @@ In **Consumer groups** detail, you get the **Reset offsets…** action (enabled 
 3. Click **Reset offsets…**.  
 4. Choose `Topic` and `Strategy` (`earliest`, `latest`, `specific offset`, `timestamp`, `shift-by`).  
 5. Select partitions to update.  
-6. Review **Lag preview** before commit.  
-7. Click **Commit reset** and confirm.
+6. Check the **Lag preview**.  
+7. Click **Review reset**. The dialog shows a summary of group, topic, strategy, partitions and projected lag, and lists any selected partition that cannot be reset.  
+8. Type the group name and click **Commit reset**. **Back** or Escape returns to the settings.  
+9. The result step shows which partitions were committed and which failed.
 
 **When should I use this?**  
 Use it when you intentionally need to replay, skip, or realign consumption for a group.

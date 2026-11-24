@@ -158,7 +158,7 @@ test.describe("form errors are announced, not only coloured", () => {
 
     await offset.fill("abc");
     await expectFieldError(page, offset, "Enter a numeric offset.");
-    await expect(dialog.getByRole("button", { name: /commit reset/i })).toBeDisabled();
+    await expect(dialog.getByRole("button", { name: /review reset/i })).toBeDisabled();
 
     await offset.fill("0");
     await expectFieldValid(offset);
