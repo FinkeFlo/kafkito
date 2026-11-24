@@ -115,7 +115,7 @@ export function Modal({
     // Register this modal on the module-level stack. Both Escape and
     // the focus-trap Tab handler short-circuit when this entry is not
     // the topmost — that's how nested modals (e.g. ConfirmDialog inside
-    // ResetOffsetsModal) avoid double-closing or leaking Tab focus to
+    // ReplayModal) avoid double-closing or leaking Tab focus to
     // the outer panel.
     const stackEntry: ModalStackEntry = { id: Date.now() + Math.random() };
     modalStack.push(stackEntry);

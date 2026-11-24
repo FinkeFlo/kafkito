@@ -136,6 +136,73 @@ describe("ResetOffsetsModal review step", () => {
   });
 });
 
+describe("ResetOffsetsModal partition errors", () => {
+  const ok = (partition: number) => ({ partition, old_offset: 10, new_offset: 0, end_offset: 100 });
+  const failed = (partition: number) => ({
+    partition,
+    old_offset: -1,
+    new_offset: -1,
+    end_offset: 100,
+    error: "no committed offset to shift from",
+  });
+
+  function respond(preview: object[], commit: object[]) {
+    resetGroupOffsets.mockReset();
+    resetGroupOffsets.mockImplementation((_c, _g, body: { dry_run: boolean }) =>
+      Promise.resolve({
+        group: "g1",
+        topic: "t1",
+        dry_run: body.dry_run,
+        results: body.dry_run ? preview : commit,
+      }),
+    );
+  }
+
+  async function commitWithPhrase(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: /review reset/i }));
+    await user.type(screen.getByRole("textbox", { name: /type the group name/i }), "g1");
+    await user.click(screen.getByRole("button", { name: /commit reset/i }));
+    return screen.findByRole("button", { name: "Done" });
+  }
+
+  it("reports a partial commit instead of a plain success", async () => {
+    respond([ok(0), ok(1)], [ok(0), failed(1)]);
+    const user = userEvent.setup();
+    renderModal([0, 1]);
+
+    const done = await commitWithPhrase(user);
+    expect(done).toHaveAccessibleDescription(
+      /committed for 1 of 2 partitions\. 1 failed; see the errors below/i,
+    );
+    expect(screen.getByText("no committed offset to shift from")).toBeInTheDocument();
+  });
+
+  it("reports that nothing was committed when every partition failed", async () => {
+    respond([ok(0)], [failed(0)]);
+    const user = userEvent.setup();
+    renderModal([0]);
+
+    const done = await commitWithPhrase(user);
+    expect(done).toHaveAccessibleDescription(/no offsets were committed/i);
+    expect(screen.getByText("Not committed")).toBeInTheDocument();
+  });
+
+  it("blocks the commit when the preview says no selected partition can be reset", async () => {
+    respond([failed(0), failed(1)], []);
+    const user = userEvent.setup();
+    renderModal([0, 1]);
+
+    await screen.findAllByText("no committed offset to shift from", undefined, { timeout: 2000 });
+    await user.click(screen.getByRole("button", { name: /review reset/i }));
+
+    expect(screen.getByText("None of the selected partitions can be reset")).toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: /type the group name/i }), "g1");
+    const commit = screen.getByRole("button", { name: /commit reset/i });
+    expect(commit).toBeDisabled();
+    expect(commit).toHaveAccessibleDescription(/none of the selected partitions can be reset/i);
+  });
+});
+
 describe("ResetOffsetsModal timestamp strategy", () => {
   beforeEach(() => {
     resetGroupOffsets.mockReset();

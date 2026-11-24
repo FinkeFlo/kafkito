@@ -241,6 +241,53 @@ const STATES: State[] = [
     },
   },
   {
+    ...route("group-detail"),
+    name: "reset-offsets-review",
+    open: async (page) => {
+      await page.getByRole("button", { name: /^reset offsets/i }).click();
+      const dialog = page.getByRole("dialog", { name: /reset offsets/i });
+      await dialog.getByRole("button", { name: /review reset/i }).click();
+      await expect(dialog.getByRole("textbox", { name: /type the group name/i })).toBeVisible();
+    },
+  },
+  {
+    ...route("group-detail"),
+    name: "reset-offsets-done",
+    open: async (page) => {
+      // Abort-safe: the commit is answered here and never reaches the broker.
+      // One committed and one failed partition render the warning outcome.
+      await page.route("**/groups/*/reset-offsets", async (r) => {
+        const body = r.request().postDataJSON() as { dry_run?: boolean; topic?: string };
+        if (body.dry_run !== false) return r.continue();
+        return r.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            group: GROUP,
+            topic: body.topic,
+            dry_run: false,
+            results: [
+              { partition: 0, old_offset: 10, new_offset: 0, end_offset: 100 },
+              {
+                partition: 1,
+                old_offset: -1,
+                new_offset: -1,
+                end_offset: 100,
+                error: "e2e-failed-partition",
+              },
+            ],
+          }),
+        });
+      });
+      await page.getByRole("button", { name: /^reset offsets/i }).click();
+      const dialog = page.getByRole("dialog", { name: /reset offsets/i });
+      await dialog.getByRole("button", { name: /review reset/i }).click();
+      await dialog.getByRole("textbox", { name: /type the group name/i }).fill(GROUP);
+      await dialog.getByRole("button", { name: /commit reset/i }).click();
+      await expect(dialog.getByRole("button", { name: "Done" })).toBeVisible();
+    },
+  },
+  {
     ...route("security-acls"),
     name: "acl-create-modal",
     open: async (page) => {

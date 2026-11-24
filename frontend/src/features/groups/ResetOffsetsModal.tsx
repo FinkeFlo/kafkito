@@ -41,6 +41,14 @@ function sumKnown(values: (number | null)[]): number | null {
 
 type Step = "configure" | "review" | "done";
 
+function plural(n: number, word: string): string {
+  return n === 1 ? word : `${word}s`;
+}
+
+function Num({ value }: { value: number }) {
+  return <span className="font-mono tabular-nums">{value}</span>;
+}
+
 function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-[7rem_minmax(0,1fr)] items-baseline gap-3">
@@ -166,7 +174,6 @@ export function ResetOffsetsModal({
     onError: (e: Error) => setErr(e.message),
   });
 
-  const phraseOk = typed === detail.group_id;
   const canReview = selectedParts.length > 0 && strategyReady;
 
   // Each step swaps the body, so focus would fall back to <body>; move it to
@@ -188,7 +195,7 @@ export function ResetOffsetsModal({
   };
 
   const commit = async () => {
-    if (!phraseOk || commitMut.isPending) return;
+    if (!canCommit || commitMut.isPending) return;
     setErr(null);
     try {
       await commitMut.mutateAsync();
@@ -216,6 +223,19 @@ export function ResetOffsetsModal({
     previewRows && previewCurrent
       ? sumKnown(previewRows.map((r) => lagAfter(r, !!partSel[r.partition])))
       : null;
+  // Selected partitions the dry run says cannot be reset. When none of the
+  // selection is resettable, committing would write nothing, so it is blocked.
+  const previewFailures =
+    previewRows && previewCurrent ? previewRows.filter((r) => partSel[r.partition] && r.error) : [];
+  const nothingResettable =
+    previewFailures.length > 0 && previewFailures.length >= selectedParts.length;
+  const phraseOk = typed === detail.group_id;
+  const canCommit = phraseOk && !nothingResettable;
+
+  // The backend answers 200 even when some or all partitions fail, with a
+  // per-partition error; the outcome is derived from those rows.
+  const committedCount = result ? result.filter((r) => !r.error && r.new_offset >= 0).length : 0;
+  const failedCount = result ? result.length - committedCount : 0;
 
   const strategySummary: ReactNode = (() => {
     switch (strategy) {
@@ -247,7 +267,9 @@ export function ResetOffsetsModal({
   const renderLagPanel = () => (
     <div className="rounded-md border border-border bg-subtle p-2 text-xs">
       <div className="mb-1 flex items-center justify-between">
-        <span className="font-semibold">{result ? "Committed" : "Lag preview"}</span>
+        <span className="font-semibold">
+          {result ? (committedCount > 0 ? "Committed" : "Not committed") : "Lag preview"}
+        </span>
         {!result && previewQuery.isFetching && (
           <span className="text-[10px] text-subtle-text">updating…</span>
         )}
@@ -370,15 +392,17 @@ export function ResetOffsetsModal({
           type="submit"
           variant="danger"
           size="sm"
-          disabled={!phraseOk}
-          aria-describedby={phraseOk ? undefined : "reset-offsets-commit-reason"}
+          disabled={!canCommit}
+          aria-describedby={canCommit ? undefined : "reset-offsets-commit-reason"}
           loading={commitMut.isPending}
         >
           Commit reset
         </Button>
-        {!phraseOk && (
+        {!canCommit && (
           <span id="reset-offsets-commit-reason" className="sr-only">
-            Type the group name exactly to enable.
+            {nothingResettable
+              ? "None of the selected partitions can be reset."
+              : "Type the group name exactly to enable."}
           </span>
         )}
       </>
@@ -438,6 +462,29 @@ export function ResetOffsetsModal({
               <LagBadge value={projectedLag} />
             </SummaryRow>
           </dl>
+          {previewFailures.length > 0 && (
+            <Notice
+              intent={nothingResettable ? "danger" : "warning"}
+              title={
+                nothingResettable ? (
+                  "None of the selected partitions can be reset"
+                ) : (
+                  <>
+                    <Num value={previewFailures.length} /> of <Num value={selectedParts.length} />{" "}
+                    selected partitions cannot be reset
+                  </>
+                )
+              }
+            >
+              <ul className="space-y-0.5">
+                {previewFailures.map((r) => (
+                  <li key={r.partition}>
+                    <span className="font-mono">p{r.partition}</span>: {r.error}
+                  </li>
+                ))}
+              </ul>
+            </Notice>
+          )}
           <p className="text-muted">
             This overwrites the committed offsets of the selected partitions.
           </p>
@@ -479,11 +526,23 @@ export function ResetOffsetsModal({
       ) : step === "done" ? (
         <div className="space-y-4 text-sm">
           <div id="reset-offsets-done">
-            <Notice intent="success">
-              Offsets committed for{" "}
-              <span className="font-mono tabular-nums">{result?.length ?? 0}</span>{" "}
-              {result?.length === 1 ? "partition" : "partitions"}.
-            </Notice>
+            {failedCount === 0 ? (
+              <Notice intent="success">
+                Offsets committed for <Num value={committedCount} />{" "}
+                {plural(committedCount, "partition")}.
+              </Notice>
+            ) : committedCount === 0 ? (
+              <Notice intent="danger">
+                No offsets were committed. <Num value={failedCount} />{" "}
+                {plural(failedCount, "partition")} failed; see the errors below.
+              </Notice>
+            ) : (
+              <Notice intent="warning">
+                Offsets committed for <Num value={committedCount} /> of{" "}
+                <Num value={committedCount + failedCount} /> partitions. <Num value={failedCount} />{" "}
+                failed; see the errors below.
+              </Notice>
+            )}
           </div>
           {renderLagPanel()}
         </div>
